@@ -30,19 +30,19 @@
 - [x] Dashboard de receita — MRR, total orgs ativas, churn
 - [x] Painel React: `/master` com autenticação MASTER-only
 
-## Fase 3 — Onboarding de Escritórios + Billing Asaas
+## Fase 3 — Onboarding de Escritórios + Billing Asaas ✅
 ### Testes da Fase 3
-- [ ] `asaas.ts` — mock do client HTTP, testar criação de customer e subscription
-- [ ] `organizations.service.test.ts` — registro completo (org + admin + Asaas mockado)
-- [ ] `webhooks.routes.test.ts` — PAYMENT_CONFIRMED, PAYMENT_OVERDUE, SUSPENDED atualizam status corretamente
-- [ ] `checkSubscription.test.ts` — middleware bloqueia mutações em org suspensa
-- [ ] Client HTTP Asaas (`src/lib/asaas.ts`)
-- [ ] `POST /organizations/register` — cria org + admin + customer Asaas + subscription
-- [ ] `GET /organizations/plans` — listagem pública de planos
-- [ ] Webhook Asaas (`POST /webhooks/asaas`) — PAYMENT_CONFIRMED, PAYMENT_OVERDUE, SUSPENDED
-- [ ] Grace period automático (7 dias após PAYMENT_OVERDUE)
-- [ ] Painel `/org/subscription` — status atual + histórico + botão de troca de plano
-- [ ] Tela de cadastro público (landing → escolher plano → criar conta)
+- [x] `asaas.ts` — mock do client HTTP, testar criação de customer e subscription
+- [x] `organizations.service.test.ts` — registro completo (org + admin + Asaas mockado)
+- [x] `webhooks.routes.test.ts` — PAYMENT_CONFIRMED, PAYMENT_OVERDUE, SUSPENDED atualizam status corretamente
+- [x] `checkSubscription.test.ts` — middleware bloqueia mutações em org suspensa
+- [x] Client HTTP Asaas (`src/lib/asaas.ts`)
+- [x] `POST /organizations/register` — cria org + admin + customer Asaas + subscription
+- [x] `GET /organizations/plans` — listagem pública de planos
+- [x] Webhook Asaas (`POST /webhooks/asaas`) — PAYMENT_CONFIRMED, PAYMENT_OVERDUE, SUSPENDED
+- [x] Grace period automático (7 dias após PAYMENT_OVERDUE)
+- [x] Painel `/org/subscription` — status atual + histórico + botão de troca de plano
+- [x] Tela de cadastro público (landing → escolher plano → criar conta)
 
 ## Fase 4 — Core Kanban
 ### Testes da Fase 4
