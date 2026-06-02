@@ -20,15 +20,15 @@
 - [x] `GET /health`
 - [x] Seed: planos padrão (Starter/Pro/Enterprise) + usuário MASTER
 
-## Fase 2 — Master AutoHubs
+## Fase 2 — Master AutoHubs ✅
 ### Testes da Fase 2
-- [ ] `plans.service.test.ts` — CRUD de planos, soft delete
-- [ ] `plans.routes.test.ts` — acesso bloqueado para role != MASTER
-- [ ] `organizations.routes.test.ts` — listagem e gestão pelo Master
-- [ ] CRUD de planos (`/master/plans`)
-- [ ] Listagem e gestão de escritórios (`/master/organizations`)
-- [ ] Dashboard de receita — MRR, total orgs ativas, churn
-- [ ] Painel React: `/master` com autenticação MASTER-only
+- [x] `plans.service.test.ts` — CRUD de planos, soft delete
+- [x] `plans.routes.test.ts` — acesso bloqueado para role != MASTER
+- [x] `organizations.routes.test.ts` — listagem e gestão pelo Master
+- [x] CRUD de planos (`/master/plans`)
+- [x] Listagem e gestão de escritórios (`/master/organizations`)
+- [x] Dashboard de receita — MRR, total orgs ativas, churn
+- [x] Painel React: `/master` com autenticação MASTER-only
 
 ## Fase 3 — Onboarding de Escritórios + Billing Asaas
 ### Testes da Fase 3
