@@ -2,6 +2,7 @@ import Fastify from 'fastify'
 import corsPlugin from '@/plugins/cors'
 import rateLimitPlugin from '@/plugins/rate-limit'
 import { authRoutes } from '@/modules/auth/auth.routes'
+import { masterRoutes } from '@/modules/master/index'
 import { AppError } from '@/errors/AppError'
 
 export function buildApp() {
@@ -15,6 +16,7 @@ export function buildApp() {
   app.get('/health', async () => ({ status: 'ok' }))
 
   app.register(authRoutes, { prefix: '/auth' })
+  app.register(masterRoutes, { prefix: '/master' })
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof AppError) {
