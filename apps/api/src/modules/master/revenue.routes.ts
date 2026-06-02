@@ -1,4 +1,8 @@
 import type { FastifyInstance } from 'fastify'
+import { getRevenue } from '@/modules/master/revenue.service'
 
-// Implementation added in Task 5 (TDD)
-export async function revenueRoutes(_app: FastifyInstance) {}
+export async function revenueRoutes(app: FastifyInstance) {
+  app.get('/revenue', async (_req, reply) => {
+    return reply.send(await getRevenue())
+  })
+}
