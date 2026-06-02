@@ -84,6 +84,45 @@ export async function createMasterUser() {
   return { user, password }
 }
 
+export async function createTestBoard(organizationId: string, clientId: string) {
+  return prisma.board.create({
+    data: {
+      title: 'Test Board',
+      organizationId,
+      clientId,
+    },
+  })
+}
+
+export async function createTestColumn(
+  boardId: string,
+  overrides?: Partial<{ title: string; isFinal: boolean; position: number }>,
+) {
+  return prisma.column.create({
+    data: {
+      title: overrides?.title ?? (overrides?.isFinal ? 'Concluído' : 'Em Andamento'),
+      position: overrides?.position ?? 0,
+      isFinal: overrides?.isFinal ?? false,
+      boardId,
+    },
+  })
+}
+
+export async function createTestTask(
+  columnId: string,
+  creatorId: string,
+  overrides?: Partial<{ title: string; position: number }>,
+) {
+  return prisma.task.create({
+    data: {
+      title: overrides?.title ?? 'Test Task',
+      position: overrides?.position ?? 0,
+      columnId,
+      creatorId,
+    },
+  })
+}
+
 // Convenience: returns "Bearer <accessToken>"
 export async function getAuthHeader(email: string, password: string): Promise<string> {
   const res = await loginAs(email, password)
