@@ -1,0 +1,334 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Plan {
+  id           String   @id @default(cuid())
+  name         String
+  maxClients   Int
+  priceMonthly Decimal  @db.Decimal(10, 2)
+  features     Json
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  organizations Organization[]
+
+  @@map("plans")
+}
+
+model Organization {
+  id                  String             @id @default(cuid())
+  name                String
+  slug                String             @unique
+  cnpj                String?            @unique
+  email               String             @unique
+  phone               String?
+  planId              String
+  subscriptionStatus  SubscriptionStatus @default(TRIAL)
+  trialEndsAt         DateTime?
+  gracePeriodEndsAt   DateTime?
+  asaasCustomerId     String?
+  asaasSubscriptionId String?
+  isActive            Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  plan                Plan                  @relation(fields: [planId], references: [id])
+  users               User[]
+  clients             Client[]
+  boards              Board[]
+  notificationConfig  NotificationConfig?
+  messageTemplates    MessageTemplate[]
+  notificationLogs    NotificationLog[]
+  subscriptionHistory SubscriptionHistory[]
+
+  @@map("organizations")
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  GRACE_PERIOD
+  SUSPENDED
+  CANCELLED
+}
+
+model SubscriptionHistory {
+  id             String   @id @default(cuid())
+  organizationId String
+  event          String
+  planId         String?
+  amount         Decimal? @db.Decimal(10, 2)
+  asaasPaymentId String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("subscription_history")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  passwordHash   String
+  role           UserRole @default(ORG_MEMBER)
+  phone          String?
+  organizationId String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  assignedTasks Task[]       @relation("TaskAssignee")
+  createdTasks  Task[]       @relation("TaskCreator")
+  comments      Comment[]
+  attachments   Attachment[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  MASTER
+  ORG_ADMIN
+  ORG_MANAGER
+  ORG_MEMBER
+}
+
+model Client {
+  id             String   @id @default(cuid())
+  name           String
+  cnpj           String?
+  email          String
+  passwordHash   String
+  whatsapp       String?
+  organizationId String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  boards       Board[]
+  comments     Comment[]
+
+  @@unique([email, organizationId])
+  @@map("clients")
+}
+
+model Board {
+  id             String   @id @default(cuid())
+  title          String
+  description    String?
+  organizationId String
+  clientId       String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  client       Client       @relation(fields: [clientId], references: [id])
+  columns      Column[]
+
+  @@map("boards")
+}
+
+model Column {
+  id        String   @id @default(cuid())
+  title     String
+  position  Int
+  color     String?
+  isFinal   Boolean  @default(false)
+  boardId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@map("columns")
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  position    Int
+  priority    Priority   @default(MEDIUM)
+  status      TaskStatus @default(OPEN)
+  dueDate     DateTime?
+  columnId    String
+  assigneeId  String?
+  creatorId   String
+  tags        String[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  column      Column        @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  assignee    User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creator     User          @relation("TaskCreator", fields: [creatorId], references: [id])
+  comments    Comment[]
+  history     TaskHistory[]
+  attachments Attachment[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+  @@index([title])
+  @@map("tasks")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  REVIEW
+  DONE
+  CANCELLED
+}
+
+model Comment {
+  id         String            @id @default(cuid())
+  content    String
+  taskId     String
+  authorType CommentAuthorType
+  userId     String?
+  clientId   String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  task   Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id])
+  client Client? @relation(fields: [clientId], references: [id])
+
+  @@map("comments")
+}
+
+enum CommentAuthorType {
+  USER
+  CLIENT
+}
+
+model TaskHistory {
+  id        String   @id @default(cuid())
+  taskId    String
+  action    String
+  fromValue String?
+  toValue   String?
+  actorType String
+  actorId   String
+  actorName String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_history")
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  taskId     String
+  filename   String
+  mimeType   String
+  size       Int
+  storageKey String
+  uploadedBy String
+  createdAt  DateTime @default(now())
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader User @relation(fields: [uploadedBy], references: [id])
+
+  @@map("attachments")
+}
+
+model NotificationConfig {
+  id               String   @id @default(cuid())
+  organizationId   String   @unique
+  whatsappEnabled  Boolean  @default(true)
+  emailEnabled     Boolean  @default(true)
+  taskCreated      Boolean  @default(false)
+  taskMoved        Boolean  @default(true)
+  taskCompleted    Boolean  @default(true)
+  commentAdded     Boolean  @default(true)
+  dueDateAlert     Boolean  @default(true)
+  maximizebotToken String?
+  saveOnTicket     Boolean  @default(true)
+  startChatbot     Boolean  @default(false)
+  smtpHost         String?
+  smtpPort         Int?
+  smtpUser         String?
+  smtpPass         String?
+  emailFrom        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("notification_configs")
+}
+
+model MessageTemplate {
+  id             String            @id @default(cuid())
+  organizationId String
+  event          NotificationEvent
+  channel        MessageChannel
+  subject        String?
+  body           String
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, event, channel])
+  @@map("message_templates")
+}
+
+enum NotificationEvent {
+  TASK_CREATED
+  TASK_MOVED
+  TASK_COMPLETED
+  TASK_COMMENT_ADDED
+  TASK_DUE_DATE_APPROACHING
+}
+
+enum MessageChannel {
+  WHATSAPP
+  EMAIL
+}
+
+model NotificationLog {
+  id             String             @id @default(cuid())
+  organizationId String
+  clientId       String?
+  event          NotificationEvent
+  channel        MessageChannel
+  taskId         String?
+  recipient      String
+  message        String
+  status         NotificationStatus @default(PENDING)
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime           @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("notification_logs")
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}

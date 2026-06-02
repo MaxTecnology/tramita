@@ -1,0 +1,44 @@
+{
+  "name": "api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prisma": "prisma"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.2",
+    "@fastify/rate-limit": "^10.3.0",
+    "@prisma/client": "^6.9.0",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.56.0",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.3.0",
+    "fastify-plugin": "^5.0.1",
+    "ioredis": "^5.6.0",
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^9.7.0",
+    "uuid": "^11.1.0",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.15.29",
+    "@vitest/coverage-v8": "^3.2.3",
+    "prisma": "^6.9.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.3"
+  }
+}

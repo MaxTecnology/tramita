@@ -1,0 +1,14 @@
+{
+  "name": "tramita",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter api dev",
+    "dev:web": "pnpm --filter web dev",
+    "test:api": "pnpm --filter api test",
+    "test:web": "pnpm --filter web test"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  }
+}
