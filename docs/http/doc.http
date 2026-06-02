@@ -1,0 +1,82 @@
+### Tramita API — Fase 1
+### Base URL (dev): http://localhost:3000
+### Todos os endpoints autenticados exigem: Authorization: Bearer {{accessToken}}
+
+@baseUrl = http://localhost:3000
+@accessToken = eyJhbGciOiJSUzI1NiJ9...
+@refreshToken = 00000000-0000-0000-0000-000000000000
+
+# ─────────────────────────────────────────────
+# HEALTH
+# ─────────────────────────────────────────────
+
+### Verifica se a API está no ar
+GET {{baseUrl}}/health
+
+
+# ─────────────────────────────────────────────
+# AUTH
+# ─────────────────────────────────────────────
+
+### Login unificado — funciona para MASTER, ORG_*, e CLIENT
+# Role no JWT determina o redirecionamento pós-login:
+#   MASTER      → /master/dashboard
+#   ORG_ADMIN   → /app/dashboard
+#   ORG_MANAGER → /app/dashboard
+#   ORG_MEMBER  → /app/board
+#   CLIENT      → /portal/board
+# Resposta: { accessToken (JWT RS256 15min), refreshToken (UUID 7d), user }
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "master@autohubs.com.br",
+  "password": "Master@AutoHubs2025"
+}
+
+###
+
+### Login como admin de escritório (criado pelo seed)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@g2a.com.br",
+  "password": "G2A@Admin2025"
+}
+
+###
+
+### Login como cliente final (CLIENT)
+# Email do client pertence a uma org específica — sem unicidade global
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "cliente@exemplo.com",
+  "password": "senha123"
+}
+
+###
+
+### Renova access token usando o refresh token
+# O refresh token (token único) fica armazenado no Redis com TTL de 7 dias
+# Retorna: { accessToken }
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+###
+
+### Invalida o refresh token (logout)
+# Remove a chave refresh:<uuid> do Redis
+# Retorna: 204 No Content
+POST {{baseUrl}}/auth/logout
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
