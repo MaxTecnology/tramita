@@ -11,6 +11,7 @@ import { boardsRoutes } from '@/modules/boards/boards.routes'
 import { columnsRoutes } from '@/modules/columns/columns.routes'
 import { tasksRoutes } from '@/modules/tasks/tasks.routes'
 import { commentsRoutes } from '@/modules/comments/comments.routes'
+import { notificationsRoutes } from '@/modules/notifications/notifications.routes'
 import { AppError } from '@/errors/AppError'
 
 export function buildApp() {
@@ -32,6 +33,7 @@ export function buildApp() {
   app.register(columnsRoutes)
   app.register(tasksRoutes)
   app.register(commentsRoutes)
+  app.register(notificationsRoutes, { prefix: '/notifications' })
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof AppError) {
