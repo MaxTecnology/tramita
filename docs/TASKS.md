@@ -59,32 +59,32 @@
 - [x] Histórico automático em cada mutação (`TaskHistory`)
 - [x] CRUD comentários com `authorType` discriminado
 
-## Fase 5 — Templates e Notificações
+## Fase 5 — Templates e Notificações ✅
 ### Testes da Fase 5
-- [ ] `template.test.ts` — interpolação de todas as variáveis, variável ausente retorna string vazia
-- [ ] `template.test.ts` — fallback para template padrão quando org não tem customizado
-- [ ] `maximizebot.test.ts` — mock axios, valida payload enviado (number, body, token)
-- [ ] `mailer.test.ts` — mock nodemailer, valida subject e body renderizados
-- [ ] `notification-worker.test.ts` — evento desabilitado não envia, log FAILED em erro de envio
-- [ ] `templates.routes.test.ts` — POST /notifications/templates/preview renderiza corretamente
-- [ ] Client HTTP MaximizeBot (`src/lib/maximizebot.ts`)
-- [ ] Nodemailer/Resend client (`src/lib/mailer.ts`)
-- [ ] CRUD `NotificationConfig` por org
-- [ ] CRUD `MessageTemplate` por org — WhatsApp + Email por evento
-- [ ] Endpoint `POST /notifications/templates/preview` — renderiza prévia com vars fictícias
-- [ ] Endpoints de teste: `test-whatsapp` e `test-email`
-- [ ] BullMQ worker `notification-queue`
-  - [ ] Interpola variáveis no template ({{clientName}}, {{taskTitle}}, etc.)
-  - [ ] Busca template customizado ou fallback padrão do sistema
-  - [ ] Envia via MaximizeBot (WhatsApp)
-  - [ ] Envia via Nodemailer (Email)
-  - [ ] Salva log em `NotificationLog`
-  - [ ] Retry 3x com backoff exponencial
-- [ ] Disparar `TASK_MOVED` ao mover tarefa
-- [ ] Disparar `TASK_COMPLETED` ao entrar em coluna `isFinal`
-- [ ] Disparar `TASK_COMMENT_ADDED` ao comentar
-- [ ] Cron BullMQ: verificar `dueDate` em 24h → `TASK_DUE_DATE_APPROACHING`
-- [ ] Painel de logs de notificação no frontend interno
+- [x] `template.test.ts` — interpolação de todas as variáveis, variável ausente retorna string vazia
+- [x] `template.test.ts` — fallback para template padrão quando org não tem customizado
+- [x] `maximizebot.test.ts` — mock axios, valida payload enviado (number, body, token)
+- [x] `mailer.test.ts` — mock nodemailer, valida subject e body renderizados
+- [x] `notification-worker.test.ts` — evento desabilitado não envia, log FAILED em erro de envio
+- [x] `templates.routes.test.ts` — POST /notifications/templates/preview renderiza corretamente
+- [x] Client HTTP MaximizeBot (`src/lib/maximizebot.ts`)
+- [x] Nodemailer/Resend client (`src/lib/mailer.ts`)
+- [x] CRUD `NotificationConfig` por org
+- [x] CRUD `MessageTemplate` por org — WhatsApp + Email por evento
+- [x] Endpoint `POST /notifications/templates/preview` — renderiza prévia com vars fictícias
+- [x] Endpoints de teste: `test-whatsapp` e `test-email`
+- [x] BullMQ worker `notification-queue`
+  - [x] Interpola variáveis no template ({{clientName}}, {{taskTitle}}, etc.)
+  - [x] Busca template customizado ou fallback padrão do sistema
+  - [x] Envia via MaximizeBot (WhatsApp)
+  - [x] Envia via Nodemailer (Email)
+  - [x] Salva log em `NotificationLog`
+  - [x] Retry 3x com backoff exponencial
+- [x] Disparar `TASK_MOVED` ao mover tarefa
+- [x] Disparar `TASK_COMPLETED` ao entrar em coluna `isFinal`
+- [x] Disparar `TASK_COMMENT_ADDED` ao comentar
+- [x] Cron BullMQ: verificar `dueDate` em 24h → `TASK_DUE_DATE_APPROACHING`
+- [x] Painel de logs de notificação no frontend interno ← endpoint GET /notifications/logs entregue; painel visual na Fase 6
 
 ## Fase 6 — Frontend Interno (Painel do Escritório)
 ### Testes da Fase 6
