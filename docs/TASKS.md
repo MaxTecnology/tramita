@@ -1,24 +1,24 @@
 # Plano de Implementação — Tramita
 
-## Fase 1 — Fundação
+## Fase 1 — Fundação ✅
 ### Testes da Fase 1
-- [ ] Configurar Vitest no monorepo (`vitest.config.ts` compartilhado)
-- [ ] Configurar banco de teste (`DATABASE_URL_TEST` + `prisma migrate deploy` no setup)
-- [ ] Helper `buildApp()` — sobe instância Fastify isolada para testes
-- [ ] `auth.service.test.ts` — hash de senha, geração e validação de JWT
-- [ ] `auth.routes.test.ts` — POST /auth/login (credenciais válidas, inválidas, role correto)
-- [ ] `auth.routes.test.ts` — POST /auth/refresh e POST /auth/logout
-- [ ] Inicializar monorepo pnpm: `apps/api` + `apps/web`
-- [ ] Setup Fastify v5 + TypeScript strict + Zod
-- [ ] Configurar Prisma v6 + PostgreSQL (migration inicial com schema completo)
-- [ ] Configurar Redis + BullMQ
-- [ ] Módulo `auth`: login unificado, JWT RS256, refresh, logout
-- [ ] Middleware `verifyOrg` — tenant isolation por organizationId
-- [ ] Middleware `checkSubscription` — bloqueia org suspensa
-- [ ] Middleware `checkPlanLimit` — valida limite de clientes
-- [ ] Rate limiting + CORS
-- [ ] `GET /health`
-- [ ] Seed: planos padrão (Starter/Pro/Enterprise) + usuário MASTER
+- [x] Configurar Vitest no monorepo (`vitest.config.ts` compartilhado)
+- [x] Configurar banco de teste (`DATABASE_URL_TEST` + `prisma migrate deploy` no setup)
+- [x] Helper `buildApp()` — sobe instância Fastify isolada para testes
+- [x] `auth.service.test.ts` — hash de senha, geração e validação de JWT
+- [x] `auth.routes.test.ts` — POST /auth/login (credenciais válidas, inválidas, role correto)
+- [x] `auth.routes.test.ts` — POST /auth/refresh e POST /auth/logout
+- [x] Inicializar monorepo pnpm: `apps/api` + `apps/web`
+- [x] Setup Fastify v5 + TypeScript strict + Zod
+- [x] Configurar Prisma v6 + PostgreSQL (migration inicial com schema completo)
+- [x] Configurar Redis + BullMQ
+- [x] Módulo `auth`: login unificado, JWT RS256, refresh, logout
+- [x] Middleware `verifyOrg` — tenant isolation por organizationId
+- [x] Middleware `checkSubscription` — bloqueia org suspensa
+- [x] Middleware `checkPlanLimit` — valida limite de clientes
+- [x] Rate limiting + CORS
+- [x] `GET /health`
+- [x] Seed: planos padrão (Starter/Pro/Enterprise) + usuário MASTER
 
 ## Fase 2 — Master AutoHubs
 ### Testes da Fase 2
