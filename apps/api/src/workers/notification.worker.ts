@@ -28,10 +28,18 @@ export async function processNotificationJob(job: { data: NotificationJob }): Pr
 
   const [client, task, org] = await Promise.all([
     prisma.client.findUnique({ where: { id: clientId } }),
-    prisma.task.findUnique({ where: { id: taskId } }),
+    prisma.task.findUnique({
+      where: { id: taskId },
+      include: { column: { include: { board: { select: { organizationId: true } } } } },
+    }),
     prisma.organization.findUnique({ where: { id: organizationId } }),
   ])
   if (!client || !task || !org) return
+
+  if (
+    task.column.board.organizationId !== organizationId ||
+    client.organizationId !== organizationId
+  ) return
 
   const vars = {
     clientName: client.name,

@@ -3,11 +3,33 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { encrypt, decrypt } from '@/lib/encryption'
 import { getTemplate, renderTemplate, PREVIEW_VARS } from '@/lib/template'
-import type { NotificationEvent, MessageChannel } from '@prisma/client'
+import type { NotificationEvent, MessageChannel, NotificationStatus } from '@prisma/client'
 import type { UpdateConfigBody, UpsertTemplateBody } from './notifications.schema'
 
 export async function getConfig(organizationId: string) {
-  return prisma.notificationConfig.findUnique({ where: { organizationId } })
+  return prisma.notificationConfig.findUnique({
+    where: { organizationId },
+    select: {
+      id: true,
+      organizationId: true,
+      whatsappEnabled: true,
+      emailEnabled: true,
+      taskCreated: true,
+      taskMoved: true,
+      taskCompleted: true,
+      commentAdded: true,
+      dueDateAlert: true,
+      saveOnTicket: true,
+      startChatbot: true,
+      smtpHost: true,
+      smtpPort: true,
+      smtpUser: true,
+      emailFrom: true,
+      createdAt: true,
+      updatedAt: true,
+      // smtpPass e maximizebotToken propositalmente omitidos
+    },
+  })
 }
 
 export async function updateConfig(organizationId: string, data: UpdateConfigBody) {
@@ -91,7 +113,9 @@ export async function testWhatsApp(organizationId: string, number: string) {
 
 export async function testEmail(organizationId: string, to: string) {
   const config = await prisma.notificationConfig.findUnique({ where: { organizationId } })
-  if (!config?.smtpHost || !config.smtpPass) throw new AppError(422, 'SMTP não configurado')
+  if (!config?.smtpHost || !config.smtpPort || !config.smtpUser || !config.smtpPass || !config.emailFrom) {
+    throw new AppError(422, 'SMTP não configurado completamente')
+  }
   const pass = decrypt(config.smtpPass)
   const { sendEmail } = await import('@/lib/mailer')
   await sendEmail(
@@ -105,14 +129,14 @@ export async function testEmail(organizationId: string, to: string) {
 
 export async function listLogs(
   organizationId: string,
-  filters: { page: number; limit: number; status?: string; channel?: string },
+  filters: { page: number; limit: number; status?: NotificationStatus; channel?: MessageChannel },
 ) {
   const skip = (filters.page - 1) * filters.limit
   return prisma.notificationLog.findMany({
     where: {
       organizationId,
-      ...(filters.status ? { status: filters.status as any } : {}),
-      ...(filters.channel ? { channel: filters.channel as any } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.channel ? { channel: filters.channel } : {}),
     },
     orderBy: { createdAt: 'desc' },
     skip,

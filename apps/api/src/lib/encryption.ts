@@ -19,7 +19,9 @@ export function encrypt(text: string): string {
 
 export function decrypt(encoded: string): string {
   const key = getKey()
-  const [ivHex, tagHex, encHex] = encoded.split(':')
+  const parts = encoded.split(':')
+  if (parts.length !== 3) throw new Error('Invalid encrypted value format')
+  const [ivHex, tagHex, encHex] = parts
   const decipher = createDecipheriv(ALGORITHM, key, Buffer.from(ivHex, 'hex'))
   decipher.setAuthTag(Buffer.from(tagHex, 'hex'))
   return decipher.update(Buffer.from(encHex, 'hex')).toString('utf8') + decipher.final('utf8')

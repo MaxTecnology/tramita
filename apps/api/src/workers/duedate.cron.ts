@@ -6,7 +6,7 @@ import { enqueueNotification } from '@/lib/queue'
 export function startDueDateCronWorker() {
   const cronQueue = new Queue('duedate-cron', { connection: redis })
 
-  cronQueue.add('check', {}, {
+  await cronQueue.add('check', {}, {
     repeat: { every: 3_600_000 },
     jobId: 'duedate-check',
   })
