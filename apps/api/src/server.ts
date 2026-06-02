@@ -5,6 +5,12 @@ import { authRoutes } from '@/modules/auth/auth.routes'
 import { masterRoutes } from '@/modules/master/index'
 import { publicOrgRoutes, orgRoutes } from '@/modules/organizations/organizations.routes'
 import { webhooksRoutes } from '@/modules/webhooks/webhooks.routes'
+import { usersRoutes } from '@/modules/users/users.routes'
+import { clientsRoutes } from '@/modules/clients/clients.routes'
+import { boardsRoutes } from '@/modules/boards/boards.routes'
+import { columnsRoutes } from '@/modules/columns/columns.routes'
+import { tasksRoutes } from '@/modules/tasks/tasks.routes'
+import { commentsRoutes } from '@/modules/comments/comments.routes'
 import { AppError } from '@/errors/AppError'
 
 export function buildApp() {
@@ -20,6 +26,12 @@ export function buildApp() {
   app.register(publicOrgRoutes, { prefix: '/organizations' })
   app.register(orgRoutes, { prefix: '/org' })
   app.register(webhooksRoutes, { prefix: '/webhooks' })
+  app.register(usersRoutes, { prefix: '/users' })
+  app.register(clientsRoutes, { prefix: '/clients' })
+  app.register(boardsRoutes, { prefix: '/boards' })
+  app.register(columnsRoutes)
+  app.register(tasksRoutes)
+  app.register(commentsRoutes)
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof AppError) {
