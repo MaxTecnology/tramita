@@ -2,7 +2,7 @@
 import type { NotificationEvent, MessageChannel } from '@prisma/client'
 
 type TemplateEntry = { subject?: string; body: string }
-type TemplateMap = Record<NotificationEvent, Partial<Record<MessageChannel, TemplateEntry>>>
+type TemplateMap = Record<NotificationEvent, Record<MessageChannel, TemplateEntry>>
 
 export const DEFAULT_TEMPLATES: TemplateMap = {
   TASK_CREATED: {

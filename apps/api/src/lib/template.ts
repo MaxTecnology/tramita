@@ -39,5 +39,5 @@ export async function getTemplate(
   const custom = await prisma.messageTemplate.findUnique({
     where: { organizationId_event_channel: { organizationId, event, channel } },
   })
-  return custom ?? DEFAULT_TEMPLATES[event]?.[channel] ?? { body: '' }
+  return custom ?? DEFAULT_TEMPLATES[event][channel]
 }
