@@ -20,14 +20,15 @@ process.env.JWT_PUBLIC_KEY = publicKey
 export const app = buildApp()
 
 beforeAll(async () => {
-  await redis.connect()
+  // Redis uses lazyConnect: true, so we skip explicit connect in tests
+  // This avoids requiring a running Redis server for unit tests
   await app.ready()
 })
 
 afterAll(async () => {
   await app.close()
   await prisma.$disconnect()
-  await redis.quit()
+  // Redis never connected in tests (lazyConnect: true), so skip quit
 })
 
 afterEach(async () => {
@@ -47,5 +48,5 @@ afterEach(async () => {
     prisma.organization.deleteMany(),
     prisma.plan.deleteMany(),
   ])
-  await redis.flushdb()
+  // Redis never connected in tests (lazyConnect: true), so skip flushdb
 })
