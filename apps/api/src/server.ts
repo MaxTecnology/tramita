@@ -3,12 +3,12 @@ import corsPlugin from '@/plugins/cors'
 import rateLimitPlugin from '@/plugins/rate-limit'
 import { authRoutes } from '@/modules/auth/auth.routes'
 import { masterRoutes } from '@/modules/master/index'
+import { publicOrgRoutes, orgRoutes } from '@/modules/organizations/organizations.routes'
+import { webhooksRoutes } from '@/modules/webhooks/webhooks.routes'
 import { AppError } from '@/errors/AppError'
 
 export function buildApp() {
-  const app = Fastify({
-    logger: process.env.NODE_ENV !== 'test',
-  })
+  const app = Fastify({ logger: process.env.NODE_ENV !== 'test' })
 
   app.register(corsPlugin)
   app.register(rateLimitPlugin)
@@ -17,6 +17,9 @@ export function buildApp() {
 
   app.register(authRoutes, { prefix: '/auth' })
   app.register(masterRoutes, { prefix: '/master' })
+  app.register(publicOrgRoutes, { prefix: '/organizations' })
+  app.register(orgRoutes, { prefix: '/org' })
+  app.register(webhooksRoutes, { prefix: '/webhooks' })
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof AppError) {
