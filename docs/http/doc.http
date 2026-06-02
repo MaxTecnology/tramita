@@ -1,4 +1,4 @@
-### Tramita API — Fases 1, 2 e 3
+### Tramita API — Fases 1, 2, 3 e 4
 ### Base URL (dev): http://localhost:3000
 ### Todos os endpoints autenticados exigem: Authorization: Bearer {{accessToken}}
 
@@ -8,6 +8,12 @@
 @planId = plan-id-aqui
 @orgId = org-id-aqui
 @asaasSubscriptionId = sub_xxx
+@userId = user-id-aqui
+@clientId = client-id-aqui
+@boardId = board-id-aqui
+@columnId = column-id-aqui
+@taskId = task-id-aqui
+@commentId = comment-id-aqui
 
 # ─────────────────────────────────────────────
 # HEALTH
@@ -257,3 +263,281 @@ Content-Type: application/json
     "value": 197.00
   }
 }
+
+
+# ─────────────────────────────────────────────
+# USERS — Usuários internos do escritório
+# Todas as rotas /users exigem role ORG_ADMIN
+# ─────────────────────────────────────────────
+
+### Lista usuários da org (apenas isActive: true)
+GET {{baseUrl}}/users
+Authorization: Bearer {{accessToken}}
+
+###
+
+### Cria usuário interno
+# role: ORG_MANAGER | ORG_MEMBER (ORG_ADMIN só é criado no registro)
+POST {{baseUrl}}/users
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "Maria Gerente",
+  "email": "maria@escritorio.com.br",
+  "password": "Senha@1234",
+  "role": "ORG_MANAGER",
+  "phone": "(82) 99999-0001"
+}
+
+###
+
+### Atualiza campos do usuário
+PATCH {{baseUrl}}/users/{{userId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "role": "ORG_MEMBER"
+}
+
+###
+
+### Soft-delete de usuário (isActive: false)
+DELETE {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+
+# ─────────────────────────────────────────────
+# CLIENTS — Clientes finais do escritório
+# ORG_ADMIN ou ORG_MANAGER; POST bloqueia se atingir plan.maxClients
+# ─────────────────────────────────────────────
+
+### Lista clientes da org (isActive: true, ordem alfabética)
+GET {{baseUrl}}/clients
+Authorization: Bearer {{accessToken}}
+
+###
+
+### Cria cliente final
+# Senha usada para login no portal (/auth/login → role CLIENT)
+POST {{baseUrl}}/clients
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "Empresa ABC Ltda",
+  "cnpj": "12.345.678/0001-99",
+  "email": "contato@empresaabc.com.br",
+  "password": "Cliente@1234",
+  "whatsapp": "5582999990001"
+}
+
+###
+
+### Atualiza cliente
+PATCH {{baseUrl}}/clients/{{clientId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "whatsapp": "5582999990002"
+}
+
+###
+
+### Soft-delete de cliente (isActive: false — não conta mais no limite do plano)
+DELETE {{baseUrl}}/clients/{{clientId}}
+Authorization: Bearer {{accessToken}}
+
+
+# ─────────────────────────────────────────────
+# BOARDS — Boards de processo
+# Leitura: qualquer role autenticada da org (+ CLIENT vê só os próprios)
+# Escrita: ORG_ADMIN ou ORG_MANAGER
+# ─────────────────────────────────────────────
+
+### Lista boards da org (CLIENT filtra pelos próprios automaticamente)
+GET {{baseUrl}}/boards
+Authorization: Bearer {{accessToken}}
+
+###
+
+### Board completo com colunas + tarefas ordenadas por position
+GET {{baseUrl}}/boards/{{boardId}}
+Authorization: Bearer {{accessToken}}
+
+###
+
+### Cria board para um cliente
+POST {{baseUrl}}/boards
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "title": "Abertura de LTDA — Empresa ABC",
+  "description": "Processo de abertura de empresa",
+  "clientId": "{{clientId}}"
+}
+
+###
+
+### Atualiza título ou descrição do board
+PATCH {{baseUrl}}/boards/{{boardId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "title": "Abertura de LTDA — Empresa ABC (Revisado)"
+}
+
+
+# ─────────────────────────────────────────────
+# COLUMNS — Colunas (etapas do processo)
+# ─────────────────────────────────────────────
+
+### Cria coluna no board
+POST {{baseUrl}}/boards/{{boardId}}/columns
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "title": "Documentação Pendente",
+  "color": "#F59E0B",
+  "position": 0,
+  "isFinal": false
+}
+
+###
+
+### Cria coluna final (mover tarefa para cá → status DONE)
+POST {{baseUrl}}/boards/{{boardId}}/columns
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "title": "Concluído",
+  "color": "#10B981",
+  "position": 4,
+  "isFinal": true
+}
+
+###
+
+### Atualiza coluna
+PATCH {{baseUrl}}/columns/{{columnId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "title": "Em Análise",
+  "color": "#3B82F6"
+}
+
+###
+
+### Reordena colunas em lote
+PATCH {{baseUrl}}/columns/reorder
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+[
+  { "id": "col-id-1", "position": 0 },
+  { "id": "col-id-2", "position": 1 },
+  { "id": "col-id-3", "position": 2 }
+]
+
+###
+
+### Remove coluna (cascade deleta tarefas filhas)
+DELETE {{baseUrl}}/columns/{{columnId}}
+Authorization: Bearer {{accessToken}}
+
+
+# ─────────────────────────────────────────────
+# TASKS — Tarefas / processos
+# ─────────────────────────────────────────────
+
+### Cria tarefa em uma coluna (position calculado automaticamente)
+POST {{baseUrl}}/columns/{{columnId}}/tasks
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "title": "Enviar contrato social assinado",
+  "description": "Cliente deve enviar o documento original",
+  "priority": "HIGH",
+  "assigneeId": "{{userId}}",
+  "dueDate": "2026-06-30T00:00:00.000Z",
+  "tags": ["documento", "urgente"]
+}
+
+###
+
+### Atualiza campos da tarefa (grava TaskHistory para priority e assignee)
+PATCH {{baseUrl}}/tasks/{{taskId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "priority": "URGENT",
+  "assigneeId": "{{userId}}"
+}
+
+###
+
+### Move tarefa para outra coluna
+# Se coluna destino tiver isFinal: true → task.status vira DONE automaticamente
+PATCH {{baseUrl}}/tasks/{{taskId}}/move
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "columnId": "{{columnId}}",
+  "position": 0
+}
+
+###
+
+### Reordena tarefas em lote (permite mover entre colunas)
+PATCH {{baseUrl}}/tasks/reorder
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+[
+  { "id": "task-id-1", "columnId": "col-id-1", "position": 0 },
+  { "id": "task-id-2", "columnId": "col-id-1", "position": 1 }
+]
+
+###
+
+### Remove tarefa
+DELETE {{baseUrl}}/tasks/{{taskId}}
+Authorization: Bearer {{accessToken}}
+
+
+# ─────────────────────────────────────────────
+# COMMENTS — Comentários em tarefas
+# authorType determinado pelo JWT: USER (org) ou CLIENT
+# ─────────────────────────────────────────────
+
+### Lista comentários de uma tarefa
+GET {{baseUrl}}/tasks/{{taskId}}/comments
+Authorization: Bearer {{accessToken}}
+
+###
+
+### Adiciona comentário (authorType detectado pelo JWT automaticamente)
+POST {{baseUrl}}/tasks/{{taskId}}/comments
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "content": "Documento recebido, iniciando análise."
+}
+
+###
+
+### Remove comentário (só o autor ou ORG_ADMIN pode deletar)
+DELETE {{baseUrl}}/comments/{{commentId}}
+Authorization: Bearer {{accessToken}}
