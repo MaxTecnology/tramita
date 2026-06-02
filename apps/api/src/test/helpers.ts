@@ -59,6 +59,37 @@ export async function createTestClient(organizationId: string) {
   })
 }
 
+// Returns { user, password } so the test can call loginAs(user.email, password)
+export async function createMasterUser() {
+  const plan = await createTestPlan({ name: 'Master Plan' })
+  const org = await prisma.organization.create({
+    data: {
+      name: 'AutoHubs Test',
+      slug: `autohubs-${Date.now()}`,
+      email: `autohubs-${Date.now()}@test.com`,
+      planId: plan.id,
+      subscriptionStatus: 'ACTIVE',
+    },
+  })
+  const password = 'Master@Test123'
+  const user = await prisma.user.create({
+    data: {
+      name: 'Master Test',
+      email: `master-${Date.now()}@test.com`,
+      passwordHash: await bcrypt.hash(password, 10),
+      role: 'MASTER',
+      organizationId: org.id,
+    },
+  })
+  return { user, password }
+}
+
+// Convenience: returns "Bearer <accessToken>"
+export async function getAuthHeader(email: string, password: string): Promise<string> {
+  const res = await loginAs(email, password)
+  return `Bearer ${res.accessToken}`
+}
+
 export async function loginAs(email: string, password: string): Promise<LoginResponse> {
   const response = await app.inject({
     method: 'POST',
