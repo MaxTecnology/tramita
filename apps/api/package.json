@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "worker": "tsx src/worker.ts",
     "prisma": "prisma"
   },
   "prisma": {
@@ -19,6 +20,7 @@
     "@fastify/cors": "^10.0.2",
     "@fastify/rate-limit": "^10.3.0",
     "@prisma/client": "^6.9.0",
+    "axios": "^1.16.1",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.56.0",
     "dotenv": "^17.4.2",
@@ -26,6 +28,7 @@
     "fastify-plugin": "^5.0.1",
     "ioredis": "^5.6.0",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^8.0.10",
     "pino": "^9.7.0",
     "uuid": "^11.1.0",
     "zod": "^3.24.4"
@@ -34,6 +37,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.15.29",
+    "@types/nodemailer": "^8.0.0",
     "@vitest/coverage-v8": "^3.2.3",
     "prisma": "^6.9.0",
     "tsx": "^4.20.3",

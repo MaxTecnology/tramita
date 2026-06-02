@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { redis } from '@/lib/redis'
 import { buildApp } from '@/server'
 
+// 32 bytes of zeros in hex — test-only encryption key
+process.env.ENCRYPTION_KEY = '0'.repeat(64)
+
 // Generate RS256 key pair for tests — must run before any module reads process.env for JWT
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 process.env.JWT_PRIVATE_KEY = privateKey
