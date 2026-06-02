@@ -1,10 +1,12 @@
-### Tramita API — Fase 1
+### Tramita API — Fases 1 e 2
 ### Base URL (dev): http://localhost:3000
 ### Todos os endpoints autenticados exigem: Authorization: Bearer {{accessToken}}
 
 @baseUrl = http://localhost:3000
 @accessToken = eyJhbGciOiJSUzI1NiJ9...
 @refreshToken = 00000000-0000-0000-0000-000000000000
+@planId = plan-id-aqui
+@orgId = org-id-aqui
 
 # ─────────────────────────────────────────────
 # HEALTH
@@ -80,3 +82,107 @@ Content-Type: application/json
 {
   "refreshToken": "{{refreshToken}}"
 }
+
+
+# ─────────────────────────────────────────────
+# MASTER — Planos
+# Todas as rotas /master/* exigem role MASTER
+# ─────────────────────────────────────────────
+
+### Lista todos os planos (ativos e inativos), ordenados por priceMonthly asc
+GET {{baseUrl}}/master/plans
+Authorization: Bearer {{accessToken}}
+
+###
+
+### Cria novo plano
+POST {{baseUrl}}/master/plans
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "Pro",
+  "maxClients": 50,
+  "priceMonthly": 197.00,
+  "features": { "pdf": true, "sse": true, "attachments": true }
+}
+
+###
+
+### Atualiza campos parciais de um plano
+PATCH {{baseUrl}}/master/plans/{{planId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "maxClients": 60,
+  "priceMonthly": 217.00
+}
+
+###
+
+### Soft-delete de plano — marca isActive: false (não remove do banco)
+DELETE {{baseUrl}}/master/plans/{{planId}}
+Authorization: Bearer {{accessToken}}
+
+
+# ─────────────────────────────────────────────
+# MASTER — Escritórios
+# ─────────────────────────────────────────────
+
+### Lista todos os escritórios com status de assinatura e contadores
+# Retorna: id, name, slug, email, subscriptionStatus, planName, clientsCount, usersCount
+GET {{baseUrl}}/master/organizations
+Authorization: Bearer {{accessToken}}
+
+###
+
+### Detalhes do escritório + histórico de assinatura
+GET {{baseUrl}}/master/organizations/{{orgId}}
+Authorization: Bearer {{accessToken}}
+
+###
+
+### Altera o plano do escritório
+PATCH {{baseUrl}}/master/organizations/{{orgId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "planId": "{{planId}}"
+}
+
+###
+
+### Suspende o escritório (bloqueia mutações via checkSubscription)
+PATCH {{baseUrl}}/master/organizations/{{orgId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "subscriptionStatus": "SUSPENDED"
+}
+
+###
+
+### Reativa escritório suspenso
+PATCH {{baseUrl}}/master/organizations/{{orgId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "subscriptionStatus": "ACTIVE"
+}
+
+
+# ─────────────────────────────────────────────
+# MASTER — Revenue Dashboard
+# ─────────────────────────────────────────────
+
+### Retorna métricas de receita calculadas do banco local
+# mrr: soma de plan.priceMonthly de todas as orgs ACTIVE
+# totalOrgsAtivas: count de orgs com subscriptionStatus = ACTIVE
+# churn: count de orgs com subscriptionStatus = CANCELLED
+# (Fase 3 integra com Asaas para dados reais de pagamento)
+GET {{baseUrl}}/master/revenue
+Authorization: Bearer {{accessToken}}
