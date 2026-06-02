@@ -1,4 +1,4 @@
-### Tramita API — Fases 1 e 2
+### Tramita API — Fases 1, 2 e 3
 ### Base URL (dev): http://localhost:3000
 ### Todos os endpoints autenticados exigem: Authorization: Bearer {{accessToken}}
 
@@ -7,6 +7,7 @@
 @refreshToken = 00000000-0000-0000-0000-000000000000
 @planId = plan-id-aqui
 @orgId = org-id-aqui
+@asaasSubscriptionId = sub_xxx
 
 # ─────────────────────────────────────────────
 # HEALTH
@@ -183,6 +184,76 @@ Authorization: Bearer {{accessToken}}
 # mrr: soma de plan.priceMonthly de todas as orgs ACTIVE
 # totalOrgsAtivas: count de orgs com subscriptionStatus = ACTIVE
 # churn: count de orgs com subscriptionStatus = CANCELLED
-# (Fase 3 integra com Asaas para dados reais de pagamento)
+# (integração com dados reais de pagamento via webhooks na Fase 3)
 GET {{baseUrl}}/master/revenue
 Authorization: Bearer {{accessToken}}
+
+
+# ─────────────────────────────────────────────
+# ORGANIZATIONS — Cadastro Público (sem auth)
+# ─────────────────────────────────────────────
+
+### Lista planos ativos para escolha no cadastro
+GET {{baseUrl}}/organizations/plans
+
+###
+
+### Registra novo escritório
+# planId = "trial" → TRIAL 14 dias, sem integração com sistema de cobrança
+# Retorna: { organization: {...}, user: { id, name, email, role: "ORG_ADMIN" } }
+POST {{baseUrl}}/organizations/register
+Content-Type: application/json
+
+{
+  "name": "Contabilidade Exemplo",
+  "cnpj": "12.345.678/0001-99",
+  "email": "contato@exemplo.com.br",
+  "phone": "(82) 99999-9999",
+  "adminName": "João Admin",
+  "adminPassword": "Senha@12345",
+  "planId": "{{planId}}"
+}
+
+
+# ─────────────────────────────────────────────
+# ORG — Assinatura (role: ORG_ADMIN)
+# ─────────────────────────────────────────────
+
+### Status da assinatura + histórico + plano atual
+# subscriptionStatus: TRIAL | ACTIVE | GRACE_PERIOD | SUSPENDED | CANCELLED
+GET {{baseUrl}}/org/subscription
+Authorization: Bearer {{accessToken}}
+
+###
+
+### Troca de plano — atualiza planId no banco
+# Retorna 204 No Content
+POST {{baseUrl}}/org/subscription/change-plan
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "planId": "{{planId}}"
+}
+
+
+# ─────────────────────────────────────────────
+# WEBHOOKS — Sistema de Cobrança
+# Autenticado por ?accessToken= na query string
+# ─────────────────────────────────────────────
+
+### PAYMENT_CONFIRMED → subscriptionStatus = ACTIVE + SubscriptionHistory
+### PAYMENT_OVERDUE   → subscriptionStatus = GRACE_PERIOD + gracePeriodEndsAt = now+7d
+### PAYMENT_DELETED   → subscriptionStatus = SUSPENDED
+POST {{baseUrl}}/webhooks/asaas?accessToken=ASAAS_WEBHOOK_SECRET
+Content-Type: application/json
+
+{
+  "event": "PAYMENT_CONFIRMED",
+  "payment": {
+    "id": "pay_xxx",
+    "subscription": "{{asaasSubscriptionId}}",
+    "customer": "cus_xxx",
+    "value": 197.00
+  }
+}
