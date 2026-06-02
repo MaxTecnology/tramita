@@ -44,20 +44,20 @@
 - [x] Painel `/org/subscription` — status atual + histórico + botão de troca de plano
 - [x] Tela de cadastro público (landing → escolher plano → criar conta)
 
-## Fase 4 — Core Kanban
+## Fase 4 — Core Kanban ✅
 ### Testes da Fase 4
-- [ ] `checkPlanLimit.test.ts` — bloqueia criação de cliente acima do limite do plano
-- [ ] `verifyOrg.test.ts` — bloqueia acesso a recurso de outra org
-- [ ] `tasks.service.test.ts` — move tarefa, atualiza position, grava TaskHistory
-- [ ] `tasks.routes.test.ts` — PATCH /tasks/:id/move (coluna isFinal dispara TASK_COMPLETED)
-- [ ] `comments.routes.test.ts` — authorType correto para USER e CLIENT
-- [ ] CRUD usuários internos (`/users`)
-- [ ] CRUD clientes finais (`/clients`) com validação de limite do plano
-- [ ] CRUD boards (`/boards`)
-- [ ] CRUD colunas + reorder (`/columns`)
-- [ ] CRUD tarefas + move + reorder (`/tasks`)
-- [ ] Histórico automático em cada mutação (`TaskHistory`)
-- [ ] CRUD comentários com `authorType` discriminado
+- [x] `checkPlanLimit.test.ts` — bloqueia criação de cliente acima do limite do plano
+- [x] `verifyOrg.test.ts` — bloqueia acesso a recurso de outra org
+- [x] `tasks.service.test.ts` — move tarefa, atualiza position, grava TaskHistory
+- [x] `tasks.routes.test.ts` — PATCH /tasks/:id/move (coluna isFinal dispara TASK_COMPLETED)
+- [x] `comments.routes.test.ts` — authorType correto para USER e CLIENT
+- [x] CRUD usuários internos (`/users`)
+- [x] CRUD clientes finais (`/clients`) com validação de limite do plano
+- [x] CRUD boards (`/boards`)
+- [x] CRUD colunas + reorder (`/columns`)
+- [x] CRUD tarefas + move + reorder (`/tasks`)
+- [x] Histórico automático em cada mutação (`TaskHistory`)
+- [x] CRUD comentários com `authorType` discriminado
 
 ## Fase 5 — Templates e Notificações
 ### Testes da Fase 5
