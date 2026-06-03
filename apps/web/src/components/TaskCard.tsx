@@ -8,6 +8,20 @@ const PRIORITY_STYLES: Record<Task['priority'], string> = {
   URGENT: 'bg-red-100 text-red-600',
 }
 
+const PRIORITY_LABELS: Record<Task['priority'], string> = {
+  LOW: 'Baixa',
+  MEDIUM: 'Média',
+  HIGH: 'Alta',
+  URGENT: 'Urgente',
+}
+
+function daysOpen(dateStr: string): string {
+  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24))
+  if (days === 0) return 'Aberta hoje'
+  if (days === 1) return 'Aberta há 1 dia'
+  return `Aberta há ${days} dias`
+}
+
 interface Props {
   task: Task
   onClick: () => void
@@ -35,12 +49,13 @@ export function TaskCard({ task, onClick }: Props) {
             PRIORITY_STYLES[task.priority],
           )}
         >
-          {task.priority}
+          {PRIORITY_LABELS[task.priority]}
         </span>
         {isOverdue && (
           <span className="text-xs text-red-500 font-medium">⚠ Prazo vencido</span>
         )}
       </div>
+      <p className="text-xs text-gray-400 mt-1.5">{daysOpen(task.createdAt)}</p>
     </div>
   )
 }

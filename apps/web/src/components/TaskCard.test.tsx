@@ -25,7 +25,7 @@ it('renders task title', () => {
 
 it('renders priority badge with correct color class for HIGH', () => {
   render(<TaskCard task={baseTask} onClick={() => {}} />)
-  const badge = screen.getByText('HIGH')
+  const badge = screen.getByText('Alta')
   expect(badge).toHaveClass('bg-orange-100')
 })
 

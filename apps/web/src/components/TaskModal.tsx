@@ -21,7 +21,12 @@ interface Attachment {
   createdAt: string
 }
 
-const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const
+const PRIORITY_OPTIONS: { value: Task['priority']; label: string }[] = [
+  { value: 'LOW', label: 'Baixa' },
+  { value: 'MEDIUM', label: 'Média' },
+  { value: 'HIGH', label: 'Alta' },
+  { value: 'URGENT', label: 'Urgente' },
+]
 
 export function TaskModal({ task, open, onClose }: Props) {
   const queryClient = useQueryClient()
@@ -92,7 +97,7 @@ export function TaskModal({ task, open, onClose }: Props) {
               className="mt-1 flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm"
             >
               {PRIORITY_OPTIONS.map((p) => (
-                <option key={p} value={p}>{p}</option>
+                <option key={p.value} value={p.value}>{p.label}</option>
               ))}
             </select>
           </div>

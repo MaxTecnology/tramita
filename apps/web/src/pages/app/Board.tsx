@@ -4,10 +4,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
   DragEndEvent,
+  DragStartEvent,
   DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
 } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -18,6 +20,15 @@ import { api } from '@/lib/api'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskModal } from '@/components/TaskModal'
 import type { Task } from '@/types'
+
+function DroppableColumn({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef } = useDroppable({ id })
+  return (
+    <div ref={setNodeRef} className="flex flex-col gap-2 min-h-[4rem] rounded-lg bg-gray-50 p-2">
+      {children}
+    </div>
+  )
+}
 
 function SortableTaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -74,6 +85,12 @@ export default function Board() {
   })
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+
+  function handleDragStart(event: DragStartEvent) {
+    const allTasks = board?.columns.flatMap((c) => c.tasks) ?? []
+    const task = allTasks.find((t) => t.id === event.active.id)
+    if (task) setActiveTask(task)
+  }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -163,7 +180,7 @@ export default function Board() {
       )}
 
       <div className="flex-1 overflow-x-auto p-6">
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex gap-4 h-full">
             {board.columns.map((column) => (
               <div key={column.id} className="flex-shrink-0 w-64">
@@ -178,7 +195,7 @@ export default function Board() {
                   items={column.tasks.map((t) => t.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  <div className="flex flex-col gap-2 min-h-[4rem] rounded-lg bg-gray-50 p-2">
+                  <DroppableColumn id={column.id}>
                     {column.tasks.map((task) => (
                       <SortableTaskCard
                         key={task.id}
@@ -186,7 +203,7 @@ export default function Board() {
                         onClick={() => setSelectedTask(task)}
                       />
                     ))}
-                  </div>
+                  </DroppableColumn>
                 </SortableContext>
 
                 {addingToColumn === column.id ? (
