@@ -4,11 +4,13 @@ export const createBoardSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   clientId: z.string().cuid(),
+  responsibleUserId: z.string().cuid().optional(),
 })
 
 export const updateBoardSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
+  responsibleUserId: z.string().cuid().nullable().optional(),
 })
 
 export type CreateBoardBody = z.infer<typeof createBoardSchema>
