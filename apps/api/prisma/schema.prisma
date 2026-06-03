@@ -85,11 +85,12 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization  Organization @relation(fields: [organizationId], references: [id])
-  assignedTasks Task[]       @relation("TaskAssignee")
-  createdTasks  Task[]       @relation("TaskCreator")
-  comments      Comment[]
-  attachments   Attachment[]
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  assignedTasks     Task[]       @relation("TaskAssignee")
+  createdTasks      Task[]       @relation("TaskCreator")
+  comments          Comment[]
+  attachments       Attachment[]
+  responsibleBoards Board[]      @relation("BoardResponsible")
 
   @@map("users")
 }
@@ -122,18 +123,20 @@ model Client {
 }
 
 model Board {
-  id             String   @id @default(cuid())
-  title          String
-  description    String?
-  organizationId String
-  clientId       String
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                String   @id @default(cuid())
+  title             String
+  description       String?
+  organizationId    String
+  clientId          String
+  responsibleUserId String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  client       Client       @relation(fields: [clientId], references: [id])
-  columns      Column[]
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  client          Client       @relation(fields: [clientId], references: [id])
+  responsibleUser User?        @relation("BoardResponsible", fields: [responsibleUserId], references: [id])
+  columns         Column[]
 
   @@map("boards")
 }
