@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
@@ -15,6 +16,12 @@ import Users from '@/pages/app/Users'
 import Templates from '@/pages/app/settings/Templates'
 import Notifications from '@/pages/app/settings/Notifications'
 import AppSubscription from '@/pages/app/settings/Subscription'
+
+const PortalLayout = lazy(() => import('@/pages/portal/Layout'))
+const PortalBoards = lazy(() => import('@/pages/portal/Boards'))
+const PortalBoard = lazy(() => import('@/pages/portal/Board'))
+const PortalProfile = lazy(() => import('@/pages/portal/Profile'))
+const PortalReports = lazy(() => import('@/pages/portal/Reports'))
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER']
 const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
@@ -85,6 +92,23 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+    ],
+  },
+  {
+    path: '/portal',
+    element: (
+      <ProtectedRoute allowedRoles={['CLIENT']}>
+        <Suspense fallback={<div className="flex items-center justify-center h-screen text-gray-500">Carregando...</div>}>
+          <PortalLayout />
+        </Suspense>
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Navigate to="/portal/board" replace /> },
+      { path: 'board', element: <PortalBoards /> },
+      { path: 'board/:boardId', element: <PortalBoard /> },
+      { path: 'profile', element: <PortalProfile /> },
+      { path: 'reports', element: <PortalReports /> },
     ],
   },
   { path: '*', element: <Navigate to="/login" replace /> },
