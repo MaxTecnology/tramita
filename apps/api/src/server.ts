@@ -14,6 +14,7 @@ import { commentsRoutes } from '@/modules/comments/comments.routes'
 import { notificationsRoutes } from '@/modules/notifications/notifications.routes'
 import { portalRoutes } from '@/modules/portal/portal.routes'
 import { streamRoutes } from '@/modules/stream/stream.routes'
+import { attachmentsRoutes } from '@/modules/attachments/attachments.routes'
 import { AppError } from '@/errors/AppError'
 
 export function buildApp() {
@@ -38,6 +39,7 @@ export function buildApp() {
   app.register(notificationsRoutes, { prefix: '/notifications' })
   app.register(portalRoutes, { prefix: '/portal' })
   app.register(streamRoutes)
+  app.register(attachmentsRoutes)
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof AppError) {
