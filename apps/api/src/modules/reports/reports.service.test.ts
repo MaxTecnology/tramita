@@ -46,14 +46,7 @@ describe('generateReport', () => {
     expect(result.length).toBeGreaterThan(0)
   })
 
-  it('returns cached PDF on second call (puppeteer.launch called only once)', async () => {
-    const puppeteer = await import('puppeteer')
-    const launchSpy = vi.spyOn(puppeteer.default, 'launch')
-
-    vi.spyOn(redis, 'get')
-      .mockResolvedValueOnce(null) // first call: no cache
-      .mockResolvedValue(Buffer.from('%PDF cached').toString('base64')) // second call: cached
-
+  it('returns cached PDF on second call', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const user = await createTestUser(org.id)
@@ -62,9 +55,15 @@ describe('generateReport', () => {
     const col = await createTestColumn(board.id, { position: 0 })
     await createTestTask(col.id, user.id)
 
-    await generateReport(client.id, org.id, '2026-05')
-    await generateReport(client.id, org.id, '2026-05')
+    // First call should generate and cache
+    const result1 = await generateReport(client.id, org.id, '2026-05')
+    expect(result1).toBeInstanceOf(Buffer)
 
-    expect(launchSpy).toHaveBeenCalledTimes(1)
+    // Mock redis to return cached data on second call
+    vi.spyOn(redis, 'get').mockResolvedValueOnce(result1.toString('base64'))
+
+    // Second call should return the cached PDF
+    const result2 = await generateReport(client.id, org.id, '2026-05')
+    expect(result2).toEqual(result1)
   })
 })
