@@ -137,8 +137,8 @@
 ### Testes da Fase 8
 - [x] `stream.test.ts` — evento emitido ao mover tarefa, heartbeat a cada 30s
 - [x] `search.routes.test.ts` — filtros combinados retornam apenas tarefas da org correta
-- [ ] `attachments.service.test.ts` — mock B2 client, valida storageKey e signed URL
-- [ ] `attachments.routes.test.ts` — rejeita arquivo acima de 20MB, tipo não permitido
+- [x] `attachments.service.test.ts` — mock B2 client, valida storageKey e signed URL
+- [x] `attachments.routes.test.ts` — rejeita arquivo acima de 20MB, tipo não permitido
 - [ ] `reports.service.test.ts` — PDF gerado com dados do mês correto, cache Redis funciona
 ### 8a — Tempo Real (SSE) ✅
 - [x] `stream.test.ts` — evento emitido ao mover tarefa, heartbeat (endpoint auth)
@@ -153,13 +153,13 @@
 - [x] Frontend: barra de busca + filtros no board interno
 - [x] Portal: busca por título de tarefa
 
-### 8c — Anexos (Backblaze B2)
-- [ ] Backblaze B2 configurado via variáveis de ambiente
-- [ ] `POST /tasks/:id/attachments` — upload multipart, max 20MB
-- [ ] `GET /tasks/:id/attachments` — lista com signed URL (TTL 1h)
-- [ ] `DELETE /tasks/:id/attachments/:attachmentId`
-- [ ] Frontend: dropzone no modal da tarefa
-- [ ] Portal: visualização e download de anexos
+### 8c — Anexos (Backblaze B2) ✅
+- [x] Backblaze B2 configurado via variáveis de ambiente
+- [x] `POST /tasks/:id/attachments` — upload multipart, max 20MB
+- [x] `GET /tasks/:id/attachments` — lista com signed URL (TTL 1h)
+- [x] `DELETE /tasks/:id/attachments/:attachmentId`
+- [x] Frontend: dropzone no modal da tarefa
+- [x] Portal: visualização e download de anexos
 
 ### 8d — Relatório PDF
 - [ ] Puppeteer no docker-compose
