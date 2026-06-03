@@ -1,3 +1,1 @@
-export default function AppSubscription() {
-  return <div>Assinatura</div>
-}
+export { default } from '@/pages/org/Subscription'
