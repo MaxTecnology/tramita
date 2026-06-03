@@ -89,9 +89,15 @@
   - [x] Retry 3x com backoff exponencial
 - [x] Disparar `TASK_MOVED` ao mover tarefa
 - [x] Disparar `TASK_COMPLETED` ao entrar em coluna `isFinal`
-- [x] Disparar `TASK_COMMENT_ADDED` ao comentar
+- [x] Disparar `TASK_COMMENT_ADDED` ao comentar ← fix aplicado: `comments.service.ts` agora chama `enqueueNotification` com `taskTitle`, `commentText` e `commentAuthorName`
 - [x] Cron BullMQ: verificar `dueDate` em 24h → `TASK_DUE_DATE_APPROACHING`
 - [x] Painel de logs de notificação no frontend interno ← endpoint GET /notifications/logs entregue; painel visual na Fase 6
+
+### Pré-requisitos para WhatsApp funcionar localmente
+- Worker deve rodar em processo separado: `pnpm --filter api worker`
+- Org deve ter `NotificationConfig` com `whatsappEnabled: true` e `maximizebotToken` preenchido (em `/app/settings/notifications`)
+- Cliente deve ter número `whatsapp` cadastrado (em `/app/clients`)
+- Eventos que disparam mensagem: tarefa movida, tarefa concluída, comentário adicionado, prazo se aproximando
 
 ## Fase 6 — Frontend Interno (Painel do Escritório) ✅
 ### Testes da Fase 6
