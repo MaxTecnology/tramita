@@ -12,6 +12,7 @@ import { columnsRoutes } from '@/modules/columns/columns.routes'
 import { tasksRoutes } from '@/modules/tasks/tasks.routes'
 import { commentsRoutes } from '@/modules/comments/comments.routes'
 import { notificationsRoutes } from '@/modules/notifications/notifications.routes'
+import { portalRoutes } from '@/modules/portal/portal.routes'
 import { AppError } from '@/errors/AppError'
 
 export function buildApp() {
@@ -34,6 +35,7 @@ export function buildApp() {
   app.register(tasksRoutes)
   app.register(commentsRoutes)
   app.register(notificationsRoutes, { prefix: '/notifications' })
+  app.register(portalRoutes, { prefix: '/portal' })
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof AppError) {
