@@ -12,6 +12,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-
 import { CSS } from '@dnd-kit/utilities'
 import { ArrowLeft } from 'lucide-react'
 import { useBoard } from '@/hooks/useBoard'
+import { useBoardStream } from '@/hooks/useBoardStream'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskModal } from '@/components/TaskModal'
 import type { Task } from '@/types'
@@ -34,6 +35,7 @@ function SortableTaskCard({ task, onClick }: { task: Task; onClick: () => void }
 export default function Board() {
   const { boardId } = useParams<{ boardId: string }>()
   const { board, isLoading, moveTask } = useBoard(boardId!)
+  useBoardStream(boardId)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
 

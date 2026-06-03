@@ -3,12 +3,14 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { ArrowLeft } from 'lucide-react'
+import { useBoardStream } from '@/hooks/useBoardStream'
 import { TaskDrawer } from '@/components/portal/TaskDrawer'
 import { cn } from '@/lib/utils'
 import type { Board, Task } from '@/types'
 
 export default function PortalBoard() {
   const { boardId } = useParams<{ boardId: string }>()
+  useBoardStream(boardId)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   const { data: board, isLoading } = useQuery<Board>({
