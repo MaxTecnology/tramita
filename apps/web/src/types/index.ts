@@ -30,6 +30,7 @@ export interface Board {
   description: string | null
   clientId: string
   organizationId: string
+  responsibleUserId: string | null
   isActive: boolean
   columns: Column[]
   client: { id: string; name: string }
