@@ -11,7 +11,7 @@ export async function columnsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', checkSubscription)
 
   app.post('/boards/:boardId/columns', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
   }, async (request, reply) => {
     const { boardId } = request.params as { boardId: string }
     const result = createColumnSchema.safeParse(request.body)
@@ -19,9 +19,8 @@ export async function columnsRoutes(app: FastifyInstance) {
     return reply.status(201).send(await createColumn(boardId, request.user.organizationId!, result.data))
   })
 
-  // reorder ANTES de /:id para evitar conflito de rota
   app.patch('/columns/reorder', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
   }, async (request, reply) => {
     const result = reorderColumnsSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
@@ -29,7 +28,7 @@ export async function columnsRoutes(app: FastifyInstance) {
   })
 
   app.patch('/columns/:id', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const result = updateColumnSchema.safeParse(request.body)
@@ -37,6 +36,7 @@ export async function columnsRoutes(app: FastifyInstance) {
     return reply.send(await updateColumn(id, request.user.organizationId!, result.data))
   })
 
+  // Delete restrito a ADMIN — ação destrutiva
   app.delete('/columns/:id', {
     preHandler: [requireRole('ORG_ADMIN')],
   }, async (request, reply) => {
