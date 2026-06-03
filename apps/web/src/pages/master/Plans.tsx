@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 interface Plan {
   id: string
@@ -60,99 +64,152 @@ export default function MasterPlans() {
     })
   }
 
-  if (isLoading) return <p>Carregando planos...</p>
+  if (isLoading) return <div className="p-8 text-gray-500">Carregando planos...</div>
 
   return (
-    <div>
-      <h1 style={{ marginTop: 0 }}>Planos</h1>
+    <div className="p-8">
+      <h1 className="text-xl font-bold text-gray-900 mb-6">Planos</h1>
 
-      <form onSubmit={handleCreate} style={{ marginBottom: 24, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <input
-          placeholder="Nome"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
-          style={{ padding: '6px 10px' }}
-        />
-        <input
-          type="number"
-          placeholder="Max clientes"
-          value={form.maxClients}
-          onChange={(e) => setForm({ ...form, maxClients: e.target.value ? Number(e.target.value) : '' })}
-          required
-          style={{ padding: '6px 10px', width: 130 }}
-        />
-        <input
-          type="number"
-          placeholder="Preço/mês (R$)"
-          value={form.priceMonthly}
-          onChange={(e) => setForm({ ...form, priceMonthly: e.target.value ? Number(e.target.value) : '' })}
-          required
-          style={{ padding: '6px 10px', width: 140 }}
-        />
-        <button type="submit" disabled={createMutation.isPending} style={{ padding: '6px 16px' }}>
-          {createMutation.isPending ? 'Criando...' : 'Criar Plano'}
-        </button>
-      </form>
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-base">Novo plano</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleCreate} className="flex gap-3 flex-wrap items-end">
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500">Nome</label>
+              <Input
+                placeholder="Ex: Pro"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="w-36"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500">Max clientes</label>
+              <Input
+                type="number"
+                placeholder="50"
+                value={form.maxClients}
+                onChange={(e) =>
+                  setForm({ ...form, maxClients: e.target.value ? Number(e.target.value) : '' })
+                }
+                className="w-32"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500">Preço/mês (R$)</label>
+              <Input
+                type="number"
+                placeholder="197"
+                value={form.priceMonthly}
+                onChange={(e) =>
+                  setForm({ ...form, priceMonthly: e.target.value ? Number(e.target.value) : '' })
+                }
+                className="w-36"
+                required
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={createMutation.isPending}
+              className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+            >
+              {createMutation.isPending ? 'Criando...' : 'Criar plano'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 8 }}>
-        <thead>
-          <tr style={{ background: '#f0f0f0', textAlign: 'left' }}>
-            <th style={{ padding: '10px 12px' }}>Nome</th>
-            <th style={{ padding: '10px 12px' }}>Max Clientes</th>
-            <th style={{ padding: '10px 12px' }}>Preço/mês</th>
-            <th style={{ padding: '10px 12px' }}>Ativo</th>
-            <th style={{ padding: '10px 12px' }}>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {plans.map((plan) => (
-            <tr key={plan.id} style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '10px 12px' }}>
-                {editId === plan.id ? (
-                  <input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    style={{ padding: '4px 8px' }}
-                  />
-                ) : (
-                  plan.name
-                )}
-              </td>
-              <td style={{ padding: '10px 12px' }}>{plan.maxClients}</td>
-              <td style={{ padding: '10px 12px' }}>R$ {Number(plan.priceMonthly).toFixed(2)}</td>
-              <td style={{ padding: '10px 12px' }}>{plan.isActive ? 'Sim' : 'Não'}</td>
-              <td style={{ padding: '10px 12px', display: 'flex', gap: 6 }}>
-                {editId === plan.id ? (
-                  <>
-                    <button onClick={() => updateMutation.mutate({ id: plan.id, name: editName })}>
-                      Salvar
-                    </button>
-                    <button onClick={() => setEditId(null)}>Cancelar</button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setEditId(plan.id)
-                      setEditName(plan.name)
-                    }}
-                  >
-                    Editar
-                  </button>
-                )}
-                {plan.isActive && (
-                  <button
-                    onClick={() => deleteMutation.mutate(plan.id)}
-                    style={{ color: '#c00' }}
-                  >
-                    Desativar
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Card>
+        <CardContent className="p-0">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                {['Nome', 'Max clientes', 'Preço/mês', 'Status', 'Ações'].map((h) => (
+                  <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {plans.map((plan) => (
+                <tr key={plan.id} className="border-b border-gray-100 last:border-0">
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {editId === plan.id ? (
+                      <Input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="h-7 w-36"
+                      />
+                    ) : (
+                      plan.name
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{plan.maxClients}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    R$ {Number(plan.priceMonthly).toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge
+                      className={
+                        plan.isActive
+                          ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-100'
+                      }
+                    >
+                      {plan.isActive ? 'Ativo' : 'Inativo'}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      {editId === plan.id ? (
+                        <>
+                          <Button
+                            size="sm"
+                            className="h-7 bg-[#185FA5] hover:bg-[#0C447C] text-white"
+                            onClick={() => updateMutation.mutate({ id: plan.id, name: editName })}
+                          >
+                            Salvar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7"
+                            onClick={() => setEditId(null)}
+                          >
+                            Cancelar
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7"
+                          onClick={() => { setEditId(plan.id); setEditName(plan.name) }}
+                        >
+                          Editar
+                        </Button>
+                      )}
+                      {plan.isActive && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-red-600 border-red-200 hover:bg-red-50"
+                          onClick={() => deleteMutation.mutate(plan.id)}
+                        >
+                          Desativar
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
     </div>
   )
 }
