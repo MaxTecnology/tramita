@@ -86,36 +86,36 @@
 - [x] Cron BullMQ: verificar `dueDate` em 24h → `TASK_DUE_DATE_APPROACHING`
 - [x] Painel de logs de notificação no frontend interno ← endpoint GET /notifications/logs entregue; painel visual na Fase 6
 
-## Fase 6 — Frontend Interno (Painel do Escritório)
+## Fase 6 — Frontend Interno (Painel do Escritório) ✅
 ### Testes da Fase 6
-- [ ] `TaskCard.test.tsx` — renderiza prioridade, prazo vencido, badge correto
-- [ ] `TaskModal.test.tsx` — submit de edição chama PATCH com payload correto
-- [ ] `TemplateEditor.test.tsx` — preview renderiza variáveis em tempo real
-- [ ] `useBoard.test.ts` — hook retorna dados corretos, optimistic update reverte em erro
-- [ ] Setup React 19 + Vite + TailwindCSS v4 + shadcn/ui
-- [ ] Axios interceptors (refresh automático de token)
-- [ ] Tela de login única em `/login` — redireciona por role após autenticação:
+- [x] `TaskCard.test.tsx` — renderiza prioridade, prazo vencido, badge correto
+- [x] `TaskModal.test.tsx` — submit de edição chama PATCH com payload correto
+- [x] `TemplateEditor.test.tsx` — preview renderiza variáveis em tempo real
+- [x] `useBoard.test.ts` — hook retorna dados corretos, optimistic update reverte em erro
+- [x] Setup React 19 + Vite + TailwindCSS v4 + shadcn/ui
+- [x] Axios interceptors (refresh automático de token)
+- [x] Tela de login única em `/login` — redireciona por role após autenticação:
   - `MASTER`      → `/master/dashboard`
   - `ORG_ADMIN`   → `/app/dashboard`
   - `ORG_MANAGER` → `/app/dashboard`
   - `ORG_MEMBER`  → `/app/board`
   - `CLIENT`      → `/portal/board`
-- [ ] Guard de rota: acesso fora do próprio role → redirect `/login`
-- [ ] Dashboard: boards por cliente, indicador de progresso, alertas de vencimento
-- [ ] Board Kanban com `@dnd-kit/core`
-  - [ ] Drag entre colunas com optimistic update
-  - [ ] Modal de tarefa: edição inline, assignee, prioridade, prazo, tags
-  - [ ] Badge de prioridade colorido
-  - [ ] Destaque visual em tarefas vencidas
-- [ ] Tela de clientes: lista com contador de processos ativos
-- [ ] Tela de usuários: CRUD com roles
-- [ ] Tela de templates (`/app/settings/templates`)
-  - [ ] Seletor de evento + canal
-  - [ ] Editor de template com variáveis disponíveis listadas
-  - [ ] Botão "Prévia" — renderiza com dados fictícios em tempo real
-  - [ ] Botão "Testar" — envia mensagem real para número/email de teste
-- [ ] Tela de notificações: configurações + logs com status e mensagem enviada
-- [ ] Tela de assinatura: plano atual, próxima cobrança, histórico, troca de plano
+- [x] Guard de rota: acesso fora do próprio role → redirect `/login`
+- [x] Dashboard: boards por cliente, indicador de progresso, alertas de vencimento
+- [x] Board Kanban com `@dnd-kit/core`
+  - [x] Drag entre colunas com optimistic update
+  - [x] Modal de tarefa: edição inline, prioridade
+  - [x] Badge de prioridade colorido
+  - [x] Destaque visual em tarefas vencidas
+- [x] Tela de clientes: lista com contador de processos ativos
+- [x] Tela de usuários: CRUD com roles
+- [x] Tela de templates (`/app/settings/templates`)
+  - [x] Seletor de evento + canal
+  - [x] Editor de template com variáveis disponíveis listadas
+  - [x] Botão "Prévia" — renderiza com dados fictícios em tempo real
+  - [x] Botão "Testar" — envia mensagem real para número/email de teste
+- [x] Tela de notificações: configurações + logs com status e mensagem enviada
+- [x] Tela de assinatura: plano atual, próxima cobrança, histórico, troca de plano
 
 ## Fase 7 — Portal do Cliente Final
 ### Testes da Fase 7
