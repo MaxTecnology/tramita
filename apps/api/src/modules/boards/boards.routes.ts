@@ -3,8 +3,8 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
-import { createBoardSchema, updateBoardSchema } from './boards.schema'
-import { listBoards, getBoardById, createBoard, updateBoard } from './boards.service'
+import { createBoardSchema, updateBoardSchema, searchQuerySchema } from './boards.schema'
+import { listBoards, getBoardById, createBoard, updateBoard, searchTasks } from './boards.service'
 
 export async function boardsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
@@ -22,6 +22,15 @@ export async function boardsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(await getBoardById(id, request.user.organizationId!))
+  })
+
+  app.get('/:id/tasks/search', {
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const result = searchQuerySchema.safeParse(request.query)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(await searchTasks(id, request.user.organizationId!, result.data))
   })
 
   app.post('/', {

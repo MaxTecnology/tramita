@@ -111,11 +111,12 @@ export async function createTestColumn(
 export async function createTestTask(
   columnId: string,
   creatorId: string,
-  overrides?: Partial<{ title: string; position: number }>,
+  overrides?: Partial<{ title: string; position: number; priority: string }>,
 ) {
   return prisma.task.create({
     data: {
       title: overrides?.title ?? 'Test Task',
+      priority: (overrides?.priority as any) ?? 'MEDIUM',
       position: overrides?.position ?? 0,
       columnId,
       creatorId,
