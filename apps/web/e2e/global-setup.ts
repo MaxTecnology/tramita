@@ -1,7 +1,10 @@
 // apps/web/e2e/global-setup.ts
 import { execSync } from 'child_process'
 import { resolve } from 'path'
+import { fileURLToPath } from 'url'
 import { config as loadEnv } from 'dotenv'
+
+const __dirname = resolve(fileURLToPath(import.meta.url), '..')
 
 // Load root .env so DATABASE_URL_TEST is available
 loadEnv({ path: resolve(__dirname, '../../../.env') })
