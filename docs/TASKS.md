@@ -117,21 +117,21 @@
 - [x] Tela de notificações: configurações + logs com status e mensagem enviada
 - [x] Tela de assinatura: plano atual, próxima cobrança, histórico, troca de plano
 
-## Fase 7 — Portal do Cliente Final
+## Fase 7 — Portal do Cliente Final ✅
 ### Testes da Fase 7
-- [ ] `portal.routes.test.ts` — CLIENT não acessa board de outra org
-- [ ] `portal.routes.test.ts` — CLIENT não pode mover tarefas (403)
-- [ ] `Comments.test.tsx` — submit registra authorType CLIENT corretamente
-- [ ] Rota `/portal/*` com bundle separado (lazy load)
-- [ ] Login do cliente (email + senha própria — sem conta Microsoft)
-- [ ] Board do processo: colunas com cores, cards com prioridade e prazo
-- [ ] Drawer de detalhes da tarefa
-  - [ ] Campo de comentário (POST como CLIENT)
-  - [ ] Lista de comentários com avatar e timestamp
-  - [ ] Timeline de histórico de movimentações visível
-- [ ] Barra de progresso: % concluído no board
-- [ ] Seção de relatórios: download de PDFs mensais
-- [ ] Tela de perfil: alterar senha, número WhatsApp
+- [x] `portal.routes.test.ts` — CLIENT não acessa board de outra org
+- [x] `portal.routes.test.ts` — CLIENT não pode mover tarefas (403)
+- [x] `Comments.test.tsx` — submit registra authorType CLIENT corretamente
+- [x] Rota `/portal/*` com bundle separado (lazy load)
+- [x] Login do cliente (email + senha própria — sem conta Microsoft)
+- [x] Board do processo: colunas com cores, cards com prioridade e prazo
+- [x] Drawer de detalhes da tarefa
+  - [x] Campo de comentário (POST como CLIENT)
+  - [x] Lista de comentários com avatar e timestamp
+  - [x] Timeline de histórico de movimentações visível
+- [x] Barra de progresso: % concluído no board
+- [x] Seção de relatórios: download de PDFs mensais
+- [x] Tela de perfil: alterar senha, número WhatsApp
 
 ## Fase 8 — Recursos Avançados
 ### Testes da Fase 8
