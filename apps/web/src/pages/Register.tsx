@@ -1,16 +1,15 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import axios from 'axios'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent } from '@/components/ui/card'
+import { ArrowLeft } from 'lucide-react'
 
-interface Plan {
-  id: string
-  name: string
-  maxClients: number
-  priceMonthly: number
-}
-
+interface Plan { id: string; name: string; maxClients: number; priceMonthly: number }
 type Step = 'plan' | 'form'
 
 export default function Register() {
@@ -23,7 +22,7 @@ export default function Register() {
     name: '', cnpj: '', email: '', phone: '', adminName: '', adminPassword: '',
   })
 
-  const { data: plans = [], isLoading: loadingPlans } = useQuery<Plan[]>({
+  const { data: plans = [], isLoading } = useQuery<Plan[]>({
     queryKey: ['public', 'plans'],
     queryFn: () => api.get('/organizations/plans').then((r) => r.data as Plan[]),
   })
@@ -54,85 +53,167 @@ export default function Register() {
 
   if (step === 'plan') {
     return (
-      <div style={{ maxWidth: 800, margin: '48px auto', padding: 24, fontFamily: 'sans-serif' }}>
-        <h1 style={{ marginTop: 0 }}>Comece agora — escolha seu plano</h1>
-        {loadingPlans ? (
-          <p>Carregando planos...</p>
-        ) : (
-          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-            {plans.map((plan) => (
-              <div
-                key={plan.id}
-                onClick={() => { setSelectedPlan(plan); setStep('form') }}
-                style={{
-                  border: '2px solid #ddd', borderRadius: 12, padding: 24,
-                  cursor: 'pointer', minWidth: 200, flex: 1,
-                }}
-              >
-                <h2 style={{ marginTop: 0 }}>{plan.name}</h2>
-                <p style={{ fontSize: 28, fontWeight: 700, margin: '8px 0' }}>
-                  R$ {Number(plan.priceMonthly).toFixed(2)}
-                  <span style={{ fontSize: 14, fontWeight: 400, color: '#666' }}>/mês</span>
-                </p>
-                <p style={{ color: '#555', marginBottom: 16 }}>Até {plan.maxClients} clientes</p>
-                <button style={{ width: '100%', padding: '10px' }}>Escolher</button>
-              </div>
-            ))}
-          </div>
-        )}
-        <p style={{ marginTop: 24, color: '#666' }}>
-          Já tem conta? <a href="/login">Entrar</a>
-        </p>
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
+          <HubIcon />
+          <span className="font-bold text-[#185FA5]">Tramita</span>
+        </header>
+
+        <div className="flex-1 flex flex-col items-center justify-center p-8">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Escolha seu plano</h1>
+          <p className="text-gray-500 mb-8">Comece com um trial gratuito. Sem cartão de crédito.</p>
+
+          {isLoading ? (
+            <p className="text-gray-400">Carregando planos...</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl">
+              {plans.map((plan) => (
+                <Card
+                  key={plan.id}
+                  className="cursor-pointer border-2 hover:border-[#185FA5] transition-colors"
+                  onClick={() => { setSelectedPlan(plan); setStep('form') }}
+                >
+                  <CardContent className="pt-6">
+                    <h2 className="text-lg font-bold text-gray-900 mb-1">{plan.name}</h2>
+                    <p className="text-3xl font-bold text-[#185FA5] mb-1">
+                      R$ {Number(plan.priceMonthly).toFixed(0)}
+                      <span className="text-sm font-normal text-gray-500">/mês</span>
+                    </p>
+                    <p className="text-sm text-gray-500 mb-4">Até {plan.maxClients} clientes</p>
+                    <Button className="w-full bg-[#185FA5] hover:bg-[#0C447C] text-white">
+                      Escolher
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <p className="mt-8 text-sm text-gray-500">
+            Já tem conta?{' '}
+            <Link to="/login" className="text-[#185FA5] hover:underline font-medium">Entrar</Link>
+          </p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div style={{ maxWidth: 520, margin: '48px auto', padding: 24, fontFamily: 'sans-serif' }}>
-      <button
-        onClick={() => setStep('plan')}
-        style={{ marginBottom: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#0070f3' }}
-      >
-        ← Voltar para planos
-      </button>
-      <h1 style={{ marginTop: 0 }}>Criar conta — {selectedPlan?.name}</h1>
-      <form onSubmit={handleSubmit}>
-        <Field label="Nome do escritório" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
-        <Field label="CNPJ" value={form.cnpj} onChange={(v) => setForm({ ...form, cnpj: v })} />
-        <Field label="E-mail" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
-        <Field label="Telefone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
-        <hr style={{ margin: '16px 0', borderColor: '#eee' }} />
-        <p style={{ color: '#666', margin: '0 0 8px', fontSize: 13 }}>Dados do administrador</p>
-        <Field label="Seu nome" value={form.adminName} onChange={(v) => setForm({ ...form, adminName: v })} required />
-        <Field label="Senha" type="password" value={form.adminPassword} onChange={(v) => setForm({ ...form, adminPassword: v })} required />
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-        <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px', marginTop: 8 }}>
-          {loading ? 'Criando conta...' : 'Criar conta'}
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
+        <button
+          onClick={() => setStep('plan')}
+          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        >
+          <ArrowLeft size={16} />
+          Planos
         </button>
-      </form>
+        <span className="text-gray-300">/</span>
+        <span className="text-sm font-medium text-gray-700">{selectedPlan?.name}</span>
+      </header>
+
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="w-full max-w-md">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Criar conta</h1>
+          <p className="text-gray-500 text-sm mb-6">
+            Plano <strong>{selectedPlan?.name}</strong> — R$ {Number(selectedPlan?.priceMonthly).toFixed(2)}/mês
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="org-name">Nome do escritório</Label>
+              <Input
+                id="org-name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cnpj">
+                CNPJ <span className="text-gray-400 font-normal">(opcional)</span>
+              </Label>
+              <Input
+                id="cnpj"
+                value={form.cnpj}
+                onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="reg-email">E-mail</Label>
+              <Input
+                id="reg-email"
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="phone">
+                Telefone <span className="text-gray-400 font-normal">(opcional)</span>
+              </Label>
+              <Input
+                id="phone"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+            </div>
+
+            <div className="border-t border-gray-200 pt-4">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">
+                Administrador da conta
+              </p>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="admin-name">Seu nome</Label>
+                  <Input
+                    id="admin-name"
+                    value={form.adminName}
+                    onChange={(e) => setForm({ ...form, adminName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="admin-pass">Senha</Label>
+                  <Input
+                    id="admin-pass"
+                    type="password"
+                    value={form.adminPassword}
+                    onChange={(e) => setForm({ ...form, adminPassword: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            {error && <p className="text-sm text-red-600">{error}</p>}
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#185FA5] hover:bg-[#0C447C] text-white"
+            >
+              {loading ? 'Criando conta...' : 'Criar conta'}
+            </Button>
+          </form>
+        </div>
+      </div>
     </div>
   )
 }
 
-function Field({
-  label, value, onChange, type = 'text', required,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  type?: string
-  required?: boolean
-}) {
+function HubIcon() {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ display: 'block', marginBottom: 4, fontSize: 14 }}>{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required={required}
-        style={{ display: 'block', width: '100%', padding: '8px', boxSizing: 'border-box' }}
-      />
-    </div>
+    <svg width="24" height="24" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="72" rx="16" fill="#185FA5" />
+      <circle cx="36" cy="36" r="10" fill="white" />
+      <circle cx="36" cy="10" r="5" fill="white" opacity="0.85" />
+      <circle cx="60" cy="51" r="5" fill="white" opacity="0.85" />
+      <circle cx="12" cy="51" r="5" fill="white" opacity="0.85" />
+      <line x1="36" y1="26" x2="36" y2="15" stroke="white" strokeWidth="2" opacity="0.7" />
+      <line x1="46" y1="42" x2="55" y2="46" stroke="white" strokeWidth="2" opacity="0.7" />
+      <line x1="26" y1="42" x2="17" y2="46" stroke="white" strokeWidth="2" opacity="0.7" />
+    </svg>
   )
 }
