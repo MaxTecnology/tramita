@@ -1,7 +1,7 @@
 // apps/web/e2e/fixtures.ts
 import { test as base, expect, type Page, type APIRequestContext } from '@playwright/test'
 
-const API = 'http://localhost:3000'
+const API = process.env.VITE_API_URL ?? 'http://localhost:3001'
 
 async function loginAndInject(
   page: Page,

@@ -27,19 +27,24 @@ export default defineConfig({
   webServer: [
     {
       command: 'pnpm --filter api dev',
-      url: 'http://localhost:3000/health',
-      reuseExistingServer: !process.env.CI,
-      timeout: 30_000,
+      url: 'http://localhost:3001/health',
+      reuseExistingServer: false,
+      timeout: 60_000,
       env: {
         ...process.env,
         DATABASE_URL: process.env.DATABASE_URL_TEST ?? '',
+        PORT: '3001',
       },
     },
     {
       command: 'pnpm --filter web dev',
       url: 'http://localhost:5173',
-      reuseExistingServer: !process.env.CI,
-      timeout: 30_000,
+      reuseExistingServer: false,
+      timeout: 60_000,
+      env: {
+        ...process.env,
+        VITE_API_URL: 'http://localhost:3001',
+      },
     },
   ],
 })
