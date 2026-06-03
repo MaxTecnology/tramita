@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
   DragEndEvent,
@@ -11,7 +11,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Plus } from 'lucide-react'
 import { useBoard } from '@/hooks/useBoard'
 import { useBoardStream } from '@/hooks/useBoardStream'
 import { api } from '@/lib/api'
@@ -38,11 +38,29 @@ export default function Board() {
   const { boardId } = useParams<{ boardId: string }>()
   const { board, isLoading, moveTask } = useBoard(boardId!)
   useBoardStream(boardId)
+  const qc = useQueryClient()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [search, setSearch] = useState('')
   const [filterPriority, setFilterPriority] = useState('')
   const hasFilters = search.trim() !== '' || filterPriority !== ''
+  const [addingToColumn, setAddingToColumn] = useState<string | null>(null)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+
+  const createTaskMutation = useMutation({
+    mutationFn: ({ columnId, title }: { columnId: string; title: string }) =>
+      api.post(`/columns/${columnId}/tasks`, { title }).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['board', boardId] })
+      setAddingToColumn(null)
+      setNewTaskTitle('')
+    },
+  })
+
+  function handleAddTask(columnId: string) {
+    if (!newTaskTitle.trim()) return
+    createTaskMutation.mutate({ columnId, title: newTaskTitle.trim() })
+  }
 
   const { data: searchResults } = useQuery<Task[]>({
     queryKey: ['board-search', boardId, search, filterPriority],
@@ -170,6 +188,45 @@ export default function Board() {
                     ))}
                   </div>
                 </SortableContext>
+
+                {addingToColumn === column.id ? (
+                  <div className="mt-2 p-1">
+                    <input
+                      autoFocus
+                      value={newTaskTitle}
+                      onChange={(e) => setNewTaskTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleAddTask(column.id)
+                        if (e.key === 'Escape') { setAddingToColumn(null); setNewTaskTitle('') }
+                      }}
+                      placeholder="Nome da tarefa..."
+                      className="w-full text-sm rounded-md border border-gray-300 bg-white px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <div className="flex gap-2 mt-1.5">
+                      <button
+                        onClick={() => handleAddTask(column.id)}
+                        disabled={!newTaskTitle.trim() || createTaskMutation.isPending}
+                        className="text-xs bg-[#185FA5] text-white px-3 py-1 rounded hover:bg-[#0C447C] disabled:opacity-50"
+                      >
+                        {createTaskMutation.isPending ? '...' : 'Adicionar'}
+                      </button>
+                      <button
+                        onClick={() => { setAddingToColumn(null); setNewTaskTitle('') }}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setAddingToColumn(column.id); setNewTaskTitle('') }}
+                    className="mt-2 w-full text-left text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1"
+                  >
+                    <Plus size={12} />
+                    Adicionar tarefa
+                  </button>
+                )}
               </div>
             ))}
           </div>
