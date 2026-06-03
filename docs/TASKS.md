@@ -59,6 +59,13 @@
 - [x] Histórico automático em cada mutação (`TaskHistory`)
 - [x] CRUD comentários com `authorType` discriminado
 
+### Ajustes de roles e workflow (pós-fase 4)
+- [x] `responsibleUserId` no Board — colaborador vê apenas seus processos
+- [x] `POST /boards` aberto para ORG_MEMBER — cria com responsável automático e 3 colunas padrão
+- [x] `GET /clients` aberto para ORG_MEMBER — para modal de criação de board
+- [x] `POST /boards/:id/columns` aberto para ORG_MEMBER
+- [x] Dashboard: botão "Novo Processo" + modal com 3 colunas padrão automáticas
+
 ## Fase 5 — Templates e Notificações ✅
 ### Testes da Fase 5
 - [x] `template.test.ts` — interpolação de todas as variáveis, variável ausente retorna string vazia
