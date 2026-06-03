@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   DndContext,
   DragEndEvent,
@@ -13,6 +14,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { ArrowLeft } from 'lucide-react'
 import { useBoard } from '@/hooks/useBoard'
 import { useBoardStream } from '@/hooks/useBoardStream'
+import { api } from '@/lib/api'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskModal } from '@/components/TaskModal'
 import type { Task } from '@/types'
@@ -38,6 +40,20 @@ export default function Board() {
   useBoardStream(boardId)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [search, setSearch] = useState('')
+  const [filterPriority, setFilterPriority] = useState('')
+  const hasFilters = search.trim() !== '' || filterPriority !== ''
+
+  const { data: searchResults } = useQuery<Task[]>({
+    queryKey: ['board-search', boardId, search, filterPriority],
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (search.trim()) params.set('q', search.trim())
+      if (filterPriority) params.set('priority', filterPriority)
+      return api.get(`/boards/${boardId}/tasks/search?${params}`).then((r) => r.data)
+    },
+    enabled: !!boardId && hasFilters,
+  })
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -74,6 +90,59 @@ export default function Board() {
           <p className="text-sm text-gray-500">{board.client.name}</p>
         </div>
       </div>
+
+      {/* Search bar */}
+      <div className="flex items-center gap-3 px-6 py-2 border-b border-gray-100 bg-white">
+        <input
+          type="text"
+          placeholder="Buscar tarefas..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 h-8 rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <select
+          value={filterPriority}
+          onChange={(e) => setFilterPriority(e.target.value)}
+          className="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Prioridade</option>
+          <option value="LOW">Baixa</option>
+          <option value="MEDIUM">Média</option>
+          <option value="HIGH">Alta</option>
+          <option value="URGENT">Urgente</option>
+        </select>
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('')
+              setFilterPriority('')
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 underline"
+          >
+            Limpar
+          </button>
+        )}
+      </div>
+
+      {/* Search results */}
+      {hasFilters && searchResults && (
+        <div className="px-6 py-3 border-b border-gray-100 bg-yellow-50">
+          <p className="text-xs text-gray-500 mb-2">{searchResults.length} resultado(s)</p>
+          <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+            {searchResults.map((task) => (
+              <div
+                key={task.id}
+                onClick={() => setSelectedTask(task)}
+                className="bg-white rounded-lg p-2.5 border border-gray-200 cursor-pointer hover:shadow-sm text-sm flex items-center justify-between"
+              >
+                <span className="font-medium text-gray-800">{task.title}</span>
+                <span className="text-xs text-gray-400 ml-2">{task.priority}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-x-auto p-6">
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>

@@ -12,6 +12,7 @@ export default function PortalBoard() {
   const { boardId } = useParams<{ boardId: string }>()
   useBoardStream(boardId)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [titleSearch, setTitleSearch] = useState('')
 
   const { data: board, isLoading } = useQuery<Board>({
     queryKey: ['portal-board', boardId],
@@ -25,6 +26,15 @@ export default function PortalBoard() {
   const allTasks = board.columns.flatMap((c) => c.tasks)
   const doneTasks = allTasks.filter((t) => t.status === 'DONE').length
   const progress = allTasks.length > 0 ? Math.round((doneTasks / allTasks.length) * 100) : 0
+
+  const filteredColumns = board.columns.map((col) => ({
+    ...col,
+    tasks: titleSearch.trim()
+      ? col.tasks.filter((t) =>
+          t.title.toLowerCase().includes(titleSearch.toLowerCase()),
+        )
+      : col.tasks,
+  }))
 
   return (
     <div className="flex flex-col h-full">
@@ -46,9 +56,20 @@ export default function PortalBoard() {
         </div>
       </div>
 
+      {/* Title search */}
+      <div className="px-6 py-2 border-b border-gray-100 bg-white">
+        <input
+          type="text"
+          placeholder="Buscar por título..."
+          value={titleSearch}
+          onChange={(e) => setTitleSearch(e.target.value)}
+          className="w-full h-8 rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+
       <div className="flex-1 overflow-x-auto p-6">
         <div className="flex gap-4 h-full">
-          {board.columns.map((column) => (
+          {filteredColumns.map((column) => (
             <div key={column.id} className="flex-shrink-0 w-64">
               <div
                 className="flex items-center justify-between mb-3 pb-2 border-b-2"
