@@ -26,7 +26,7 @@ export default function Login() {
       const role: string = data.user.role
       if (role === 'MASTER') navigate('/master/dashboard')
       else if (role === 'ORG_ADMIN' || role === 'ORG_MANAGER') navigate('/app/dashboard')
-      else if (role === 'ORG_MEMBER') navigate('/app/board')
+      else if (role === 'ORG_MEMBER') navigate('/app/dashboard')
       else navigate('/portal/board')
     } catch {
       setError('E-mail ou senha inválidos')
