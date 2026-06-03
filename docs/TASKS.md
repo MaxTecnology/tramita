@@ -136,7 +136,7 @@
 ## Fase 8 — Recursos Avançados
 ### Testes da Fase 8
 - [x] `stream.test.ts` — evento emitido ao mover tarefa, heartbeat a cada 30s
-- [ ] `search.routes.test.ts` — filtros combinados retornam apenas tarefas da org correta
+- [x] `search.routes.test.ts` — filtros combinados retornam apenas tarefas da org correta
 - [ ] `attachments.service.test.ts` — mock B2 client, valida storageKey e signed URL
 - [ ] `attachments.routes.test.ts` — rejeita arquivo acima de 20MB, tipo não permitido
 - [ ] `reports.service.test.ts` — PDF gerado com dados do mês correto, cache Redis funciona
@@ -148,10 +148,10 @@
 - [x] Portal do cliente: mesma lógica — board atualiza ao vivo
 - [x] Reconexão automática com backoff
 
-### 8b — Busca e Filtros
-- [ ] `GET /boards/:id/tasks/search?q=&priority=&status=&assigneeId=&dueBefore=&dueAfter=`
-- [ ] Frontend: barra de busca + filtros no board interno
-- [ ] Portal: busca por título de tarefa
+### 8b — Busca e Filtros ✅
+- [x] `GET /boards/:id/tasks/search?q=&priority=&status=&assigneeId=&dueBefore=&dueAfter=`
+- [x] Frontend: barra de busca + filtros no board interno
+- [x] Portal: busca por título de tarefa
 
 ### 8c — Anexos (Backblaze B2)
 - [ ] Backblaze B2 configurado via variáveis de ambiente
