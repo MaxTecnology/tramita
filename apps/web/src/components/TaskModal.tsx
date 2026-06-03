@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,15 @@ interface Props {
   task: Task
   open: boolean
   onClose: () => void
+}
+
+interface Attachment {
+  id: string
+  filename: string
+  mimeType: string
+  size: number
+  signedUrl: string
+  createdAt: string
 }
 
 const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const
@@ -26,6 +35,29 @@ export function TaskModal({ task, open, onClose }: Props) {
       queryClient.invalidateQueries({ queryKey: ['board'] })
       onClose()
     },
+  })
+
+  const { data: attachments = [] } = useQuery<Attachment[]>({
+    queryKey: ['attachments', task.id],
+    queryFn: () => api.get(`/tasks/${task.id}/attachments`).then((r) => r.data),
+    enabled: open,
+  })
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return api.post(`/tasks/${task.id}/attachments`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['attachments', task.id] }),
+  })
+
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: (attachmentId: string) =>
+      api.delete(`/tasks/${task.id}/attachments/${attachmentId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['attachments', task.id] }),
   })
 
   if (!open) return null
@@ -63,6 +95,46 @@ export function TaskModal({ task, open, onClose }: Props) {
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
+          </div>
+
+          {/* Attachments */}
+          <div className="mt-4">
+            <Label>Anexos</Label>
+            <div className="mt-1 space-y-1">
+              {attachments.map((a) => (
+                <div key={a.id} className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-1.5">
+                  <a
+                    href={a.signedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline truncate max-w-[240px]"
+                  >
+                    {a.filename}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => deleteAttachmentMutation.mutate(a.id)}
+                    className="text-xs text-red-400 hover:text-red-600 ml-2 flex-shrink-0"
+                  >
+                    Remover
+                  </button>
+                </div>
+              ))}
+            </div>
+            <label className="mt-2 flex items-center gap-2 cursor-pointer">
+              <input
+                type="file"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) uploadMutation.mutate(file)
+                  e.target.value = ''
+                }}
+              />
+              <span className="text-xs text-blue-600 hover:underline">
+                {uploadMutation.isPending ? 'Enviando...' : '+ Adicionar arquivo'}
+              </span>
+            </label>
           </div>
         </div>
 

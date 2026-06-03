@@ -14,6 +14,13 @@ interface TaskHistory {
   createdAt: string
 }
 
+interface Attachment {
+  id: string
+  filename: string
+  size: number
+  signedUrl: string
+}
+
 interface Props {
   task: Task
   onClose: () => void
@@ -37,6 +44,11 @@ export function TaskDrawer({ task, onClose }: Props) {
   const { data: history = [] } = useQuery<TaskHistory[]>({
     queryKey: ['task-history', task.id],
     queryFn: () => api.get(`/portal/tasks/${task.id}/history`).then((r) => r.data),
+  })
+
+  const { data: attachments = [] } = useQuery<Attachment[]>({
+    queryKey: ['attachments', task.id],
+    queryFn: () => api.get(`/tasks/${task.id}/attachments`).then((r) => r.data),
   })
 
   const isOverdue =
@@ -93,6 +105,26 @@ export function TaskDrawer({ task, onClose }: Props) {
                       {new Date(h.createdAt).toLocaleString('pt-BR')}
                     </p>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {attachments.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Anexos</h3>
+              <div className="space-y-1">
+                {attachments.map((a) => (
+                  <a
+                    key={a.id}
+                    href={a.signedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                  >
+                    <span className="text-gray-400">📎</span>
+                    {a.filename}
+                  </a>
                 ))}
               </div>
             </div>
