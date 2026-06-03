@@ -133,13 +133,13 @@
 - [x] Seção de relatórios: download de PDFs mensais
 - [x] Tela de perfil: alterar senha, número WhatsApp
 
-## Fase 8 — Recursos Avançados
+## Fase 8 — Recursos Avançados ✅
 ### Testes da Fase 8
 - [x] `stream.test.ts` — evento emitido ao mover tarefa, heartbeat a cada 30s
 - [x] `search.routes.test.ts` — filtros combinados retornam apenas tarefas da org correta
 - [x] `attachments.service.test.ts` — mock B2 client, valida storageKey e signed URL
 - [x] `attachments.routes.test.ts` — rejeita arquivo acima de 20MB, tipo não permitido
-- [ ] `reports.service.test.ts` — PDF gerado com dados do mês correto, cache Redis funciona
+- [x] `reports.service.test.ts` — PDF gerado com dados do mês correto, cache Redis funciona
 ### 8a — Tempo Real (SSE) ✅
 - [x] `stream.test.ts` — evento emitido ao mover tarefa, heartbeat (endpoint auth)
 - [x] `GET /boards/:id/stream?token=<jwt>` — endpoint SSE
@@ -161,12 +161,11 @@
 - [x] Frontend: dropzone no modal da tarefa
 - [x] Portal: visualização e download de anexos
 
-### 8d — Relatório PDF
-- [ ] Puppeteer no docker-compose
-- [ ] `GET /clients/:clientId/report?month=YYYY-MM` — gera PDF com cache Redis 1h
-- [ ] Conteúdo: cabeçalho org, resumo executivo, tabela de tarefas, histórico do período
-- [ ] Frontend interno: botão "Exportar relatório"
-- [ ] Portal: seção de relatórios disponíveis para download
+### 8d — Relatório PDF ✅
+- [x] `GET /clients/:clientId/report?month=YYYY-MM` — gera PDF com cache Redis 1h
+- [x] Conteúdo: cabeçalho org, resumo executivo, tabela de tarefas, histórico do período
+- [x] Frontend interno: botão "Exportar relatório"
+- [x] Portal: seção de relatórios disponíveis para download
 
 ## Fase 9 — Infra e Deploy
 ### Testes da Fase 9
