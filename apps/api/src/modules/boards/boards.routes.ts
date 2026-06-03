@@ -14,7 +14,8 @@ export async function boardsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { organizationId, role, sub } = request.user
     const clientId = role === 'CLIENT' ? sub : undefined
-    return reply.send(await listBoards(organizationId!, clientId))
+    const responsibleUserId = role === 'ORG_MEMBER' ? sub : undefined
+    return reply.send(await listBoards(organizationId!, clientId, responsibleUserId))
   })
 
   app.get('/:id', {
@@ -34,11 +35,18 @@ export async function boardsRoutes(app: FastifyInstance) {
   })
 
   app.post('/', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), checkSubscription],
   }, async (request, reply) => {
     const result = createBoardSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
-    return reply.status(201).send(await createBoard(request.user.organizationId!, result.data))
+    return reply.status(201).send(
+      await createBoard(
+        request.user.organizationId!,
+        request.user.sub,
+        request.user.role,
+        result.data,
+      ),
+    )
   })
 
   app.patch('/:id', {
