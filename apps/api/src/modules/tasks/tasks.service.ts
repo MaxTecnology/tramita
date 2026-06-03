@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
+import { publishBoardEvent } from '@/lib/sse'
 import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody } from './tasks.schema'
 
 export interface Actor {
@@ -21,7 +22,7 @@ async function resolveActorName(actorId: string, actorType: 'user' | 'client'): 
 async function verifyColumnBelongsToOrg(columnId: string, organizationId: string) {
   const column = await prisma.column.findFirst({
     where: { id: columnId },
-    include: { board: { select: { organizationId: true, clientId: true } } },
+    include: { board: { select: { id: true, organizationId: true, clientId: true } } },
   })
   if (!column || column.board.organizationId !== organizationId) {
     throw new AppError(404, 'Coluna não encontrada')
@@ -34,7 +35,7 @@ async function verifyTaskBelongsToOrg(taskId: string, organizationId: string) {
     where: { id: taskId },
     include: {
       column: {
-        include: { board: { select: { organizationId: true, clientId: true } } },
+        include: { board: { select: { id: true, organizationId: true, clientId: true } } },
       },
     },
   })
@@ -90,6 +91,11 @@ export async function createTask(
     organizationId,
     clientId: column.board.clientId,
     metadata: { taskTitle: task.title },
+  })
+
+  await publishBoardEvent(column.board.id, {
+    event: 'task:created',
+    data: { taskId: task.id, columnId, title: task.title },
   })
 
   return task
@@ -153,6 +159,11 @@ export async function moveTask(
     })
   }
 
+  await publishBoardEvent(toColumn.board.id, {
+    event: 'task:moved',
+    data: { taskId, fromColumn: fromColumn.id, toColumn: data.columnId, position: data.position },
+  })
+
   return updatedTask
 }
 
@@ -182,8 +193,8 @@ export async function updateTask(
     })
   }
 
-  return prisma.$transaction(async (tx) => {
-    const updated = await tx.task.update({
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.task.update({
       where: { id },
       data: {
         title: data.title,
@@ -212,8 +223,15 @@ export async function updateTask(
       })
     }
 
-    return updated
+    return result
   })
+
+  await publishBoardEvent(task.column.board.id, {
+    event: 'task:updated',
+    data: { taskId: id },
+  })
+
+  return updated
 }
 
 export async function reorderTasks(items: ReorderTasksBody, organizationId: string) {

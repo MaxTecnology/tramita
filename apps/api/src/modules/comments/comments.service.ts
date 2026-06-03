@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
+import { publishBoardEvent } from '@/lib/sse'
 import type { CreateCommentBody } from './comments.schema'
 
 interface CommentActor {
@@ -31,11 +32,12 @@ export async function createComment(
 ) {
   const task = await prisma.task.findFirst({
     where: { id: taskId, column: { board: { organizationId: actor.organizationId } } },
+    include: { column: { include: { board: { select: { id: true } } } } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
 
   const isClient = actor.role === 'CLIENT'
-  return prisma.comment.create({
+  const comment = await prisma.comment.create({
     data: {
       content: data.content,
       taskId,
@@ -48,6 +50,13 @@ export async function createComment(
       client: { select: { id: true, name: true } },
     },
   })
+
+  await publishBoardEvent(task.column.board.id, {
+    event: 'comment:added',
+    data: { taskId, commentId: comment.id },
+  })
+
+  return comment
 }
 
 export async function deleteComment(id: string, actor: CommentActor) {
