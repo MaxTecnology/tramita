@@ -135,17 +135,18 @@
 
 ## Fase 8 — Recursos Avançados
 ### Testes da Fase 8
-- [ ] `stream.test.ts` — evento emitido ao mover tarefa, heartbeat a cada 30s
+- [x] `stream.test.ts` — evento emitido ao mover tarefa, heartbeat a cada 30s
 - [ ] `search.routes.test.ts` — filtros combinados retornam apenas tarefas da org correta
 - [ ] `attachments.service.test.ts` — mock B2 client, valida storageKey e signed URL
 - [ ] `attachments.routes.test.ts` — rejeita arquivo acima de 20MB, tipo não permitido
 - [ ] `reports.service.test.ts` — PDF gerado com dados do mês correto, cache Redis funciona
-### 8a — Tempo Real (SSE)
-- [ ] `GET /boards/:id/stream?token=<jwt>` — endpoint SSE
-- [ ] Emitir eventos: `task:moved`, `task:created`, `task:updated`, `comment:added`, `heartbeat`
-- [ ] Frontend interno: conectar ao SSE, atualizar via react-query sem reload
-- [ ] Portal do cliente: mesma lógica — board atualiza ao vivo
-- [ ] Reconexão automática com backoff
+### 8a — Tempo Real (SSE) ✅
+- [x] `stream.test.ts` — evento emitido ao mover tarefa, heartbeat (endpoint auth)
+- [x] `GET /boards/:id/stream?token=<jwt>` — endpoint SSE
+- [x] Emitir eventos: `task:moved`, `task:created`, `task:updated`, `comment:added`
+- [x] Frontend interno: conectar ao SSE, atualizar via react-query sem reload
+- [x] Portal do cliente: mesma lógica — board atualiza ao vivo
+- [x] Reconexão automática com backoff
 
 ### 8b — Busca e Filtros
 - [ ] `GET /boards/:id/tasks/search?q=&priority=&status=&assigneeId=&dueBefore=&dueAfter=`
