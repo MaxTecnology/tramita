@@ -2,16 +2,30 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { CreateBoardBody, UpdateBoardBody, SearchQuery } from './boards.schema'
 
-export async function listBoards(organizationId: string, clientId?: string) {
+const DEFAULT_COLUMNS = [
+  { title: 'Pendente', position: 0, color: '#6B7280', isFinal: false },
+  { title: 'Em andamento', position: 1, color: '#3B82F6', isFinal: false },
+  { title: 'Concluído', position: 2, color: '#10B981', isFinal: true },
+]
+
+export async function listBoards(
+  organizationId: string,
+  clientId?: string,
+  responsibleUserId?: string,
+) {
   return prisma.board.findMany({
     where: {
       organizationId,
       isActive: true,
       ...(clientId ? { clientId } : {}),
+      ...(responsibleUserId ? { responsibleUserId } : {}),
     },
     include: {
       client: { select: { id: true, name: true } },
-      _count: { select: { columns: true } },
+      columns: {
+        orderBy: { position: 'asc' },
+        include: { tasks: { orderBy: { position: 'asc' } } },
+      },
     },
     orderBy: { createdAt: 'desc' },
   })
@@ -32,15 +46,33 @@ export async function getBoardById(id: string, organizationId: string) {
   return board
 }
 
-export async function createBoard(organizationId: string, data: CreateBoardBody) {
+export async function createBoard(
+  organizationId: string,
+  userId: string,
+  userRole: string,
+  data: CreateBoardBody,
+) {
   const client = await prisma.client.findFirst({
     where: { id: data.clientId, organizationId, isActive: true },
   })
   if (!client) throw new AppError(404, 'Cliente não encontrado')
 
+  const responsibleUserId =
+    userRole === 'ORG_MEMBER' ? userId : (data.responsibleUserId ?? null)
+
   return prisma.board.create({
-    data: { title: data.title, description: data.description, clientId: data.clientId, organizationId },
-    include: { client: { select: { id: true, name: true } } },
+    data: {
+      title: data.title,
+      description: data.description,
+      clientId: data.clientId,
+      organizationId,
+      responsibleUserId,
+      columns: { create: DEFAULT_COLUMNS },
+    },
+    include: {
+      client: { select: { id: true, name: true } },
+      columns: { orderBy: { position: 'asc' } },
+    },
   })
 }
 
