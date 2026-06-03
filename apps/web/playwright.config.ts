@@ -31,6 +31,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
       env: {
+        ...process.env,
         DATABASE_URL: process.env.DATABASE_URL_TEST ?? '',
       },
     },
