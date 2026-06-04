@@ -258,8 +258,7 @@ export async function deleteTask(id: string, organizationId: string) {
 }
 
 export async function getTaskHistory(taskId: string, organizationId: string) {
-  const task = await verifyTaskBelongsToOrg(taskId, organizationId)
-  if (!task) throw new AppError(404, 'Tarefa não encontrada')
+  await verifyTaskBelongsToOrg(taskId, organizationId)
 
   return prisma.taskHistory.findMany({
     where: { taskId },
