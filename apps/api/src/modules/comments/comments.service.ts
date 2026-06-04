@@ -108,7 +108,7 @@ export async function deleteComment(id: string, actor: CommentActor) {
   const isAuthor =
     (actor.role === 'CLIENT' && comment.clientId === actor.id) ||
     (actor.role !== 'CLIENT' && comment.userId === actor.id)
-  const isAdmin = actor.role === 'ORG_ADMIN'
+  const isAdmin = actor.role === 'ORG_ADMIN' || actor.role === 'ORG_MANAGER'
 
   if (!isAuthor && !isAdmin) throw new AppError(403, 'Sem permissão')
 
