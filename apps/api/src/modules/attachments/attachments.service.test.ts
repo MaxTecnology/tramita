@@ -31,7 +31,7 @@ describe('attachments.service', () => {
     const result = await createAttachment(
       task.id,
       org.id,
-      user.id,
+      { id: user.id, role: 'ORG_ADMIN' },
       { filename: 'doc.pdf', mimeType: 'application/pdf', size: 1024, buffer: Buffer.from('') },
     )
 
@@ -52,7 +52,7 @@ describe('attachments.service', () => {
     const col = await createTestColumn(board.id, { position: 0 })
     const task = await createTestTask(col.id, user.id)
 
-    await createAttachment(task.id, org.id, user.id, {
+    await createAttachment(task.id, org.id, { id: user.id, role: 'ORG_ADMIN' }, {
       filename: 'report.pdf',
       mimeType: 'application/pdf',
       size: 2048,
