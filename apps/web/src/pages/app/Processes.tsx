@@ -66,7 +66,6 @@ interface Group {
 function BoardRow({ board, now }: { board: Board; now: Date }) {
   const progress = getProgress(board)
   const taskDueDate = getMostUrgentDueDate(board)
-  // fallback para board.dueDate quando não há task com prazo
   const effectiveDueDate = taskDueDate ?? (board.dueDate ? new Date(board.dueDate) : null)
   const { label: dueDateLabel, cls: dueDateCls } = formatDueDate(effectiveDueDate, now)
   const stage = getCurrentStage(board)
@@ -74,28 +73,49 @@ function BoardRow({ board, now }: { board: Board; now: Date }) {
   return (
     <Link
       to={`/app/board/${board.id}`}
-      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+      className="block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
     >
-      <div className="flex-[2] min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">{board.title}</p>
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-gray-600 truncate">{board.client.name}</p>
-      </div>
-      <div className="flex-1 min-w-0">
-        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full truncate">{stage}</span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-gray-500 truncate">{board.responsibleUser?.name ?? '—'}</p>
-      </div>
-      <div className="flex-1 flex items-center gap-2">
-        <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progress}%` }} />
+      {/* Mobile: card layout */}
+      <div className="md:hidden">
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <p className="text-sm font-medium text-gray-900 flex-1 min-w-0 truncate">{board.title}</p>
+          <span className={cn('text-xs flex-shrink-0', dueDateCls)}>{dueDateLabel}</span>
         </div>
-        <span className="text-xs text-gray-500 w-8 text-right">{progress}%</span>
+        <p className="text-xs text-gray-500 mb-2">{board.client.name}</p>
+        <div className="flex items-center gap-3">
+          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{stage}</span>
+          <div className="flex-1 flex items-center gap-2">
+            <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progress}%` }} />
+            </div>
+            <span className="text-xs text-gray-500 w-8 text-right">{progress}%</span>
+          </div>
+        </div>
       </div>
-      <div className="w-24 text-right">
-        <span className={cn('text-xs', dueDateCls)}>{dueDateLabel}</span>
+
+      {/* Desktop: table row */}
+      <div className="hidden md:flex items-center gap-3">
+        <div className="flex-[2] min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">{board.title}</p>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-gray-600 truncate">{board.client.name}</p>
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full truncate">{stage}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-gray-500 truncate">{board.responsibleUser?.name ?? '—'}</p>
+        </div>
+        <div className="flex-1 flex items-center gap-2">
+          <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progress}%` }} />
+          </div>
+          <span className="text-xs text-gray-500 w-8 text-right">{progress}%</span>
+        </div>
+        <div className="w-24 text-right">
+          <span className={cn('text-xs', dueDateCls)}>{dueDateLabel}</span>
+        </div>
       </div>
     </Link>
   )
@@ -118,7 +138,7 @@ function BoardGroup({ group, now }: { group: Group; now: Date }) {
 
       {open && (
         <>
-          <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200">
+          <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200">
             <div className="flex-[2] text-xs font-semibold text-gray-500 uppercase tracking-wide">Processo</div>
             <div className="flex-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</div>
             <div className="flex-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">Etapa</div>
@@ -262,9 +282,9 @@ export default function Processes() {
   if (isLoading) return <div className="p-8 text-gray-500">Carregando processos...</div>
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">Processos</h1>
+        <h1 className="text-lg md:text-xl font-bold text-gray-900">Processos</h1>
         {MANAGER_ROLES.includes(user?.role ?? '') && (
           <Button
             onClick={() => setNewProcessOpen(true)}
@@ -282,7 +302,7 @@ export default function Processes() {
           placeholder="Buscar processo ou cliente..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-60"
+          className="w-full sm:w-60"
         />
 
         <select
