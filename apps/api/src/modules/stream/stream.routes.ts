@@ -41,6 +41,8 @@ export async function streamRoutes(app: FastifyInstance) {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Credentials': 'true',
     })
+    // Flush headers immediately — writeHead buffers until first write()
+    raw.write(': connected\n\n')
 
     // Dedicated Redis subscriber per connection
     const sub = redis.duplicate()
