@@ -29,17 +29,15 @@ export async function streamRoutes(app: FastifyInstance) {
     reply.hijack()
     const raw = reply.raw
 
-    const origin = process.env.NODE_ENV === 'production'
-      ? 'https://tramita.autohubs.com.br'
-      : (request.headers.origin ?? '*')
-
+    // Forward CORS headers already set by @fastify/cors plugin (via onRequest hook),
+    // then overlay SSE-specific headers. This ensures Vary: Origin and correct
+    // Access-Control-Allow-Origin are sent even with hijacked responses.
     raw.writeHead(200, {
+      ...reply.getHeaders(),
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
       'X-Accel-Buffering': 'no',
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Credentials': 'true',
     })
     // Flush headers immediately — writeHead buffers until first write()
     raw.write(': connected\n\n')
