@@ -54,10 +54,10 @@ export async function streamRoutes(app: FastifyInstance) {
 
     await sub.subscribe(`board:${id}`)
 
-    // Heartbeat every 30 seconds
+    // Heartbeat every 15 seconds — keeps connection alive and resets browser SSE timeout
     const heartbeat = setInterval(() => {
       raw.write(`event: heartbeat\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`)
-    }, 30_000)
+    }, 15_000)
 
     // Cleanup on client disconnect
     request.raw.on('close', () => {
