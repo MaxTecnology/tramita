@@ -43,7 +43,7 @@ export default function AppLayout() {
           'fixed inset-y-0 left-0 z-50 w-56 bg-white border-r border-gray-200 flex flex-col',
           'transition-transform duration-200',
           'md:relative md:translate-x-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
@@ -53,6 +53,7 @@ export default function AppLayout() {
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
+            aria-label="Fechar menu"
             className="md:hidden p-1 text-gray-400 hover:text-gray-600"
           >
             <X size={18} />
@@ -100,6 +101,7 @@ export default function AppLayout() {
         <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
+            aria-label="Abrir menu"
             className="p-1 text-gray-500 hover:text-gray-700"
           >
             <Menu size={22} />
