@@ -31,6 +31,7 @@ export interface Board {
   clientId: string
   organizationId: string
   responsibleUserId: string | null
+  responsibleUser: { id: string; name: string } | null
   isActive: boolean
   columns: Column[]
   client: { id: string; name: string }

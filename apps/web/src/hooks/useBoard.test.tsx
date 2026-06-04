@@ -12,6 +12,7 @@ const mockBoard: Board = {
   clientId: 'c1',
   organizationId: 'o1',
   responsibleUserId: null,
+  responsibleUser: null,
   isActive: true,
   client: { id: 'c1', name: 'Empresa ABC' },
   columns: [
