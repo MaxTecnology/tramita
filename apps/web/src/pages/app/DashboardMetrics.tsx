@@ -69,8 +69,8 @@ export default function DashboardMetrics() {
   ]
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <h1 className="text-lg md:text-xl font-bold text-gray-900">Dashboard</h1>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -86,7 +86,7 @@ export default function DashboardMetrics() {
         {/* Gráfico de barras — tarefas por status */}
         <div className="lg:col-span-2 bg-white rounded-lg shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Tarefas por status</h2>
-          <div className="flex items-end gap-6 h-40">
+          <div className="flex items-end gap-2 md:gap-6 h-40">
             {Object.entries(tasksByStatus).map(([status, count]) => (
               <div key={status} className="flex-1 flex flex-col items-center gap-2">
                 <span className="text-sm font-semibold text-gray-700">{count}</span>
