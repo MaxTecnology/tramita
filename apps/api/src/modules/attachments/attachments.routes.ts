@@ -6,7 +6,7 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createAttachment, listAttachments, deleteAttachment } from './attachments.service'
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB in bytes
+const MAX_FILE_SIZE = 20 * 1024 * 1024
 
 const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
@@ -28,7 +28,7 @@ export async function attachmentsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
 
   app.post('/tasks/:id/attachments', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), checkSubscription],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT'), checkSubscription],
   }, async (request, reply) => {
     const { id: taskId } = request.params as { id: string }
 
@@ -46,21 +46,17 @@ export async function attachmentsRoutes(app: FastifyInstance) {
     if (!file) throw new AppError(400, 'Nenhum arquivo enviado')
 
     if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      // Drain the stream to avoid hanging
       await file.toBuffer().catch(() => {})
       throw new AppError(422, 'Tipo de arquivo não permitido')
     }
 
     const buffer = await file.toBuffer()
-
-    if (buffer.length > MAX_FILE_SIZE) {
-      throw new AppError(413, 'Arquivo excede o limite de 20MB')
-    }
+    if (buffer.length > MAX_FILE_SIZE) throw new AppError(413, 'Arquivo excede o limite de 20MB')
 
     const attachment = await createAttachment(
       taskId,
       request.user.organizationId!,
-      request.user.sub,
+      { id: request.user.sub, role: request.user.role },
       { filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer },
     )
 
@@ -75,11 +71,16 @@ export async function attachmentsRoutes(app: FastifyInstance) {
   })
 
   app.delete('/tasks/:id/attachments/:attachmentId', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), checkSubscription],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT'), checkSubscription],
   }, async (request, reply) => {
     const { id: taskId, attachmentId } = request.params as { id: string; attachmentId: string }
     return reply.status(204).send(
-      await deleteAttachment(attachmentId, taskId, request.user.organizationId!),
+      await deleteAttachment(
+        attachmentId,
+        taskId,
+        request.user.organizationId!,
+        { id: request.user.sub, role: request.user.role },
+      )
     )
   })
 }
