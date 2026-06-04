@@ -33,6 +33,7 @@ export interface Board {
   responsibleUserId: string | null
   responsibleUser: { id: string; name: string } | null
   isActive: boolean
+  dueDate: string | null
   columns: Column[]
   client: { id: string; name: string }
 }

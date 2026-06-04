@@ -55,8 +55,10 @@ interface Group {
 
 function BoardRow({ board, now }: { board: Board; now: Date }) {
   const progress = getProgress(board)
-  const dueDate = getMostUrgentDueDate(board)
-  const { label: dueDateLabel, cls: dueDateCls } = formatDueDate(dueDate, now)
+  const taskDueDate = getMostUrgentDueDate(board)
+  // fallback para board.dueDate quando não há task com prazo
+  const effectiveDueDate = taskDueDate ?? (board.dueDate ? new Date(board.dueDate) : null)
+  const { label: dueDateLabel, cls: dueDateCls } = formatDueDate(effectiveDueDate, now)
   const stage = getCurrentStage(board)
 
   return (
@@ -134,7 +136,7 @@ export default function Processes() {
   const [filterStage, setFilterStage] = useState('')
   const [showOnlyOverdue, setShowOnlyOverdue] = useState(false)
   const [newProcessOpen, setNewProcessOpen] = useState(false)
-  const [newProcessForm, setNewProcessForm] = useState({ title: '', clientId: '' })
+  const [newProcessForm, setNewProcessForm] = useState({ title: '', clientId: '', dueDate: '' })
 
   const { data: boards = [], isLoading } = useQuery<Board[]>({
     queryKey: ['boards'],
@@ -149,11 +151,15 @@ export default function Processes() {
 
   const createMutation = useMutation({
     mutationFn: () =>
-      api.post('/boards', { title: newProcessForm.title, clientId: newProcessForm.clientId }).then((r) => r.data),
+      api.post('/boards', {
+        title: newProcessForm.title,
+        clientId: newProcessForm.clientId,
+        ...(newProcessForm.dueDate ? { dueDate: new Date(newProcessForm.dueDate).toISOString() } : {}),
+      }).then((r) => r.data),
     onSuccess: (board) => {
       qc.invalidateQueries({ queryKey: ['boards'] })
       setNewProcessOpen(false)
-      setNewProcessForm({ title: '', clientId: '' })
+      setNewProcessForm({ title: '', clientId: '', dueDate: '' })
       navigate(`/app/board/${board.id}`)
     },
   })
@@ -364,6 +370,16 @@ export default function Processes() {
                 <option value="">Selecione um cliente</option>
                 {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="proc-due">Prazo estimado de conclusão</Label>
+              <Input
+                id="proc-due"
+                type="date"
+                value={newProcessForm.dueDate}
+                onChange={(e) => setNewProcessForm({ ...newProcessForm, dueDate: e.target.value })}
+              />
+              <p className="text-xs text-gray-400">Opcional — você poderá alterar depois</p>
             </div>
             <p className="text-xs text-gray-400">3 colunas padrão serão criadas automaticamente: Pendente → Em andamento → Concluído</p>
             {createMutation.isError && <p className="text-sm text-red-600">Erro ao criar processo. Tente novamente.</p>}
