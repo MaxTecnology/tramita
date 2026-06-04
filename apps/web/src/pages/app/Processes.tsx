@@ -14,9 +14,17 @@ import type { Board, Client } from '@/types'
 const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
 
 function getProgress(board: Board): number {
-  const all = board.columns.flatMap((c) => c.tasks)
-  if (all.length === 0) return 0
-  return Math.round((all.filter((t) => t.status === 'DONE').length / all.length) * 100)
+  const tasks = board.columns
+    .flatMap((c) => c.tasks)
+    .filter((t) => t.status !== 'CANCELLED')
+  if (tasks.length === 0) return 0
+  const maxPos = board.columns.length - 1
+  if (maxPos <= 0) return 0
+  const sum = tasks.reduce((acc, t) => {
+    const col = board.columns.find((c) => c.id === t.columnId)
+    return acc + (col?.position ?? 0) / maxPos
+  }, 0)
+  return Math.round((sum / tasks.length) * 100)
 }
 
 function getMostUrgentDueDate(board: Board): Date | null {
