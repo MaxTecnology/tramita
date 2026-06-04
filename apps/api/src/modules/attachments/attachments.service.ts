@@ -19,13 +19,20 @@ async function verifyTaskBelongsToOrg(
   organizationId: string,
   clientId?: string,
 ) {
-  // For CLIENT role, also restrict to tasks whose board belongs to this client
   const boardWhere = clientId ? { organizationId, clientId } : { organizationId }
   const task = await prisma.task.findFirst({
     where: { id: taskId, column: { board: boardWhere } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
   return task
+}
+
+async function getOrgSlug(organizationId: string): Promise<string> {
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { slug: true },
+  })
+  return org?.slug ?? organizationId
 }
 
 export async function createAttachment(
@@ -37,7 +44,8 @@ export async function createAttachment(
   const isClient = actor.role === 'CLIENT'
   await verifyTaskBelongsToOrg(taskId, organizationId, isClient ? actor.id : undefined)
 
-  const storageKey = `attachments/${organizationId}/${taskId}/${Date.now()}-${payload.filename}`
+  const orgSlug = await getOrgSlug(organizationId)
+  const storageKey = `attachments/${orgSlug}/${taskId}/${Date.now()}-${payload.filename}`
   await uploadFile(storageKey, payload.buffer, payload.mimeType)
 
   return prisma.attachment.create({
