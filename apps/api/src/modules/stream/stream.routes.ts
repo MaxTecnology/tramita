@@ -29,11 +29,17 @@ export async function streamRoutes(app: FastifyInstance) {
     reply.hijack()
     const raw = reply.raw
 
+    const origin = process.env.NODE_ENV === 'production'
+      ? 'https://tramita.autohubs.com.br'
+      : (request.headers.origin ?? '*')
+
     raw.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
       'X-Accel-Buffering': 'no',
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Credentials': 'true',
     })
 
     // Dedicated Redis subscriber per connection
