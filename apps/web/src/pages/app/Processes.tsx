@@ -29,6 +29,8 @@ function getMostUrgentDueDate(board: Board): Date | null {
 }
 
 function getCurrentStage(board: Board): string {
+  const all = board.columns.flatMap((c) => c.tasks)
+  if (all.length === 0) return '—'
   const counts = board.columns.map((col) => ({
     title: col.title,
     count: col.tasks.filter((t) => t.status !== 'DONE' && t.status !== 'CANCELLED').length,
