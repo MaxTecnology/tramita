@@ -129,7 +129,9 @@ export async function updateBoard(id: string, organizationId: string, data: Upda
   return prisma.board.update({
     where: { id },
     data: {
-      ...data,
+      title: data.title,
+      description: data.description,
+      responsibleUserId: data.responsibleUserId,
       dueDate: data.dueDate !== undefined
         ? (data.dueDate ? new Date(data.dueDate) : null)
         : undefined,
