@@ -37,3 +37,19 @@ Thumbs.db
 
 # pnpm
 .pnpm-store/
+
+# Playwright
+apps/web/test-results/
+apps/web/playwright-report/
+
+# Superpowers brainstorm artifacts
+.superpowers/
+
+# Compiled prisma seed files
+apps/api/prisma/*.js
+apps/api/prisma/*.js.map
+apps/api/prisma/*.d.ts
+apps/api/prisma/*.d.ts.map
+
+# Claude Code
+.claude/settings.json
