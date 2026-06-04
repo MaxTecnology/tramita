@@ -11,7 +11,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "worker": "tsx src/worker.ts",
-    "prisma": "prisma"
+    "prisma": "prisma",
+    "migrate:dev": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config ./node_modules/prisma/build/index.js migrate dev",
+    "migrate:deploy": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config ./node_modules/prisma/build/index.js migrate deploy",
+    "migrate:reset": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config ./node_modules/prisma/build/index.js migrate reset"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -288,7 +288,14 @@ openssl genrsa -out private.pem 2048
 openssl rsa -in private.pem -pubout -out public.pem
 
 # Migrations
-pnpm --filter api prisma migrate dev --name init
+# ⚠️  NUNCA use `pnpm --filter api prisma migrate dev` direto — o CLI do Prisma não
+#     passa por app.ts, então DATABASE_URL não é carregado e o migrate falha silenciosamente
+#     ou aplica no banco errado. Use sempre os scripts abaixo:
+
+pnpm --filter api migrate:dev -- --name <nome>   # desenvolvimento (DATABASE_URL do .env raiz)
+pnpm --filter api migrate:deploy                  # produção / CI
+pnpm --filter api migrate:reset                   # reset completo (destrutivo — confirmar antes)
+
 pnpm --filter api prisma db seed   # planos padrão + MASTER user + G2A como org
 
 # Dev
