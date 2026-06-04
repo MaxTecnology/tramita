@@ -118,7 +118,7 @@ export async function moveTask(
       data: {
         columnId: data.columnId,
         position: data.position,
-        ...(toColumn.isFinal ? { status: 'DONE' } : {}),
+        status: toColumn.isFinal ? 'DONE' : 'OPEN',
       },
     })
 
@@ -255,4 +255,14 @@ export async function deleteTask(id: string, organizationId: string) {
   await verifyTaskBelongsToOrg(id, organizationId)
   await prisma.task.delete({ where: { id } })
   return { ok: true }
+}
+
+export async function getTaskHistory(taskId: string, organizationId: string) {
+  const task = await verifyTaskBelongsToOrg(taskId, organizationId)
+  if (!task) throw new AppError(404, 'Tarefa não encontrada')
+
+  return prisma.taskHistory.findMany({
+    where: { taskId },
+    orderBy: { createdAt: 'desc' },
+  })
 }

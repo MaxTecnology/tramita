@@ -4,7 +4,7 @@ import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createTaskSchema, updateTaskSchema, moveTaskSchema, reorderTasksSchema } from './tasks.schema'
-import { createTask, moveTask, updateTask, reorderTasks, deleteTask } from './tasks.service'
+import { createTask, moveTask, updateTask, reorderTasks, deleteTask, getTaskHistory } from './tasks.service'
 
 export async function tasksRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
@@ -50,6 +50,13 @@ export async function tasksRoutes(app: FastifyInstance) {
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     const actor = { id: request.user.sub, type: 'user' as const }
     return reply.send(await updateTask(id, request.user.organizationId!, result.data, actor))
+  })
+
+  app.get('/tasks/:id/history', {
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    return reply.send(await getTaskHistory(id, request.user.organizationId!))
   })
 
   app.delete('/tasks/:id', {
