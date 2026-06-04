@@ -117,6 +117,7 @@ model Client {
   organization Organization @relation(fields: [organizationId], references: [id])
   boards       Board[]
   comments     Comment[]
+  attachments  Attachment[]
 
   @@unique([email, organizationId])
   @@map("clients")
@@ -248,17 +249,19 @@ model TaskHistory {
 }
 
 model Attachment {
-  id         String   @id @default(cuid())
-  taskId     String
-  filename   String
-  mimeType   String
-  size       Int
-  storageKey String
-  uploadedBy String
-  createdAt  DateTime @default(now())
+  id               String   @id @default(cuid())
+  taskId           String
+  filename         String
+  mimeType         String
+  size             Int
+  storageKey       String
+  uploadedBy       String?
+  uploadedByClient String?
+  createdAt        DateTime @default(now())
 
-  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  uploader User @relation(fields: [uploadedBy], references: [id])
+  task           Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader       User?   @relation(fields: [uploadedBy], references: [id])
+  uploaderClient Client? @relation(fields: [uploadedByClient], references: [id])
 
   @@map("attachments")
 }
