@@ -10,19 +10,32 @@ interface CommentActor {
   organizationId: string
 }
 
-export async function listComments(taskId: string, organizationId: string) {
+const CAN_SEE_DELETED_CONTENT = new Set(['ORG_ADMIN', 'ORG_MANAGER'])
+
+export async function listComments(taskId: string, organizationId: string, role: string) {
   const task = await prisma.task.findFirst({
     where: { id: taskId, column: { board: { organizationId } } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
 
-  return prisma.comment.findMany({
+  const comments = await prisma.comment.findMany({
     where: { taskId },
     orderBy: { createdAt: 'asc' },
     include: {
       user: { select: { id: true, name: true } },
       client: { select: { id: true, name: true } },
     },
+  })
+
+  const canSeeDeleted = CAN_SEE_DELETED_CONTENT.has(role)
+
+  return comments.map((c) => {
+    if (!c.deletedAt) return c
+    return {
+      ...c,
+      content: null,
+      ...(canSeeDeleted ? { deletedContent: c.content } : {}),
+    }
   })
 }
 
@@ -99,6 +112,14 @@ export async function deleteComment(id: string, actor: CommentActor) {
 
   if (!isAuthor && !isAdmin) throw new AppError(403, 'Sem permissão')
 
-  await prisma.comment.delete({ where: { id } })
+  await prisma.comment.update({
+    where: { id },
+    data: {
+      deletedAt: new Date(),
+      deletedBy: actor.id,
+      deletedByType: actor.role === 'CLIENT' ? 'CLIENT' : 'USER',
+    },
+  })
+
   return { ok: true }
 }
