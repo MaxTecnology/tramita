@@ -123,35 +123,34 @@ export default function Board() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 bg-white">
-        <Link to="/app/dashboard" className="text-gray-400 hover:text-gray-600">
+      <div className="flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 bg-white flex-shrink-0">
+        <Link to="/app/processes" className="text-gray-400 hover:text-gray-600 flex-shrink-0">
           <ArrowLeft size={18} />
         </Link>
-        <div className="flex-1">
-          <h1 className="text-lg font-semibold text-gray-900">{board.title}</h1>
-          <p className="text-sm text-gray-500">{board.client.name}</p>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-base md:text-lg font-semibold text-gray-900 truncate">{board.title}</h1>
+          <p className="text-xs md:text-sm text-gray-500 truncate">{board.client.name}</p>
         </div>
         {boardDueDate && (
           <span className={cn(
-            'text-xs px-2.5 py-1 rounded-full font-medium',
+            'text-xs px-2 py-1 rounded-full font-medium flex-shrink-0',
             boardDueDateOverdue
               ? 'bg-red-100 text-red-700'
               : 'bg-amber-50 text-amber-700'
           )}>
-            {boardDueDateOverdue ? '⚠ Prazo vencido: ' : 'Prazo: '}
-            {boardDueDate.toLocaleDateString('pt-BR')}
+            {boardDueDateOverdue ? '⚠ ' : ''}{boardDueDate.toLocaleDateString('pt-BR')}
           </span>
         )}
       </div>
 
       {/* Search bar */}
-      <div className="flex items-center gap-3 px-6 py-2 border-b border-gray-100 bg-white">
+      <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-2 border-b border-gray-100 bg-white">
         <input
           type="text"
           placeholder="Buscar tarefas..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 h-8 rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 min-w-0 h-8 rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <select
           value={filterPriority}
@@ -197,11 +196,11 @@ export default function Board() {
         </div>
       )}
 
-      <div className="flex-1 overflow-x-auto p-6">
+      <div className="flex-1 overflow-x-auto p-4 md:p-6">
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 h-full">
+          <div className="flex gap-3 md:gap-4 h-full">
             {board.columns.map((column) => (
-              <div key={column.id} className="flex-shrink-0 w-64">
+              <div key={column.id} className="flex-shrink-0 w-[280px] md:w-64">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-gray-700">{column.title}</h3>
                   <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
