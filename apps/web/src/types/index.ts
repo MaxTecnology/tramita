@@ -55,3 +55,40 @@ export interface Client {
   isActive: boolean
   createdAt: string
 }
+
+export type OrgRole = 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'
+export type DrawerRole = OrgRole | 'CLIENT'
+
+export interface Comment {
+  id: string
+  content: string | null
+  authorType: 'USER' | 'CLIENT'
+  user: { id: string; name: string } | null
+  client: { id: string; name: string } | null
+  deletedAt: string | null
+  deletedBy: string | null
+  deletedByType: 'USER' | 'CLIENT' | null
+  deletedContent?: string
+  createdAt: string
+}
+
+export interface Attachment {
+  id: string
+  filename: string
+  mimeType: string
+  size: number
+  uploadedBy: string | null
+  uploadedByClient: string | null
+  uploaderName: string
+  signedUrl: string
+  createdAt: string
+}
+
+export interface TaskHistory {
+  id: string
+  action: string
+  fromValue: string | null
+  toValue: string | null
+  actorName: string
+  createdAt: string
+}
