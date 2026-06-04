@@ -30,7 +30,7 @@ it('lista comentários existentes com nome do autor', async () => {
       HttpResponse.json(existingComments),
     ),
   )
-  render(<Comments taskId="task-1" />, { wrapper })
+  render(<Comments taskId="task-1" currentUserId="cl1" role="CLIENT" />, { wrapper })
   await waitFor(() => expect(screen.getByText('Processo iniciado')).toBeInTheDocument())
   expect(screen.getByText('João Escrit.')).toBeInTheDocument()
 })
@@ -52,7 +52,7 @@ it('submits POST /tasks/:taskId/comments com content correto', async () => {
     }),
   )
 
-  render(<Comments taskId="task-1" />, { wrapper })
+  render(<Comments taskId="task-1" currentUserId="cl1" role="CLIENT" />, { wrapper })
   await waitFor(() => screen.getByPlaceholderText('Adicionar comentário...'))
 
   const textarea = screen.getByPlaceholderText('Adicionar comentário...')

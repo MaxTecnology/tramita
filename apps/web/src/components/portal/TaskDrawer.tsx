@@ -3,6 +3,7 @@ import { api } from '@/lib/api'
 import { X } from 'lucide-react'
 import { Comments } from '@/components/portal/Comments'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/hooks/useAuth'
 import type { Task } from '@/types'
 
 interface TaskHistory {
@@ -41,6 +42,7 @@ const PRIORITY_COLOR: Record<Task['priority'], string> = {
 }
 
 export function TaskDrawer({ task, onClose }: Props) {
+  const { user } = useAuth()
   const { data: history = [] } = useQuery<TaskHistory[]>({
     queryKey: ['task-history', task.id],
     queryFn: () => api.get(`/portal/tasks/${task.id}/history`).then((r) => r.data),
@@ -132,7 +134,7 @@ export function TaskDrawer({ task, onClose }: Props) {
 
           <div>
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Comentários</h3>
-            <Comments taskId={task.id} />
+            <Comments taskId={task.id} currentUserId={user?.id ?? ''} role="CLIENT" />
           </div>
         </div>
       </aside>
