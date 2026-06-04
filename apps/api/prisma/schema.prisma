@@ -210,7 +210,7 @@ model Comment {
   clientId      String?
   deletedAt     DateTime?
   deletedBy     String?
-  deletedByType String?           // "USER" | "CLIENT"
+  deletedByType DeletedByType?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
@@ -222,6 +222,11 @@ model Comment {
 }
 
 enum CommentAuthorType {
+  USER
+  CLIENT
+}
+
+enum DeletedByType {
   USER
   CLIENT
 }
