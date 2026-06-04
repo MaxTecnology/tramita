@@ -8,7 +8,6 @@ interface CommentActor {
   id: string
   role: string
   organizationId: string
-  clientId?: string // present when role === 'CLIENT'
 }
 
 const CAN_SEE_DELETED_CONTENT = new Set(['ORG_ADMIN', 'ORG_MANAGER'])
@@ -57,10 +56,9 @@ export async function createComment(
   const isClient = actor.role === 'CLIENT'
 
   // For CLIENT role, restrict to tasks whose board belongs to this client
-  const boardWhere =
-    isClient && actor.clientId
-      ? { organizationId: actor.organizationId, clientId: actor.clientId }
-      : { organizationId: actor.organizationId }
+  const boardWhere = isClient
+    ? { organizationId: actor.organizationId, clientId: actor.id }
+    : { organizationId: actor.organizationId }
 
   const task = await prisma.task.findFirst({
     where: { id: taskId, column: { board: boardWhere } },
