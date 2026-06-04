@@ -14,6 +14,7 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ArrowLeft, Plus } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useBoard } from '@/hooks/useBoard'
 import { useBoardStream } from '@/hooks/useBoardStream'
 import { api } from '@/lib/api'
@@ -122,10 +123,25 @@ export default function Board() {
         <Link to="/app/dashboard" className="text-gray-400 hover:text-gray-600">
           <ArrowLeft size={18} />
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-lg font-semibold text-gray-900">{board.title}</h1>
           <p className="text-sm text-gray-500">{board.client.name}</p>
         </div>
+        {board.dueDate && (() => {
+          const d = new Date(board.dueDate)
+          const isOverdue = d < new Date()
+          return (
+            <span className={cn(
+              'text-xs px-2.5 py-1 rounded-full font-medium',
+              isOverdue
+                ? 'bg-red-100 text-red-700'
+                : 'bg-amber-50 text-amber-700'
+            )}>
+              {isOverdue ? '⚠ Prazo vencido: ' : 'Prazo: '}
+              {d.toLocaleDateString('pt-BR')}
+            </span>
+          )
+        })()}
       </div>
 
       {/* Search bar */}
@@ -261,6 +277,7 @@ export default function Board() {
           task={selectedTask}
           currentUserId={user.id}
           role={user.role as 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'}
+          boardDueDate={board.dueDate}
           onClose={() => setSelectedTask(null)}
         />
       )}

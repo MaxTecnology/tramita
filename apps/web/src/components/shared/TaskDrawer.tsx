@@ -10,6 +10,7 @@ interface Props {
   task: Task
   currentUserId: string
   role: DrawerRole
+  boardDueDate?: string | null
   onClose: () => void
 }
 
@@ -53,7 +54,7 @@ const historyEndpoint = (taskId: string, role: DrawerRole) =>
     ? `/portal/tasks/${taskId}/history`
     : `/tasks/${taskId}/history`
 
-export function TaskDrawer({ task, currentUserId, role, onClose }: Props) {
+export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }: Props) {
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<Tab>('comments')
   const [editingTitle, setEditingTitle] = useState(false)
@@ -165,10 +166,32 @@ export function TaskDrawer({ task, currentUserId, role, onClose }: Props) {
               </span>
             )}
 
-            {task.dueDate && (
-              <span className={cn('text-xs px-2 py-0.5 rounded-full bg-gray-100', isOverdue && 'bg-red-100 text-red-600 font-medium')}>
-                {isOverdue ? '⚠ ' : ''}Prazo: {new Date(task.dueDate).toLocaleDateString('pt-BR')}
-              </span>
+            {canEdit ? (
+              <div className="flex flex-col gap-1">
+                <input
+                  type="date"
+                  defaultValue={task.dueDate ? task.dueDate.slice(0, 10) : ''}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    updateMutation.mutate({
+                      dueDate: val ? new Date(val + 'T00:00:00').toISOString() : null,
+                    })
+                  }}
+                  className="text-xs border border-gray-300 rounded px-2 py-0.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {/* Aviso quando prazo da tarefa ultrapassa prazo do processo */}
+                {task.dueDate && boardDueDate && new Date(task.dueDate) > new Date(boardDueDate) && (
+                  <p className="text-xs text-amber-600">
+                    ⚠ Prazo além do processo ({new Date(boardDueDate).toLocaleDateString('pt-BR')})
+                  </p>
+                )}
+              </div>
+            ) : (
+              task.dueDate && (
+                <span className={cn('text-xs px-2 py-0.5 rounded-full bg-gray-100', isOverdue && 'bg-red-100 text-red-600 font-medium')}>
+                  {isOverdue ? '⚠ ' : ''}Prazo: {new Date(task.dueDate).toLocaleDateString('pt-BR')}
+                </span>
+              )
             )}
           </div>
 
