@@ -61,6 +61,10 @@ export default function Board() {
   const [addingToColumn, setAddingToColumn] = useState<string | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
 
+  // Computed values for board due date
+  const boardDueDate = board?.dueDate ? new Date(board.dueDate) : null
+  const boardDueDateOverdue = boardDueDate ? boardDueDate < new Date() : false
+
   const createTaskMutation = useMutation({
     mutationFn: ({ columnId, title }: { columnId: string; title: string }) =>
       api.post(`/columns/${columnId}/tasks`, { title }).then((r) => r.data),
@@ -127,21 +131,17 @@ export default function Board() {
           <h1 className="text-lg font-semibold text-gray-900">{board.title}</h1>
           <p className="text-sm text-gray-500">{board.client.name}</p>
         </div>
-        {board.dueDate && (() => {
-          const d = new Date(board.dueDate)
-          const isOverdue = d < new Date()
-          return (
-            <span className={cn(
-              'text-xs px-2.5 py-1 rounded-full font-medium',
-              isOverdue
-                ? 'bg-red-100 text-red-700'
-                : 'bg-amber-50 text-amber-700'
-            )}>
-              {isOverdue ? '⚠ Prazo vencido: ' : 'Prazo: '}
-              {d.toLocaleDateString('pt-BR')}
-            </span>
-          )
-        })()}
+        {boardDueDate && (
+          <span className={cn(
+            'text-xs px-2.5 py-1 rounded-full font-medium',
+            boardDueDateOverdue
+              ? 'bg-red-100 text-red-700'
+              : 'bg-amber-50 text-amber-700'
+          )}>
+            {boardDueDateOverdue ? '⚠ Prazo vencido: ' : 'Prazo: '}
+            {boardDueDate.toLocaleDateString('pt-BR')}
+          </span>
+        )}
       </div>
 
       {/* Search bar */}
