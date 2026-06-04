@@ -31,6 +31,7 @@ export function useBoardStream(boardId: string | undefined) {
         const invalidate = () => {
           queryClient.invalidateQueries({ queryKey: ['board', boardId] })
           queryClient.invalidateQueries({ queryKey: ['portal-board', boardId] })
+          queryClient.invalidateQueries({ queryKey: ['boards'] })
         }
 
         es.addEventListener('task:moved', invalidate)
