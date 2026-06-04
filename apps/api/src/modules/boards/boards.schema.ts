@@ -26,3 +26,13 @@ export const searchQuerySchema = z.object({
 })
 
 export type SearchQuery = z.infer<typeof searchQuerySchema>
+
+export const listBoardsQuerySchema = z.object({
+  clientId: z.string().cuid().optional(),
+  responsibleUserId: z.string().cuid().optional(),
+  columnTitle: z.string().optional(),
+  overdue: z.coerce.boolean().optional(),
+  dueSoon: z.coerce.boolean().optional(),
+})
+
+export type ListBoardsQuery = z.infer<typeof listBoardsQuerySchema>

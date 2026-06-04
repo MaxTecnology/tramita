@@ -3,7 +3,7 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
-import { createBoardSchema, updateBoardSchema, searchQuerySchema } from './boards.schema'
+import { createBoardSchema, updateBoardSchema, searchQuerySchema, listBoardsQuerySchema } from './boards.schema'
 import { listBoards, getBoardById, createBoard, updateBoard, searchTasks } from './boards.service'
 
 export async function boardsRoutes(app: FastifyInstance) {
@@ -13,9 +13,21 @@ export async function boardsRoutes(app: FastifyInstance) {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT')],
   }, async (request, reply) => {
     const { organizationId, role, sub } = request.user
-    const clientId = role === 'CLIENT' ? sub : undefined
-    const responsibleUserId = role === 'ORG_MEMBER' ? sub : undefined
-    return reply.send(await listBoards(organizationId!, clientId, responsibleUserId))
+
+    const rawQuery = listBoardsQuerySchema.safeParse(request.query)
+    const query = rawQuery.success ? rawQuery.data : {}
+
+    // CLIENT always sees only their own boards
+    if (role === 'CLIENT') {
+      return reply.send(await listBoards(organizationId!, { clientId: sub }))
+    }
+
+    // ORG_MEMBER always sees only boards they are responsible for
+    if (role === 'ORG_MEMBER') {
+      return reply.send(await listBoards(organizationId!, { ...query, responsibleUserId: sub }))
+    }
+
+    return reply.send(await listBoards(organizationId!, query))
   })
 
   app.get('/:id', {

@@ -10,18 +10,62 @@ const DEFAULT_COLUMNS = [
 
 export async function listBoards(
   organizationId: string,
-  clientId?: string,
-  responsibleUserId?: string,
+  query: {
+    clientId?: string
+    responsibleUserId?: string
+    columnTitle?: string
+    overdue?: boolean
+    dueSoon?: boolean
+  } = {},
 ) {
+  const now = new Date()
+  const in7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+
   return prisma.board.findMany({
     where: {
       organizationId,
       isActive: true,
-      ...(clientId ? { clientId } : {}),
-      ...(responsibleUserId ? { responsibleUserId } : {}),
+      ...(query.clientId ? { clientId: query.clientId } : {}),
+      ...(query.responsibleUserId ? { responsibleUserId: query.responsibleUserId } : {}),
+      ...(query.columnTitle
+        ? {
+            columns: {
+              some: {
+                title: { contains: query.columnTitle, mode: 'insensitive' },
+                tasks: { some: { status: { notIn: ['DONE', 'CANCELLED'] } } },
+              },
+            },
+          }
+        : {}),
+      ...(query.overdue
+        ? {
+            columns: {
+              some: {
+                tasks: {
+                  some: { dueDate: { lt: now }, status: { notIn: ['DONE', 'CANCELLED'] } },
+                },
+              },
+            },
+          }
+        : {}),
+      ...(query.dueSoon
+        ? {
+            columns: {
+              some: {
+                tasks: {
+                  some: {
+                    dueDate: { gte: now, lte: in7days },
+                    status: { notIn: ['DONE', 'CANCELLED'] },
+                  },
+                },
+              },
+            },
+          }
+        : {}),
     },
     include: {
       client: { select: { id: true, name: true } },
+      responsibleUser: { select: { id: true, name: true } },
       columns: {
         orderBy: { position: 'asc' },
         include: { tasks: { orderBy: { position: 'asc' } } },
