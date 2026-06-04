@@ -16,6 +16,7 @@ import { portalRoutes } from '@/modules/portal/portal.routes'
 import { streamRoutes } from '@/modules/stream/stream.routes'
 import { attachmentsRoutes } from '@/modules/attachments/attachments.routes'
 import { reportsRoutes } from '@/modules/reports/reports.routes'
+import { dashboardRoutes } from '@/modules/dashboard/dashboard.routes'
 import { AppError } from '@/errors/AppError'
 
 export function buildApp() {
@@ -42,6 +43,7 @@ export function buildApp() {
   app.register(streamRoutes)
   app.register(attachmentsRoutes)
   app.register(reportsRoutes)
+  app.register(dashboardRoutes, { prefix: '/dashboard' })
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof AppError) {
