@@ -1,4 +1,11 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  ListObjectVersionsCommand,
+} from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 // Lazy init so env vars are guaranteed to be loaded before first use
@@ -32,5 +39,24 @@ export async function getSignedDownloadUrl(key: string, ttlSeconds = 3600): Prom
 }
 
 export async function deleteFile(key: string): Promise<void> {
-  await getClient().send(new DeleteObjectCommand({ Bucket: getBucket(), Key: key }))
+  const bucket = getBucket()
+  const client = getClient()
+
+  // List all versions and delete markers for this key — required for versioned buckets
+  const listed = await client.send(
+    new ListObjectVersionsCommand({ Bucket: bucket, Prefix: key }),
+  )
+
+  const toDelete = [
+    ...(listed.Versions ?? []).map((v) => ({ Key: v.Key!, VersionId: v.VersionId })),
+    ...(listed.DeleteMarkers ?? []).map((v) => ({ Key: v.Key!, VersionId: v.VersionId })),
+  ]
+
+  if (toDelete.length === 0) {
+    // Bucket without versioning — simple delete
+    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+    return
+  }
+
+  await client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: toDelete } }))
 }
