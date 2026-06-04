@@ -18,7 +18,8 @@ import { useBoard } from '@/hooks/useBoard'
 import { useBoardStream } from '@/hooks/useBoardStream'
 import { api } from '@/lib/api'
 import { TaskCard } from '@/components/TaskCard'
-import { TaskModal } from '@/components/TaskModal'
+import { TaskDrawer } from '@/components/shared/TaskDrawer'
+import { useAuth } from '@/hooks/useAuth'
 import type { Task } from '@/types'
 
 function DroppableColumn({ id, children }: { id: string; children: React.ReactNode }) {
@@ -50,6 +51,7 @@ export default function Board() {
   const { board, isLoading, moveTask } = useBoard(boardId!)
   useBoardStream(boardId)
   const qc = useQueryClient()
+  const { user } = useAuth()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [search, setSearch] = useState('')
@@ -254,10 +256,11 @@ export default function Board() {
         </DndContext>
       </div>
 
-      {selectedTask && (
-        <TaskModal
+      {selectedTask && user && (
+        <TaskDrawer
           task={selectedTask}
-          open={!!selectedTask}
+          currentUserId={user.id}
+          role={user.role as 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'}
           onClose={() => setSelectedTask(null)}
         />
       )}
