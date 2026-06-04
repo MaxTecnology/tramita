@@ -1,10 +1,10 @@
 import { Queue, Worker } from 'bullmq'
-import { redis } from '@/lib/redis'
+import { bullmqRedis } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import { enqueueNotification } from '@/lib/queue'
 
-export function startDueDateCronWorker() {
-  const cronQueue = new Queue('duedate-cron', { connection: redis })
+export async function startDueDateCronWorker() {
+  const cronQueue = new Queue('duedate-cron', { connection: bullmqRedis })
 
   await cronQueue.add('check', {}, {
     repeat: { every: 3_600_000 },
@@ -39,5 +39,5 @@ export function startDueDateCronWorker() {
         },
       })
     }
-  }, { connection: redis })
+  }, { connection: bullmqRedis })
 }

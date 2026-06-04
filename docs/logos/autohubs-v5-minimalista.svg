@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 75" width="300" height="75">
+  <!-- AutoHubs V5 — Ultra minimalista · outline · peso médio -->
+
+  <!-- Hub outline -->
+  <circle cx="36" cy="37" r="9" fill="none" stroke="#185FA5" stroke-width="2"/>
+
+  <!-- Nós -->
+  <circle cx="36" cy="10" r="4" fill="#378ADD"/>
+  <circle cx="62" cy="54" r="4" fill="#378ADD"/>
+  <circle cx="10" cy="54" r="4" fill="#378ADD"/>
+
+  <!-- Conexões -->
+  <line x1="36" y1="28" x2="36" y2="14" stroke="#378ADD" stroke-width="1.5"/>
+  <line x1="44" y1="43" x2="58" y2="50" stroke="#378ADD" stroke-width="1.5"/>
+  <line x1="28" y1="43" x2="14" y2="50" stroke="#378ADD" stroke-width="1.5"/>
+
+  <!-- Wordmark -->
+  <text x="85" y="46" font-family="'SF Pro Display','Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="600" fill="#185FA5" letter-spacing="0">AutoHubs</text>
+</svg>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 80" width="300" height="80">
+  <!-- AutoHubs V3 — Anel externo · stacked · contraste de peso -->
+
+  <!-- Anel externo -->
+  <circle cx="36" cy="40" r="28" fill="none" stroke="#B5D4F4" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- Hub central -->
+  <circle cx="36" cy="40" r="11" fill="#378ADD"/>
+
+  <!-- Nós -->
+  <circle cx="36" cy="12" r="6" fill="#185FA5"/>
+  <circle cx="62" cy="57" r="6" fill="#185FA5"/>
+  <circle cx="10" cy="57" r="6" fill="#185FA5"/>
+
+  <!-- Conexões -->
+  <line x1="36" y1="29" x2="36" y2="18" stroke="#B5D4F4" stroke-width="2"/>
+  <line x1="46" y1="46" x2="56" y2="51" stroke="#B5D4F4" stroke-width="2"/>
+  <line x1="26" y1="46" x2="16" y2="51" stroke="#B5D4F4" stroke-width="2"/>
+
+  <!-- Wordmark stacked -->
+  <text x="85" y="34" font-family="'SF Pro Display','Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="700" fill="#185FA5" letter-spacing="-0.5">AUTO</text>
+  <text x="85" y="62" font-family="'SF Pro Display','Segoe UI',Helvetica,Arial,sans-serif" font-size="28" font-weight="300" fill="#378ADD" letter-spacing="5">HUBS</text>
+</svg>

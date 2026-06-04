@@ -62,7 +62,13 @@ export default function Notifications() {
   }, [config])
 
   const saveMutation = useMutation({
-    mutationFn: () => api.patch('/notifications/config', form).then((r) => r.data),
+    mutationFn: () => {
+      // Strip null and empty-string values — Zod rejects null for optional fields
+      const payload = Object.fromEntries(
+        Object.entries(form).filter(([, v]) => v !== null && v !== '' && v !== undefined),
+      )
+      return api.patch('/notifications/config', payload).then((r) => r.data)
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications-config'] }),
   })
 
@@ -109,7 +115,7 @@ export default function Notifications() {
           <Toggle label="Habilitar E-mail" checked={form.emailEnabled ?? false} onChange={(v) => setForm({ ...form, emailEnabled: v })} />
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Host SMTP</Label><Input value={form.smtpHost ?? ''} onChange={(e) => setForm({ ...form, smtpHost: e.target.value })} className="mt-1" /></div>
-            <div><Label>Porta</Label><Input type="number" value={form.smtpPort ?? ''} onChange={(e) => setForm({ ...form, smtpPort: Number(e.target.value) })} className="mt-1" /></div>
+            <div><Label>Porta</Label><Input type="number" value={form.smtpPort ?? ''} onChange={(e) => setForm({ ...form, smtpPort: e.target.value ? Number(e.target.value) : undefined })} className="mt-1" /></div>
             <div><Label>Usuário</Label><Input value={form.smtpUser ?? ''} onChange={(e) => setForm({ ...form, smtpUser: e.target.value })} className="mt-1" /></div>
             <div><Label>Remetente</Label><Input value={form.emailFrom ?? ''} onChange={(e) => setForm({ ...form, emailFrom: e.target.value })} className="mt-1" /></div>
           </div>

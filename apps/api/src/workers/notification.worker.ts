@@ -1,6 +1,6 @@
 // apps/api/src/workers/notification.worker.ts
 import { Worker } from 'bullmq'
-import { redis } from '@/lib/redis'
+import { bullmqRedis } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import { renderTemplate, getTemplate } from '@/lib/template'
 import { sendWhatsApp } from '@/lib/maximizebot'
@@ -112,7 +112,7 @@ export async function processNotificationJob(job: { data: NotificationJob }): Pr
 
 export function startNotificationWorker() {
   return new Worker('notification-queue', processNotificationJob, {
-    connection: redis,
+    connection: bullmqRedis,
     concurrency: 5,
   })
 }

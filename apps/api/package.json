@@ -17,7 +17,10 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1060.0",
+    "@aws-sdk/s3-request-presigner": "^3.1060.0",
     "@fastify/cors": "^10.0.2",
+    "@fastify/multipart": "^10.0.0",
     "@fastify/rate-limit": "^10.3.0",
     "@prisma/client": "^6.9.0",
     "axios": "^1.16.1",
@@ -30,6 +33,7 @@
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^8.0.10",
     "pino": "^9.7.0",
+    "puppeteer": "^25.1.0",
     "uuid": "^11.1.0",
     "zod": "^3.24.4"
   },

@@ -1,5 +1,5 @@
 import { Queue } from 'bullmq'
-import { redis } from '@/lib/redis'
+import { bullmqRedis } from '@/lib/redis'
 
 export interface NotificationJob {
   event: string
@@ -9,7 +9,7 @@ export interface NotificationJob {
   metadata: Record<string, string | undefined>
 }
 
-export const notificationQueue = new Queue('notification-queue', { connection: redis })
+export const notificationQueue = new Queue('notification-queue', { connection: bullmqRedis })
 
 export async function enqueueNotification(job: NotificationJob): Promise<void> {
   await notificationQueue.add(job.event, job, {
