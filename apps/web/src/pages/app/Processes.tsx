@@ -154,7 +154,7 @@ export default function Processes() {
       api.post('/boards', {
         title: newProcessForm.title,
         clientId: newProcessForm.clientId,
-        ...(newProcessForm.dueDate ? { dueDate: new Date(newProcessForm.dueDate).toISOString() } : {}),
+        ...(newProcessForm.dueDate ? { dueDate: new Date(newProcessForm.dueDate + 'T00:00:00').toISOString() } : {}),
       }).then((r) => r.data),
     onSuccess: (board) => {
       qc.invalidateQueries({ queryKey: ['boards'] })
