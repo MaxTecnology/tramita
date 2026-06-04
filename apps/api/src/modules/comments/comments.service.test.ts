@@ -75,9 +75,10 @@ describe('deleteComment - soft delete', () => {
       data: { content: 'Comentário do outro', taskId: task.id, authorType: 'CLIENT', clientId: client.id },
     })
 
+    // otherClient belongs to a different board — board isolation check fires first
     await expect(
       deleteComment(comment.id, { id: otherClient.id, role: 'CLIENT', organizationId: org.id })
-    ).rejects.toThrow('Sem permissão')
+    ).rejects.toThrow('Acesso negado')
   })
 })
 

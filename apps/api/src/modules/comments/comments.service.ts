@@ -8,13 +8,23 @@ interface CommentActor {
   id: string
   role: string
   organizationId: string
+  clientId?: string // present when role === 'CLIENT'
 }
 
 const CAN_SEE_DELETED_CONTENT = new Set(['ORG_ADMIN', 'ORG_MANAGER'])
 
-export async function listComments(taskId: string, organizationId: string, role: string) {
+export async function listComments(
+  taskId: string,
+  organizationId: string,
+  role: string,
+  clientId?: string,
+) {
+  // For CLIENT role, restrict to tasks whose board belongs to this client
+  const boardWhere =
+    role === 'CLIENT' && clientId ? { organizationId, clientId } : { organizationId }
+
   const task = await prisma.task.findFirst({
-    where: { id: taskId, column: { board: { organizationId } } },
+    where: { id: taskId, column: { board: boardWhere } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
 
@@ -44,13 +54,20 @@ export async function createComment(
   data: CreateCommentBody,
   actor: CommentActor,
 ) {
+  const isClient = actor.role === 'CLIENT'
+
+  // For CLIENT role, restrict to tasks whose board belongs to this client
+  const boardWhere =
+    isClient && actor.clientId
+      ? { organizationId: actor.organizationId, clientId: actor.clientId }
+      : { organizationId: actor.organizationId }
+
   const task = await prisma.task.findFirst({
-    where: { id: taskId, column: { board: { organizationId: actor.organizationId } } },
+    where: { id: taskId, column: { board: boardWhere } },
     include: { column: { include: { board: { select: { id: true, clientId: true } } } } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
 
-  const isClient = actor.role === 'CLIENT'
   const comment = await prisma.comment.create({
     data: {
       content: data.content,
@@ -95,13 +112,24 @@ export async function deleteComment(id: string, actor: CommentActor) {
     include: {
       task: {
         include: {
-          column: { include: { board: { select: { organizationId: true } } } },
+          column: {
+            include: { board: { select: { organizationId: true, clientId: true } } },
+          },
         },
       },
     },
   })
   if (!comment) throw new AppError(404, 'Comentário não encontrado')
+
+  // Guard against double soft-delete
+  if (comment.deletedAt) throw new AppError(410, 'Comentário já foi removido')
+
   if (comment.task.column.board.organizationId !== actor.organizationId) {
+    throw new AppError(403, 'Acesso negado')
+  }
+
+  // For CLIENT role, also validate that the board belongs to this client
+  if (actor.role === 'CLIENT' && comment.task.column.board.clientId !== actor.id) {
     throw new AppError(403, 'Acesso negado')
   }
 

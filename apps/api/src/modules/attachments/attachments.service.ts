@@ -14,9 +14,15 @@ interface UploaderActor {
   role: string
 }
 
-async function verifyTaskBelongsToOrg(taskId: string, organizationId: string) {
+async function verifyTaskBelongsToOrg(
+  taskId: string,
+  organizationId: string,
+  clientId?: string,
+) {
+  // For CLIENT role, also restrict to tasks whose board belongs to this client
+  const boardWhere = clientId ? { organizationId, clientId } : { organizationId }
   const task = await prisma.task.findFirst({
-    where: { id: taskId, column: { board: { organizationId } } },
+    where: { id: taskId, column: { board: boardWhere } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
   return task
@@ -28,12 +34,11 @@ export async function createAttachment(
   actor: UploaderActor,
   payload: UploadPayload,
 ) {
-  await verifyTaskBelongsToOrg(taskId, organizationId)
+  const isClient = actor.role === 'CLIENT'
+  await verifyTaskBelongsToOrg(taskId, organizationId, isClient ? actor.id : undefined)
 
   const storageKey = `attachments/${taskId}/${Date.now()}-${payload.filename}`
   await uploadFile(storageKey, payload.buffer, payload.mimeType)
-
-  const isClient = actor.role === 'CLIENT'
 
   return prisma.attachment.create({
     data: {
@@ -48,8 +53,12 @@ export async function createAttachment(
   })
 }
 
-export async function listAttachments(taskId: string, organizationId: string) {
-  await verifyTaskBelongsToOrg(taskId, organizationId)
+export async function listAttachments(
+  taskId: string,
+  organizationId: string,
+  clientId?: string,
+) {
+  await verifyTaskBelongsToOrg(taskId, organizationId, clientId)
 
   const attachments = await prisma.attachment.findMany({
     where: { taskId },
@@ -81,7 +90,8 @@ export async function deleteAttachment(
   organizationId: string,
   actor: UploaderActor,
 ) {
-  await verifyTaskBelongsToOrg(taskId, organizationId)
+  const isClient = actor.role === 'CLIENT'
+  await verifyTaskBelongsToOrg(taskId, organizationId, isClient ? actor.id : undefined)
 
   const attachment = await prisma.attachment.findFirst({
     where: { id: attachmentId, taskId },
@@ -89,7 +99,7 @@ export async function deleteAttachment(
   if (!attachment) throw new AppError(404, 'Anexo não encontrado')
 
   // Cliente só pode deletar o próprio anexo
-  if (actor.role === 'CLIENT' && attachment.uploadedByClient !== actor.id) {
+  if (isClient && attachment.uploadedByClient !== actor.id) {
     throw new AppError(403, 'Sem permissão para remover este anexo')
   }
 

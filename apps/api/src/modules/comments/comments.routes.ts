@@ -12,8 +12,9 @@ export async function commentsRoutes(app: FastifyInstance) {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT')],
   }, async (request, reply) => {
     const { taskId } = request.params as { taskId: string }
+    const clientId = request.user.role === 'CLIENT' ? request.user.sub : undefined
     return reply.send(
-      await listComments(taskId, request.user.organizationId!, request.user.role)
+      await listComments(taskId, request.user.organizationId!, request.user.role, clientId)
     )
   })
 
@@ -28,6 +29,7 @@ export async function commentsRoutes(app: FastifyInstance) {
         id: request.user.sub,
         role: request.user.role,
         organizationId: request.user.organizationId!,
+        clientId: request.user.role === 'CLIENT' ? request.user.sub : undefined,
       })
     )
   })

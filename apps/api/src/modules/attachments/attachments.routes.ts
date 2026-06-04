@@ -67,7 +67,8 @@ export async function attachmentsRoutes(app: FastifyInstance) {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT')],
   }, async (request, reply) => {
     const { id: taskId } = request.params as { id: string }
-    return reply.send(await listAttachments(taskId, request.user.organizationId!))
+    const clientId = request.user.role === 'CLIENT' ? request.user.sub : undefined
+    return reply.send(await listAttachments(taskId, request.user.organizationId!, clientId))
   })
 
   app.delete('/tasks/:id/attachments/:attachmentId', {
