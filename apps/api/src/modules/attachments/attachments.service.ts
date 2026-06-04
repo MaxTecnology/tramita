@@ -37,7 +37,7 @@ export async function createAttachment(
   const isClient = actor.role === 'CLIENT'
   await verifyTaskBelongsToOrg(taskId, organizationId, isClient ? actor.id : undefined)
 
-  const storageKey = `attachments/${taskId}/${Date.now()}-${payload.filename}`
+  const storageKey = `attachments/${organizationId}/${taskId}/${Date.now()}-${payload.filename}`
   await uploadFile(storageKey, payload.buffer, payload.mimeType)
 
   return prisma.attachment.create({
@@ -103,7 +103,26 @@ export async function deleteAttachment(
     throw new AppError(403, 'Sem permissão para remover este anexo')
   }
 
+  const actorName = isClient
+    ? (await prisma.client.findUnique({ where: { id: actor.id }, select: { name: true } }))?.name ?? 'Cliente'
+    : (await prisma.user.findUnique({ where: { id: actor.id }, select: { name: true } }))?.name ?? 'Colaborador'
+
   await deleteFile(attachment.storageKey)
-  await prisma.attachment.delete({ where: { id: attachmentId } })
+
+  await prisma.$transaction([
+    prisma.attachment.delete({ where: { id: attachmentId } }),
+    prisma.taskHistory.create({
+      data: {
+        taskId,
+        action: 'attachment_deleted',
+        fromValue: attachment.filename,
+        toValue: null,
+        actorType: isClient ? 'client' : 'user',
+        actorId: actor.id,
+        actorName,
+      },
+    }),
+  ])
+
   return { ok: true }
 }

@@ -13,6 +13,23 @@ interface Props {
   onClose: () => void
 }
 
+const ACTION_LABELS: Record<string, string> = {
+  moved_to: 'moveu para',
+  created: 'criou a tarefa',
+  updated_priority: 'alterou prioridade para',
+  updated_title: 'alterou título para',
+  updated_assignee: 'alterou responsável para',
+  updated_due_date: 'alterou vencimento para',
+  attachment_deleted: 'removeu o anexo',
+}
+
+function formatHistoryAction(h: TaskHistory): string {
+  const label = ACTION_LABELS[h.action] ?? h.action
+  if (h.action === 'attachment_deleted' && h.fromValue) return `${label} "${h.fromValue}"`
+  if (h.toValue) return `${label} ${h.toValue}`
+  return label
+}
+
 const PRIORITY_LABEL: Record<Task['priority'], string> = {
   LOW: 'Baixa',
   MEDIUM: 'Média',
@@ -265,8 +282,7 @@ export function TaskDrawer({ task, currentUserId, role, onClose }: Props) {
                   <p className="text-xs text-gray-600">
                     <span className="font-medium">{h.actorName}</span>
                     {' — '}
-                    {h.action}
-                    {h.toValue && <span className="text-gray-500"> → {h.toValue}</span>}
+                    {formatHistoryAction(h)}
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     {new Date(h.createdAt).toLocaleString('pt-BR')}
