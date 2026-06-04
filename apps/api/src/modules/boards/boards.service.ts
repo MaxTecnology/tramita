@@ -80,6 +80,7 @@ export async function getBoardById(id: string, organizationId: string) {
     where: { id, organizationId, isActive: true },
     include: {
       client: { select: { id: true, name: true } },
+      responsibleUser: { select: { id: true, name: true } },
       columns: {
         orderBy: { position: 'asc' },
         include: { tasks: { orderBy: { position: 'asc' } } },
