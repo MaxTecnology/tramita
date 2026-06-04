@@ -67,9 +67,7 @@ export function TaskDrawer({ task, currentUserId, role, onClose }: Props) {
     mutationFn: (file: File) => {
       const form = new FormData()
       form.append('file', file)
-      return api.post(`/tasks/${task.id}/attachments`, form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      return api.post(`/tasks/${task.id}/attachments`, form)
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['attachments', task.id] }),
   })
