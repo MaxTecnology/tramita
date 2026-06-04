@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { ArrowLeft } from 'lucide-react'
 import { useBoardStream } from '@/hooks/useBoardStream'
 import { TaskDrawer } from '@/components/portal/TaskDrawer'
+import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import type { Board, Task } from '@/types'
 
@@ -13,6 +14,7 @@ export default function PortalBoard() {
   useBoardStream(boardId)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [titleSearch, setTitleSearch] = useState('')
+  const { user } = useAuth()
 
   const { data: board, isLoading } = useQuery<Board>({
     queryKey: ['portal-board', boardId],
@@ -126,7 +128,12 @@ export default function PortalBoard() {
       </div>
 
       {selectedTask && (
-        <TaskDrawer task={selectedTask} onClose={() => setSelectedTask(null)} />
+        <TaskDrawer
+          task={selectedTask}
+          currentUserId={user?.id ?? ''}
+          role="CLIENT"
+          onClose={() => setSelectedTask(null)}
+        />
       )}
     </div>
   )
