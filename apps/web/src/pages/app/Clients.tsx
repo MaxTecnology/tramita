@@ -10,6 +10,8 @@ import type { Client } from '@/types'
 type CreateForm = { name: string; email: string; password: string; whatsapp: string; cnpj: string }
 type EditForm = { name: string; email: string; whatsapp: string; cnpj: string }
 
+const normalizeOptional = (val: string) => val.trim() || undefined
+
 export default function Clients() {
   const queryClient = useQueryClient()
 
@@ -32,8 +34,8 @@ export default function Clients() {
         name: createForm.name,
         email: createForm.email,
         password: createForm.password,
-        whatsapp: createForm.whatsapp || undefined,
-        cnpj: createForm.cnpj || undefined,
+        whatsapp: normalizeOptional(createForm.whatsapp),
+        cnpj: normalizeOptional(createForm.cnpj),
       }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
@@ -43,13 +45,15 @@ export default function Clients() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: EditForm) =>
-      api.patch(`/clients/${editingClient!.id}`, {
+    mutationFn: (data: EditForm) => {
+      if (!editingClient) throw new Error('Nenhum cliente selecionado')
+      return api.patch(`/clients/${editingClient.id}`, {
         name: data.name,
         email: data.email,
-        whatsapp: data.whatsapp || undefined,
-        cnpj: data.cnpj || undefined,
-      }).then((r) => r.data),
+        whatsapp: normalizeOptional(data.whatsapp),
+        cnpj: normalizeOptional(data.cnpj),
+      }).then((r) => r.data)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       setEditingClient(null)
