@@ -19,13 +19,18 @@ export async function getDashboardMetrics(organizationId: string) {
       where: {
         organizationId,
         isActive: true,
-        columns: {
-          some: {
-            tasks: {
-              some: { dueDate: { lt: now }, status: { notIn: ['DONE', 'CANCELLED'] } },
+        OR: [
+          {
+            columns: {
+              some: {
+                tasks: {
+                  some: { dueDate: { lt: now }, status: { notIn: ['DONE', 'CANCELLED'] } },
+                },
+              },
             },
           },
-        },
+          { dueDate: { lt: now } },
+        ],
       },
     }),
 
@@ -55,17 +60,23 @@ export async function getDashboardMetrics(organizationId: string) {
       where: {
         organizationId,
         isActive: true,
-        columns: {
-          some: {
-            tasks: {
-              some: { dueDate: { lte: in7days }, status: { notIn: ['DONE', 'CANCELLED'] } },
+        OR: [
+          {
+            columns: {
+              some: {
+                tasks: {
+                  some: { dueDate: { lte: in7days }, status: { notIn: ['DONE', 'CANCELLED'] } },
+                },
+              },
             },
           },
-        },
+          { dueDate: { lte: in7days } },
+        ],
       },
       select: {
         id: true,
         title: true,
+        dueDate: true,
         client: { select: { name: true } },
         columns: {
           select: {
@@ -92,7 +103,7 @@ export async function getDashboardMetrics(organizationId: string) {
         .flatMap((c) => c.tasks)
         .map((t) => new Date(t.dueDate!))
         .sort((a, z) => a.getTime() - z.getTime())
-      const earliest = allDueDates[0] ?? null
+      const earliest = allDueDates[0] ?? (b.dueDate ? new Date(b.dueDate) : null)
       const daysOverdue = earliest
         ? Math.floor((now.getTime() - earliest.getTime()) / (1000 * 60 * 60 * 24))
         : 0

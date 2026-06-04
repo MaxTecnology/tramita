@@ -112,6 +112,7 @@ export async function createBoard(
       clientId: data.clientId,
       organizationId,
       responsibleUserId,
+      dueDate: data.dueDate ? new Date(data.dueDate) : null,
       columns: { create: DEFAULT_COLUMNS },
     },
     include: {
@@ -127,7 +128,12 @@ export async function updateBoard(id: string, organizationId: string, data: Upda
 
   return prisma.board.update({
     where: { id },
-    data,
+    data: {
+      ...data,
+      dueDate: data.dueDate !== undefined
+        ? (data.dueDate ? new Date(data.dueDate) : null)
+        : undefined,
+    },
     include: { client: { select: { id: true, name: true } } },
   })
 }
