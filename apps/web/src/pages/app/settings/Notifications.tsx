@@ -231,9 +231,9 @@ export default function Notifications() {
                 placeholder="Bearer <token>"
                 className="font-mono text-sm"
               />
-              {form.maximizebotToken && (
+              {config?.maximizebotToken && (
                 <p className="text-xs text-gray-400 mt-1">
-                  Salvo: <span className="font-mono text-gray-500">{maskToken(form.maximizebotToken)}</span>
+                  Salvo: <span className="font-mono text-gray-500">{maskToken(config.maximizebotToken)}</span>
                 </p>
               )}
             </div>
