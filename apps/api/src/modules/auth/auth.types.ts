@@ -5,6 +5,7 @@ export interface AuthUser {
   name: string
   role: Role
   organizationId: string | null
+  orgName: string | null
 }
 
 export interface LoginResponse {

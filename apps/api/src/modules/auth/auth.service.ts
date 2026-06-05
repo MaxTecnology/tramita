@@ -18,15 +18,21 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
   // Try User table first
-  const user = await prisma.user.findUnique({ where: { email } })
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { organization: { select: { name: true } } },
+  })
   if (user && (await verifyPassword(password, user.passwordHash))) {
-    return buildSession(user.id, user.name, user.role as Role, user.organizationId)
+    return buildSession(user.id, user.name, user.role as Role, user.organizationId, user.organization?.name ?? null)
   }
 
   // Fall back to Client table
-  const client = await prisma.client.findFirst({ where: { email } })
+  const client = await prisma.client.findFirst({
+    where: { email },
+    include: { organization: { select: { name: true } } },
+  })
   if (client && (await verifyPassword(password, client.passwordHash))) {
-    return buildSession(client.id, client.name, 'CLIENT', client.organizationId)
+    return buildSession(client.id, client.name, 'CLIENT', client.organizationId, client.organization?.name ?? null)
   }
 
   throw new AppError(401, 'Credenciais inválidas')
@@ -36,7 +42,8 @@ async function buildSession(
   id: string,
   name: string,
   role: Role,
-  organizationId: string,
+  organizationId: string | null,
+  orgName: string | null,
 ): Promise<LoginResponse> {
   const accessToken = generateAccessToken({ sub: id, role, organizationId })
   const refreshToken = uuidv4()
@@ -48,7 +55,7 @@ async function buildSession(
     REFRESH_TTL_SECONDS,
   )
 
-  return { accessToken, refreshToken, user: { id, name, role, organizationId } }
+  return { accessToken, refreshToken, user: { id, name, role, organizationId, orgName } }
 }
 
 export async function refreshSession(refreshToken: string): Promise<{ accessToken: string }> {
