@@ -103,7 +103,11 @@ export default function PortalBoard() {
                   return (
                     <div
                       key={task.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Abrir tarefa: ${task.title}`}
                       onClick={() => setSelectedTask(task)}
+                      onKeyDown={(e) => e.key === 'Enter' && setSelectedTask(task)}
                       className={cn(
                         'bg-white rounded-lg p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow',
                         isOverdue ? 'border-red-400' : 'border-gray-200',
@@ -113,12 +117,12 @@ export default function PortalBoard() {
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <span className={cn(
                           'text-xs font-medium px-2 py-0.5 rounded-full',
-                          {
+                          ({
                             LOW: 'bg-gray-100 text-gray-600',
                             MEDIUM: 'bg-blue-100 text-blue-600',
                             HIGH: 'bg-orange-100 text-orange-600',
                             URGENT: 'bg-red-100 text-red-600',
-                          }[task.priority],
+                          } as Record<string, string>)[task.priority] ?? 'bg-gray-100 text-gray-600',
                         )}>
                           {PRIORITY_LABELS[task.priority] ?? task.priority}
                         </span>
