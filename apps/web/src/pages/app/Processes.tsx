@@ -73,21 +73,19 @@ interface Group {
   defaultOpen: boolean
 }
 
-function BoardRow({ board, now, accentCls }: { board: Board; now: Date; accentCls: string }) {
+function BoardRow({ board, now }: { board: Board; now: Date }) {
   const progress = getProgress(board)
   const taskDueDate = getMostUrgentDueDate(board)
   const effectiveDueDate = taskDueDate ?? (board.dueDate ? new Date(board.dueDate) : null)
   const { label: dueDateLabel, cls: dueDateCls } = formatDueDate(effectiveDueDate, now)
   const stage = getCurrentStage(board)
-  const isOverdue = effectiveDueDate ? effectiveDueDate < now : false
-  const progressCls = getProgressCls(progress, isOverdue)
 
   return (
     <Link
       to={`/app/board/${board.id}`}
-      className={cn('block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 border-l-4', accentCls)}
+      className="block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
     >
-      {/* Mobile */}
+      {/* Mobile: card layout */}
       <div className="md:hidden">
         <div className="flex items-start justify-between gap-2 mb-1">
           <p className="text-sm font-medium text-gray-900 flex-1 min-w-0 truncate">{board.title}</p>
@@ -98,14 +96,14 @@ function BoardRow({ board, now, accentCls }: { board: Board; now: Date; accentCl
           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{stage}</span>
           <div className="flex-1 flex items-center gap-2">
             <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-              <div className={cn('h-full rounded-full transition-all', progressCls)} style={{ width: `${progress}%` }} />
+              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progress}%` }} />
             </div>
             <span className="text-xs text-gray-500 w-8 text-right">{progress}%</span>
           </div>
         </div>
       </div>
 
-      {/* Desktop */}
+      {/* Desktop: table row */}
       <div className="hidden md:flex items-center gap-3">
         <div className="flex-[2] min-w-0">
           <p className="text-sm font-medium text-gray-900 truncate">{board.title}</p>
@@ -121,7 +119,7 @@ function BoardRow({ board, now, accentCls }: { board: Board; now: Date; accentCl
         </div>
         <div className="flex-1 flex items-center gap-2">
           <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div className={cn('h-full rounded-full transition-all', progressCls)} style={{ width: `${progress}%` }} />
+            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progress}%` }} />
           </div>
           <span className="text-xs text-gray-500 w-8 text-right">{progress}%</span>
         </div>
@@ -160,7 +158,7 @@ function BoardGroup({ group, now }: { group: Group; now: Date }) {
             <div className="w-24 text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Prazo</div>
           </div>
           {group.boards.map((board) => (
-            <BoardRow key={board.id} board={board} now={now} accentCls={group.accentCls} />
+            <BoardRow key={board.id} board={board} now={now} />
           ))}
         </>
       )}
