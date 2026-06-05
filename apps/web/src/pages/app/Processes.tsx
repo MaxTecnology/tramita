@@ -317,7 +317,7 @@ export default function Processes() {
       {/* Card de filtros */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
         <div className="flex flex-wrap gap-2 items-center">
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-60">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <Input
               placeholder="Buscar processo ou cliente..."
