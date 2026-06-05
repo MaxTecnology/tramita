@@ -93,6 +93,11 @@ function SwitchRow({ label, description, checked, onChange }: {
   )
 }
 
+function maskToken(token: string): string {
+  if (!token || token.length <= 12) return '••••••••'
+  return token.slice(0, 10) + '••••••••' + token.slice(-4)
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -225,6 +230,11 @@ export default function Notifications() {
                 onChange={(e) => setForm({ ...form, maximizebotToken: e.target.value })}
                 placeholder="Bearer <token>"
               />
+              {config?.maximizebotToken && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Token atual: <span className="font-mono text-gray-500">{maskToken(config.maximizebotToken)}</span>
+                </p>
+              )}
             </div>
           </Section>
 
