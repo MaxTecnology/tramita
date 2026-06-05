@@ -32,9 +32,16 @@ export default function PortalBoard() {
   if (isLoading) return <div className="p-8 text-gray-500">Carregando...</div>
   if (!board) return <div className="p-8 text-gray-500">Processo não encontrado.</div>
 
-  const allTasks = board.columns.flatMap((c) => c.tasks)
-  const doneTasks = allTasks.filter((t) => t.status === 'DONE').length
-  const progress = allTasks.length > 0 ? Math.round((doneTasks / allTasks.length) * 100) : 0
+  const tasks = board.columns.flatMap((c) => c.tasks).filter((t) => t.status !== 'CANCELLED')
+  const maxPos = board.columns.length - 1
+  const progress = tasks.length === 0 || maxPos <= 0
+    ? 0
+    : Math.round(
+        tasks.reduce((acc, t) => {
+          const col = board.columns.find((c) => c.id === t.columnId)
+          return acc + (col?.position ?? 0) / maxPos
+        }, 0) / tasks.length * 100,
+      )
 
   const filteredColumns = board.columns.map((col) => ({
     ...col,

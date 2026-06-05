@@ -7,11 +7,13 @@ import { cn } from '@/lib/utils'
 interface Task {
   id: string
   status: string
+  columnId: string
 }
 
 interface Column {
   id: string
   title: string
+  position: number
   tasks: Task[]
 }
 
@@ -24,14 +26,23 @@ interface BoardSummary {
 }
 
 function getProgress(board: BoardSummary): number {
-  const all = board.columns.flatMap((c) => c.tasks)
-  if (all.length === 0) return 0
-  const done = all.filter((t) => t.status === 'DONE').length
-  return Math.round((done / all.length) * 100)
+  const tasks = board.columns
+    .flatMap((c) => c.tasks)
+    .filter((t) => t.status !== 'CANCELLED')
+  if (tasks.length === 0) return 0
+  const maxPos = board.columns.length - 1
+  if (maxPos <= 0) return 0
+  const sum = tasks.reduce((acc, t) => {
+    const col = board.columns.find((c) => c.id === t.columnId)
+    return acc + (col?.position ?? 0) / maxPos
+  }, 0)
+  return Math.round((sum / tasks.length) * 100)
 }
 
 function getCurrentStage(board: BoardSummary): string {
-  const active = board.columns.find((c) => c.tasks.some((t) => t.status !== 'DONE'))
+  const active = board.columns.find((c) =>
+    c.tasks.some((t) => t.status !== 'DONE' && t.status !== 'CANCELLED'),
+  )
   return active?.title ?? board.columns.at(-1)?.title ?? '—'
 }
 
