@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Search } from 'lucide-react'
 import { useBoardStream } from '@/hooks/useBoardStream'
 import { TaskDrawer } from '@/components/portal/TaskDrawer'
 import { useAuth } from '@/hooks/useAuth'
@@ -21,6 +21,13 @@ export default function PortalBoard() {
     queryFn: () => api.get(`/boards/${boardId}`).then((r) => r.data),
     enabled: !!boardId,
   })
+
+  const PRIORITY_LABELS: Record<string, string> = {
+    LOW: 'Baixa',
+    MEDIUM: 'Média',
+    HIGH: 'Alta',
+    URGENT: 'Urgente',
+  }
 
   if (isLoading) return <div className="p-8 text-gray-500">Carregando...</div>
   if (!board) return <div className="p-8 text-gray-500">Processo não encontrado.</div>
@@ -49,7 +56,7 @@ export default function PortalBoard() {
           <div className="flex items-center gap-3 mt-1">
             <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-blue-500 rounded-full transition-all"
+                className={cn('h-full rounded-full transition-all', progress >= 80 ? 'bg-green-500' : 'bg-[#185FA5]')}
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -59,20 +66,23 @@ export default function PortalBoard() {
       </div>
 
       {/* Title search */}
-      <div className="px-6 py-2 border-b border-gray-100 bg-white">
-        <input
-          type="text"
-          placeholder="Buscar por título..."
-          value={titleSearch}
-          onChange={(e) => setTitleSearch(e.target.value)}
-          className="w-full h-8 rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div className="px-4 md:px-6 py-2 border-b border-gray-100 bg-white">
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por título..."
+            value={titleSearch}
+            onChange={(e) => setTitleSearch(e.target.value)}
+            className="w-full h-8 rounded-md border border-gray-300 bg-white pl-8 pr-3 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
+          />
+        </div>
       </div>
 
-      <div className="flex-1 overflow-x-auto p-6">
-        <div className="flex gap-4 h-full">
+      <div className="flex-1 overflow-x-auto p-4 md:p-6">
+        <div className="flex gap-3 md:gap-4 h-full">
           {filteredColumns.map((column) => (
-            <div key={column.id} className="flex-shrink-0 w-64">
+            <div key={column.id} className="flex-shrink-0 w-[280px] md:w-64">
               <div
                 className="flex items-center justify-between mb-3 pb-2 border-b-2"
                 style={{ borderBottomColor: column.color ?? '#e5e7eb' }}
@@ -110,7 +120,7 @@ export default function PortalBoard() {
                             URGENT: 'bg-red-100 text-red-600',
                           }[task.priority],
                         )}>
-                          {task.priority}
+                          {PRIORITY_LABELS[task.priority] ?? task.priority}
                         </span>
                         {task.dueDate && (
                           <span className={cn('text-xs', isOverdue ? 'text-red-500 font-medium' : 'text-gray-400')}>
