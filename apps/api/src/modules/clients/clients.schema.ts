@@ -27,7 +27,7 @@ export type CreateClientBody = z.infer<typeof createClientSchema>
 export type UpdateClientBody = z.infer<typeof updateClientSchema>
 
 export const listClientsQuerySchema = z.object({
-  includeInactive: z.coerce.boolean().optional().default(false),
+  includeInactive: z.coerce.boolean().default(false),
 })
 
 export type ListClientsQuery = z.infer<typeof listClientsQuerySchema>

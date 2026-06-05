@@ -14,8 +14,7 @@ export async function clientsRoutes(app: FastifyInstance) {
   app.get('/', {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
   }, async (request, reply) => {
-    const result = listClientsQuerySchema.safeParse(request.query)
-    const includeInactive = result.success ? result.data.includeInactive : false
+    const { includeInactive } = listClientsQuerySchema.parse(request.query)
     return reply.send(await listClients(request.user.organizationId!, includeInactive))
   })
 
