@@ -100,7 +100,7 @@ Contador: mostra total quando sem filtro, "Exibindo X de Y" quando filtrado.
 - Badge de perfil: `Admin` (cinza), `Gerente` (azul claro), `Colaborador` (verde claro)
 - Telefone exibido apenas quando preenchido (`user.phone && ...`)
 - Botão "Desativar" com `window.confirm` + loading por item
-- Botões "Editar" e "Desativar" **não exibidos para usuários `ORG_ADMIN`** — o `updateUserSchema` do backend só aceita `ORG_MANAGER | ORG_MEMBER`, e o admin não deve poder se remover
+- Botões "Editar" e "Desativar" **não exibidos para usuários `ORG_ADMIN`** — o `updateUserSchema` do backend só aceita `ORG_MANAGER | ORG_MEMBER`, e o admin não deve poder se remover. O MASTER gerencia ORG_ADMINs pelo painel master (rota separada), não por esta tela
 
 ---
 
