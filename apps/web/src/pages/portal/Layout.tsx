@@ -4,6 +4,12 @@ import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { LayoutGrid, FileText, User, LogOut } from 'lucide-react'
 
+const tabs = [
+  { to: '/portal/board', icon: LayoutGrid, label: 'Processos' },
+  { to: '/portal/reports', icon: FileText, label: 'Relatórios' },
+  { to: '/portal/profile', icon: User, label: 'Perfil' },
+] as const
+
 export default function PortalLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -19,16 +25,29 @@ export default function PortalLayout() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <aside className="w-52 bg-white border-r border-gray-200 flex flex-col">
+      {/* Sidebar — desktop only */}
+      <aside className="hidden md:flex w-52 bg-white border-r border-gray-200 flex-col">
         <div className="p-4 border-b border-gray-200">
-          <h1 className="text-lg font-bold text-blue-600">Tramita</h1>
-          <p className="text-xs text-gray-500 truncate">{user?.name}</p>
+          <h1 className="text-lg font-bold text-[#185FA5]">Tramita</h1>
+          <p className="text-xs text-gray-500 truncate mt-0.5">{user?.name}</p>
         </div>
 
         <nav className="flex-1 p-3 space-y-1">
-          <PortalLink to="/portal/board" icon={<LayoutGrid size={16} />} label="Meus Processos" />
-          <PortalLink to="/portal/reports" icon={<FileText size={16} />} label="Relatórios" />
-          <PortalLink to="/portal/profile" icon={<User size={16} />} label="Perfil" />
+          {tabs.map(({ to, icon: Icon, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                  isActive ? 'bg-blue-50 text-[#185FA5] font-medium' : 'text-gray-600 hover:bg-gray-100',
+                )
+              }
+            >
+              <Icon size={16} />
+              {label}
+            </NavLink>
+          ))}
         </nav>
 
         <div className="p-3 border-t border-gray-200">
@@ -42,26 +61,29 @@ export default function PortalLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
+      {/* Main content — pb-16 evita conteúdo atrás da tab bar no mobile */}
+      <main className="flex-1 overflow-auto pb-16 md:pb-0">
         <Outlet />
       </main>
-    </div>
-  )
-}
 
-function PortalLink({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) {
-  return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        cn(
-          'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-          isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100',
-        )
-      }
-    >
-      {icon}
-      {label}
-    </NavLink>
+      {/* Bottom tab bar — mobile only */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white border-t border-gray-200 flex h-16">
+        {tabs.map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              cn(
+                'flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors',
+                isActive ? 'text-[#185FA5]' : 'text-gray-400',
+              )
+            }
+          >
+            <Icon size={20} />
+            <span className="text-[10px] font-medium">{label}</span>
+          </NavLink>
+        ))}
+      </nav>
+    </div>
   )
 }
