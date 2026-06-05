@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,23 +36,31 @@ export default function MasterPlans() {
     mutationFn: (data: { name: string; maxClients: number; priceMonthly: number }) =>
       api.post('/master/plans', { ...data, features: { pdf: true, sse: true, attachments: true } }),
     onSuccess: () => {
+      toast.success('Plano criado')
       qc.invalidateQueries({ queryKey: ['master', 'plans'] })
       setForm({ name: '', maxClients: '', priceMonthly: '' })
     },
+    onError: () => toast.error('Erro ao criar plano'),
   })
 
   const updateMutation = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       api.patch(`/master/plans/${id}`, { name }),
     onSuccess: () => {
+      toast.success('Plano atualizado')
       qc.invalidateQueries({ queryKey: ['master', 'plans'] })
       setEditId(null)
     },
+    onError: () => toast.error('Erro ao atualizar plano'),
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/master/plans/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['master', 'plans'] }),
+    onSuccess: () => {
+      toast.success('Plano removido')
+      qc.invalidateQueries({ queryKey: ['master', 'plans'] })
+    },
+    onError: () => toast.error('Erro ao remover plano'),
   })
 
   function handleCreate(e: React.FormEvent) {

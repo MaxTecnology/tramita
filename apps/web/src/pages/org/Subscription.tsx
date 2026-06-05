@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -58,9 +59,11 @@ export default function OrgSubscription() {
   const changePlanMutation = useMutation({
     mutationFn: (planId: string) => api.post('/org/subscription/change-plan', { planId }),
     onSuccess: () => {
+      toast.success('Plano alterado com sucesso')
       qc.invalidateQueries({ queryKey: ['org', 'subscription'] })
       setShowChangePlan(false)
     },
+    onError: () => toast.error('Erro ao alterar plano'),
   })
 
   if (!isAuthenticated || user?.role !== 'ORG_ADMIN') return null

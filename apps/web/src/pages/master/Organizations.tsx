@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -41,7 +42,11 @@ export default function MasterOrganizations() {
   const patchMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Record<string, string> }) =>
       api.patch(`/master/organizations/${id}`, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['master', 'organizations'] }),
+    onSuccess: () => {
+      toast.success('Escritório atualizado')
+      qc.invalidateQueries({ queryKey: ['master', 'organizations'] })
+    },
+    onError: () => toast.error('Erro ao atualizar escritório'),
   })
 
   if (isLoading) return <div className="p-8 text-gray-500">Carregando escritórios...</div>

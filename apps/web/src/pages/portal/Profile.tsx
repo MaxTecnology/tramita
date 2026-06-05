@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,7 +11,6 @@ import { useAuth } from '@/hooks/useAuth'
 export default function PortalProfile() {
   const { user } = useAuth()
   const [form, setForm] = useState({ password: '', confirmPassword: '', whatsapp: '' })
-  const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
   const mutation = useMutation({
@@ -21,12 +21,11 @@ export default function PortalProfile() {
       return api.patch('/portal/profile', payload).then((r) => r.data)
     },
     onSuccess: () => {
-      setSuccessMsg('Perfil atualizado com sucesso.')
-      setErrorMsg('')
+      toast.success('Perfil atualizado')
       setForm({ password: '', confirmPassword: '', whatsapp: '' })
     },
     onError: () => {
-      setErrorMsg('Erro ao salvar. Verifique os dados e tente novamente.')
+      toast.error('Erro ao atualizar perfil')
     },
   })
 
@@ -80,7 +79,6 @@ export default function PortalProfile() {
           </div>
 
           {errorMsg && <p className="text-sm text-red-500">{errorMsg}</p>}
-          {successMsg && <p className="text-sm text-green-600">{successMsg}</p>}
 
           <Button onClick={handleSave} disabled={mutation.isPending}>
             Salvar alterações
