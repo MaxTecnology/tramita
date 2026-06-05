@@ -4,9 +4,16 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
-const TEMPLATE_VARS = [
-  'clientName', 'orgName', 'taskTitle', 'fromColumn',
-  'toColumn', 'dueDate', 'portalUrl', 'commentText', 'commentAuthorName',
+const TEMPLATE_VARS: { key: string; label: string }[] = [
+  { key: 'clientName',        label: 'Nome do cliente' },
+  { key: 'orgName',           label: 'Nome do escritório' },
+  { key: 'taskTitle',         label: 'Título da tarefa' },
+  { key: 'fromColumn',        label: 'Etapa anterior' },
+  { key: 'toColumn',          label: 'Nova etapa' },
+  { key: 'dueDate',           label: 'Data de vencimento' },
+  { key: 'portalUrl',         label: 'Link do portal' },
+  { key: 'commentText',       label: 'Texto do comentário' },
+  { key: 'commentAuthorName', label: 'Autor do comentário' },
 ]
 
 interface Props {
@@ -51,15 +58,16 @@ export function TemplateEditor({ event, channel }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-1">
-        {TEMPLATE_VARS.map((v) => (
+      <div className="flex flex-wrap gap-2">
+        {TEMPLATE_VARS.map(({ key, label }) => (
           <button
-            key={v}
+            key={key}
             type="button"
-            onClick={() => setBody((b) => b + `{{${v}}}`)}
-            className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
+            onClick={() => setBody((b) => b + `{{${key}}}`)}
+            className="flex flex-col items-start px-3 py-2 rounded-md bg-[#185FA5] hover:bg-[#0C447C] active:scale-95 shadow-sm transition-all text-left"
           >
-            {`{{${v}}}`}
+            <span className="text-xs font-mono font-semibold text-white leading-tight">{`{{${key}}}`}</span>
+            <span className="text-[10px] text-blue-200 leading-tight mt-0.5">{label}</span>
           </button>
         ))}
       </div>
