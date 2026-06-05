@@ -15,7 +15,8 @@ interface Config {
   taskCompleted?: boolean
   commentAdded?: boolean
   dueDateAlert?: boolean
-  maximizebotToken?: string
+  maximizebotToken?: string        // write-only: sent on save, never returned by API
+  maximizebotTokenPreview?: string | null  // read-only: masked preview returned by API
   smtpHost?: string
   smtpPort?: number
   smtpUser?: string
@@ -93,10 +94,6 @@ function SwitchRow({ label, description, checked, onChange }: {
   )
 }
 
-function maskToken(token: string): string {
-  if (!token || token.length <= 12) return '••••••••'
-  return token.slice(0, 10) + '••••••••' + token.slice(-4)
-}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -231,9 +228,9 @@ export default function Notifications() {
                 placeholder="Bearer <token>"
                 className="font-mono text-sm"
               />
-              {config?.maximizebotToken && (
+              {config?.maximizebotTokenPreview && (
                 <p className="text-xs text-gray-400 mt-1">
-                  Salvo: <span className="font-mono text-gray-500">{maskToken(config.maximizebotToken)}</span>
+                  Salvo: <span className="font-mono text-gray-500">{config.maximizebotTokenPreview}</span>
                 </p>
               )}
             </div>

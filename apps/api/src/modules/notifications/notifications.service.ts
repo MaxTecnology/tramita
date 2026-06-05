@@ -6,8 +6,13 @@ import { getTemplate, renderTemplate, PREVIEW_VARS } from '@/lib/template'
 import type { NotificationEvent, MessageChannel, NotificationStatus } from '@prisma/client'
 import type { UpdateConfigBody, UpsertTemplateBody } from './notifications.schema'
 
+function maskToken(token: string): string {
+  if (token.length <= 12) return '••••••••'
+  return token.slice(0, 10) + '••••••••' + token.slice(-4)
+}
+
 export async function getConfig(organizationId: string) {
-  return prisma.notificationConfig.findUnique({
+  const config = await prisma.notificationConfig.findUnique({
     where: { organizationId },
     select: {
       id: true,
@@ -27,9 +32,17 @@ export async function getConfig(organizationId: string) {
       emailFrom: true,
       createdAt: true,
       updatedAt: true,
-      // smtpPass e maximizebotToken propositalmente omitidos
+      maximizebotToken: true, // fetched only to produce the masked preview
     },
   })
+
+  if (!config) return null
+
+  const { maximizebotToken, ...rest } = config
+  return {
+    ...rest,
+    maximizebotTokenPreview: maximizebotToken ? maskToken(maximizebotToken) : null,
+  }
 }
 
 export async function updateConfig(organizationId: string, data: UpdateConfigBody) {
