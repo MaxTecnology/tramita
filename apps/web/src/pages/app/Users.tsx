@@ -6,16 +6,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import type { User } from '@/types'
+import type { User, OrgRole } from '@/types'
 
-type OrgRole = 'ORG_MANAGER' | 'ORG_MEMBER'
+type EditableRole = Exclude<OrgRole, 'ORG_ADMIN'>
 
 type CreateForm = {
-  name: string; email: string; password: string; role: OrgRole; phone: string
+  name: string; email: string; password: string; role: EditableRole; phone: string
 }
 
 type EditForm = {
-  name: string; email: string; role: OrgRole; phone: string
+  name: string; email: string; role: EditableRole; phone: string
 }
 
 const EMPTY_CREATE: CreateForm = {
@@ -48,7 +48,7 @@ export default function Users() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState<'all' | OrgRole>('all')
+  const [roleFilter, setRoleFilter] = useState<'all' | EditableRole>('all')
 
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ['users'],
@@ -112,7 +112,7 @@ export default function Users() {
     setEditForm({
       name: user.name,
       email: user.email,
-      role: (user.role as OrgRole) ?? 'ORG_MEMBER',
+      role: user.role === 'ORG_MANAGER' ? 'ORG_MANAGER' : 'ORG_MEMBER',
       phone: user.phone ?? '',
     })
   }
@@ -153,7 +153,7 @@ export default function Users() {
               <select
                 id="c-role"
                 value={createForm.role}
-                onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as OrgRole })}
+                onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as EditableRole })}
                 className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <option value="ORG_MEMBER">Colaborador</option>
@@ -198,7 +198,7 @@ export default function Users() {
         </div>
 
         <div className="flex rounded-md border border-gray-300 overflow-hidden">
-          {(['all', 'ORG_MANAGER', 'ORG_MEMBER'] as const).map((r) => (
+          {(['all', 'ORG_MANAGER', 'ORG_MEMBER'] as const satisfies readonly ('all' | EditableRole)[]).map((r) => (
             <button
               key={r}
               type="button"
@@ -269,7 +269,7 @@ export default function Users() {
 
       {/* Modal de edição */}
       <Dialog open={!!editingUser} onOpenChange={(open) => { if (!open) setEditingUser(null) }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar usuário</DialogTitle>
           </DialogHeader>
@@ -287,7 +287,7 @@ export default function Users() {
               <select
                 id="e-role"
                 value={editForm.role}
-                onChange={(e) => setEditForm({ ...editForm, role: e.target.value as OrgRole })}
+                onChange={(e) => setEditForm({ ...editForm, role: e.target.value as EditableRole })}
                 className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <option value="ORG_MEMBER">Colaborador</option>
