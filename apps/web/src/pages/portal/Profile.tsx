@@ -5,8 +5,16 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/hooks/useAuth'
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+}
 
 export default function PortalProfile() {
   const { user } = useAuth()
@@ -34,57 +42,74 @@ export default function PortalProfile() {
       setErrorMsg('As senhas não coincidem.')
       return
     }
+    setErrorMsg('')
     mutation.mutate()
   }
 
   return (
-    <div className="p-6 max-w-lg">
-      <h1 className="text-xl font-bold text-gray-900 mb-6">Meu Perfil</h1>
+    <div className="p-4 md:p-6 max-w-lg">
+      <h1 className="text-lg md:text-xl font-bold text-gray-900 mb-6">Meu Perfil</h1>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Dados da conta</CardTitle>
-          <p className="text-sm text-gray-500">{user?.name}</p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label>WhatsApp</Label>
-            <Input
-              value={form.whatsapp}
-              onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-              placeholder="5582999999999"
-              className="mt-1"
-            />
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-5 space-y-5">
+        {/* Avatar + nome */}
+        <div className="flex items-center gap-4">
+          <div
+            className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-base"
+            style={{ backgroundColor: '#185FA5' }}
+          >
+            {user?.name ? getInitials(user.name) : '?'}
           </div>
-
-          <div>
-            <Label>Nova senha</Label>
-            <Input
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="Deixe em branco para não alterar"
-              className="mt-1"
-            />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
+            {user?.orgName && <p className="text-xs text-gray-500 truncate">{user.orgName}</p>}
           </div>
+        </div>
 
-          <div>
-            <Label>Confirmar nova senha</Label>
-            <Input
-              type="password"
-              value={form.confirmPassword}
-              onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-              className="mt-1"
-            />
-          </div>
+        <hr className="border-gray-100" />
 
-          {errorMsg && <p className="text-sm text-red-500">{errorMsg}</p>}
+        <div>
+          <Label>WhatsApp</Label>
+          <Input
+            value={form.whatsapp}
+            onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
+            placeholder="5582999999999"
+            className="mt-1"
+          />
+        </div>
 
-          <Button onClick={handleSave} disabled={mutation.isPending}>
+        <div>
+          <Label>Nova senha</Label>
+          <Input
+            type="password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            placeholder="Deixe em branco para não alterar"
+            className="mt-1"
+          />
+        </div>
+
+        <div>
+          <Label>Confirmar nova senha</Label>
+          <Input
+            type="password"
+            value={form.confirmPassword}
+            onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+            className="mt-1"
+          />
+        </div>
+
+        {errorMsg && <p className="text-sm text-red-500">{errorMsg}</p>}
+
+        <div className="flex justify-end">
+          <Button
+            onClick={handleSave}
+            disabled={mutation.isPending}
+            className="bg-[#185FA5] hover:bg-[#145088] text-white"
+          >
             Salvar alterações
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }
