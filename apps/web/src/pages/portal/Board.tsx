@@ -9,6 +9,13 @@ import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import type { Board, Task } from '@/types'
 
+const PRIORITY_LABELS: Record<string, string> = {
+  LOW: 'Baixa',
+  MEDIUM: 'Média',
+  HIGH: 'Alta',
+  URGENT: 'Urgente',
+}
+
 export default function PortalBoard() {
   const { boardId } = useParams<{ boardId: string }>()
   useBoardStream(boardId)
@@ -21,13 +28,6 @@ export default function PortalBoard() {
     queryFn: () => api.get(`/boards/${boardId}`).then((r) => r.data),
     enabled: !!boardId,
   })
-
-  const PRIORITY_LABELS: Record<string, string> = {
-    LOW: 'Baixa',
-    MEDIUM: 'Média',
-    HIGH: 'Alta',
-    URGENT: 'Urgente',
-  }
 
   if (isLoading) return <div className="p-8 text-gray-500">Carregando...</div>
   if (!board) return <div className="p-8 text-gray-500">Processo não encontrado.</div>
@@ -48,7 +48,7 @@ export default function PortalBoard() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 bg-white">
-        <Link to="/portal/board" className="text-gray-400 hover:text-gray-600">
+        <Link to="/portal/board" aria-label="Voltar para processos" className="text-gray-400 hover:text-gray-600">
           <ArrowLeft size={18} />
         </Link>
         <div className="flex-1">
