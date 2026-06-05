@@ -127,7 +127,7 @@ export default function Board() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 bg-white flex-shrink-0">
-        <Link to="/app/processes" className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+        <Link to="/app/processes" aria-label="Voltar para Processos" className="text-gray-400 hover:text-gray-600 flex-shrink-0">
           <ArrowLeft size={18} />
         </Link>
         <div className="flex-1 min-w-0">
