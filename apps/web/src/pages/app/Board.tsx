@@ -199,11 +199,11 @@ export default function Board() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto md:overflow-x-auto p-4 md:p-6">
+      <div className="flex-1 overflow-x-auto p-4 md:p-6">
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex flex-col gap-4 md:flex-row md:gap-4 md:h-full">
+          <div className="flex gap-3 md:gap-4 h-full">
             {board.columns.map((column) => (
-              <div key={column.id} className="w-full md:flex-shrink-0 md:w-64">
+              <div key={column.id} className="flex-shrink-0 w-[280px] md:w-64">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-gray-700">{column.title}</h3>
                   <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
