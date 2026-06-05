@@ -3,11 +3,15 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { AppError } from '@/errors/AppError'
 import { updateProfileSchema } from './portal.schema'
-import { updateClientProfile, getTaskHistory } from './portal.service'
+import { getClientProfile, updateClientProfile, getTaskHistory } from './portal.service'
 
 export async function portalRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
   app.addHook('preHandler', requireRole('CLIENT'))
+
+  app.get('/profile', async (request, reply) => {
+    return reply.send(await getClientProfile(request.user.sub))
+  })
 
   app.patch('/profile', async (request, reply) => {
     const result = updateProfileSchema.safeParse(request.body)

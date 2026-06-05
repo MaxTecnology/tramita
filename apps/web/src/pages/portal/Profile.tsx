@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,11 @@ export default function PortalProfile() {
   const [form, setForm] = useState({ password: '', confirmPassword: '', whatsapp: '' })
   const [errorMsg, setErrorMsg] = useState('')
 
+  const { data: profile, refetch } = useQuery<{ whatsapp: string | null }>({
+    queryKey: ['portal-profile'],
+    queryFn: () => api.get('/portal/profile').then((r) => r.data),
+  })
+
   const mutation = useMutation({
     mutationFn: () => {
       const payload: { password?: string; whatsapp?: string } = {}
@@ -31,6 +36,7 @@ export default function PortalProfile() {
     onSuccess: () => {
       toast.success('Perfil atualizado')
       setForm({ password: '', confirmPassword: '', whatsapp: '' })
+      refetch()
     },
     onError: () => {
       toast.error('Erro ao atualizar perfil')
@@ -69,11 +75,19 @@ export default function PortalProfile() {
 
         <div>
           <Label>WhatsApp</Label>
+          {profile?.whatsapp ? (
+            <p className="mt-1 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+              {profile.whatsapp}
+              <span className="ml-2 text-xs text-gray-400">— para alterar, use o campo abaixo</span>
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-gray-400">Nenhum número cadastrado</p>
+          )}
           <Input
             value={form.whatsapp}
             onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-            placeholder="5582999999999"
-            className="mt-1"
+            placeholder="Novo número (ex: 5582999999999)"
+            className="mt-2"
           />
         </div>
 

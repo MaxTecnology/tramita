@@ -3,6 +3,15 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { UpdateProfileBody } from './portal.schema'
 
+export async function getClientProfile(clientId: string) {
+  const client = await prisma.client.findUnique({
+    where: { id: clientId },
+    select: { id: true, name: true, email: true, whatsapp: true },
+  })
+  if (!client) throw new AppError(404, 'Cliente não encontrado')
+  return client
+}
+
 export async function updateClientProfile(clientId: string, data: UpdateProfileBody) {
   const updateData: { whatsapp?: string; passwordHash?: string } = {}
   if (data.whatsapp !== undefined) updateData.whatsapp = data.whatsapp
