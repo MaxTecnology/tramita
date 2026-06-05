@@ -57,45 +57,63 @@ export function TemplateEditor({ event, channel }: Props) {
   })
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {TEMPLATE_VARS.map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setBody((b) => b + `{{${key}}}`)}
-            className="flex flex-col items-start px-3 py-2 rounded-md bg-[#185FA5] hover:bg-[#0C447C] active:scale-95 shadow-sm transition-all text-left"
-          >
-            <span className="text-xs font-mono font-semibold text-white leading-tight">{`{{${key}}}`}</span>
-            <span className="text-[10px] text-blue-200 leading-tight mt-0.5">{label}</span>
-          </button>
-        ))}
+    <div className="space-y-5">
+
+      {/* Variáveis disponíveis */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Variáveis disponíveis</p>
+        <div className="flex flex-wrap gap-2">
+          {TEMPLATE_VARS.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setBody((b) => b + `{{${key}}}`)}
+              className="flex flex-col items-start px-3 py-2 rounded-md bg-[#185FA5] hover:bg-[#0C447C] active:scale-95 shadow-sm transition-all text-left"
+            >
+              <span className="text-xs font-mono font-semibold text-white leading-tight">{`{{${key}}}`}</span>
+              <span className="text-[10px] text-blue-200 leading-tight mt-0.5">{label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <Textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        rows={8}
-        className="font-mono text-sm"
-      />
+      <div className="border-t border-gray-100" />
 
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
+      {/* Textarea */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Mensagem</p>
+        <Textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={8}
+          className="font-mono text-sm border-gray-200 focus:ring-2 focus:ring-[#185FA5] focus:border-transparent rounded-lg resize-none"
+        />
+      </div>
+
+      {/* Ações */}
+      <div className="flex items-center justify-between pt-1">
+        <button
+          type="button"
           onClick={() => previewMutation.mutate()}
           disabled={previewMutation.isPending}
+          className="text-sm font-medium text-[#185FA5] hover:text-[#0C447C] disabled:opacity-40 transition-colors"
         >
-          Prévia
-        </Button>
-        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-          Salvar
+          {previewMutation.isPending ? 'Gerando prévia...' : '↗ Ver prévia'}
+        </button>
+        <Button
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending}
+          className="bg-[#185FA5] hover:bg-[#0C447C] text-white shadow-sm"
+        >
+          {saveMutation.isPending ? 'Salvando...' : 'Salvar template'}
         </Button>
       </div>
 
+      {/* Preview */}
       {preview && (
-        <div className="rounded-md border border-gray-200 bg-gray-50 p-4 text-sm whitespace-pre-wrap">
-          <p className="text-xs font-medium text-gray-500 mb-2">Preview:</p>
-          {preview}
+        <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+          <p className="text-xs font-semibold text-blue-400 uppercase tracking-wide mb-2">Prévia renderizada</p>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{preview}</p>
         </div>
       )}
     </div>
