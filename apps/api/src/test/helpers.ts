@@ -48,13 +48,17 @@ export async function createTestUser(
   })
 }
 
-export async function createTestClient(organizationId: string) {
+export async function createTestClient(
+  organizationId: string,
+  overrides: Partial<{ isActive: boolean; name: string; email: string }> = {},
+) {
   return prisma.client.create({
     data: {
-      name: 'Test Client',
-      email: `client-${Date.now()}@test.com`,
+      name: overrides.name ?? 'Test Client',
+      email: overrides.email ?? `client-${Date.now()}@test.com`,
       passwordHash: await bcrypt.hash('Client@1234', 10),
       organizationId,
+      isActive: overrides.isActive ?? true,
     },
   })
 }

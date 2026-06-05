@@ -9,9 +9,12 @@ const SELECT = {
   isActive: true, createdAt: true,
 }
 
-export async function listClients(organizationId: string) {
+export async function listClients(organizationId: string, includeInactive = false) {
   return prisma.client.findMany({
-    where: { organizationId, isActive: true },
+    where: {
+      organizationId,
+      ...(includeInactive ? {} : { isActive: true }),
+    },
     select: SELECT,
     orderBy: { name: 'asc' },
   })

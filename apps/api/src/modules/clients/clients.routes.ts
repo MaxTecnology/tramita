@@ -4,7 +4,7 @@ import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { checkPlanLimit } from '@/middlewares/checkPlanLimit'
 import { AppError } from '@/errors/AppError'
-import { createClientSchema, updateClientSchema } from './clients.schema'
+import { createClientSchema, updateClientSchema, listClientsQuerySchema } from './clients.schema'
 import { listClients, createClient, updateClient, deleteClient } from './clients.service'
 
 export async function clientsRoutes(app: FastifyInstance) {
@@ -14,7 +14,9 @@ export async function clientsRoutes(app: FastifyInstance) {
   app.get('/', {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
   }, async (request, reply) => {
-    return reply.send(await listClients(request.user.organizationId!))
+    const result = listClientsQuerySchema.safeParse(request.query)
+    const includeInactive = result.success ? result.data.includeInactive : false
+    return reply.send(await listClients(request.user.organizationId!, includeInactive))
   })
 
   // Apenas Admin e Gerente criam, editam e excluem clientes
