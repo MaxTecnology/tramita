@@ -79,10 +79,10 @@ export default function PortalBoard() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-auto p-4 md:p-6">
-        <div className="flex gap-3 md:gap-4 h-full">
+      <div className="flex-1 overflow-y-auto md:overflow-x-auto p-4 md:p-6">
+        <div className="flex flex-col md:flex-row gap-4 md:h-full">
           {filteredColumns.map((column) => (
-            <div key={column.id} className="flex-shrink-0 w-[280px] md:w-64">
+            <div key={column.id} className="w-full md:flex-shrink-0 md:w-64">
               <div
                 className="flex items-center justify-between mb-3 pb-2 border-b-2"
                 style={{ borderBottomColor: column.color ?? '#e5e7eb' }}
