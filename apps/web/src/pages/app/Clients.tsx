@@ -108,6 +108,7 @@ export default function Clients() {
   const [editForm, setEditForm] = useState<EditForm>({
     name: '', clientType: 'PJ', cnpj: '', cpf: '', email: '', whatsapp: '', phone: '', notes: '',
   })
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ['clients'],
@@ -135,8 +136,8 @@ export default function Clients() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: EditForm) =>
-      api.patch(`/clients/${editingClient!.id}`, {
+    mutationFn: (data: EditForm & { id: string }) =>
+      api.patch(`/clients/${data.id}`, {
         name: data.name,
         clientType: data.clientType,
         cnpj: data.cnpj || undefined,
@@ -154,14 +155,17 @@ export default function Clients() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/clients/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clients'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] })
+      setDeletingId(null)
+    },
   })
 
   function openEdit(client: Client) {
     setEditingClient(client)
     setEditForm({
       name: client.name,
-      clientType: (client.clientType as ClientType) ?? 'PJ',
+      clientType: client.clientType ?? 'PJ',
       cnpj: client.cnpj ?? '',
       cpf: client.cpf ?? '',
       email: client.email,
@@ -178,7 +182,7 @@ export default function Clients() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-lg md:text-xl font-bold text-gray-900">Clientes</h1>
         <Button
-          onClick={() => setShowCreate(!showCreate)}
+          onClick={() => { if (showCreate) setCreateForm(EMPTY_CREATE); setShowCreate(!showCreate) }}
           className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
         >
           {showCreate ? 'Cancelar' : '+ Novo cliente'}
@@ -257,11 +261,15 @@ export default function Clients() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => deleteMutation.mutate(client.id)}
-                disabled={deleteMutation.isPending}
+                onClick={() => {
+                  if (!window.confirm(`Desativar o cliente "${client.name}"?`)) return
+                  setDeletingId(client.id)
+                  deleteMutation.mutate(client.id)
+                }}
+                disabled={deleteMutation.isPending && deletingId === client.id}
                 className="text-red-500 hover:text-red-700 hover:bg-red-50"
               >
-                Desativar
+                {deleteMutation.isPending && deletingId === client.id ? 'Desativando...' : 'Desativar'}
               </Button>
             </div>
           </div>
@@ -294,7 +302,7 @@ export default function Clients() {
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setEditingClient(null)}>Cancelar</Button>
               <Button
-                onClick={() => updateMutation.mutate(editForm)}
+                onClick={() => { if (editingClient) updateMutation.mutate({ ...editForm, id: editingClient.id }) }}
                 disabled={updateMutation.isPending || !editForm.name || !editForm.email}
                 className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
               >
