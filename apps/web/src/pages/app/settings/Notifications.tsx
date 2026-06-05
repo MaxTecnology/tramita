@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { toast } from 'sonner'
 
 interface Config {
   whatsappEnabled?: boolean
@@ -69,7 +70,11 @@ export default function Notifications() {
       )
       return api.patch('/notifications/config', payload).then((r) => r.data)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications-config'] }),
+    onSuccess: () => {
+      toast.success('Configurações salvas')
+      queryClient.invalidateQueries({ queryKey: ['notifications-config'] })
+    },
+    onError: () => toast.error('Erro ao salvar configurações'),
   })
 
   const STATUS_COLOR: Record<string, string> = {

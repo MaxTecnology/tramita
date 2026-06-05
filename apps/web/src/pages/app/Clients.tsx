@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import type { Client } from '@/types'
+import { toast } from 'sonner'
 
 type ClientType = 'PF' | 'PJ'
 
@@ -148,12 +149,14 @@ export default function Clients() {
         notes: createForm.notes || undefined,
       }).then((r) => r.data),
     onSuccess: () => {
+      toast.success('Cliente cadastrado com sucesso')
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       setShowCreate(false)
       setCreateForm(EMPTY_CREATE)
       setSearch('')
       setTypeFilter('all')
     },
+    onError: () => toast.error('Erro ao cadastrar cliente'),
   })
 
   const updateMutation = useMutation({
@@ -169,17 +172,21 @@ export default function Clients() {
         notes: data.notes || undefined,
       }).then((r) => r.data),
     onSuccess: () => {
+      toast.success('Cliente atualizado')
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       setEditingClient(null)
     },
+    onError: () => toast.error('Erro ao salvar alterações'),
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/clients/${id}`),
     onSuccess: () => {
+      toast.success('Cliente desativado')
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       setDeletingId(null)
     },
+    onError: () => toast.error('Erro ao desativar cliente'),
   })
 
   function openEdit(client: Client) {

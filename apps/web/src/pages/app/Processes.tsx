@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { cn } from '@/lib/utils'
 import { Plus, ChevronDown, ChevronRight, AlertTriangle, Clock, ClipboardList, CheckCircle2, Search, X, FileSearch } from 'lucide-react'
 import type { Board, Client } from '@/types'
+import { toast } from 'sonner'
 
 const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
 
@@ -199,11 +200,13 @@ export default function Processes() {
         ...(newProcessForm.dueDate ? { dueDate: new Date(newProcessForm.dueDate + 'T00:00:00').toISOString() } : {}),
       }).then((r) => r.data),
     onSuccess: (board) => {
+      toast.success('Processo criado com sucesso')
       qc.invalidateQueries({ queryKey: ['boards'] })
       setNewProcessOpen(false)
       setNewProcessForm({ title: '', clientId: '', dueDate: '' })
       navigate(`/app/board/${board.id}`)
     },
+    onError: () => toast.error('Erro ao criar processo'),
   })
 
   const now = useMemo(() => new Date(), [])

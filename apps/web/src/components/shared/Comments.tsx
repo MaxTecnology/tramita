@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Comment, DrawerRole } from '@/types'
+import { toast } from 'sonner'
 
 interface Props {
   taskId: string
@@ -26,15 +27,21 @@ export function Comments({ taskId, currentUserId, role }: Props) {
     mutationFn: () =>
       api.post(`/tasks/${taskId}/comments`, { content }).then((r) => r.data),
     onSuccess: () => {
+      toast.success('Comentário adicionado')
       queryClient.invalidateQueries({ queryKey: ['comments', taskId] })
       setContent('')
     },
+    onError: () => toast.error('Erro ao adicionar comentário'),
   })
 
   const deleteMutation = useMutation({
     mutationFn: (commentId: string) =>
       api.delete(`/comments/${commentId}`).then((r) => r.data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['comments', taskId] }),
+    onSuccess: () => {
+      toast.success('Comentário removido')
+      queryClient.invalidateQueries({ queryKey: ['comments', taskId] })
+    },
+    onError: () => toast.error('Erro ao remover comentário'),
   })
 
   function canDelete(c: Comment) {

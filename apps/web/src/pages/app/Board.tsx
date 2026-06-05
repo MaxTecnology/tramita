@@ -22,6 +22,7 @@ import { TaskCard } from '@/components/TaskCard'
 import { TaskDrawer } from '@/components/shared/TaskDrawer'
 import { useAuth } from '@/hooks/useAuth'
 import type { Task } from '@/types'
+import { toast } from 'sonner'
 
 function DroppableColumn({ id, children }: { id: string; children: React.ReactNode }) {
   const { setNodeRef } = useDroppable({ id })
@@ -69,10 +70,12 @@ export default function Board() {
     mutationFn: ({ columnId, title }: { columnId: string; title: string }) =>
       api.post(`/columns/${columnId}/tasks`, { title }).then((r) => r.data),
     onSuccess: () => {
+      toast.success('Tarefa criada')
       qc.invalidateQueries({ queryKey: ['board', boardId] })
       setAddingToColumn(null)
       setNewTaskTitle('')
     },
+    onError: () => toast.error('Erro ao criar tarefa'),
   })
 
   function handleAddTask(columnId: string) {

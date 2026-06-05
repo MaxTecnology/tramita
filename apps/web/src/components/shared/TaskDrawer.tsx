@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Comments } from '@/components/shared/Comments'
 import type { Task, Attachment, TaskHistory, DrawerRole } from '@/types'
+import { toast } from 'sonner'
 
 interface Props {
   task: Task
@@ -66,7 +67,11 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Pick<Task, 'title' | 'priority' | 'description' | 'dueDate'>>) =>
       api.patch(`/tasks/${task.id}`, data).then((r) => r.data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['board'] }),
+    onSuccess: () => {
+      toast.success('Tarefa atualizada')
+      queryClient.invalidateQueries({ queryKey: ['board'] })
+    },
+    onError: () => toast.error('Erro ao salvar tarefa'),
   })
 
   const { data: attachments = [] } = useQuery<Attachment[]>({
@@ -87,13 +92,21 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
       form.append('file', file)
       return api.post(`/tasks/${task.id}/attachments`, form)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['attachments', task.id] }),
+    onSuccess: () => {
+      toast.success('Arquivo anexado')
+      queryClient.invalidateQueries({ queryKey: ['attachments', task.id] })
+    },
+    onError: () => toast.error('Erro ao anexar arquivo'),
   })
 
   const deleteAttachmentMutation = useMutation({
     mutationFn: (attachmentId: string) =>
       api.delete(`/tasks/${task.id}/attachments/${attachmentId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['attachments', task.id] }),
+    onSuccess: () => {
+      toast.success('Anexo removido')
+      queryClient.invalidateQueries({ queryKey: ['attachments', task.id] })
+    },
+    onError: () => toast.error('Erro ao remover anexo'),
   })
 
   const isOverdue =

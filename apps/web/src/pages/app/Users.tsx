@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import type { User, OrgRole } from '@/types'
+import { toast } from 'sonner'
 
 type EditableRole = Exclude<OrgRole, 'ORG_ADMIN'>
 
@@ -77,12 +78,14 @@ export default function Users() {
         phone: createForm.phone || undefined,
       }).then((r) => r.data),
     onSuccess: () => {
+      toast.success('Usuário cadastrado com sucesso')
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setShowCreate(false)
       setCreateForm(EMPTY_CREATE)
       setSearch('')
       setRoleFilter('all')
     },
+    onError: () => toast.error('Erro ao cadastrar usuário'),
   })
 
   const updateMutation = useMutation({
@@ -94,17 +97,21 @@ export default function Users() {
         phone: data.phone || undefined,
       }).then((r) => r.data),
     onSuccess: () => {
+      toast.success('Usuário atualizado')
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setEditingUser(null)
     },
+    onError: () => toast.error('Erro ao salvar alterações'),
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/users/${id}`),
     onSuccess: () => {
+      toast.success('Usuário desativado')
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setDeletingId(null)
     },
+    onError: () => toast.error('Erro ao desativar usuário'),
   })
 
   function openEdit(user: User) {

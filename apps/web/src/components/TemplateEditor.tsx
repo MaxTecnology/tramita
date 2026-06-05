@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { toast } from 'sonner'
 
 const TEMPLATE_VARS: { key: string; label: string }[] = [
   { key: 'clientName',        label: 'Nome do cliente' },
@@ -52,8 +53,10 @@ export function TemplateEditor({ event, channel }: Props) {
     mutationFn: () =>
       api.put(`/notifications/templates/${event}/${channel}`, { body }).then((r) => r.data),
     onSuccess: () => {
+      toast.success('Template salvo')
       queryClient.invalidateQueries({ queryKey: ['template', event, channel] })
     },
+    onError: () => toast.error('Erro ao salvar template'),
   })
 
   return (

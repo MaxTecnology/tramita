@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Plus } from 'lucide-react'
 import type { Board, Client } from '@/types'
+import { toast } from 'sonner'
 
 interface BoardSummary extends Pick<Board, 'id' | 'title' | 'client' | 'columns'> {}
 
@@ -41,11 +42,13 @@ export default function Dashboard() {
     mutationFn: () =>
       api.post('/boards', { title: form.title, clientId: form.clientId }).then((r) => r.data),
     onSuccess: (board) => {
+      toast.success('Processo criado com sucesso')
       qc.invalidateQueries({ queryKey: ['boards'] })
       setOpen(false)
       setForm({ title: '', clientId: '' })
       navigate(`/app/board/${board.id}`)
     },
+    onError: () => toast.error('Erro ao criar processo'),
   })
 
   function handleSubmit(e: React.FormEvent) {
