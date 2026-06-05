@@ -54,6 +54,7 @@ export default function AppLayout() {
             <p className="text-xs text-gray-500 truncate">{user?.name}</p>
           </div>
           <button
+            aria-label="Fechar menu"
             onClick={() => setSidebarOpen(false)}
             className="md:hidden p-1 text-gray-400 hover:text-gray-600"
           >
@@ -101,6 +102,7 @@ export default function AppLayout() {
         {/* Mobile top-bar */}
         <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
           <button
+            aria-label="Abrir menu de navegação"
             onClick={() => setSidebarOpen(true)}
             className="p-1 text-gray-500 hover:text-gray-700"
           >
