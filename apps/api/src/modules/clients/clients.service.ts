@@ -4,7 +4,9 @@ import { hashPassword } from '@/modules/auth/auth.service'
 import type { CreateClientBody, UpdateClientBody } from './clients.schema'
 
 const SELECT = {
-  id: true, name: true, cnpj: true, email: true, whatsapp: true, isActive: true, createdAt: true,
+  id: true, name: true, clientType: true, cnpj: true, cpf: true,
+  email: true, whatsapp: true, phone: true, notes: true,
+  isActive: true, createdAt: true,
 }
 
 export async function listClients(organizationId: string) {
@@ -24,10 +26,14 @@ export async function createClient(organizationId: string, data: CreateClientBod
   return prisma.client.create({
     data: {
       name: data.name,
+      clientType: data.clientType ?? 'PJ',
       cnpj: data.cnpj,
+      cpf: data.cpf,
       email: data.email,
       passwordHash: await hashPassword(data.password),
       whatsapp: data.whatsapp,
+      phone: data.phone,
+      notes: data.notes,
       organizationId,
     },
     select: SELECT,

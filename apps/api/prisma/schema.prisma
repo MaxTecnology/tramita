@@ -105,10 +105,14 @@ enum UserRole {
 model Client {
   id             String   @id @default(cuid())
   name           String
+  clientType     String   @default("PJ")
   cnpj           String?
+  cpf            String?
   email          String
   passwordHash   String
   whatsapp       String?
+  phone          String?
+  notes          String?
   organizationId String
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
