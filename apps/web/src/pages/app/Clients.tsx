@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -109,11 +109,30 @@ export default function Clients() {
     name: '', clientType: 'PJ', cnpj: '', cpf: '', email: '', whatsapp: '', phone: '', notes: '',
   })
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'PF' | 'PJ'>('all')
+  const [includeInactive, setIncludeInactive] = useState(false)
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
-    queryKey: ['clients'],
-    queryFn: () => api.get('/clients').then((r) => r.data),
+    queryKey: ['clients', { includeInactive }],
+    queryFn: () =>
+      api.get('/clients', { params: includeInactive ? { includeInactive: true } : {} })
+        .then((r) => r.data),
   })
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    return clients.filter((c) => {
+      const matchType = typeFilter === 'all' || c.clientType === typeFilter
+      const matchSearch =
+        !q ||
+        c.name.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q) ||
+        (c.cnpj ?? '').toLowerCase().includes(q) ||
+        (c.cpf ?? '').toLowerCase().includes(q)
+      return matchType && matchSearch
+    })
+  }, [clients, search, typeFilter])
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -189,6 +208,55 @@ export default function Clients() {
         </Button>
       </div>
 
+      {/* Barra de filtros */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-[200px]">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Buscar por nome, e-mail, CPF/CNPJ..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="flex rounded-md border border-gray-300 overflow-hidden">
+          {(['all', 'PJ', 'PF'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTypeFilter(t)}
+              className={cn(
+                'px-3 py-2 text-sm font-medium transition-colors',
+                typeFilter === t ? 'bg-[#185FA5] text-white' : 'bg-white text-gray-600 hover:bg-gray-50',
+              )}
+            >
+              {t === 'all' ? 'Todos' : t}
+            </button>
+          ))}
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={includeInactive}
+            onChange={(e) => setIncludeInactive(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-blue-600"
+          />
+          Incluir desativados
+        </label>
+      </div>
+
+      {/* Contador */}
+      {clients.length > 0 && (
+        <p className="text-xs text-gray-400 mb-3">
+          Exibindo {filtered.length} de {clients.length} cliente{clients.length !== 1 ? 's' : ''}
+        </p>
+      )}
+
       {/* Formulário de criação */}
       {showCreate && (
         <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6 space-y-3">
@@ -232,17 +300,24 @@ export default function Clients() {
 
       {/* Lista */}
       <div className="space-y-2">
-        {clients.length === 0 && (
-          <p className="text-center text-gray-400 py-12">Nenhum cliente cadastrado.</p>
+        {filtered.length === 0 && (
+          <p className="text-center text-gray-400 py-12">
+            {clients.length === 0 ? 'Nenhum cliente cadastrado.' : 'Nenhum cliente encontrado para este filtro.'}
+          </p>
         )}
-        {clients.map((client) => (
-          <div key={client.id} className="bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between gap-3">
+        {filtered.map((client) => (
+          <div key={client.id} className={cn('bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between gap-3', !client.isActive && 'opacity-60')}>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium text-gray-900 truncate">{client.name}</p>
                 <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0">
                   {client.clientType ?? 'PJ'}
                 </span>
+                {!client.isActive && (
+                  <span className="text-xs bg-red-100 text-red-500 px-1.5 py-0.5 rounded flex-shrink-0">
+                    Inativo
+                  </span>
+                )}
               </div>
               <p className="text-xs text-gray-500 truncate">{client.email}</p>
               {(client.cnpj || client.cpf || client.whatsapp || client.phone) && (
