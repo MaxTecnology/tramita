@@ -65,7 +65,7 @@ export async function refreshSession(refreshToken: string): Promise<{ accessToke
   const payload = JSON.parse(stored) as {
     sub: string
     role: Role
-    organizationId: string
+    organizationId: string | null
   }
   const accessToken = generateAccessToken(payload)
   return { accessToken }
