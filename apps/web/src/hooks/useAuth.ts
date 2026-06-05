@@ -5,6 +5,7 @@ interface StoredUser {
   name: string
   role: string
   organizationId: string | null
+  orgName: string | null
 }
 
 export function useAuth() {
