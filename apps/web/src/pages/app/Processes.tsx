@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, AlertTriangle, Clock, ClipboardList, CheckCircle2, Search, X, FileSearch } from 'lucide-react'
 import type { Board, Client } from '@/types'
 
 const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
@@ -56,26 +56,37 @@ function formatDueDate(date: Date | null, now: Date): { label: string; cls: stri
   return { label: date.toLocaleDateString('pt-BR'), cls: 'text-gray-500' }
 }
 
+function getProgressCls(progress: number, isOverdue: boolean): string {
+  if (progress === 100) return 'bg-green-500'
+  if (isOverdue) return 'bg-red-500'
+  if (progress >= 60) return 'bg-blue-500'
+  return 'bg-amber-500'
+}
+
 interface Group {
   label: string
   boards: Board[]
   headerCls: string
+  accentCls: string
+  icon: React.ReactNode
   defaultOpen: boolean
 }
 
-function BoardRow({ board, now }: { board: Board; now: Date }) {
+function BoardRow({ board, now, accentCls }: { board: Board; now: Date; accentCls: string }) {
   const progress = getProgress(board)
   const taskDueDate = getMostUrgentDueDate(board)
   const effectiveDueDate = taskDueDate ?? (board.dueDate ? new Date(board.dueDate) : null)
   const { label: dueDateLabel, cls: dueDateCls } = formatDueDate(effectiveDueDate, now)
   const stage = getCurrentStage(board)
+  const isOverdue = effectiveDueDate ? effectiveDueDate < now : false
+  const progressCls = getProgressCls(progress, isOverdue)
 
   return (
     <Link
       to={`/app/board/${board.id}`}
-      className="block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+      className={cn('block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 border-l-4', accentCls)}
     >
-      {/* Mobile: card layout */}
+      {/* Mobile */}
       <div className="md:hidden">
         <div className="flex items-start justify-between gap-2 mb-1">
           <p className="text-sm font-medium text-gray-900 flex-1 min-w-0 truncate">{board.title}</p>
@@ -86,14 +97,14 @@ function BoardRow({ board, now }: { board: Board; now: Date }) {
           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{stage}</span>
           <div className="flex-1 flex items-center gap-2">
             <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progress}%` }} />
+              <div className={cn('h-full rounded-full transition-all', progressCls)} style={{ width: `${progress}%` }} />
             </div>
             <span className="text-xs text-gray-500 w-8 text-right">{progress}%</span>
           </div>
         </div>
       </div>
 
-      {/* Desktop: table row */}
+      {/* Desktop */}
       <div className="hidden md:flex items-center gap-3">
         <div className="flex-[2] min-w-0">
           <p className="text-sm font-medium text-gray-900 truncate">{board.title}</p>
@@ -109,7 +120,7 @@ function BoardRow({ board, now }: { board: Board; now: Date }) {
         </div>
         <div className="flex-1 flex items-center gap-2">
           <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progress}%` }} />
+            <div className={cn('h-full rounded-full transition-all', progressCls)} style={{ width: `${progress}%` }} />
           </div>
           <span className="text-xs text-gray-500 w-8 text-right">{progress}%</span>
         </div>
@@ -125,29 +136,30 @@ function BoardGroup({ group, now }: { group: Group; now: Date }) {
   const [open, setOpen] = useState(group.defaultOpen)
 
   return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
         className={cn('w-full flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-left', group.headerCls)}
       >
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        {group.icon}
         {group.label}
-        <span className="ml-1 font-normal opacity-70">({group.boards.length})</span>
+        <span className="ml-1 font-normal opacity-60">({group.boards.length})</span>
       </button>
 
       {open && (
         <>
-          <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200">
-            <div className="flex-[2] text-xs font-semibold text-gray-500 uppercase tracking-wide">Processo</div>
-            <div className="flex-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</div>
-            <div className="flex-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">Etapa</div>
-            <div className="flex-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">Responsável</div>
-            <div className="flex-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">Progresso</div>
-            <div className="w-24 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Prazo</div>
+          <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-gray-50/80 border-b border-gray-100">
+            <div className="flex-[2] text-xs font-semibold text-gray-400 uppercase tracking-wide">Processo</div>
+            <div className="flex-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Cliente</div>
+            <div className="flex-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Etapa</div>
+            <div className="flex-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Responsável</div>
+            <div className="flex-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Progresso</div>
+            <div className="w-24 text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Prazo</div>
           </div>
           {group.boards.map((board) => (
-            <BoardRow key={board.id} board={board} now={now} />
+            <BoardRow key={board.id} board={board} now={now} accentCls={group.accentCls} />
           ))}
         </>
       )}
@@ -237,6 +249,14 @@ export default function Processes() {
 
   const hasActiveFilter = search || filterClient || filterResponsible || filterStage || showOnlyOverdue
 
+  const stats = useMemo(() => {
+    const overdue = filtered.filter((b) => { const d = getMostUrgentDueDate(b); return d && d < now }).length
+    const dueSoon = filtered.filter((b) => { const d = getMostUrgentDueDate(b); return d && d >= now && d <= in7days }).length
+    const completed = filtered.filter((b) => getProgress(b) === 100).length
+    const rate = filtered.length > 0 ? Math.round((completed / filtered.length) * 100) : 0
+    return { total: filtered.length, overdue, dueSoon, completed, rate }
+  }, [filtered, now, in7days])
+
   const groups = useMemo((): Group[] => {
     if (hasActiveFilter) {
       return [
@@ -251,31 +271,23 @@ export default function Processes() {
             return da.getTime() - db.getTime()
           }),
           headerCls: 'bg-gray-100 text-gray-700',
+          accentCls: 'border-l-gray-300',
+          icon: <Search size={14} />,
           defaultOpen: true,
         },
       ]
     }
 
-    const overdue = filtered.filter((b) => {
-      const d = getMostUrgentDueDate(b)
-      return d && d < now
-    })
-    const dueSoon = filtered.filter((b) => {
-      const d = getMostUrgentDueDate(b)
-      return d && d >= now && d <= in7days
-    })
-    const inProgress = filtered.filter((b) => {
-      const d = getMostUrgentDueDate(b)
-      const p = getProgress(b)
-      return p < 100 && (!d || d > in7days)
-    })
+    const overdue = filtered.filter((b) => { const d = getMostUrgentDueDate(b); return d && d < now })
+    const dueSoon = filtered.filter((b) => { const d = getMostUrgentDueDate(b); return d && d >= now && d <= in7days })
+    const inProgress = filtered.filter((b) => { const d = getMostUrgentDueDate(b); const p = getProgress(b); return p < 100 && (!d || d > in7days) })
     const completed = filtered.filter((b) => getProgress(b) === 100)
 
     return [
-      { label: '⚠ Atrasados', boards: overdue, headerCls: 'bg-red-50 text-red-700', defaultOpen: true },
-      { label: '⏰ Vence em 7 dias', boards: dueSoon, headerCls: 'bg-amber-50 text-amber-700', defaultOpen: true },
-      { label: '📋 Em andamento', boards: inProgress, headerCls: 'bg-blue-50 text-blue-700', defaultOpen: true },
-      { label: '✓ Concluídos', boards: completed, headerCls: 'bg-gray-100 text-gray-600', defaultOpen: false },
+      { label: 'Atrasados',      boards: overdue,     headerCls: 'bg-red-50 text-red-700',     accentCls: 'border-l-red-500',   icon: <AlertTriangle size={14} />, defaultOpen: true },
+      { label: 'Vence em 7 dias', boards: dueSoon,    headerCls: 'bg-amber-50 text-amber-700', accentCls: 'border-l-amber-500', icon: <Clock size={14} />,         defaultOpen: true },
+      { label: 'Em andamento',    boards: inProgress, headerCls: 'bg-blue-50 text-blue-700',   accentCls: 'border-l-blue-500',  icon: <ClipboardList size={14} />, defaultOpen: true },
+      { label: 'Concluídos',      boards: completed,  headerCls: 'bg-green-50 text-green-700', accentCls: 'border-l-green-500', icon: <CheckCircle2 size={14} />,  defaultOpen: false },
     ].filter((g) => g.boards.length > 0)
   }, [filtered, hasActiveFilter, now, in7days])
 
@@ -283,12 +295,17 @@ export default function Processes() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
+
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-lg md:text-xl font-bold text-gray-900">Processos</h1>
+        <div>
+          <h1 className="text-lg md:text-xl font-bold text-gray-900">Processos</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Acompanhe o andamento dos processos dos seus clientes.</p>
+        </div>
         {MANAGER_ROLES.includes(user?.role ?? '') && (
           <Button
             onClick={() => setNewProcessOpen(true)}
-            className="bg-[#185FA5] hover:bg-[#0C447C] text-white gap-2"
+            className="bg-[#185FA5] hover:bg-[#0C447C] text-white gap-2 shadow-sm"
           >
             <Plus size={16} />
             Novo Processo
@@ -296,74 +313,102 @@ export default function Processes() {
         )}
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <Input
-          placeholder="Buscar processo ou cliente..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full sm:w-60"
-        />
+      {/* Card de filtros */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="relative w-full sm:w-64">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Buscar processo ou cliente..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 border-gray-200 focus:ring-[#185FA5]"
+            />
+          </div>
 
-        <select
-          value={filterClient}
-          onChange={(e) => setFilterClient(e.target.value)}
-          className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm shadow-sm focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Cliente</option>
-          {uniqueClients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-
-        {MANAGER_ROLES.includes(user?.role ?? '') && (
           <select
-            value={filterResponsible}
-            onChange={(e) => setFilterResponsible(e.target.value)}
-            className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm shadow-sm focus:ring-2 focus:ring-blue-500"
+            value={filterClient}
+            onChange={(e) => setFilterClient(e.target.value)}
+            className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
           >
-            <option value="">Colaborador</option>
-            {uniqueResponsible.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            <option value="">Cliente</option>
+            {uniqueClients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-        )}
 
-        <select
-          value={filterStage}
-          onChange={(e) => setFilterStage(e.target.value)}
-          className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm shadow-sm focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Etapa</option>
-          {uniqueStages.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-
-        <button
-          type="button"
-          onClick={() => setShowOnlyOverdue(!showOnlyOverdue)}
-          className={cn(
-            'h-9 px-3 rounded-md text-sm font-medium border transition-colors',
-            showOnlyOverdue
-              ? 'bg-red-500 text-white border-red-500'
-              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50',
+          {MANAGER_ROLES.includes(user?.role ?? '') && (
+            <select
+              value={filterResponsible}
+              onChange={(e) => setFilterResponsible(e.target.value)}
+              className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
+            >
+              <option value="">Colaborador</option>
+              {uniqueResponsible.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
           )}
-        >
-          ⚠ Atrasados
-        </button>
 
-        {hasActiveFilter && (
+          <select
+            value={filterStage}
+            onChange={(e) => setFilterStage(e.target.value)}
+            className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
+          >
+            <option value="">Etapa</option>
+            {uniqueStages.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+
           <button
             type="button"
-            onClick={() => { setSearch(''); setFilterClient(''); setFilterResponsible(''); setFilterStage(''); setShowOnlyOverdue(false) }}
-            className="text-xs text-blue-600 hover:underline"
+            onClick={() => setShowOnlyOverdue(!showOnlyOverdue)}
+            className={cn(
+              'h-9 px-3 rounded-lg text-sm font-medium border transition-colors flex items-center gap-1.5',
+              showOnlyOverdue
+                ? 'bg-red-500 text-white border-red-500 shadow-sm'
+                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50',
+            )}
           >
-            Limpar filtros
+            <AlertTriangle size={13} />
+            Atrasados
           </button>
-        )}
+
+          {hasActiveFilter && (
+            <button
+              type="button"
+              onClick={() => { setSearch(''); setFilterClient(''); setFilterResponsible(''); setFilterStage(''); setShowOnlyOverdue(false) }}
+              className="h-9 px-2 text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+            >
+              <X size={13} />
+              Limpar
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Resumo */}
+      {stats.total > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400 px-1">
+          <span className="text-gray-600 font-medium">{stats.total} processo{stats.total !== 1 ? 's' : ''}</span>
+          {stats.overdue > 0 && (
+            <span className="text-red-500 font-medium flex items-center gap-1">
+              <AlertTriangle size={11} /> {stats.overdue} atrasado{stats.overdue !== 1 ? 's' : ''}
+            </span>
+          )}
+          {stats.dueSoon > 0 && (
+            <span className="text-amber-500 flex items-center gap-1">
+              <Clock size={11} /> {stats.dueSoon} vence{stats.dueSoon !== 1 ? 'm' : ''} esta semana
+            </span>
+          )}
+          <span className="text-green-600 flex items-center gap-1">
+            <CheckCircle2 size={11} /> {stats.rate}% concluídos
+          </span>
+        </div>
+      )}
 
       {/* Grupos */}
       <div className="space-y-3">
         {groups.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <p className="text-lg font-medium mb-2">Nenhum processo encontrado</p>
-            <p className="text-sm">Ajuste os filtros ou crie um novo processo</p>
+          <div className="text-center py-16">
+            <FileSearch size={40} className="mx-auto mb-3 text-gray-300" />
+            <p className="text-base font-medium text-gray-500 mb-1">Nenhum processo encontrado</p>
+            <p className="text-sm text-gray-400">Ajuste os filtros ou crie um novo processo</p>
           </div>
         ) : (
           groups.map((group) => <BoardGroup key={group.label} group={group} now={now} />)
