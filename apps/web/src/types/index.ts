@@ -51,9 +51,13 @@ export interface User {
 export interface Client {
   id: string
   name: string
+  clientType: 'PF' | 'PJ'
   cnpj: string | null
+  cpf: string | null
   email: string
   whatsapp: string | null
+  phone: string | null
+  notes: string | null
   isActive: boolean
   createdAt: string
 }

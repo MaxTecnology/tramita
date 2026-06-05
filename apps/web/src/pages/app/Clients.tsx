@@ -5,23 +5,109 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 import type { Client } from '@/types'
 
-type CreateForm = { name: string; email: string; password: string; whatsapp: string; cnpj: string }
-type EditForm = { name: string; email: string; whatsapp: string; cnpj: string }
+type ClientType = 'PF' | 'PJ'
 
-const normalizeOptional = (val: string) => val.trim() || undefined
+type CreateForm = {
+  name: string; clientType: ClientType; cnpj: string; cpf: string
+  email: string; password: string; whatsapp: string; phone: string; notes: string
+}
+
+type EditForm = {
+  name: string; clientType: ClientType; cnpj: string; cpf: string
+  email: string; whatsapp: string; phone: string; notes: string
+}
+
+const EMPTY_CREATE: CreateForm = {
+  name: '', clientType: 'PJ', cnpj: '', cpf: '',
+  email: '', password: '', whatsapp: '', phone: '', notes: '',
+}
+
+function TypeToggle({ value, onChange }: { value: ClientType; onChange: (v: ClientType) => void }) {
+  return (
+    <div className="flex rounded-md border border-gray-300 overflow-hidden w-fit">
+      {(['PJ', 'PF'] as ClientType[]).map((t) => (
+        <button
+          key={t}
+          type="button"
+          onClick={() => onChange(t)}
+          className={cn(
+            'px-4 py-1.5 text-sm font-medium transition-colors',
+            value === t ? 'bg-[#185FA5] text-white' : 'bg-white text-gray-600 hover:bg-gray-50',
+          )}
+        >
+          {t === 'PJ' ? 'Pessoa Jurídica' : 'Pessoa Física'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ClientFields<T extends { clientType: ClientType; cnpj: string; cpf: string; whatsapp: string; phone: string; notes: string }>({
+  form,
+  onChange,
+  idPrefix,
+}: {
+  form: T
+  onChange: (patch: Partial<T>) => void
+  idPrefix: string
+}) {
+  return (
+    <>
+      <div className="space-y-1">
+        <Label>Tipo</Label>
+        <TypeToggle value={form.clientType} onChange={(v) => onChange({ clientType: v } as Partial<T>)} />
+      </div>
+
+      {form.clientType === 'PJ' ? (
+        <div className="space-y-1">
+          <Label htmlFor={`${idPrefix}-cnpj`}>CNPJ</Label>
+          <Input id={`${idPrefix}-cnpj`} value={form.cnpj} onChange={(e) => onChange({ cnpj: e.target.value } as Partial<T>)} placeholder="00.000.000/0001-00" />
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <Label htmlFor={`${idPrefix}-cpf`}>CPF</Label>
+          <Input id={`${idPrefix}-cpf`} value={form.cpf} onChange={(e) => onChange({ cpf: e.target.value } as Partial<T>)} placeholder="000.000.000-00" />
+        </div>
+      )}
+
+      <div className="space-y-1">
+        <Label htmlFor={`${idPrefix}-whatsapp`}>WhatsApp</Label>
+        <Input id={`${idPrefix}-whatsapp`} value={form.whatsapp} onChange={(e) => onChange({ whatsapp: e.target.value } as Partial<T>)} placeholder="5582999999999" />
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor={`${idPrefix}-phone`}>Telefone fixo</Label>
+        <Input id={`${idPrefix}-phone`} value={form.phone} onChange={(e) => onChange({ phone: e.target.value } as Partial<T>)} placeholder="(82) 3000-0000" />
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor={`${idPrefix}-notes`}>Observações internas</Label>
+        <textarea
+          id={`${idPrefix}-notes`}
+          value={form.notes}
+          onChange={(e) => onChange({ notes: e.target.value } as Partial<T>)}
+          rows={2}
+          placeholder="Notas visíveis apenas para o escritório..."
+          className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 resize-none"
+        />
+      </div>
+    </>
+  )
+}
 
 export default function Clients() {
   const queryClient = useQueryClient()
 
   const [showCreate, setShowCreate] = useState(false)
-  const [createForm, setCreateForm] = useState<CreateForm>({
-    name: '', email: '', password: '', whatsapp: '', cnpj: '',
-  })
+  const [createForm, setCreateForm] = useState<CreateForm>(EMPTY_CREATE)
 
   const [editingClient, setEditingClient] = useState<Client | null>(null)
-  const [editForm, setEditForm] = useState<EditForm>({ name: '', email: '', whatsapp: '', cnpj: '' })
+  const [editForm, setEditForm] = useState<EditForm>({
+    name: '', clientType: 'PJ', cnpj: '', cpf: '', email: '', whatsapp: '', phone: '', notes: '',
+  })
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ['clients'],
@@ -32,28 +118,34 @@ export default function Clients() {
     mutationFn: () =>
       api.post('/clients', {
         name: createForm.name,
+        clientType: createForm.clientType,
+        cnpj: createForm.cnpj || undefined,
+        cpf: createForm.cpf || undefined,
         email: createForm.email,
         password: createForm.password,
-        whatsapp: normalizeOptional(createForm.whatsapp),
-        cnpj: normalizeOptional(createForm.cnpj),
+        whatsapp: createForm.whatsapp || undefined,
+        phone: createForm.phone || undefined,
+        notes: createForm.notes || undefined,
       }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       setShowCreate(false)
-      setCreateForm({ name: '', email: '', password: '', whatsapp: '', cnpj: '' })
+      setCreateForm(EMPTY_CREATE)
     },
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: EditForm) => {
-      if (!editingClient) throw new Error('Nenhum cliente selecionado')
-      return api.patch(`/clients/${editingClient.id}`, {
+    mutationFn: (data: EditForm) =>
+      api.patch(`/clients/${editingClient!.id}`, {
         name: data.name,
+        clientType: data.clientType,
+        cnpj: data.cnpj || undefined,
+        cpf: data.cpf || undefined,
         email: data.email,
-        whatsapp: normalizeOptional(data.whatsapp),
-        cnpj: normalizeOptional(data.cnpj),
-      }).then((r) => r.data)
-    },
+        whatsapp: data.whatsapp || undefined,
+        phone: data.phone || undefined,
+        notes: data.notes || undefined,
+      }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       setEditingClient(null)
@@ -69,9 +161,13 @@ export default function Clients() {
     setEditingClient(client)
     setEditForm({
       name: client.name,
+      clientType: (client.clientType as ClientType) ?? 'PJ',
+      cnpj: client.cnpj ?? '',
+      cpf: client.cpf ?? '',
       email: client.email,
       whatsapp: client.whatsapp ?? '',
-      cnpj: client.cnpj ?? '',
+      phone: client.phone ?? '',
+      notes: client.notes ?? '',
     })
   }
 
@@ -94,29 +190,28 @@ export default function Clients() {
         <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6 space-y-3">
           <h2 className="text-sm font-semibold text-gray-700">Novo cliente</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
+            <div className="space-y-1 sm:col-span-2">
               <Label htmlFor="c-name">Nome *</Label>
               <Input id="c-name" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="c-cnpj">CNPJ</Label>
-              <Input id="c-cnpj" value={createForm.cnpj} onChange={(e) => setCreateForm({ ...createForm, cnpj: e.target.value })} placeholder="00.000.000/0001-00" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="c-email">E-mail *</Label>
               <Input id="c-email" type="email" value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="c-whatsapp">WhatsApp</Label>
-              <Input id="c-whatsapp" value={createForm.whatsapp} onChange={(e) => setCreateForm({ ...createForm, whatsapp: e.target.value })} placeholder="5582999999999" />
-            </div>
-            <div className="space-y-1">
               <Label htmlFor="c-password">Senha do portal *</Label>
               <Input id="c-password" type="password" value={createForm.password} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} />
             </div>
           </div>
+
+          <ClientFields
+            form={createForm}
+            onChange={(patch) => setCreateForm((f) => ({ ...f, ...patch }))}
+            idPrefix="c"
+          />
+
           {createMutation.isError && (
-            <p className="text-sm text-red-600">Erro ao cadastrar cliente. Verifique os dados.</p>
+            <p className="text-sm text-red-600">Erro ao cadastrar. Verifique os dados.</p>
           )}
           <div className="flex gap-2 pt-1">
             <Button
@@ -131,7 +226,7 @@ export default function Clients() {
         </div>
       )}
 
-      {/* Lista de clientes */}
+      {/* Lista */}
       <div className="space-y-2">
         {clients.length === 0 && (
           <p className="text-center text-gray-400 py-12">Nenhum cliente cadastrado.</p>
@@ -139,12 +234,20 @@ export default function Clients() {
         {clients.map((client) => (
           <div key={client.id} className="bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-gray-900 truncate">{client.name}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-gray-900 truncate">{client.name}</p>
+                <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0">
+                  {client.clientType ?? 'PJ'}
+                </span>
+              </div>
               <p className="text-xs text-gray-500 truncate">{client.email}</p>
-              {(client.cnpj || client.whatsapp) && (
+              {(client.cnpj || client.cpf || client.whatsapp || client.phone) && (
                 <p className="text-xs text-gray-400 truncate mt-0.5">
-                  {[client.cnpj, client.whatsapp].filter(Boolean).join(' · ')}
+                  {[client.cnpj, client.cpf, client.whatsapp, client.phone].filter(Boolean).join(' · ')}
                 </p>
+              )}
+              {client.notes && (
+                <p className="text-xs text-amber-600 truncate mt-0.5 italic">{client.notes}</p>
               )}
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
@@ -167,7 +270,7 @@ export default function Clients() {
 
       {/* Modal de edição */}
       <Dialog open={!!editingClient} onOpenChange={(open) => { if (!open) setEditingClient(null) }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar cliente</DialogTitle>
           </DialogHeader>
@@ -177,17 +280,14 @@ export default function Clients() {
               <Input id="e-name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="e-cnpj">CNPJ</Label>
-              <Input id="e-cnpj" value={editForm.cnpj} onChange={(e) => setEditForm({ ...editForm, cnpj: e.target.value })} placeholder="00.000.000/0001-00" />
-            </div>
-            <div className="space-y-1">
               <Label htmlFor="e-email">E-mail *</Label>
               <Input id="e-email" type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="e-whatsapp">WhatsApp</Label>
-              <Input id="e-whatsapp" value={editForm.whatsapp} onChange={(e) => setEditForm({ ...editForm, whatsapp: e.target.value })} placeholder="5582999999999" />
-            </div>
+            <ClientFields
+              form={editForm}
+              onChange={(patch) => setEditForm((f) => ({ ...f, ...patch }))}
+              idPrefix="e"
+            />
             {updateMutation.isError && (
               <p className="text-sm text-red-600">Erro ao salvar. Tente novamente.</p>
             )}
