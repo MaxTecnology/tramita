@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
+import { redis } from '@/lib/redis'
 import {
   createTestPlan,
   createTestOrg,
@@ -202,5 +203,57 @@ describe('rejectRequest', () => {
     expect(rejected.status).toBe('REJECTED')
     expect(rejected.rejectionReason).toBe('Fora de escopo')
     expect(rejected.reviewedById).toBe(admin.id)
+  })
+})
+
+describe('publishOrgEvent ao mudar status da request', () => {
+  it('createRequest publica request:changed no canal da org', async () => {
+    const publishSpy = vi.spyOn(redis, 'publish').mockResolvedValue(0 as unknown as number)
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+
+    await createRequest(org.id, client.id, { title: 'Pedido com evento' })
+
+    expect(publishSpy).toHaveBeenCalledWith(
+      `org:${org.id}:requests`,
+      expect.stringContaining('"request:changed"'),
+    )
+    publishSpy.mockRestore()
+  })
+
+  it('approveRequest e rejectRequest publicam request:changed', async () => {
+    const publishSpy = vi.spyOn(redis, 'publish').mockResolvedValue(0 as unknown as number)
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+
+    const r1 = await createRequest(org.id, client.id, { title: 'Pedido 1' })
+    await approveRequest(r1.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
+
+    const r2 = await createRequest(org.id, client.id, { title: 'Pedido 2' })
+    await rejectRequest(r2.id, org.id, admin.id, { reason: 'Teste' })
+
+    const orgChannelCalls = publishSpy.mock.calls.filter(([channel]) => channel === `org:${org.id}:requests`)
+    expect(orgChannelCalls.length).toBeGreaterThanOrEqual(4) // create x2, approve, reject
+    publishSpy.mockRestore()
+  })
+
+  it('cancelRequest publica request:changed', async () => {
+    const publishSpy = vi.spyOn(redis, 'publish').mockResolvedValue(0 as unknown as number)
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido a cancelar' })
+    publishSpy.mockClear() // ignora o publish do createRequest, foca no do cancelRequest
+
+    await cancelRequest(request.id, org.id, client.id)
+
+    expect(publishSpy).toHaveBeenCalledWith(
+      `org:${org.id}:requests`,
+      expect.stringContaining('"request:changed"'),
+    )
+    publishSpy.mockRestore()
   })
 })

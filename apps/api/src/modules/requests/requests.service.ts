@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
+import { publishOrgEvent } from '@/lib/sse'
 import { createBoard } from '@/modules/boards/boards.service'
 import { createTask } from '@/modules/tasks/tasks.service'
 import type { CreateRequestBody, ApproveRequestBody, RejectRequestBody } from './requests.schema'
@@ -36,6 +37,8 @@ export async function createRequest(
       }),
     ),
   )
+
+  await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
 
   return request
 }
@@ -77,7 +80,9 @@ export async function cancelRequest(id: string, organizationId: string, clientId
   if (request.status !== 'PENDING') {
     throw new AppError(422, 'Apenas solicitações pendentes podem ser canceladas')
   }
-  return prisma.request.update({ where: { id }, data: { status: 'CANCELLED' } })
+  const updated = await prisma.request.update({ where: { id }, data: { status: 'CANCELLED' } })
+  await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
+  return updated
 }
 
 export async function approveRequest(
@@ -132,6 +137,8 @@ export async function approveRequest(
     metadata: { requestTitle: request.title },
   })
 
+  await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
+
   return updatedRequest
 }
 
@@ -161,6 +168,8 @@ export async function rejectRequest(
     requestId: id,
     metadata: { requestTitle: request.title, rejectionReason: data.reason },
   })
+
+  await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
 
   return updated
 }
