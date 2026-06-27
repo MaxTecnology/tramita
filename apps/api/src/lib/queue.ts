@@ -3,9 +3,12 @@ import { bullmqRedis } from '@/lib/redis'
 
 export interface NotificationJob {
   event: string
-  taskId: string
   organizationId: string
-  clientId: string
+  recipientType?: 'CLIENT' | 'USER'
+  clientId?: string
+  userId?: string
+  taskId?: string
+  requestId?: string
   metadata: Record<string, string | undefined>
 }
 

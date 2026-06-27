@@ -18,12 +18,14 @@ import Notifications from '@/pages/app/settings/Notifications'
 import AppSubscription from '@/pages/app/settings/Subscription'
 import DashboardMetrics from '@/pages/app/DashboardMetrics'
 import Processes from '@/pages/app/Processes'
+import Requests from '@/pages/app/Requests'
 
 const PortalLayout = lazy(() => import('@/pages/portal/Layout'))
 const PortalBoards = lazy(() => import('@/pages/portal/Boards'))
 const PortalBoard = lazy(() => import('@/pages/portal/Board'))
 const PortalProfile = lazy(() => import('@/pages/portal/Profile'))
 const PortalReports = lazy(() => import('@/pages/portal/Reports'))
+const PortalRequests = lazy(() => import('@/pages/portal/Requests'))
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER']
 const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
@@ -54,6 +56,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/app/dashboard" replace /> },
       { path: 'dashboard', element: <DashboardMetrics /> },
       { path: 'processes', element: <Processes /> },
+      { path: 'requests', element: <Requests /> },
       { path: 'board/:boardId', element: <Board /> },
       {
         path: 'clients',
@@ -110,6 +113,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/portal/board" replace /> },
       { path: 'board', element: <PortalBoards /> },
       { path: 'board/:boardId', element: <PortalBoard /> },
+      { path: 'requests', element: <PortalRequests /> },
       { path: 'profile', element: <PortalProfile /> },
       { path: 'reports', element: <PortalReports /> },
     ],

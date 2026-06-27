@@ -25,4 +25,16 @@ export const DEFAULT_TEMPLATES: TemplateMap = {
     WHATSAPP: { body: 'Olá, {{clientName}}! O processo *{{taskTitle}}* vence em {{dueDate}}. Acesse: {{portalUrl}}' },
     EMAIL: { subject: 'Prazo se aproximando — {{taskTitle}}', body: 'Olá, {{clientName}}!\n\nO processo *{{taskTitle}}* vence em {{dueDate}}.\n\nAcompanhe em: {{portalUrl}}' },
   },
+  REQUEST_CREATED: {
+    WHATSAPP: { body: 'Nova solicitação de {{clientName}}: *{{requestTitle}}*.' },
+    EMAIL: { subject: 'Nova solicitação — {{requestTitle}}', body: 'Olá!\n\nO cliente {{clientName}} abriu uma nova solicitação: *{{requestTitle}}*.\n\nAcesse o painel para avaliar: {{portalUrl}}' },
+  },
+  REQUEST_APPROVED: {
+    WHATSAPP: { body: 'Olá, {{clientName}}! Sua solicitação *{{requestTitle}}* foi aprovada e já está em andamento.\n\nAcompanhe: {{portalUrl}}' },
+    EMAIL: { subject: 'Solicitação aprovada — {{requestTitle}}', body: 'Olá, {{clientName}}!\n\nSua solicitação *{{requestTitle}}* foi aprovada e já está em andamento.\n\nAcompanhe em: {{portalUrl}}' },
+  },
+  REQUEST_REJECTED: {
+    WHATSAPP: { body: 'Olá, {{clientName}}! Sua solicitação *{{requestTitle}}* não foi aprovada.\n\nMotivo: {{rejectionReason}}\n\nAcompanhe: {{portalUrl}}' },
+    EMAIL: { subject: 'Solicitação não aprovada — {{requestTitle}}', body: 'Olá, {{clientName}}!\n\nSua solicitação *{{requestTitle}}* não foi aprovada.\n\nMotivo: {{rejectionReason}}\n\nAcompanhe em: {{portalUrl}}' },
+  },
 }

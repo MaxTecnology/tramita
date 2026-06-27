@@ -43,6 +43,7 @@ model Organization {
   users               User[]
   clients             Client[]
   boards              Board[]
+  requests            Request[]
   notificationConfig  NotificationConfig?
   messageTemplates    MessageTemplate[]
   notificationLogs    NotificationLog[]
@@ -88,6 +89,7 @@ model User {
   organization      Organization @relation(fields: [organizationId], references: [id])
   assignedTasks     Task[]       @relation("TaskAssignee")
   createdTasks      Task[]       @relation("TaskCreator")
+  reviewedRequests  Request[]    @relation("RequestReviewer")
   comments          Comment[]
   attachments       Attachment[]
   responsibleBoards Board[]      @relation("BoardResponsible")
@@ -120,6 +122,7 @@ model Client {
 
   organization Organization @relation(fields: [organizationId], references: [id])
   boards       Board[]
+  requests     Request[]
   comments     Comment[]
   attachments  Attachment[]
 
@@ -128,7 +131,7 @@ model Client {
 }
 
 model Board {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   title             String
   description       String?
   organizationId    String
@@ -137,7 +140,7 @@ model Board {
   isActive          Boolean   @default(true)
   dueDate           DateTime?
   createdAt         DateTime  @default(now())
-  updatedAt         DateTime @updatedAt
+  updatedAt         DateTime  @updatedAt
 
   organization    Organization @relation(fields: [organizationId], references: [id])
   client          Client       @relation(fields: [clientId], references: [id])
@@ -145,6 +148,52 @@ model Board {
   columns         Column[]
 
   @@map("boards")
+}
+
+model Request {
+  id              String        @id @default(cuid())
+  organizationId  String
+  clientId        String
+  title           String
+  description     String?
+  status          RequestStatus @default(PENDING)
+  taskId          String?       @unique
+  rejectionReason String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  client       Client              @relation(fields: [clientId], references: [id])
+  task         Task?               @relation(fields: [taskId], references: [id])
+  reviewedBy   User?               @relation("RequestReviewer", fields: [reviewedById], references: [id])
+  attachments  RequestAttachment[]
+
+  @@index([organizationId, status])
+  @@map("requests")
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model RequestAttachment {
+  id         String   @id @default(cuid())
+  requestId  String
+  filename   String
+  mimeType   String
+  size       Int
+  storageKey String
+  uploadedBy String
+  createdAt  DateTime @default(now())
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("request_attachments")
 }
 
 model Column {
@@ -164,26 +213,28 @@ model Column {
 }
 
 model Task {
-  id          String     @id @default(cuid())
-  title       String
-  description String?
-  position    Int
-  priority    Priority   @default(MEDIUM)
-  status      TaskStatus @default(OPEN)
-  dueDate     DateTime?
-  columnId    String
-  assigneeId  String?
-  creatorId   String
-  tags        String[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id              String     @id @default(cuid())
+  title           String
+  description     String?
+  position        Int
+  priority        Priority   @default(MEDIUM)
+  status          TaskStatus @default(OPEN)
+  dueDate         DateTime?
+  columnId        String
+  assigneeId      String?
+  creatorId       String
+  sourceRequestId String?
+  tags            String[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  column      Column        @relation(fields: [columnId], references: [id], onDelete: Cascade)
-  assignee    User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  creator     User          @relation("TaskCreator", fields: [creatorId], references: [id])
-  comments    Comment[]
-  history     TaskHistory[]
-  attachments Attachment[]
+  column           Column        @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  assignee         User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creator          User          @relation("TaskCreator", fields: [creatorId], references: [id])
+  comments         Comment[]
+  history          TaskHistory[]
+  attachments      Attachment[]
+  sourceForRequest Request?
 
   @@index([status])
   @@index([priority])
@@ -281,6 +332,9 @@ model NotificationConfig {
   taskCompleted    Boolean  @default(true)
   commentAdded     Boolean  @default(true)
   dueDateAlert     Boolean  @default(true)
+  requestCreated   Boolean  @default(true)
+  requestApproved  Boolean  @default(true)
+  requestRejected  Boolean  @default(true)
   maximizebotToken String?
   saveOnTicket     Boolean  @default(true)
   startChatbot     Boolean  @default(false)
@@ -320,6 +374,9 @@ enum NotificationEvent {
   TASK_COMPLETED
   TASK_COMMENT_ADDED
   TASK_DUE_DATE_APPROACHING
+  REQUEST_CREATED
+  REQUEST_APPROVED
+  REQUEST_REJECTED
 }
 
 enum MessageChannel {
@@ -334,6 +391,7 @@ model NotificationLog {
   event          NotificationEvent
   channel        MessageChannel
   taskId         String?
+  requestId      String?
   recipient      String
   message        String
   status         NotificationStatus @default(PENDING)

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { processNotificationJob } from '@/workers/notification.worker'
 import * as maximizebot from '@/lib/maximizebot'
 import * as mailer from '@/lib/mailer'
+import * as encryption from '@/lib/encryption'
 import {
   createTestPlan,
   createTestOrg,
@@ -17,11 +18,15 @@ import bcrypt from 'bcryptjs'
 
 vi.mock('@/lib/maximizebot')
 vi.mock('@/lib/mailer')
+vi.mock('@/lib/encryption')
 
 type JobInput = { data: NotificationJob }
 
 describe('processNotificationJob', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(encryption.decrypt).mockImplementation((encoded) => encoded)
+  })
 
   it('does not send and creates no log when event is disabled in config', async () => {
     const plan = await createTestPlan()
@@ -139,5 +144,66 @@ describe('processNotificationJob', () => {
 
     await expect(processNotificationJob(job)).resolves.toBeUndefined()
     expect(maximizebot.sendWhatsApp).not.toHaveBeenCalled()
+  })
+
+  it('REQUEST_CREATED envia email para destinatário USER e grava log sem clientId', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+
+    await prisma.notificationConfig.create({
+      data: {
+        organizationId: org.id,
+        requestCreated: true,
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUser: 'test@test.com',
+        smtpPass: 'encrypted-or-plain-for-test',
+        emailFrom: 'Escritório <noreply@test.com>',
+      },
+    })
+
+    const job: JobInput = {
+      data: {
+        event: 'REQUEST_CREATED',
+        organizationId: org.id,
+        recipientType: 'USER',
+        userId: admin.id,
+        metadata: { clientName: 'João Silva', requestTitle: 'Abertura de empresa' },
+      },
+    }
+
+    await processNotificationJob(job)
+
+    expect(mailer.sendEmail).toHaveBeenCalledTimes(1)
+    const log = await prisma.notificationLog.findFirst()
+    expect(log?.channel).toBe('EMAIL')
+    expect(log?.recipient).toBe(admin.email)
+    expect(log?.clientId).toBeNull()
+  })
+
+  it('REQUEST_CREATED não envia quando requestCreated está desabilitado', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+
+    await prisma.notificationConfig.create({
+      data: { organizationId: org.id, requestCreated: false, emailEnabled: true },
+    })
+
+    const job: JobInput = {
+      data: {
+        event: 'REQUEST_CREATED',
+        organizationId: org.id,
+        recipientType: 'USER',
+        userId: admin.id,
+        metadata: { clientName: 'João Silva', requestTitle: 'Abertura de empresa' },
+      },
+    }
+
+    await processNotificationJob(job)
+
+    expect(mailer.sendEmail).not.toHaveBeenCalled()
   })
 })

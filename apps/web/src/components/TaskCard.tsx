@@ -1,3 +1,4 @@
+import { Inbox } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/types'
 
@@ -43,6 +44,12 @@ export function TaskCard({ task, onClick }: Props) {
     >
       <p className="text-sm font-medium text-gray-800 mb-2 line-clamp-2">{task.title}</p>
       <div className="flex items-center gap-2 flex-wrap">
+        {task.sourceRequestId && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-600" title="Originado de uma solicitação do cliente">
+            <Inbox size={11} />
+            Solicitação
+          </span>
+        )}
         <span
           className={cn(
             'inline-flex text-xs font-medium px-2 py-0.5 rounded-full',

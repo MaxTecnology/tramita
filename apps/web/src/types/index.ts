@@ -12,6 +12,7 @@ export interface Task {
   tags: string[]
   createdAt: string
   updatedAt: string
+  sourceRequestId: string | null
 }
 
 export interface Column {
@@ -97,4 +98,24 @@ export interface TaskHistory {
   toValue: string | null
   actorName: string
   createdAt: string
+}
+
+export interface RequestAttachment {
+  id: string
+  filename: string
+  mimeType: string
+  size: number
+  createdAt: string
+}
+
+export interface ClientRequest {
+  id: string
+  title: string
+  description: string | null
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+  rejectionReason: string | null
+  taskId: string | null
+  createdAt: string
+  attachments?: RequestAttachment[]
+  client?: { id: string; name: string }
 }
