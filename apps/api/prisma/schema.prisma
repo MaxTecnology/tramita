@@ -131,7 +131,7 @@ model Client {
 }
 
 model Board {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   title             String
   description       String?
   organizationId    String
@@ -140,7 +140,7 @@ model Board {
   isActive          Boolean   @default(true)
   dueDate           DateTime?
   createdAt         DateTime  @default(now())
-  updatedAt         DateTime @updatedAt
+  updatedAt         DateTime  @updatedAt
 
   organization    Organization @relation(fields: [organizationId], references: [id])
   client          Client       @relation(fields: [clientId], references: [id])
@@ -166,6 +166,7 @@ model Request {
 
   organization Organization        @relation(fields: [organizationId], references: [id])
   client       Client              @relation(fields: [clientId], references: [id])
+  task         Task?               @relation(fields: [taskId], references: [id])
   reviewedBy   User?               @relation("RequestReviewer", fields: [reviewedById], references: [id])
   attachments  RequestAttachment[]
 
@@ -227,12 +228,13 @@ model Task {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
-  column      Column        @relation(fields: [columnId], references: [id], onDelete: Cascade)
-  assignee    User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  creator     User          @relation("TaskCreator", fields: [creatorId], references: [id])
-  comments    Comment[]
-  history     TaskHistory[]
-  attachments Attachment[]
+  column           Column        @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  assignee         User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creator          User          @relation("TaskCreator", fields: [creatorId], references: [id])
+  comments         Comment[]
+  history          TaskHistory[]
+  attachments      Attachment[]
+  sourceForRequest Request?
 
   @@index([status])
   @@index([priority])
