@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { verifyAccessToken } from '@/lib/jwt'
 import { prisma } from '@/lib/prisma'
-import { redis } from '@/lib/redis'
+import { attachSSESubscriber } from '@/lib/sse'
 import { AppError } from '@/errors/AppError'
 
 export async function streamRoutes(app: FastifyInstance) {
@@ -25,45 +25,6 @@ export async function streamRoutes(app: FastifyInstance) {
     })
     if (!board) throw new AppError(404, 'Board não encontrado')
 
-    // Hijack: Fastify won't close the response automatically
-    reply.hijack()
-    const raw = reply.raw
-
-    // Forward CORS headers already set by @fastify/cors plugin (via onRequest hook),
-    // then overlay SSE-specific headers. This ensures Vary: Origin and correct
-    // Access-Control-Allow-Origin are sent even with hijacked responses.
-    raw.writeHead(200, {
-      ...reply.getHeaders(),
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    })
-    // Flush headers immediately — writeHead buffers until first write()
-    raw.write(': connected\n\n')
-
-    // Dedicated Redis subscriber per connection
-    const sub = redis.duplicate()
-
-    sub.on('message', (_channel: string, message: string) => {
-      try {
-        const parsed = JSON.parse(message) as { event: string; data: unknown }
-        raw.write(`event: ${parsed.event}\ndata: ${JSON.stringify(parsed.data)}\n\n`)
-      } catch { /* ignore malformed messages */ }
-    })
-
-    await sub.subscribe(`board:${id}`)
-
-    // Heartbeat every 15 seconds — keeps connection alive and resets browser SSE timeout
-    const heartbeat = setInterval(() => {
-      raw.write(`event: heartbeat\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`)
-    }, 15_000)
-
-    // Cleanup on client disconnect
-    request.raw.on('close', () => {
-      clearInterval(heartbeat)
-      sub.unsubscribe().catch(() => {})
-      sub.quit().catch(() => {})
-    })
+    attachSSESubscriber(request, reply, `board:${id}`)
   })
 }

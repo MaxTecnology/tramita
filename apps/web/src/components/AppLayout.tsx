@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
+import { useRequestsBadgeStream } from '@/hooks/useRequestsBadgeStream'
 import { api } from '@/lib/api'
 import { LayoutDashboard, Users, UserCheck, Bell, CreditCard, Settings, LogOut, ClipboardList, Inbox, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -27,6 +29,16 @@ export default function AppLayout() {
   }
 
   const role = user?.role ?? ''
+  const isOrgRole = ORG_ROLES.includes(role)
+
+  const { data: pendingCount } = useQuery<{ count: number }>({
+    queryKey: ['requests-pending-count'],
+    queryFn: () => api.get('/requests/pending-count').then((r) => r.data),
+    enabled: isOrgRole,
+    refetchOnWindowFocus: true,
+  })
+
+  useRequestsBadgeStream()
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -69,7 +81,13 @@ export default function AppLayout() {
             <SidebarLink to="/app/processes" icon={<ClipboardList size={16} />} label="Processos" onClick={handleNavClick} />
           )}
           {ORG_ROLES.includes(role) && (
-            <SidebarLink to="/app/requests" icon={<Inbox size={16} />} label="Solicitações" onClick={handleNavClick} />
+            <SidebarLink
+              to="/app/requests"
+              icon={<Inbox size={16} />}
+              label="Solicitações"
+              badge={pendingCount?.count}
+              onClick={handleNavClick}
+            />
           )}
           {MANAGER_ROLES.includes(role) && (
             <SidebarLink to="/app/clients" icon={<UserCheck size={16} />} label="Clientes" onClick={handleNavClick} />
@@ -125,11 +143,13 @@ function SidebarLink({
   to,
   icon,
   label,
+  badge,
   onClick,
 }: {
   to: string
   icon: React.ReactNode
   label: string
+  badge?: number
   onClick?: () => void
 }) {
   return (
@@ -146,7 +166,12 @@ function SidebarLink({
       }
     >
       {icon}
-      {label}
+      <span className="flex-1">{label}</span>
+      {!!badge && badge > 0 && (
+        <span className="flex-shrink-0 min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-xs font-medium flex items-center justify-center">
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
     </NavLink>
   )
 }
