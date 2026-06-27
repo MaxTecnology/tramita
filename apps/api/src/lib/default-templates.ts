@@ -34,7 +34,7 @@ export const DEFAULT_TEMPLATES: TemplateMap = {
     EMAIL: { subject: 'Solicitação aprovada — {{requestTitle}}', body: 'Olá, {{clientName}}!\n\nSua solicitação *{{requestTitle}}* foi aprovada e já está em andamento.\n\nAcompanhe em: {{portalUrl}}' },
   },
   REQUEST_REJECTED: {
-    WHATSAPP: { body: 'Olá, {{clientName}}! Sua solicitação *{{requestTitle}}* não foi aprovada.{{rejectionReason}}\n\nAcompanhe: {{portalUrl}}' },
+    WHATSAPP: { body: 'Olá, {{clientName}}! Sua solicitação *{{requestTitle}}* não foi aprovada.\n\nMotivo: {{rejectionReason}}\n\nAcompanhe: {{portalUrl}}' },
     EMAIL: { subject: 'Solicitação não aprovada — {{requestTitle}}', body: 'Olá, {{clientName}}!\n\nSua solicitação *{{requestTitle}}* não foi aprovada.\n\nMotivo: {{rejectionReason}}\n\nAcompanhe em: {{portalUrl}}' },
   },
 }

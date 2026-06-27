@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { createTestPlan, createTestOrg, createTestClient } from '@/test/helpers'
-import { createRequest } from './requests.service'
+import { createRequest, cancelRequest } from './requests.service'
 import { createRequestAttachment } from './request-attachments.service'
 import * as b2 from '@/lib/b2'
 
@@ -50,5 +50,23 @@ describe('createRequestAttachment', () => {
         buffer: Buffer.from('x'),
       }),
     ).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  it('lança 422 se a request não está mais PENDING', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido cancelado' })
+    await cancelRequest(request.id, org.id, client.id)
+
+    await expect(
+      createRequestAttachment(request.id, org.id, client.id, {
+        filename: 'x.pdf',
+        mimeType: 'application/pdf',
+        size: 10,
+        buffer: Buffer.from('x'),
+      }),
+    ).rejects.toMatchObject({ statusCode: 422 })
+    expect(b2.uploadFile).not.toHaveBeenCalled()
   })
 })

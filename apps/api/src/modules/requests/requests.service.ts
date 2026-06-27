@@ -115,12 +115,13 @@ export async function approveRequest(
     { id: reviewerId, type: 'user' },
   )
 
-  await prisma.task.update({ where: { id: task.id }, data: { sourceRequestId: id } })
-
-  const updatedRequest = await prisma.request.update({
-    where: { id },
-    data: { status: 'APPROVED', taskId: task.id, reviewedById: reviewerId, reviewedAt: new Date() },
-  })
+  const [, updatedRequest] = await prisma.$transaction([
+    prisma.task.update({ where: { id: task.id }, data: { sourceRequestId: id } }),
+    prisma.request.update({
+      where: { id },
+      data: { status: 'APPROVED', taskId: task.id, reviewedById: reviewerId, reviewedAt: new Date() },
+    }),
+  ])
 
   await enqueueNotification({
     event: 'REQUEST_APPROVED',

@@ -27,9 +27,13 @@ export async function createRequestAttachment(
     where: { id: requestId, organizationId, clientId },
   })
   if (!request) throw new AppError(404, 'Solicitação não encontrada')
+  if (request.status !== 'PENDING') {
+    throw new AppError(422, 'Só é possível enviar anexos enquanto a solicitação está pendente')
+  }
 
   const orgSlug = await getOrgSlug(organizationId)
-  const storageKey = `request-attachments/${orgSlug}/${requestId}/${Date.now()}-${payload.filename}`
+  const safeFilename = payload.filename.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const storageKey = `request-attachments/${orgSlug}/${requestId}/${Date.now()}-${safeFilename}`
   await uploadFile(storageKey, payload.buffer, payload.mimeType)
 
   return prisma.requestAttachment.create({
