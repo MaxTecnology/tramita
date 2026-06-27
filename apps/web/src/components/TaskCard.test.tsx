@@ -16,6 +16,7 @@ const baseTask: Task = {
   description: null,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
+  sourceRequestId: null,
 }
 
 it('renders task title', () => {
@@ -39,4 +40,9 @@ it('does not highlight completed task even if dueDate is in the past', () => {
   const doneTask: Task = { ...baseTask, dueDate: '2020-01-01T00:00:00.000Z', status: 'DONE' }
   const { container } = render(<TaskCard task={doneTask} onClick={() => {}} />)
   expect(container.firstChild).not.toHaveClass('border-red-400')
+})
+
+it('exibe badge de solicitação quando sourceRequestId está preenchido', () => {
+  render(<TaskCard task={{ ...baseTask, sourceRequestId: 'req-123' }} onClick={() => {}} />)
+  expect(screen.getByText('Solicitação')).toBeInTheDocument()
 })

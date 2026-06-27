@@ -12,6 +12,7 @@ export interface Task {
   tags: string[]
   createdAt: string
   updatedAt: string
+  sourceRequestId: string | null
 }
 
 export interface Column {
