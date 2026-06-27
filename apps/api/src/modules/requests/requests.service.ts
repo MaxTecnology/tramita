@@ -1,7 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
-import type { CreateRequestBody } from './requests.schema'
+import { createBoard } from '@/modules/boards/boards.service'
+import { createTask } from '@/modules/tasks/tasks.service'
+import type { CreateRequestBody, ApproveRequestBody, RejectRequestBody } from './requests.schema'
 import type { RequestStatus } from '@prisma/client'
 
 export async function createRequest(
@@ -76,4 +78,88 @@ export async function cancelRequest(id: string, organizationId: string, clientId
     throw new AppError(422, 'Apenas solicitações pendentes podem ser canceladas')
   }
   return prisma.request.update({ where: { id }, data: { status: 'CANCELLED' } })
+}
+
+export async function approveRequest(
+  id: string,
+  organizationId: string,
+  reviewerId: string,
+  reviewerRole: string,
+  data: ApproveRequestBody,
+) {
+  const request = await getRequestOrThrow(id, organizationId)
+  if (request.status !== 'PENDING') throw new AppError(422, 'Solicitação já foi avaliada')
+
+  let columnId: string
+
+  if (data.mode === 'NEW_BOARD') {
+    const board = await createBoard(organizationId, reviewerId, reviewerRole, {
+      title: request.title,
+      clientId: request.clientId,
+    })
+    columnId = board.columns[0].id
+  } else {
+    const board = await prisma.board.findFirst({
+      where: { id: data.boardId, organizationId, clientId: request.clientId, isActive: true },
+    })
+    if (!board) throw new AppError(404, 'Processo não encontrado para este cliente')
+    const column = await prisma.column.findFirst({ where: { id: data.columnId, boardId: board.id } })
+    if (!column) throw new AppError(404, 'Coluna não encontrada neste processo')
+    columnId = column.id
+  }
+
+  const task = await createTask(
+    columnId,
+    organizationId,
+    { title: request.title, description: request.description ?? undefined, priority: 'MEDIUM', tags: [] },
+    { id: reviewerId, type: 'user' },
+  )
+
+  await prisma.task.update({ where: { id: task.id }, data: { sourceRequestId: id } })
+
+  const updatedRequest = await prisma.request.update({
+    where: { id },
+    data: { status: 'APPROVED', taskId: task.id, reviewedById: reviewerId, reviewedAt: new Date() },
+  })
+
+  await enqueueNotification({
+    event: 'REQUEST_APPROVED',
+    organizationId,
+    clientId: request.clientId,
+    taskId: task.id,
+    requestId: id,
+    metadata: { requestTitle: request.title },
+  })
+
+  return updatedRequest
+}
+
+export async function rejectRequest(
+  id: string,
+  organizationId: string,
+  reviewerId: string,
+  data: RejectRequestBody,
+) {
+  const request = await getRequestOrThrow(id, organizationId)
+  if (request.status !== 'PENDING') throw new AppError(422, 'Solicitação já foi avaliada')
+
+  const updated = await prisma.request.update({
+    where: { id },
+    data: {
+      status: 'REJECTED',
+      rejectionReason: data.reason,
+      reviewedById: reviewerId,
+      reviewedAt: new Date(),
+    },
+  })
+
+  await enqueueNotification({
+    event: 'REQUEST_REJECTED',
+    organizationId,
+    clientId: request.clientId,
+    requestId: id,
+    metadata: { requestTitle: request.title, rejectionReason: data.reason },
+  })
+
+  return updated
 }
