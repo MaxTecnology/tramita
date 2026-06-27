@@ -18,6 +18,7 @@ import Notifications from '@/pages/app/settings/Notifications'
 import AppSubscription from '@/pages/app/settings/Subscription'
 import DashboardMetrics from '@/pages/app/DashboardMetrics'
 import Processes from '@/pages/app/Processes'
+import Requests from '@/pages/app/Requests'
 
 const PortalLayout = lazy(() => import('@/pages/portal/Layout'))
 const PortalBoards = lazy(() => import('@/pages/portal/Boards'))
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/app/dashboard" replace /> },
       { path: 'dashboard', element: <DashboardMetrics /> },
       { path: 'processes', element: <Processes /> },
+      { path: 'requests', element: <Requests /> },
       { path: 'board/:boardId', element: <Board /> },
       {
         path: 'clients',

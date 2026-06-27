@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
-import { LayoutDashboard, Users, UserCheck, Bell, CreditCard, Settings, LogOut, ClipboardList, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Users, UserCheck, Bell, CreditCard, Settings, LogOut, ClipboardList, Inbox, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER']
@@ -67,6 +67,9 @@ export default function AppLayout() {
           )}
           {ORG_ROLES.includes(role) && (
             <SidebarLink to="/app/processes" icon={<ClipboardList size={16} />} label="Processos" onClick={handleNavClick} />
+          )}
+          {ORG_ROLES.includes(role) && (
+            <SidebarLink to="/app/requests" icon={<Inbox size={16} />} label="Solicitações" onClick={handleNavClick} />
           )}
           {MANAGER_ROLES.includes(role) && (
             <SidebarLink to="/app/clients" icon={<UserCheck size={16} />} label="Clientes" onClick={handleNavClick} />
