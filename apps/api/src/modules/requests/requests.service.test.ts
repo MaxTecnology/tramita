@@ -16,6 +16,7 @@ import {
   cancelRequest,
   approveRequest,
   rejectRequest,
+  countPendingRequests,
 } from './requests.service'
 import { createBoard } from '@/modules/boards/boards.service'
 
@@ -255,5 +256,36 @@ describe('publishOrgEvent ao mudar status da request', () => {
       expect.stringContaining('"request:changed"'),
     )
     publishSpy.mockRestore()
+  })
+})
+
+describe('countPendingRequests', () => {
+  it('conta apenas requests PENDING da org', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+
+    await createRequest(org.id, client.id, { title: 'Pendente 1' })
+    const r2 = await createRequest(org.id, client.id, { title: 'Pendente 2' })
+    const r3 = await createRequest(org.id, client.id, { title: 'Vai ser rejeitada' })
+    await rejectRequest(r3.id, org.id, admin.id, {})
+
+    expect(await countPendingRequests(org.id)).toBe(2)
+
+    await cancelRequest(r2.id, org.id, client.id)
+    expect(await countPendingRequests(org.id)).toBe(1)
+  })
+
+  it('não conta requests de outra organização', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id, { slug: 'org-b-count' })
+    const clientA = await createTestClient(orgA.id)
+    await createTestClient(orgB.id)
+
+    await createRequest(orgA.id, clientA.id, { title: 'Da A' })
+
+    expect(await countPendingRequests(orgB.id)).toBe(0)
   })
 })

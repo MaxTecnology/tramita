@@ -108,3 +108,63 @@ describe('POST /requests/:id/reject', () => {
     expect(JSON.parse(res.body).status).toBe('REJECTED')
   })
 })
+
+describe('GET /requests/pending-count', () => {
+  it('retorna a contagem de pendentes da org', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+
+    await app.inject({
+      method: 'POST',
+      url: '/portal/requests',
+      headers: { authorization: await getAuthHeader(client.email, 'Client@1234') },
+      payload: { title: 'Pedido 1' },
+    })
+    await app.inject({
+      method: 'POST',
+      url: '/portal/requests',
+      headers: { authorization: await getAuthHeader(client.email, 'Client@1234') },
+      payload: { title: 'Pedido 2' },
+    })
+
+    const res = await app.inject({ method: 'GET', url: '/requests/pending-count', headers: { authorization: auth } })
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toEqual({ count: 2 })
+  })
+
+  it('CLIENT não acessa este endpoint (403)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const auth = await getAuthHeader(client.email, 'Client@1234')
+
+    const res = await app.inject({ method: 'GET', url: '/requests/pending-count', headers: { authorization: auth } })
+    expect(res.statusCode).toBe(403)
+  })
+})
+
+describe('GET /requests/stream', () => {
+  it('retorna 401 sem token', async () => {
+    const res = await app.inject({ method: 'GET', url: '/requests/stream' })
+    expect(res.statusCode).toBe(401)
+  })
+
+  it('retorna 401 com token inválido', async () => {
+    const res = await app.inject({ method: 'GET', url: '/requests/stream?token=invalid-token' })
+    expect(res.statusCode).toBe(401)
+  })
+
+  it('retorna 403 para CLIENT', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const authHeader = await getAuthHeader(client.email, 'Client@1234')
+    const token = authHeader.replace('Bearer ', '')
+
+    const res = await app.inject({ method: 'GET', url: `/requests/stream?token=${token}` })
+    expect(res.statusCode).toBe(403)
+  })
+})

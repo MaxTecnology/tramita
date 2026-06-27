@@ -173,3 +173,7 @@ export async function rejectRequest(
 
   return updated
 }
+
+export async function countPendingRequests(organizationId: string): Promise<number> {
+  return prisma.request.count({ where: { organizationId, status: 'PENDING' } })
+}
