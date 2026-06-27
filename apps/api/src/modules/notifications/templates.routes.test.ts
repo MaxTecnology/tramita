@@ -107,3 +107,30 @@ describe('GET /notifications/templates/:event/:channel', () => {
     expect(JSON.parse(res.body).isDefault).toBe(false)
   })
 })
+
+describe('PATCH /notifications/config — eventos de request', () => {
+  it('atualiza e retorna os booleans de request', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+
+    const patch = await app.inject({
+      method: 'PATCH',
+      url: '/notifications/config',
+      headers: { authorization: auth },
+      payload: { requestCreated: false, requestApproved: true, requestRejected: false },
+    })
+    expect(patch.statusCode).toBe(200)
+
+    const get = await app.inject({
+      method: 'GET',
+      url: '/notifications/config',
+      headers: { authorization: auth },
+    })
+    const body = JSON.parse(get.body)
+    expect(body.requestCreated).toBe(false)
+    expect(body.requestApproved).toBe(true)
+    expect(body.requestRejected).toBe(false)
+  })
+})
