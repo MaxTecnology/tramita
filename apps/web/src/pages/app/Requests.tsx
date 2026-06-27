@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { Inbox } from 'lucide-react'
+import { Inbox, Search, X } from 'lucide-react'
 import type { ClientRequest, Board } from '@/types'
 import { toast } from 'sonner'
 
@@ -28,6 +29,9 @@ type Mode = 'NEW_BOARD' | 'EXISTING_BOARD'
 export default function Requests() {
   const qc = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<ClientRequest['status'] | ''>('PENDING')
+  const [search, setSearch] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [approving, setApproving] = useState<ClientRequest | null>(null)
   const [rejecting, setRejecting] = useState<ClientRequest | null>(null)
   const [rejectReason, setRejectReason] = useState('')
@@ -39,6 +43,22 @@ export default function Requests() {
     queryKey: ['requests', statusFilter],
     queryFn: () => api.get('/requests', { params: statusFilter ? { status: statusFilter } : {} }).then((r) => r.data),
   })
+
+  const filtered = useMemo(() => {
+    return requests.filter((r) => {
+      if (search) {
+        const q = search.toLowerCase()
+        const matchesTitle = r.title.toLowerCase().includes(q)
+        const matchesClient = (r.client?.name ?? '').toLowerCase().includes(q)
+        if (!matchesTitle && !matchesClient) return false
+      }
+      if (dateFrom && new Date(r.createdAt) < new Date(dateFrom + 'T00:00:00')) return false
+      if (dateTo && new Date(r.createdAt) > new Date(dateTo + 'T23:59:59')) return false
+      return true
+    })
+  }, [requests, search, dateFrom, dateTo])
+
+  const hasActiveFilter = !!search || !!dateFrom || !!dateTo
 
   const { data: clientBoards = [] } = useQuery<Board[]>({
     queryKey: ['boards', 'by-client', approving?.client?.id],
@@ -100,14 +120,69 @@ export default function Requests() {
         ))}
       </div>
 
-      {requests.length === 0 ? (
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Input
+            placeholder="Buscar por cliente ou título..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 border-gray-200 focus:ring-[#185FA5]"
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <Label htmlFor="req-date-from" className="text-xs text-gray-500 whitespace-nowrap">De</Label>
+          <Input
+            id="req-date-from"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-36 border-gray-200"
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <Label htmlFor="req-date-to" className="text-xs text-gray-500 whitespace-nowrap">Até</Label>
+          <Input
+            id="req-date-to"
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-36 border-gray-200"
+          />
+        </div>
+
+        {hasActiveFilter && (
+          <button
+            type="button"
+            onClick={() => { setSearch(''); setDateFrom(''); setDateTo('') }}
+            className="h-9 px-2 text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+          >
+            <X size={13} />
+            Limpar
+          </button>
+        )}
+      </div>
+
+      {requests.length > 0 && (
+        <p className="text-xs text-gray-400">
+          {filtered.length === requests.length
+            ? `${requests.length} solicitação${requests.length !== 1 ? 'ões' : ''}`
+            : `Exibindo ${filtered.length} de ${requests.length}`}
+        </p>
+      )}
+
+      {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center text-gray-400">
           <Inbox size={48} className="mb-3 opacity-40" />
-          <p className="text-sm font-medium">Nenhuma solicitação encontrada</p>
+          <p className="text-sm font-medium">
+            {requests.length === 0 ? 'Nenhuma solicitação encontrada' : 'Nenhuma solicitação encontrada para este filtro'}
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
-          {requests.map((r) => (
+          {filtered.map((r) => (
             <div key={r.id} className="bg-white rounded-lg border border-gray-200 px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
