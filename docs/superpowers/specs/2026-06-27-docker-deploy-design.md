@@ -12,7 +12,7 @@ Postgres/Redis para dev).
 ## Decisões confirmadas com o usuário
 
 - **Domínios:** mantém a separação já implementada no código — `tramita.autohubs.com.br`
-  (web) e `api.tramita.autohubs.com.br` (api), com CORS habilitado (já está
+  (web) e `tramitaapi.autohubs.com.br` (api), com CORS habilitado (já está
   assim em `apps/api/src/plugins/cors.ts`). A nota de "domínio único, zero
   CORS" em `CLAUDE.md`/`ARCHITECTURE.md` está desatualizada em relação ao
   código real — não será seguida.
@@ -127,7 +127,7 @@ server {
 ```
 
 `VITE_API_URL` precisa ser passado como **build arg** (`--build-arg
-VITE_API_URL=https://api.tramita.autohubs.com.br`), já que o Vite assa as
+VITE_API_URL=https://tramitaapi.autohubs.com.br`), já que o Vite assa as
 env vars no bundle em tempo de build — trocar depois exige rebuild da imagem,
 não só reiniciar o container.
 
@@ -165,7 +165,7 @@ services:
       - dokploy-network
     labels:
       - traefik.enable=true
-      - traefik.http.routers.tramita-api.rule=Host(`api.tramita.autohubs.com.br`)
+      - traefik.http.routers.tramita-api.rule=Host(`tramitaapi.autohubs.com.br`)
       - traefik.http.routers.tramita-api.entrypoints=websecure
       - traefik.http.routers.tramita-api.tls.certresolver=letsencrypt
       - traefik.http.services.tramita-api.loadbalancer.server.port=3000
@@ -197,7 +197,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        VITE_API_URL: https://api.tramita.autohubs.com.br
+        VITE_API_URL: https://tramitaapi.autohubs.com.br
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:80"]
       interval: 30s
