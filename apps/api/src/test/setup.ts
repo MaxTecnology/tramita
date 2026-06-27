@@ -34,6 +34,8 @@ afterAll(async () => {
 afterEach(async () => {
   await prisma.$transaction([
     prisma.notificationLog.deleteMany(),
+    prisma.requestAttachment.deleteMany(),
+    prisma.request.deleteMany(),
     prisma.taskHistory.deleteMany(),
     prisma.comment.deleteMany(),
     prisma.attachment.deleteMany(),
