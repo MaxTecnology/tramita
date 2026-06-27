@@ -30,7 +30,7 @@ export async function requestsRoutes(app: FastifyInstance) {
       throw new AppError(401, 'Token inválido ou expirado')
     }
 
-    if (!ORG_ROLES.includes(user.role as typeof ORG_ROLES[number])) {
+    if (!ORG_ROLES.includes(user.role as typeof ORG_ROLES[number]) || !user.organizationId) {
       throw new AppError(403, 'Acesso negado')
     }
 
