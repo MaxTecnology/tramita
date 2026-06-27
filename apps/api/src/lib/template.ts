@@ -6,7 +6,9 @@ import { DEFAULT_TEMPLATES } from '@/lib/default-templates'
 export interface TemplateVars {
   clientName: string
   orgName: string
-  taskTitle: string
+  taskTitle?: string
+  requestTitle?: string
+  rejectionReason?: string
   fromColumn?: string
   toColumn?: string
   dueDate?: string
