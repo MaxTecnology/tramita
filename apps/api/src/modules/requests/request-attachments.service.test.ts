@@ -1,15 +1,17 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { createTestPlan, createTestOrg, createTestClient } from '@/test/helpers'
 import { createRequest } from './requests.service'
 import { createRequestAttachment } from './request-attachments.service'
 import * as b2 from '@/lib/b2'
 
-vi.mock('@/lib/b2', () => ({
-  uploadFile: vi.fn().mockResolvedValue(undefined),
-  getSignedDownloadUrl: vi.fn().mockResolvedValue('https://signed.example/file'),
-  deleteFile: vi.fn().mockResolvedValue(undefined),
-}))
+beforeEach(() => {
+  vi.spyOn(b2, 'uploadFile').mockResolvedValue(undefined)
+  vi.spyOn(b2, 'getSignedDownloadUrl').mockResolvedValue('https://signed.example/file')
+  vi.spyOn(b2, 'deleteFile').mockResolvedValue(undefined)
+})
+
+afterEach(() => vi.restoreAllMocks())
 
 describe('createRequestAttachment', () => {
   it('faz upload e cria o registro vinculado à request do próprio cliente', async () => {

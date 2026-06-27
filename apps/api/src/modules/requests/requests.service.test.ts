@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import {
   createTestPlan,
@@ -18,14 +18,13 @@ import {
 } from './requests.service'
 import { createBoard } from '@/modules/boards/boards.service'
 
-vi.mock('@/lib/queue', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/queue')>('@/lib/queue')
-  return { ...actual, enqueueNotification: vi.fn() }
+beforeEach(() => {
+  vi.spyOn(queue, 'enqueueNotification').mockResolvedValue(undefined)
 })
 
-describe('createRequest', () => {
-  beforeEach(() => vi.clearAllMocks())
+afterEach(() => vi.restoreAllMocks())
 
+describe('createRequest', () => {
   it('cria a request como PENDING e enfileira REQUEST_CREATED para cada ORG_ADMIN/ORG_MANAGER', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

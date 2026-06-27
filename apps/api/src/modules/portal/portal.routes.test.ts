@@ -103,3 +103,92 @@ describe('GET /portal/tasks/:id/history', () => {
     expect(Array.isArray(JSON.parse(res.body))).toBe(true)
   })
 })
+
+describe('POST /portal/requests', () => {
+  it('cliente cria uma request PENDING', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const auth = await getAuthHeader(client.email, 'Client@1234')
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/portal/requests',
+      headers: { authorization: auth },
+      payload: { title: 'Abertura de empresa', description: 'Quero abrir uma LTDA' },
+    })
+
+    expect(res.statusCode).toBe(201)
+    const body = JSON.parse(res.body)
+    expect(body.status).toBe('PENDING')
+    expect(body.title).toBe('Abertura de empresa')
+  })
+})
+
+describe('GET /portal/requests', () => {
+  it('cliente só vê as próprias requests, não as de outro cliente da mesma org', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const clientA = await createTestClient(org.id, { email: 'porta-a@test.com' })
+    const clientB = await createTestClient(org.id, { email: 'porta-b@test.com' })
+    const authA = await getAuthHeader(clientA.email, 'Client@1234')
+    const authB = await getAuthHeader(clientB.email, 'Client@1234')
+
+    await app.inject({ method: 'POST', url: '/portal/requests', headers: { authorization: authA }, payload: { title: 'Da A' } })
+    await app.inject({ method: 'POST', url: '/portal/requests', headers: { authorization: authB }, payload: { title: 'Da B' } })
+
+    const res = await app.inject({ method: 'GET', url: '/portal/requests', headers: { authorization: authA } })
+    const list = JSON.parse(res.body)
+    expect(list).toHaveLength(1)
+    expect(list[0].title).toBe('Da A')
+  })
+})
+
+describe('PATCH /portal/requests/:id/cancel', () => {
+  it('cliente cancela a própria request PENDING', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const auth = await getAuthHeader(client.email, 'Client@1234')
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/portal/requests',
+      headers: { authorization: auth },
+      payload: { title: 'Pedido a cancelar' },
+    })
+    const request = JSON.parse(created.body)
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/portal/requests/${request.id}/cancel`,
+      headers: { authorization: auth },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body).status).toBe('CANCELLED')
+  })
+
+  it('cliente não pode cancelar request de outro cliente (404)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const clientA = await createTestClient(org.id, { email: 'cancel-a@test.com' })
+    const clientB = await createTestClient(org.id, { email: 'cancel-b@test.com' })
+    const authA = await getAuthHeader(clientA.email, 'Client@1234')
+    const authB = await getAuthHeader(clientB.email, 'Client@1234')
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/portal/requests',
+      headers: { authorization: authA },
+      payload: { title: 'Da A' },
+    })
+    const request = JSON.parse(created.body)
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/portal/requests/${request.id}/cancel`,
+      headers: { authorization: authB },
+    })
+    expect(res.statusCode).toBe(404)
+  })
+})
