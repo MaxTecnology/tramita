@@ -15,13 +15,10 @@ RUN mkdir -p /prisma-client-output \
   && find /repo/node_modules/.pnpm -path '*/node_modules/.prisma/client' -exec cp -r {}/. /prisma-client-output/ \;
 RUN pnpm --filter api build
 
-# ---- runtime: só o necessário pra rodar, com Chromium de sistema pro Puppeteer ----
+# ---- runtime: só o necessário pra rodar ----
 FROM node:22-alpine AS runtime
-RUN corepack enable \
-  && apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
-ENV PUPPETEER_SKIP_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
-    NODE_ENV=production
+RUN corepack enable
+ENV NODE_ENV=production
 WORKDIR /repo
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY apps/api/package.json apps/api/package.json
