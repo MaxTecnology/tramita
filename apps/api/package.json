@@ -37,7 +37,6 @@
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^8.0.10",
     "pino": "^9.7.0",
-    "puppeteer": "^25.1.0",
     "uuid": "^11.1.0",
     "zod": "^3.24.4"
   },
