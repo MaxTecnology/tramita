@@ -21,7 +21,7 @@ services:
       NODE_ENV: production
       PORT: 3000
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -62,7 +62,7 @@ services:
       args:
         VITE_API_URL: https://tramitaapi.autohubs.com.br
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80"]
       interval: 30s
       timeout: 5s
       retries: 3
