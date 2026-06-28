@@ -57,7 +57,6 @@ export default function Dashboard() {
     createMutation.mutate()
   }
 
-
   if (isLoading) return <div className="p-8 text-gray-500">Carregando...</div>
 
   return (

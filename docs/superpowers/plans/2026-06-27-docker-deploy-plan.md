@@ -939,6 +939,13 @@ git commit -m "feat(infra): adicionar docker-compose.local-test.yml para validar
 
 ## Task 9: Documentação — `.env.example` e `docs/TASKS.md`
 
+> **Nota (2026-06-28):** a feature de relatório PDF (Puppeteer) foi removida
+> nesta data — ver `docs/superpowers/plans/2026-06-28-remove-pdf-reports-plan.md`.
+> O `apps/api/Dockerfile` já não instala Chromium nem define as variáveis
+> `PUPPETEER_*` (Tasks 3-4 deste plano, escritas antes da remoção, ainda
+> mencionam isso — ignorar essas referências ao retomar o plano, não
+> reintroduzir o Chromium).
+
 **Files:**
 - Modify: `.env.example`
 - Modify: `docs/TASKS.md`
