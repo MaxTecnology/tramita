@@ -192,12 +192,12 @@ browser headless completo), em sessão futura.
 - [ ] Cobertura mínima 80% em `apps/api/src/modules/*/` e `apps/api/src/lib/`
 - [ ] Playwright E2E: login escritório → criar tarefa → mover → mensagem no log de notificações
 - [ ] Playwright E2E: login cliente → ver board → comentar → receber notificação (mock MaximizeBot)
-- [ ] `docker-compose.yml`: api, web, postgres, redis, puppeteer
-- [ ] Dockerfiles multi-stage (api + web)
-- [ ] `.env.example` completo
-- [ ] Dokploy + Traefik
-  - [ ] `tramita.autohubs.com.br` → web (todas as rotas: landing, /login, /master, /app, /portal)
-  - [ ] `api.tramita.autohubs.com.br` → api Fastify
-  - [ ] TLS automático (Let's Encrypt via Traefik)
-- [ ] Healthchecks nos containers
+- [x] `docker-compose.prod.yml`: api, web, worker (postgres/redis já existem no Dokploy)
+- [x] Dockerfiles multi-stage (api + web)
+- [x] `.env.example` completo
+- [x] Dokploy + Traefik
+  - [x] `tramita.autohubs.com.br` → web (todas as rotas: landing, /login, /master, /app, /portal)
+  - [x] `tramitaapi.autohubs.com.br` → api Fastify
+  - [x] TLS automático (Let's Encrypt via Traefik, gerenciado pelo Dokploy)
+- [x] Healthchecks nos containers
 - [ ] Script de seed: planos padrão, usuário MASTER, org G2A como primeiro cliente
