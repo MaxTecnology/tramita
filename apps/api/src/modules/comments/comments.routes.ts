@@ -29,7 +29,6 @@ export async function commentsRoutes(app: FastifyInstance) {
         id: request.user.sub,
         role: request.user.role,
         organizationId: request.user.organizationId!,
-        clientId: request.user.role === 'CLIENT' ? request.user.sub : undefined,
       })
     )
   })

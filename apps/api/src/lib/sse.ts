@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
+import type { OutgoingHttpHeaders } from 'node:http'
 import { redis } from '@/lib/redis'
 
 export interface SSEEvent {
@@ -38,7 +39,7 @@ export function attachSSESubscriber(
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no',
-  })
+  } as OutgoingHttpHeaders)
   // Flush headers immediately — writeHead buffers until first write()
   raw.write(': connected\n\n')
 

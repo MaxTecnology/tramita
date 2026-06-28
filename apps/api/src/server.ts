@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import type { FastifyError } from 'fastify'
 import corsPlugin from '@/plugins/cors'
 import rateLimitPlugin from '@/plugins/rate-limit'
 import { authRoutes } from '@/modules/auth/auth.routes'
@@ -47,7 +48,7 @@ export function buildApp() {
   app.register(reportsRoutes)
   app.register(dashboardRoutes, { prefix: '/dashboard' })
 
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error: FastifyError, _request, reply) => {
     if (error instanceof AppError) {
       return reply.status(error.statusCode).send({ message: error.message })
     }

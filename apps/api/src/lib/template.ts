@@ -37,7 +37,7 @@ export async function getTemplate(
   organizationId: string,
   event: NotificationEvent,
   channel: MessageChannel,
-): Promise<{ body: string; subject?: string }> {
+): Promise<{ body: string; subject?: string | null }> {
   const custom = await prisma.messageTemplate.findUnique({
     where: { organizationId_event_channel: { organizationId, event, channel } },
   })
