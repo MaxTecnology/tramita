@@ -13,3 +13,9 @@
 **Contexto:** `apps/api/src/modules/reports/reports.service.ts`, função `buildReportHtml`, interpola `orgName`, `clientName`, `t.title`, `t.status`, `t.priority` diretamente em uma string HTML sem nenhum escape, antes de passar pro Puppeteer (`page.setContent(html, ...)`) pra gerar o PDF. Um nome de organização ou cliente contendo `<script>` (ou tags HTML em geral) seria refletido e executado no contexto da página renderizada pelo Chromium antes do PDF ser gerado — risco real de XSS, ainda que o impacto prático seja limitado (o output final é só o PDF, sem cookies/sessão ativa nessa página headless).
 
 **Pendente:** escapar (`encodeHTMLEntities`/equivalente) todos os valores interpolados em `buildReportHtml` antes de montar a string HTML.
+
+## `tsc-alias --resolve-full-paths` depende de `moduleResolution: "bundler"` ficar como está
+
+**Contexto:** `apps/api/tsconfig.json` usa `"moduleResolution": "bundler"`, então o `tsc` emite imports relativos sem extensão (`./server`, não `./server.js`) — o Node ESM nativo exige extensão explícita em specifiers relativos, então o build de produção usa `tsc-alias --resolve-full-paths` (em `apps/api/package.json#scripts.build`) pra completar a extensão `.js` depois da reescrita dos aliases `@/`.
+
+**Pendente (não é uma ação urgente, só uma nota pra quem tocar isso no futuro):** se o `moduleResolution` da API for trocado pra `NodeNext`/`Node16` (mais correto para ESM puro), os `import` statements em `src/` passariam a exigir extensão `.js` explícita no próprio código-fonte (regra do NodeNext), e a flag `--resolve-full-paths` deixaria de ser necessária — mas não seria prejudicial mantê-la mesmo assim.
