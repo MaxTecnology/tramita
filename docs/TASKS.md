@@ -180,6 +180,11 @@
 - [x] Frontend interno: botão "Exportar relatório"
 - [x] Portal: seção de relatórios disponíveis para download
 
+**Nota (2026-06-28):** feature removida — o Chromium necessário pro Puppeteer
+inflava demais a imagem Docker da API (~1.4GB, majoritariamente Chromium e
+libs de sistema). Reimplementação planejada com abordagem mais leve (sem
+browser headless completo), em sessão futura.
+
 ## Fase 9 — Infra e Deploy
 ### Testes da Fase 9
 - [ ] Rodar suite completa no CI (GitHub Actions) a cada push

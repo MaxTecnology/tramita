@@ -362,6 +362,10 @@ data: {"ts":1717200000}
 ### GET `/clients/:clientId/report?month=YYYY-MM` _(ORG_ADMIN | ORG_MANAGER)_
 Retorna `Content-Type: application/pdf`. Cache Redis 1h.
 
+**Removido em 2026-06-28** — endpoint não existe mais nesta versão da API
+(Chromium/Puppeteer inflava a imagem Docker). Reimplementação futura
+planejada com abordagem mais leve.
+
 ---
 
 ## Segurança

@@ -35,7 +35,7 @@ AutoHubs (Master)
 - **WhatsApp:** MaximizeBot API (`POST /backend/api/messages/send`)
 - **Email:** Nodemailer + SMTP (ou Resend)
 - **Storage:** Backblaze B2 (S3-compatible)
-- **PDF:** Puppeteer
+- **PDF:** ~~Puppeteer~~ (removido em 2026-06-28 — Chromium inflava a imagem Docker; reimplementação futura com abordagem mais leve)
 - **Billing:** Asaas API (assinaturas recorrentes + webhooks)
 - **Validação:** Zod
 - **Logs:** Pino
