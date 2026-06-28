@@ -57,22 +57,6 @@ export default function Dashboard() {
     createMutation.mutate()
   }
 
-  async function handleExportReport(clientId: string, clientName: string) {
-    const month = new Date().toISOString().slice(0, 7)
-    try {
-      const res = await api.get(`/clients/${clientId}/report?month=${month}`, {
-        responseType: 'blob',
-      })
-      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `relatorio-${clientName}-${month}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch {
-      alert('Relatório não disponível para este período.')
-    }
-  }
 
   if (isLoading) return <div className="p-8 text-gray-500">Carregando...</div>
 
@@ -133,16 +117,6 @@ export default function Dashboard() {
                         {overdueTasks > 1 ? 's' : ''}
                       </p>
                     )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        handleExportReport(board.client.id, board.client.name)
-                      }}
-                      className="mt-2 text-xs text-blue-500 hover:text-blue-700 hover:underline"
-                    >
-                      Exportar relatório
-                    </button>
                   </CardContent>
                 </Card>
               </Link>

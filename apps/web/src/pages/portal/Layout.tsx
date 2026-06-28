@@ -2,12 +2,11 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { LayoutGrid, FileText, User, LogOut, Inbox } from 'lucide-react'
+import { LayoutGrid, User, LogOut, Inbox } from 'lucide-react'
 
 const tabs = [
   { to: '/portal/board', icon: LayoutGrid, label: 'Processos' },
   { to: '/portal/requests', icon: Inbox, label: 'Solicitações' },
-  { to: '/portal/reports', icon: FileText, label: 'Relatórios' },
   { to: '/portal/profile', icon: User, label: 'Perfil' },
 ] as const
 
