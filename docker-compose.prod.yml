@@ -1,0 +1,81 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      ASAAS_API_KEY: ${ASAAS_API_KEY}
+      ASAAS_BASE_URL: ${ASAAS_BASE_URL}
+      ASAAS_WEBHOOK_SECRET: ${ASAAS_WEBHOOK_SECRET}
+      B2_KEY_ID: ${B2_KEY_ID}
+      B2_APP_KEY: ${B2_APP_KEY}
+      B2_BUCKET_NAME: ${B2_BUCKET_NAME}
+      B2_BUCKET_REGION: ${B2_BUCKET_REGION}
+      B2_ENDPOINT: ${B2_ENDPOINT}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      APP_URL: ${APP_URL}
+      NODE_ENV: production
+      PORT: 3000
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - dokploy-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.tramita-api.rule=Host(`tramitaapi.autohubs.com.br`)
+      - traefik.http.routers.tramita-api.entrypoints=websecure
+      - traefik.http.routers.tramita-api.tls.certresolver=letsencrypt
+      - traefik.http.services.tramita-api.loadbalancer.server.port=3000
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["node", "dist/worker.js"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      B2_KEY_ID: ${B2_KEY_ID}
+      B2_APP_KEY: ${B2_APP_KEY}
+      B2_BUCKET_NAME: ${B2_BUCKET_NAME}
+      B2_BUCKET_REGION: ${B2_BUCKET_REGION}
+      B2_ENDPOINT: ${B2_ENDPOINT}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      APP_URL: ${APP_URL}
+      NODE_ENV: production
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: https://tramitaapi.autohubs.com.br
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - dokploy-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.tramita-web.rule=Host(`tramita.autohubs.com.br`)
+      - traefik.http.routers.tramita-web.entrypoints=websecure
+      - traefik.http.routers.tramita-web.tls.certresolver=letsencrypt
+      - traefik.http.services.tramita-web.loadbalancer.server.port=80
+    restart: unless-stopped
+
+networks:
+  dokploy-network:
+    external: true
