@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Tornar a Tramita pronta para deploy no Dokploy (Traefik global já existente) com Dockerfiles multi-stage para `api`/`web`, um `docker-compose.prod.yml`, e um jeito de testar as mesmas imagens localmente antes do deploy — corrigindo, antes disso, dois bugs reais que impedem o build/boot de produção da API hoje.
+**Goal:** Tornar a Tramita pronta para deploy no Dokploy (Traefik global já existente) com Dockerfiles multi-stage para `api`/`web`, um `docker-compose.prod.yml`, e um jeito de testar as mesmas imagens localmente antes do deploy — corrigindo, antes disso, três problemas reais que impedem o build/boot de produção da API hoje (rootDir do tsconfig, `moduleResolution` incompatível com os aliases `@/` + 11 erros de tipo que ela mascarava, e a ausência de reescrita de aliases em runtime).
 
 **Architecture:** Dois Dockerfiles multi-stage (Node 22 Alpine para a API com Chromium de sistema para o Puppeteer; Node 22 Alpine + Nginx Alpine para o web). `docker-compose.prod.yml` com `api`/`worker`/`web` conectados à rede externa `dokploy-network` via labels Traefik, sem publicar portas. `docker-compose.local-test.yml` como override que substitui a rede por uma local e redireciona `DATABASE_URL`/`REDIS_URL` para `host.docker.internal`, permitindo testar as imagens de produção na máquina do desenvolvedor sem Traefik.
 
@@ -95,7 +95,250 @@ git commit -m "fix(api): remover prisma/**/* do tsconfig — arquivos fora do ro
 
 ---
 
-## Task 2: Corrigir resolução de alias `@/` em runtime (build de produção não inicializa)
+## Task 2: Corrigir `moduleResolution` do `tsc` e os erros de tipo reais que ela revelava
+
+**Problema confirmado:** mesmo depois da Task 1, `pnpm --filter api build` reporta **345 erros de tipo** `TS2307: Cannot find module '@/lib/...'` — para praticamente todo arquivo do projeto. Causa raiz: `tsconfig.base.json` define `"moduleResolution": "NodeNext"`, que exige extensão de arquivo explícita até para resolução via `paths` (aliases `@/...`) — o projeto usa aliases sem extensão em todo lugar (`@/lib/prisma`, não `@/lib/prisma.js`), o que é incompatível com `NodeNext`. Isso nunca foi percebido porque `tsx` (dev) e `vitest`/Vite (testes) usam resolvedores próprios, mais permissivos, que não se importam com essa exigência — só o `tsc` puro (usado no build de produção) é afetado.
+
+**A correção já existe no próprio repositório:** `apps/web/tsconfig.json` já sobrescreve `module`/`moduleResolution` localmente (sem tocar em `tsconfig.base.json`) exatamente para evitar esse problema. Replicar o mesmo padrão em `apps/api/tsconfig.json` resolve os 345 erros — restando apenas **11 erros de tipo reais e pré-existentes**, sem relação com aliases, distribuídos em 4 causas distintas:
+
+1. **Duas versões de `ioredis` instaladas** (`bullmq` fixa `ioredis@5.10.1`, a API usa `^5.6.0` → resolve para `5.11.0`) — gera tipos `Redis` estruturalmente incompatíveis entre si. Afeta `src/lib/queue.ts:15`, `src/workers/duedate.cron.ts:7,42`, `src/workers/notification.worker.ts:199`.
+2. **`reply.getHeaders()` espalhado em `raw.writeHead()`** produz um tipo mais largo que `OutgoingHttpHeaders` do Node — `src/lib/sse.ts:35`.
+3. **`getTemplate()` declara retorno `subject?: string`**, mas o registro do Prisma (`MessageTemplate.subject`) é `string | null` — `null` não é atribuível a `string | undefined` — `src/lib/template.ts:44`.
+4. **Campo `clientId` morto** passado pro objeto `CommentActor` em `comments.routes.ts:32` — a interface `CommentActor` (em `comments.service.ts`) nunca teve esse campo; `createComment` já deriva o cliente via `actor.id` quando `actor.role === 'CLIENT'`, então esse campo nunca foi lido — sobrou de um refactor anterior.
+5. **`page.setContent(html, { waitUntil: 'networkidle0' })`** — a versão instalada do Puppeteer (`^25.1.0`) só aceita `'load'`/`'domcontentloaded'` para `setContent` (diferente de `page.goto`, que aceita as variantes `networkidle`). O HTML do relatório é gerado localmente via `buildReportHtml()` (sem `<img src=http>`, `<link href=http>` ou fontes externas — confirmado por busca no arquivo), então `'load'` é equivalente em comportamento pra esse caso — `src/modules/reports/reports.service.ts:98`.
+6. **`error` tipado como `unknown` no error handler do Fastify** — `app.setErrorHandler((error, ...) => ...)` não tem o parâmetro `error` anotado explicitamente como `FastifyError` — `src/server.ts:54-55`.
+
+**Files:**
+- Modify: `apps/api/tsconfig.json`
+- Modify: `package.json` (raiz do monorepo)
+- Modify: `apps/api/src/lib/sse.ts`
+- Modify: `apps/api/src/lib/template.ts`
+- Modify: `apps/api/src/modules/comments/comments.routes.ts`
+- Modify: `apps/api/src/modules/reports/reports.service.ts`
+- Modify: `apps/api/src/server.ts`
+
+**Interfaces:**
+- Consumes: nenhuma interface de outra task.
+- Produces: `pnpm --filter api build` agora termina com exit code `0` (sem nenhum erro de tipo) — pré-requisito pra Task 4 (`Dockerfile` da API, cujo build roda exatamente esse comando dentro do container e abortaria com qualquer erro).
+
+- [ ] **Step 1: Confirmar a explosão de erros após a Task 1**
+
+```bash
+cd /home/max/job/autohubs/tramita
+pnpm --filter api build 2>&1 | grep -c "error TS"
+```
+
+Expected: `345` (ou um número na mesma ordem de grandeza — não precisa bater exatamente, já que pode variar com a ordem de varredura do `tsc`; o importante é confirmar que é uma quantidade grande, dominada por `TS2307`, não os 11 erros reais).
+
+- [ ] **Step 2: Corrigir `apps/api/tsconfig.json` — sobrescrever `module`/`moduleResolution` e adicionar tipos do Vitest**
+
+Substituir o conteúdo de `apps/api/tsconfig.json` (o resultado da Task 1) por:
+
+```json
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "outDir": "dist",
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "types": ["vitest/globals"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+(`"types": ["vitest/globals"]` é necessário porque os arquivos `*.test.ts` ficam dentro de `src/**/*` e usam `describe`/`it`/`afterEach`/`beforeAll` como globais — sem essa entrada, o `tsc` reporta `Cannot find name 'afterEach'` etc. para todo arquivo de teste.)
+
+- [ ] **Step 3: Confirmar que os 345 erros de alias desaparecem, restando só os 11 reais**
+
+```bash
+cd /home/max/job/autohubs/tramita
+pnpm --filter api exec tsc 2>&1 | grep "error TS"
+```
+
+Expected: exatamente estas 11 linhas (a ordem pode variar):
+
+```
+src/lib/queue.ts(15,68): error TS2322: Type 'Redis' is not assignable to type 'ConnectionOptions'.
+src/lib/sse.ts(35,22): error TS2769: No overload matches this call.
+src/lib/template.ts(44,3): error TS2322: Type 'TemplateEntry | { ... }' is not assignable to type '{ body: string; subject?: string | undefined; }'.
+src/modules/comments/comments.routes.ts(32,9): error TS2353: Object literal may only specify known properties, and 'clientId' does not exist in type 'CommentActor'.
+src/modules/reports/reports.service.ts(98,33): error TS2322: Type '"networkidle0"' is not assignable to type '"load" | "domcontentloaded" | ("load" | "domcontentloaded")[] | undefined'.
+src/server.ts(54,9): error TS18046: 'error' is of type 'unknown'.
+src/server.ts(55,27): error TS18046: 'error' is of type 'unknown'.
+src/server.ts(55,61): error TS18046: 'error' is of type 'unknown'.
+src/workers/duedate.cron.ts(7,49): error TS2322: Type 'Redis' is not assignable to type 'ConnectionOptions'.
+src/workers/duedate.cron.ts(42,8): error TS2322: Type 'Redis' is not assignable to type 'ConnectionOptions'.
+src/workers/notification.worker.ts(199,5): error TS2322: Type 'Redis' is not assignable to type 'ConnectionOptions'.
+```
+
+- [ ] **Step 4: Corrigir a duplicidade de `ioredis` — adicionar `pnpm.overrides` no `package.json` da raiz**
+
+`bullmq` fixa `ioredis@5.10.1` como dependência exata; a API pede `^5.6.0`, que resolve para uma versão mais nova (`5.11.0` no momento da escrita deste plano — confirme a versão real instalada com `pnpm --filter api why ioredis` antes de decidir o valor do override, caso tenha mudado). O `pnpm.overrides` força as duas a resolverem pra uma única versão.
+
+Editar `/home/max/job/autohubs/tramita/package.json` (conteúdo completo atual mostrado abaixo, só o bloco `"pnpm"` é novo):
+
+```json
+{
+  "name": "tramita",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter api dev",
+    "dev:web": "pnpm --filter web dev",
+    "test:api": "pnpm --filter api test",
+    "test:web": "pnpm --filter web test"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "pnpm": {
+    "overrides": {
+      "ioredis": "^5.11.0"
+    }
+  }
+}
+```
+
+Se `pnpm --filter api why ioredis` (rodado antes deste step) mostrar uma versão diferente de `5.11.0` instalada, usar essa versão real no lugar de `^5.11.0` acima — o objetivo é fazer as duas dependências (`api` direta e `bullmq` transitiva) convergirem pra UMA única versão instalada, qualquer que ela seja.
+
+- [ ] **Step 5: Aplicar o override e confirmar que sobra só uma versão de `ioredis`**
+
+```bash
+cd /home/max/job/autohubs/tramita
+pnpm install
+pnpm --filter api why ioredis
+```
+
+Expected: a saída do `pnpm install` termina sem erro, e `pnpm --filter api why ioredis` mostra `Found 1 version of ioredis` (em vez de 2).
+
+- [ ] **Step 6: Corrigir `src/lib/sse.ts` — cast explícito do header mesclado**
+
+Em `apps/api/src/lib/sse.ts`, adicionar `OutgoingHttpHeaders` ao import do topo do arquivo:
+
+```typescript
+import type { FastifyReply, FastifyRequest } from 'fastify'
+import type { OutgoingHttpHeaders } from 'node:http'
+import { redis } from '@/lib/redis'
+```
+
+E no bloco `raw.writeHead(200, {...})` dentro de `attachSSESubscriber`, adicionar `as OutgoingHttpHeaders` ao objeto mesclado:
+
+```typescript
+  raw.writeHead(200, {
+    ...reply.getHeaders(),
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  } as OutgoingHttpHeaders)
+```
+
+(Esse é um cast de tipo, não uma mudança de comportamento — o objeto já era estruturalmente compatível em runtime; o `tsc` só não conseguia provar isso porque o tipo de retorno de `reply.getHeaders()` do Fastify é mais amplo que o `OutgoingHttpHeaders` nativo do Node.)
+
+- [ ] **Step 7: Corrigir `src/lib/template.ts` — alinhar o tipo de retorno de `getTemplate` com o campo `subject` do Prisma**
+
+Em `apps/api/src/lib/template.ts`, trocar a assinatura de `getTemplate`:
+
+```typescript
+export async function getTemplate(
+  organizationId: string,
+  event: NotificationEvent,
+  channel: MessageChannel,
+): Promise<{ body: string; subject?: string }> {
+```
+
+por:
+
+```typescript
+export async function getTemplate(
+  organizationId: string,
+  event: NotificationEvent,
+  channel: MessageChannel,
+): Promise<{ body: string; subject?: string | null }> {
+```
+
+(O campo `subject` do model `MessageTemplate` do Prisma é `String?`, que o Prisma Client tipa como `string | null` — não `string | undefined`. Os chamadores de `getTemplate` já tratam `subject` com `?? ''`/`??` em todo lugar, então aceitar `null` não muda nenhum comportamento de runtime.)
+
+- [ ] **Step 8: Corrigir `src/modules/comments/comments.routes.ts` — remover o campo `clientId` morto**
+
+Em `apps/api/src/modules/comments/comments.routes.ts`, na chamada de `createComment` dentro da rota `POST /tasks/:taskId/comments`, remover a linha `clientId: ...`:
+
+```typescript
+    return reply.status(201).send(
+      await createComment(taskId, result.data, {
+        id: request.user.sub,
+        role: request.user.role,
+        organizationId: request.user.organizationId!,
+      })
+    )
+```
+
+(Confirme antes de remover que `createComment`/`CommentActor`, em `apps/api/src/modules/comments/comments.service.ts`, realmente não usa nenhum campo `clientId` no objeto `actor` — a função já deriva a identidade do cliente via `actor.id` quando `actor.role === 'CLIENT'`. Se esse comportamento tiver mudado desde a escrita deste plano, pare e avalie antes de remover.)
+
+- [ ] **Step 9: Corrigir `src/modules/reports/reports.service.ts` — trocar `waitUntil` pra um valor aceito por `setContent`**
+
+Em `apps/api/src/modules/reports/reports.service.ts`, trocar:
+
+```typescript
+  await page.setContent(html, { waitUntil: 'networkidle0' })
+```
+
+por:
+
+```typescript
+  await page.setContent(html, { waitUntil: 'load' })
+```
+
+- [ ] **Step 10: Corrigir `src/server.ts` — anotar o parâmetro `error` do error handler**
+
+Em `apps/api/src/server.ts`, adicionar `FastifyError` ao import do `fastify` no topo do arquivo:
+
+```typescript
+import Fastify from 'fastify'
+import type { FastifyError } from 'fastify'
+```
+
+E anotar o parâmetro `error` no `setErrorHandler`:
+
+```typescript
+  app.setErrorHandler((error: FastifyError, _request, reply) => {
+```
+
+- [ ] **Step 11: Confirmar que o build passa com exit code 0**
+
+```bash
+cd /home/max/job/autohubs/tramita
+pnpm --filter api build
+echo "EXIT=$?"
+```
+
+Expected: `EXIT=0`, sem nenhuma linha `error TS`.
+
+- [ ] **Step 12: Rodar a suíte de testes da API**
+
+```bash
+pnpm --filter api test
+```
+
+Expected: PASS, mesma contagem da baseline (177/177) — nenhuma das correções desta task mudou comportamento de runtime (são cast/anotação de tipo, troca de uma constante do Puppeteer por outra equivalente para este caso, remoção de um campo nunca lido, e dedupe de uma dependência transitiva).
+
+- [ ] **Step 13: Commit**
+
+```bash
+git add apps/api/tsconfig.json package.json pnpm-lock.yaml apps/api/src/lib/sse.ts apps/api/src/lib/template.ts apps/api/src/modules/comments/comments.routes.ts apps/api/src/modules/reports/reports.service.ts apps/api/src/server.ts
+git commit -m "fix(api): corrigir moduleResolution do tsc e os 11 erros de tipo reais que ela revelava"
+```
+
+---
+
+## Task 3: Corrigir resolução de alias `@/` em runtime (build de produção não inicializa)
 
 **Problema confirmado:** mesmo com o `tsc` passando (Task 1), o `dist/app.js` resultante mantém os imports `@/server`, `@/plugins/cors` etc. literalmente — o `tsc` puro **não** reescreve path aliases (`paths` do tsconfig) para imports relativos no JS de saída. Rodar `node dist/app.js` falha com:
 
@@ -199,7 +442,7 @@ git commit -m "fix(api): adicionar tsc-alias — build de produção não resolv
 
 ---
 
-## Task 3: `apps/api/Dockerfile` + `entrypoint.sh`
+## Task 4: `apps/api/Dockerfile` + `entrypoint.sh`
 
 **Files:**
 - Create: `apps/api/Dockerfile`
@@ -310,7 +553,7 @@ git commit -m "feat(infra): adicionar Dockerfile multi-stage da API com Chromium
 
 ---
 
-## Task 4: `apps/web/Dockerfile` + `nginx.conf`
+## Task 5: `apps/web/Dockerfile` + `nginx.conf`
 
 **Files:**
 - Create: `apps/web/Dockerfile`
@@ -399,7 +642,7 @@ git commit -m "feat(infra): adicionar Dockerfile do web (Nginx + build estático
 
 ---
 
-## Task 5: `.dockerignore` na raiz
+## Task 6: `.dockerignore` na raiz
 
 **Files:**
 - Create: `.dockerignore`
@@ -454,7 +697,7 @@ git commit -m "feat(infra): adicionar .dockerignore na raiz"
 
 ---
 
-## Task 6: `docker-compose.prod.yml`
+## Task 7: `docker-compose.prod.yml`
 
 **Files:**
 - Create: `docker-compose.prod.yml`
@@ -570,7 +813,7 @@ git commit -m "feat(infra): adicionar docker-compose.prod.yml para deploy no Dok
 
 ---
 
-## Task 7: `docker-compose.local-test.yml` + validação de integração completa local
+## Task 8: `docker-compose.local-test.yml` + validação de integração completa local
 
 **Files:**
 - Create: `docker-compose.local-test.yml`
@@ -694,7 +937,7 @@ git commit -m "feat(infra): adicionar docker-compose.local-test.yml para validar
 
 ---
 
-## Task 8: Documentação — `.env.example` e `docs/TASKS.md`
+## Task 9: Documentação — `.env.example` e `docs/TASKS.md`
 
 **Files:**
 - Modify: `.env.example`
@@ -757,8 +1000,8 @@ git commit -m "docs: atualizar .env.example e TASKS.md com o status real da Fase
 
 ## Self-Review
 
-- **Cobertura do spec:** todas as 5 seções do spec (`Dockerfile` da api, `Dockerfile` do web, `docker-compose.prod.yml`, override de teste local, arquivos auxiliares) têm task correspondente (Tasks 3, 4, 6, 7, 5/8).
-- **Gap encontrado e adicionado ao plano:** o spec não previa que o build (`tsc`) e o boot de runtime (`node dist/app.js`) da API estavam **realmente quebrados** hoje — descoberto ao validar o ambiente antes de escrever o plano. Adicionadas as Tasks 1 e 2 como pré-requisito bloqueante; sem elas, o `Dockerfile` da Task 3 buildaria uma imagem que nunca inicializa.
+- **Cobertura do spec:** todas as 5 seções do spec (`Dockerfile` da api, `Dockerfile` do web, `docker-compose.prod.yml`, override de teste local, arquivos auxiliares) têm task correspondente (Tasks 4, 5, 7, 8, 6/9).
+- **Gap encontrado e adicionado ao plano (em duas rodadas):** o spec não previa que o build (`tsc`) e o boot de runtime (`node dist/app.js`) da API estavam **realmente quebrados** hoje. Task 1 corrige o `rootDir`; ao validar o build depois dela, apareceram 345 erros de `moduleResolution` mascarando 11 erros de tipo reais — Task 2 corrige ambos; Task 3 corrige a reescrita de aliases em runtime. Sem as três, a Task 4 (`Dockerfile` da API) buildaria uma imagem que nunca inicializa (ou cujo `RUN pnpm --filter api build` falharia direto no `docker build`).
 - **Placeholder scan:** nenhum "TBD"/"implementar depois" — toda task tem comandos exatos e saída esperada.
-- **Consistência de nomes:** `tramitaapi.autohubs.com.br` usado de forma consistente nas Tasks 3, 4, 6, 8 (conferido contra a correção de domínio pedida pelo usuário no spec).
+- **Consistência de nomes:** `tramitaapi.autohubs.com.br` usado de forma consistente nas Tasks 4, 5, 7, 9 (conferido contra a correção de domínio pedida pelo usuário no spec).
 - **Fora de escopo (igual ao spec):** microserviço de Puppeteer, domínio único com proxy de path, CI/CD via GitHub Actions, self-host de Postgres/Redis em container.
