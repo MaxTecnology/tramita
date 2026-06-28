@@ -1,0 +1,24 @@
+services:
+  api:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DATABASE_URL: postgresql://tramita:tramita@host.docker.internal:5432/tramita
+      REDIS_URL: redis://host.docker.internal:6379
+    ports:
+      - "3000:3000"
+
+  worker:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DATABASE_URL: postgresql://tramita:tramita@host.docker.internal:5432/tramita
+      REDIS_URL: redis://host.docker.internal:6379
+
+  web:
+    ports:
+      - "8080:80"
+
+networks:
+  dokploy-network:
+    external: false
