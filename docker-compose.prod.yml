@@ -27,12 +27,6 @@ services:
       retries: 3
     networks:
       - dokploy-network
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.tramita-api.rule=Host(`tramitaapi.autohubs.com.br`)
-      - traefik.http.routers.tramita-api.entrypoints=websecure
-      - traefik.http.routers.tramita-api.tls.certresolver=letsencrypt
-      - traefik.http.services.tramita-api.loadbalancer.server.port=3000
     restart: unless-stopped
 
   worker:
@@ -68,12 +62,6 @@ services:
       retries: 3
     networks:
       - dokploy-network
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.tramita-web.rule=Host(`tramita.autohubs.com.br`)
-      - traefik.http.routers.tramita-web.entrypoints=websecure
-      - traefik.http.routers.tramita-web.tls.certresolver=letsencrypt
-      - traefik.http.services.tramita-web.loadbalancer.server.port=80
     restart: unless-stopped
 
 networks:
