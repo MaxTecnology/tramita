@@ -18,7 +18,7 @@
 - [x] Middleware `checkPlanLimit` — valida limite de clientes
 - [x] Rate limiting + CORS
 - [x] `GET /health`
-- [x] Seed: planos padrão (Starter/Pro/Enterprise) + usuário MASTER
+- [x] Seed: org AutoHubs (plano interno oculto, só pra satisfazer o vínculo obrigatório) + usuário MASTER (`MASTER_EMAIL`/`MASTER_PASSWORD` configuráveis) — planos de venda reais e a primeira org cliente são cadastrados depois, pelo próprio painel
 
 ## Fase 2 — Master AutoHubs ✅
 ### Testes da Fase 2
@@ -27,6 +27,9 @@
 - [x] `organizations.routes.test.ts` — listagem e gestão pelo Master
 - [x] CRUD de planos (`/master/plans`)
 - [x] Listagem e gestão de escritórios (`/master/organizations`)
+- [x] Cadastro manual de escritório pelo Master (`POST /master/organizations`) — sem depender do `/organizations/register` público nem obrigatoriamente da Asaas (checkbox opcional); senha do ORG_ADMIN gerada pelo servidor e mostrada uma vez
+- [x] Tela de detalhe da organização (`/master/organizations/:id`) com lista de usuários
+- [x] Reset de senha: Master redefine qualquer usuário; ORG_ADMIN redefine `ORG_MANAGER`/`ORG_MEMBER` da própria equipe (`POST /users/:id/reset-password`)
 - [x] Dashboard de receita — MRR, total orgs ativas, churn
 - [x] Painel React: `/master` com autenticação MASTER-only
 

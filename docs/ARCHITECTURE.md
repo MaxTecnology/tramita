@@ -158,11 +158,12 @@ Cada plano define:
 - Features habilitadas (relatório PDF, SSE, anexos, etc.)
 
 ### Cobrança via Asaas
-- Escritório se cadastra → AutoHubs cria customer no Asaas
+- Escritório se cadastra (`POST /organizations/register`, público) → AutoHubs cria customer no Asaas
 - Escolhe plano → AutoHubs cria subscription recorrente no Asaas
 - Asaas cobra automaticamente (boleto ou cartão)
 - Webhook Asaas → API Tramita atualiza status da assinatura
 - Assinatura vencida → escritório entra em modo restrito (read-only) após 7 dias de grace period
+- **Caminho alternativo:** o Master também pode cadastrar um escritório manualmente pelo painel (`POST /master/organizations`), com status `ACTIVE` direto (sem trial) e a integração com a Asaas como checkbox opcional — usado pra onboarding manual sem depender do fluxo de autosserviço nem da cobrança automática.
 
 ### Controle de Limite
 - Middleware `checkPlanLimit` em `POST /clients` valida `clientsCount < plan.maxClients`

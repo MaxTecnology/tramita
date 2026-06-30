@@ -52,8 +52,27 @@ Login unificado — role no JWT discrimina acesso (`MASTER`, `ORG_ADMIN`, `ORG_M
 ### Escritórios
 
 #### GET `/master/organizations` — lista com status da assinatura e uso
-#### GET `/master/organizations/:id` — detalhes + histórico de pagamentos
+#### GET `/master/organizations/:id` — detalhes + histórico de pagamentos + lista de usuários
 #### PATCH `/master/organizations/:id` — alterar plano, suspender, reativar
+#### POST `/master/organizations` — cadastro manual pelo Master (sem passar pelo `/organizations/register` público)
+```json
+{
+  "name": "string",
+  "email": "string",
+  "phone": "string?",
+  "cnpj": "string?",
+  "planId": "string",
+  "adminName": "string",
+  "createAsaasSubscription": false
+}
+```
+→ Cria Organization (`subscriptionStatus: ACTIVE` direto, sem trial) + User (ORG_ADMIN)
+→ Senha do ORG_ADMIN é **gerada pelo servidor**, nunca definida no formulário — retorna `temporaryPassword` em texto puro só nesta resposta (não fica persistida em lugar nenhum)
+→ `cnpj` só é obrigatório quando `createAsaasSubscription: true`; nesse caso cria Customer + Subscription no Asaas igual ao `/organizations/register` (com o mesmo rollback se a Asaas falhar)
+
+#### POST `/master/organizations/:orgId/users/:userId/reset-password` — redefine a senha de qualquer usuário da organização
+→ Mesmo mecanismo de senha gerada do endpoint acima; retorna `{ id, name, email, temporaryPassword }`
+
 #### GET `/master/revenue` — receita total, MRR, churn (agregados do Asaas)
 
 ---
@@ -100,6 +119,9 @@ Cadastro de novo escritório (público — sem autenticação).
 ```
 ### PATCH `/users/:id` _(ORG_ADMIN)_
 ### DELETE `/users/:id` _(ORG_ADMIN)_ — soft delete
+### POST `/users/:id/reset-password` _(ORG_ADMIN)_ — redefine a senha de `ORG_MANAGER`/`ORG_MEMBER` da própria org
+→ Senha gerada pelo servidor, retorna `{ id, name, email, temporaryPassword }` em texto puro só nesta resposta
+→ Não permite redefinir senha de outro `ORG_ADMIN` (escopado por `role` no backend, não só escondido na UI)
 
 ---
 
