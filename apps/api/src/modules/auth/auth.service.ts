@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs'
+import { randomInt } from 'node:crypto'
 import { v4 as uuidv4 } from 'uuid'
 import { prisma } from '@/lib/prisma'
 import { redis } from '@/lib/redis'
@@ -12,7 +13,7 @@ const PASSWORD_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@
 export function generateRandomPassword(length = 12): string {
   let password = ''
   for (let i = 0; i < length; i++) {
-    password += PASSWORD_CHARS[Math.floor(Math.random() * PASSWORD_CHARS.length)]
+    password += PASSWORD_CHARS[randomInt(PASSWORD_CHARS.length)]
   }
   return password
 }
