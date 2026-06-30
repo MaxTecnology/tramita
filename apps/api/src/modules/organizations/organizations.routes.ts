@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 import { AppError } from '@/errors/AppError'
+import { prisma } from '@/lib/prisma'
 import {
   listOrganizations, getOrganization, updateOrganization,
   register, listPublicPlans, getOrgSubscription, changePlan,
   createOrganizationByMaster,
 } from '@/modules/organizations/organizations.service'
+import { resetUserPassword } from '@/modules/users/users.service'
 import {
   updateOrgSchema, registerOrgSchema, changePlanSchema, createOrgByMasterSchema,
 } from '@/modules/organizations/organizations.schema'
@@ -31,6 +33,13 @@ export async function masterOrgRoutes(app: FastifyInstance) {
     const result = createOrgByMasterSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     return reply.status(201).send(await createOrganizationByMaster(result.data))
+  })
+
+  app.post('/:orgId/users/:userId/reset-password', async (request, reply) => {
+    const { orgId, userId } = request.params as { orgId: string; userId: string }
+    const user = await prisma.user.findFirst({ where: { id: userId, organizationId: orgId } })
+    if (!user) throw new AppError(404, 'Usuário não encontrado nesta organização')
+    return reply.send(await resetUserPassword(userId))
   })
 }
 

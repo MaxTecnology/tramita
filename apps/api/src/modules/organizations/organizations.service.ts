@@ -231,6 +231,11 @@ export async function getOrganization(id: string) {
         },
       },
       subscriptionHistory: { orderBy: { createdAt: 'desc' } },
+      users: {
+        where: { isActive: true },
+        select: { id: true, name: true, email: true, role: true, isActive: true },
+        orderBy: { createdAt: 'asc' },
+      },
     },
   })
   if (!org) throw new AppError(404, 'Organização não encontrada')
@@ -240,6 +245,7 @@ export async function getOrganization(id: string) {
     planName: org.plan.name, clientsCount: org._count.clients, usersCount: org._count.users,
     gracePeriodEndsAt: org.gracePeriodEndsAt, trialEndsAt: org.trialEndsAt,
     subscriptionHistory: org.subscriptionHistory, createdAt: org.createdAt,
+    users: org.users,
   }
 }
 

@@ -201,3 +201,48 @@ describe('POST /master/organizations', () => {
     expect(res.statusCode).toBe(400)
   })
 })
+
+describe('POST /master/organizations/:orgId/users/:userId/reset-password', () => {
+  it('returns 403 for ORG_ADMIN', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const header = await getAuthHeader(admin.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/master/organizations/${org.id}/users/${admin.id}/reset-password`,
+      headers: { authorization: header },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('resets password for a user in any organization', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/master/organizations/${org.id}/users/${admin.id}/reset-password`,
+      headers: { authorization: masterHeader },
+    })
+    expect(res.statusCode).toBe(200)
+    const body = JSON.parse(res.body) as { temporaryPassword: string }
+    expect(body.temporaryPassword).toHaveLength(12)
+  })
+
+  it('returns 404 when userId does not belong to orgId', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id)
+    const userInB = await createTestUser(orgB.id, { role: 'ORG_ADMIN' })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/master/organizations/${orgA.id}/users/${userInB.id}/reset-password`,
+      headers: { authorization: masterHeader },
+    })
+    expect(res.statusCode).toBe(404)
+  })
+})

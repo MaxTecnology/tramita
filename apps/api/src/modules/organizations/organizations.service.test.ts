@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { register, getOrgSubscription, changePlan } from '@/modules/organizations/organizations.service'
-import { createTestPlan, createTestOrg } from '@/test/helpers'
+import {
+  register, getOrgSubscription, changePlan, getOrganization,
+} from '@/modules/organizations/organizations.service'
+import { createTestPlan, createTestOrg, createTestUser } from '@/test/helpers'
 
 // vi.hoisted ensures the mock refs are available inside the vi.mock factory
 const { mockCreateCustomer, mockCreateSubscription, mockCancelSubscription } = vi.hoisted(() => ({
@@ -215,5 +217,18 @@ describe('createOrganizationByMaster', () => {
         createAsaasSubscription: false,
       }),
     ).rejects.toThrow('Plano não encontrado')
+  })
+})
+
+describe('getOrganization', () => {
+  it('includes the list of active users', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await createTestUser(org.id, { role: 'ORG_ADMIN', email: `admin-${Date.now()}@test.com` })
+
+    const result = await getOrganization(org.id)
+
+    expect(result.users).toHaveLength(1)
+    expect(result.users[0]).toMatchObject({ role: 'ORG_ADMIN' })
   })
 })
