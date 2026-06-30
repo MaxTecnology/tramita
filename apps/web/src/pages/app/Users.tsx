@@ -114,6 +114,15 @@ export default function Users() {
     onError: () => toast.error('Erro ao desativar usuário'),
   })
 
+  const [resetPassword, setResetPassword] = useState<string | null>(null)
+
+  const resetMutation = useMutation({
+    mutationFn: (userId: string) =>
+      api.post(`/users/${userId}/reset-password`).then((r) => r.data as { temporaryPassword: string }),
+    onSuccess: (data) => setResetPassword(data.temporaryPassword),
+    onError: () => toast.error('Erro ao redefinir senha'),
+  })
+
   function openEdit(user: User) {
     setEditingUser(user)
     setEditForm({
@@ -258,6 +267,15 @@ export default function Users() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  disabled={resetMutation.isPending}
+                  onClick={() => resetMutation.mutate(user.id)}
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  Redefinir senha
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     if (!window.confirm(`Desativar o usuário "${user.name}"?`)) return
                     setDeletingId(user.id)
@@ -316,6 +334,34 @@ export default function Users() {
                 className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
               >
                 {updateMutation.isPending ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!resetPassword} onOpenChange={(open) => { if (!open) setResetPassword(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Senha redefinida</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <p className="text-sm text-gray-600">
+              Nova senha temporária — repasse para o usuário agora, ela não será mostrada novamente:
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-gray-100 rounded px-3 py-2 text-sm font-mono">{resetPassword}</code>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => { navigator.clipboard.writeText(resetPassword!); toast.success('Copiado') }}
+              >
+                Copiar
+              </Button>
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => setResetPassword(null)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+                Fechar
               </Button>
             </div>
           </div>
