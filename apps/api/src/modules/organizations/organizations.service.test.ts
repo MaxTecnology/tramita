@@ -128,3 +128,92 @@ describe('changePlan', () => {
     await expect(changePlan(org.id, 'nonexistent-plan')).rejects.toMatchObject({ statusCode: 404 })
   })
 })
+
+import { createOrganizationByMaster } from '@/modules/organizations/organizations.service'
+
+describe('createOrganizationByMaster', () => {
+  it('creates organization with ACTIVE status and a generated password, without calling Asaas', async () => {
+    const plan = await createTestPlan({ name: 'Pro' })
+
+    const result = await createOrganizationByMaster({
+      name: 'Escritório Manual',
+      email: `manual-${Date.now()}@test.com`,
+      planId: plan.id,
+      adminName: 'Admin Manual',
+      createAsaasSubscription: false,
+    })
+
+    expect(result.organization.subscriptionStatus).toBe('ACTIVE')
+    expect(result.organization.asaasCustomerId).toBeNull()
+    expect(result.user.role).toBe('ORG_ADMIN')
+    expect(result.temporaryPassword).toHaveLength(12)
+    expect(mockCreateCustomer).not.toHaveBeenCalled()
+
+    const stored = await prisma.user.findUnique({ where: { id: result.user.id } })
+    expect(stored?.passwordHash).not.toBe(result.temporaryPassword)
+  })
+
+  it('creates Asaas customer and subscription when createAsaasSubscription is true', async () => {
+    const plan = await createTestPlan({ name: 'Pro' })
+
+    const result = await createOrganizationByMaster({
+      name: 'Escritório Com Asaas',
+      email: `comasaas-${Date.now()}@test.com`,
+      cnpj: '12345678000190',
+      planId: plan.id,
+      adminName: 'Admin Asaas',
+      createAsaasSubscription: true,
+    })
+
+    expect(mockCreateCustomer).toHaveBeenCalledWith(
+      expect.objectContaining({ cpfCnpj: '12345678000190' }),
+    )
+    expect(mockCreateSubscription).toHaveBeenCalled()
+    expect(result.organization.asaasCustomerId).toBe('cus_test123')
+  })
+
+  it('rolls back organization and user when Asaas fails', async () => {
+    const plan = await createTestPlan({ name: 'Pro' })
+    mockCreateCustomer.mockRejectedValueOnce(new Error('Asaas down'))
+
+    await expect(
+      createOrganizationByMaster({
+        name: 'Escritório Falho',
+        email: `falho-${Date.now()}@test.com`,
+        cnpj: '12345678000190',
+        planId: plan.id,
+        adminName: 'Admin Falho',
+        createAsaasSubscription: true,
+      }),
+    ).rejects.toThrow('Erro ao integrar com sistema de cobrança')
+
+    const org = await prisma.organization.findFirst({ where: { name: 'Escritório Falho' } })
+    expect(org).toBeNull()
+  })
+
+  it('throws 409 when email is already registered', async () => {
+    const plan = await createTestPlan({ name: 'Pro' })
+    const email = `dup-${Date.now()}@test.com`
+    await createOrganizationByMaster({
+      name: 'Primeiro', email, planId: plan.id, adminName: 'Admin', createAsaasSubscription: false,
+    })
+
+    await expect(
+      createOrganizationByMaster({
+        name: 'Segundo', email, planId: plan.id, adminName: 'Admin 2', createAsaasSubscription: false,
+      }),
+    ).rejects.toThrow('E-mail já cadastrado')
+  })
+
+  it('throws 404 when plan does not exist', async () => {
+    await expect(
+      createOrganizationByMaster({
+        name: 'Sem Plano',
+        email: `semplano-${Date.now()}@test.com`,
+        planId: 'plan-inexistente',
+        adminName: 'Admin',
+        createAsaasSubscription: false,
+      }),
+    ).rejects.toThrow('Plano não encontrado')
+  })
+})

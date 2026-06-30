@@ -1,7 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
-import { hashPassword } from '@/modules/auth/auth.service'
-import type { UpdateOrgBody, RegisterOrgBody } from '@/modules/organizations/organizations.schema'
+import { hashPassword, generateRandomPassword } from '@/modules/auth/auth.service'
+import type {
+  UpdateOrgBody, RegisterOrgBody, CreateOrgByMasterBody,
+} from '@/modules/organizations/organizations.schema'
 
 function generateSlug(name: string): string {
   return name
@@ -102,6 +104,64 @@ export async function register(data: RegisterOrgBody) {
   }
 
   return { organization, user }
+}
+
+export async function createOrganizationByMaster(data: CreateOrgByMasterBody) {
+  const existing = await prisma.organization.findUnique({ where: { email: data.email } })
+  if (existing) throw new AppError(409, 'E-mail já cadastrado')
+
+  const plan = await prisma.plan.findUnique({ where: { id: data.planId } })
+  if (!plan || !plan.isActive) throw new AppError(404, 'Plano não encontrado')
+
+  const slug = await uniqueSlug(data.name)
+  const temporaryPassword = generateRandomPassword()
+  const passwordHash = await hashPassword(temporaryPassword)
+
+  const { organization, user } = await prisma.$transaction(async (tx) => {
+    const organization = await tx.organization.create({
+      data: {
+        name: data.name, slug, cnpj: data.cnpj, email: data.email,
+        phone: data.phone, planId: data.planId, subscriptionStatus: 'ACTIVE',
+      },
+    })
+    const user = await tx.user.create({
+      data: {
+        name: data.adminName, email: data.email, passwordHash,
+        role: 'ORG_ADMIN', organizationId: organization.id,
+      },
+    })
+    return { organization, user }
+  })
+
+  if (data.createAsaasSubscription) {
+    try {
+      const { createCustomer, createSubscription } = await import('@/lib/asaas')
+      const customer = await createCustomer({ name: data.name, email: data.email, cpfCnpj: data.cnpj })
+      const subscription = await createSubscription({
+        customer: customer.id,
+        billingType: 'BOLETO',
+        value: Number(plan.priceMonthly),
+        cycle: 'MONTHLY',
+        description: `Assinatura ${plan.name} — Tramita`,
+      })
+      await prisma.organization.update({
+        where: { id: organization.id },
+        data: { asaasCustomerId: customer.id, asaasSubscriptionId: subscription.id },
+      })
+      organization.asaasCustomerId = customer.id
+      organization.asaasSubscriptionId = subscription.id
+    } catch (err) {
+      await prisma.user.delete({ where: { id: user.id } })
+      await prisma.organization.delete({ where: { id: organization.id } })
+      throw new AppError(502, 'Erro ao integrar com sistema de cobrança. Tente novamente.')
+    }
+  }
+
+  return {
+    organization,
+    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    temporaryPassword,
+  }
 }
 
 export async function listPublicPlans() {

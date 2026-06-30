@@ -21,6 +21,22 @@ export const changePlanSchema = z.object({
   planId: z.string().min(1, 'planId obrigatório'),
 })
 
+export const createOrgByMasterSchema = z
+  .object({
+    name: z.string().min(2, 'Nome obrigatório'),
+    email: z.string().email('E-mail inválido'),
+    phone: z.string().optional(),
+    cnpj: z.string().optional(),
+    planId: z.string().min(1, 'Plano obrigatório'),
+    adminName: z.string().min(2, 'Nome do admin obrigatório'),
+    createAsaasSubscription: z.boolean(),
+  })
+  .refine((data) => !data.createAsaasSubscription || !!data.cnpj, {
+    message: 'CNPJ é obrigatório para criar assinatura na Asaas',
+    path: ['cnpj'],
+  })
+
 export type UpdateOrgBody = z.infer<typeof updateOrgSchema>
 export type RegisterOrgBody = z.infer<typeof registerOrgSchema>
 export type ChangePlanBody = z.infer<typeof changePlanSchema>
+export type CreateOrgByMasterBody = z.infer<typeof createOrgByMasterSchema>

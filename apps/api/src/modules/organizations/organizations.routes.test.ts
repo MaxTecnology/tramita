@@ -142,3 +142,62 @@ describe('PATCH /master/organizations/:id', () => {
     expect(res.statusCode).toBe(404)
   })
 })
+
+describe('POST /master/organizations', () => {
+  it('returns 403 for ORG_ADMIN', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const header = await getAuthHeader(user.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/master/organizations',
+      headers: { authorization: header },
+      payload: {
+        name: 'X', email: 'x@test.com', planId: plan.id,
+        adminName: 'X Admin', createAsaasSubscription: false,
+      },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('creates organization and returns temporaryPassword', async () => {
+    const plan = await createTestPlan()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/master/organizations',
+      headers: { authorization: masterHeader },
+      payload: {
+        name: 'Escritório Via Rota',
+        email: `via-rota-${Date.now()}@test.com`,
+        planId: plan.id,
+        adminName: 'Admin Via Rota',
+        createAsaasSubscription: false,
+      },
+    })
+    expect(res.statusCode).toBe(201)
+    const body = JSON.parse(res.body) as { temporaryPassword: string; organization: { subscriptionStatus: string } }
+    expect(body.temporaryPassword).toHaveLength(12)
+    expect(body.organization.subscriptionStatus).toBe('ACTIVE')
+  })
+
+  it('returns 400 when createAsaasSubscription is true without cnpj', async () => {
+    const plan = await createTestPlan()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/master/organizations',
+      headers: { authorization: masterHeader },
+      payload: {
+        name: 'Sem CNPJ',
+        email: `semcnpj-${Date.now()}@test.com`,
+        planId: plan.id,
+        adminName: 'Admin',
+        createAsaasSubscription: true,
+      },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})

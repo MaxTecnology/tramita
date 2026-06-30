@@ -3,9 +3,10 @@ import { AppError } from '@/errors/AppError'
 import {
   listOrganizations, getOrganization, updateOrganization,
   register, listPublicPlans, getOrgSubscription, changePlan,
+  createOrganizationByMaster,
 } from '@/modules/organizations/organizations.service'
 import {
-  updateOrgSchema, registerOrgSchema, changePlanSchema,
+  updateOrgSchema, registerOrgSchema, changePlanSchema, createOrgByMasterSchema,
 } from '@/modules/organizations/organizations.schema'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
@@ -24,6 +25,12 @@ export async function masterOrgRoutes(app: FastifyInstance) {
     const result = updateOrgSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     return reply.send(await updateOrganization(id, result.data))
+  })
+
+  app.post('/', async (request, reply) => {
+    const result = createOrgByMasterSchema.safeParse(request.body)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.status(201).send(await createOrganizationByMaster(result.data))
   })
 }
 
