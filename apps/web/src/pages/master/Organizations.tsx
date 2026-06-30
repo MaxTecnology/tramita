@@ -63,8 +63,8 @@ export default function MasterOrganizations() {
   const [createdPassword, setCreatedPassword] = useState<string | null>(null)
 
   const { data: plans = [] } = useQuery<Plan[]>({
-    queryKey: ['master', 'plans'],
-    queryFn: () => api.get('/master/plans').then((r) => r.data as Plan[]),
+    queryKey: ['organizations', 'plans'],
+    queryFn: () => api.get('/organizations/plans').then((r) => r.data as Plan[]),
     enabled: showCreate,
   })
 
