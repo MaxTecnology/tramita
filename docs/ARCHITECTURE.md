@@ -4,7 +4,7 @@
 
 ## Visão Geral
 
-SaaS B2B voltado a escritórios contábeis para gestão e transparência de processos de legalização (abertura, alteração, encerramento de empresas, registros em órgãos públicos). O escritório contrata um plano e oferece ao cliente final um portal para acompanhar o andamento de cada processo em tempo real.
+SaaS B2B voltado a escritórios contábeis para gestão e transparência de processos com seus clientes — qualquer fluxo de trabalho do escritório (legalização, fiscal, folha de pagamento, etc.), não um tipo de processo específico. O escritório contrata um plano e oferece ao cliente final um portal para acompanhar o andamento de cada processo em tempo real.
 
 ---
 

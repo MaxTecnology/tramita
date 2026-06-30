@@ -43,7 +43,7 @@ export default function Login() {
         <h1 className="mt-6 text-4xl font-bold tracking-tight">Tramita</h1>
         <p className="mt-2 text-[#85B7EB] text-lg font-light">by AutoHubs</p>
         <p className="mt-8 text-center text-[#B5D4F4] text-sm max-w-xs leading-relaxed">
-          Acompanhe processos de legalização entre escritórios contábeis e seus clientes em tempo real.
+          Acompanhe processos entre escritórios contábeis e seus clientes em tempo real.
         </p>
       </div>
 

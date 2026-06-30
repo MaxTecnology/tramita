@@ -1,6 +1,6 @@
 # CLAUDE.md — Tramita
 
-> SaaS da AutoHubs para acompanhamento de processos de legalização entre escritórios contábeis e seus clientes.
+> SaaS da AutoHubs para acompanhamento de processos entre escritórios contábeis e seus clientes — qualquer fluxo de trabalho do escritório (legalização, fiscal, folha de pagamento, etc.), não só um tipo específico.
 
 ## Contexto do Produto
 
