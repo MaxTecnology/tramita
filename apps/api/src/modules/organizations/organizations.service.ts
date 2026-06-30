@@ -233,7 +233,7 @@ export async function getOrganization(id: string) {
       subscriptionHistory: { orderBy: { createdAt: 'desc' } },
       users: {
         where: { isActive: true },
-        select: { id: true, name: true, email: true, role: true, isActive: true },
+        select: { id: true, name: true, email: true, role: true },
         orderBy: { createdAt: 'asc' },
       },
     },
