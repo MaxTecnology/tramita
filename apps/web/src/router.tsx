@@ -8,6 +8,7 @@ import MasterLayout from '@/pages/master/Layout'
 import MasterDashboard from '@/pages/master/Dashboard'
 import MasterPlans from '@/pages/master/Plans'
 import MasterOrganizations from '@/pages/master/Organizations'
+import MasterOrganizationDetail from '@/pages/master/OrganizationDetail'
 import OrgSubscription from '@/pages/org/Subscription'
 import Dashboard from '@/pages/app/Dashboard'
 import Board from '@/pages/app/Board'
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <MasterDashboard /> },
       { path: 'plans', element: <MasterPlans /> },
       { path: 'organizations', element: <MasterOrganizations /> },
+      { path: 'organizations/:id', element: <MasterOrganizationDetail /> },
     ],
   },
   { path: '/org/subscription', element: <OrgSubscription /> },

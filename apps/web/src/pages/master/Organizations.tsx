@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
@@ -135,7 +136,11 @@ export default function MasterOrganizations() {
             <tbody>
               {orgs.map((org) => (
                 <tr key={org.id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-4 py-3 font-medium text-gray-900">{org.name}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    <Link to={`/master/organizations/${org.id}`} className="hover:underline">
+                      {org.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{org.email}</td>
                   <td className="px-4 py-3 text-gray-600">{org.planName}</td>
                   <td className="px-4 py-3">
