@@ -97,13 +97,6 @@ export default function Login() {
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>
           </form>
-
-          <p className="mt-6 text-center text-sm text-gray-500">
-            Sem conta?{' '}
-            <a href="/register" className="text-[#185FA5] hover:underline font-medium">
-              Cadastre seu escritório
-            </a>
-          </p>
         </div>
       </div>
     </div>
