@@ -50,4 +50,19 @@ describe('POST /users/:id/reset-password', () => {
     })
     expect(res.statusCode).toBe(404)
   })
+
+  it('returns 404 when ORG_ADMIN tries to reset another ORG_ADMIN in the same org', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const target = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const header = await getAuthHeader(admin.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/users/${target.id}/reset-password`,
+      headers: { authorization: header },
+    })
+    expect(res.statusCode).toBe(404)
+  })
 })

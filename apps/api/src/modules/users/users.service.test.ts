@@ -35,4 +35,12 @@ describe('resetUserPassword', () => {
     const result = await resetUserPassword(user.id)
     expect(result.temporaryPassword).toHaveLength(12)
   })
+
+  it('throws 404 when scoped call targets another ORG_ADMIN in the same org', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const target = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+
+    await expect(resetUserPassword(target.id, org.id)).rejects.toThrow(AppError)
+  })
 })

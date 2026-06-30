@@ -48,7 +48,13 @@ export async function deleteUser(id: string, organizationId: string) {
 
 export async function resetUserPassword(id: string, organizationId?: string) {
   const user = await prisma.user.findFirst({
-    where: { id, isActive: true, ...(organizationId ? { organizationId } : {}) },
+    where: {
+      id,
+      isActive: true,
+      ...(organizationId
+        ? { organizationId, role: { in: ['ORG_MANAGER', 'ORG_MEMBER'] } }
+        : {}),
+    },
   })
   if (!user) throw new AppError(404, 'Usuário não encontrado')
 
