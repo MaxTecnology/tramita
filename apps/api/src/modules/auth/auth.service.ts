@@ -7,6 +7,15 @@ import { AppError } from '@/errors/AppError'
 import type { LoginResponse, Role } from '@/modules/auth/auth.types'
 
 const REFRESH_TTL_SECONDS = 60 * 60 * 24 * 7 // 7 days
+const PASSWORD_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%'
+
+export function generateRandomPassword(length = 12): string {
+  let password = ''
+  for (let i = 0; i < length; i++) {
+    password += PASSWORD_CHARS[Math.floor(Math.random() * PASSWORD_CHARS.length)]
+  }
+  return password
+}
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10)

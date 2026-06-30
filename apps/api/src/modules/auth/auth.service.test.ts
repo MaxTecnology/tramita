@@ -9,6 +9,7 @@ import {
   login,
   refreshSession,
   logout,
+  generateRandomPassword,
 } from '@/modules/auth/auth.service'
 import { createTestPlan, createTestOrg, createTestUser } from '@/test/helpers'
 import { AppError } from '@/errors/AppError'
@@ -147,5 +148,23 @@ describe('logout', () => {
 
     const stored = await redis.get(`refresh:${refreshToken}`)
     expect(stored).toBeNull()
+  })
+})
+
+describe('generateRandomPassword', () => {
+  it('generates a 12-character password by default', () => {
+    const password = generateRandomPassword()
+    expect(password).toHaveLength(12)
+  })
+
+  it('never contains visually ambiguous characters', () => {
+    const password = generateRandomPassword()
+    expect(password).not.toMatch(/[0O1lI]/)
+  })
+
+  it('generates a different password on each call', () => {
+    const a = generateRandomPassword()
+    const b = generateRandomPassword()
+    expect(a).not.toBe(b)
   })
 })
