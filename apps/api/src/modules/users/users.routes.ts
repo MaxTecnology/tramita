@@ -4,7 +4,7 @@ import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createUserSchema, updateUserSchema } from './users.schema'
-import { listUsers, createUser, updateUser, deleteUser } from './users.service'
+import { listUsers, createUser, updateUser, deleteUser, resetUserPassword } from './users.service'
 
 export async function usersRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
@@ -30,5 +30,10 @@ export async function usersRoutes(app: FastifyInstance) {
   app.delete('/:id', { preHandler: [checkSubscription] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(await deleteUser(id, request.user.organizationId!))
+  })
+
+  app.post('/:id/reset-password', { preHandler: [checkSubscription] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    return reply.send(await resetUserPassword(id, request.user.organizationId!))
   })
 }

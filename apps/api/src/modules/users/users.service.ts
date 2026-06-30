@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
-import { hashPassword } from '@/modules/auth/auth.service'
+import { hashPassword, generateRandomPassword } from '@/modules/auth/auth.service'
 import type { CreateUserBody, UpdateUserBody } from './users.schema'
 
 const SELECT = {
@@ -44,4 +44,18 @@ export async function deleteUser(id: string, organizationId: string) {
   if (!user) throw new AppError(404, 'Usuário não encontrado')
 
   return prisma.user.update({ where: { id }, data: { isActive: false }, select: SELECT })
+}
+
+export async function resetUserPassword(id: string, organizationId?: string) {
+  const user = await prisma.user.findFirst({
+    where: { id, isActive: true, ...(organizationId ? { organizationId } : {}) },
+  })
+  if (!user) throw new AppError(404, 'Usuário não encontrado')
+
+  const temporaryPassword = generateRandomPassword()
+  await prisma.user.update({
+    where: { id },
+    data: { passwordHash: await hashPassword(temporaryPassword) },
+  })
+  return { id: user.id, name: user.name, email: user.email, temporaryPassword }
 }
