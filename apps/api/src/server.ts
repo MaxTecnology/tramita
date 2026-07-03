@@ -26,7 +26,7 @@ export function buildApp() {
   app.register(corsPlugin)
   app.register(rateLimitPlugin)
 
-  app.get('/health', { config: { logLevel: 'silent' } }, async () => ({ status: 'ok' }))
+  app.get('/health', { logLevel: 'silent' }, async () => ({ status: 'ok' }))
 
   app.register(authRoutes, { prefix: '/auth' })
   app.register(masterRoutes, { prefix: '/master' })
