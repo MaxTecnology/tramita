@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useRequestsBadgeStream } from '@/hooks/useRequestsBadgeStream'
 import { api } from '@/lib/api'
 import { LayoutDashboard, Users, UserCheck, Bell, CreditCard, Settings, LogOut, ClipboardList, Inbox, Menu, X } from 'lucide-react'
+import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 import { cn } from '@/lib/utils'
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER']
@@ -106,7 +107,8 @@ export default function AppLayout() {
           )}
         </nav>
 
-        <div className="p-3 border-t border-gray-200">
+        <div className="p-3 border-t border-gray-200 space-y-1">
+          <ChangePasswordDialog triggerClassName="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-100" />
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-100"

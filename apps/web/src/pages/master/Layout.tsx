@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { LayoutDashboard, Building2, CreditCard, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 
 export default function MasterLayout() {
   const { user, isAuthenticated, logout } = useAuth()
@@ -43,8 +44,9 @@ export default function MasterLayout() {
         </nav>
 
         {/* User + logout */}
-        <div className="px-3 py-4 border-t border-[#185FA5]">
+        <div className="px-3 py-4 border-t border-[#185FA5] space-y-1">
           <p className="text-[#B5D4F4] text-xs px-3 mb-2 truncate">{user?.name}</p>
+          <ChangePasswordDialog triggerClassName="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-[#85B7EB] hover:bg-[#185FA5] hover:text-white transition-colors" />
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-[#85B7EB] hover:bg-[#185FA5] hover:text-white transition-colors"

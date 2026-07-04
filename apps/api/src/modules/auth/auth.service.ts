@@ -84,3 +84,26 @@ export async function refreshSession(refreshToken: string): Promise<{ accessToke
 export async function logout(refreshToken: string): Promise<void> {
   await redis.del(`refresh:${refreshToken}`)
 }
+
+export async function changePassword(
+  sub: string,
+  role: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  if (role === 'CLIENT') {
+    const client = await prisma.client.findUnique({ where: { id: sub } })
+    if (!client) throw new AppError(404, 'Usuário não encontrado')
+    if (!(await verifyPassword(currentPassword, client.passwordHash))) {
+      throw new AppError(400, 'Senha atual incorreta')
+    }
+    await prisma.client.update({ where: { id: sub }, data: { passwordHash: await hashPassword(newPassword) } })
+  } else {
+    const user = await prisma.user.findUnique({ where: { id: sub } })
+    if (!user) throw new AppError(404, 'Usuário não encontrado')
+    if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+      throw new AppError(400, 'Senha atual incorreta')
+    }
+    await prisma.user.update({ where: { id: sub }, data: { passwordHash: await hashPassword(newPassword) } })
+  }
+}
