@@ -35,18 +35,19 @@ async function main() {
     },
   })
 
-  // MASTER user
+  // MASTER user — update always re-hashes so reruns respect the current MASTER_PASSWORD
   const masterEmail = process.env.MASTER_EMAIL ?? 'master@autohubs.com.br'
+  const masterPasswordHash = await bcrypt.hash(
+    process.env.MASTER_PASSWORD ?? 'Master@AutoHubs2025',
+    10,
+  )
   await prisma.user.upsert({
     where: { email: masterEmail },
-    update: {},
+    update: { passwordHash: masterPasswordHash },
     create: {
       name: 'AutoHubs Master',
       email: masterEmail,
-      passwordHash: await bcrypt.hash(
-        process.env.MASTER_PASSWORD ?? 'Master@AutoHubs2025',
-        10,
-      ),
+      passwordHash: masterPasswordHash,
       role: 'MASTER',
       organizationId: masterOrg.id,
     },
