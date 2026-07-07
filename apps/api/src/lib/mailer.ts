@@ -8,6 +8,7 @@ export async function sendEmail(
   to: string,
   subject: string,
   body: string,
+  html?: string,
   fromOverride?: string,
 ): Promise<void> {
   const { error } = await resend.emails.send({
@@ -15,6 +16,7 @@ export async function sendEmail(
     to,
     subject,
     text: body,
+    ...(html ? { html } : {}),
   })
   if (error) throw new Error(error.message)
 }

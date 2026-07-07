@@ -123,7 +123,10 @@ export async function testWhatsApp(organizationId: string, number: string) {
 
 export async function testEmail(_organizationId: string, to: string) {
   const { sendEmail } = await import('@/lib/mailer')
-  await sendEmail(to, 'Teste de Email — Tramita AutoHubs', 'Este é um email de teste enviado pelo Tramita.')
+  const { wrapEmailHtml } = await import('@/lib/email-template')
+  const subject = 'Teste de Email — Tramita'
+  const body = 'Este é um email de teste enviado pelo Tramita.\n\nSe você recebeu esta mensagem, a integração de email está funcionando corretamente.'
+  await sendEmail(to, subject, body, wrapEmailHtml(subject, body))
   return { ok: true }
 }
 

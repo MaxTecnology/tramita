@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { renderTemplate, getTemplate, type TemplateVars } from '@/lib/template'
 import { sendWhatsApp } from '@/lib/maximizebot'
 import { sendEmail } from '@/lib/mailer'
+import { wrapEmailHtml } from '@/lib/email-template'
 import type { NotificationConfig, NotificationEvent, MessageChannel } from '@prisma/client'
 import type { NotificationJob } from '@/lib/queue'
 
@@ -101,10 +102,12 @@ async function processClientNotification(
           linkPreview: true,
         })
       } else {
+        const subject = renderTemplate(template.subject ?? '', vars)
         await sendEmail(
           client.email,
-          renderTemplate(template.subject ?? '', vars),
+          subject,
           rendered,
+          wrapEmailHtml(subject, rendered, vars.portalUrl, 'Acessar portal'),
         )
       }
     } catch (err) {
@@ -164,10 +167,12 @@ async function processUserNotification(
   let error: string | undefined
 
   try {
+    const subject = renderTemplate(template.subject ?? '', vars)
     await sendEmail(
       user.email,
-      renderTemplate(template.subject ?? '', vars),
+      subject,
       rendered,
+      wrapEmailHtml(subject, rendered, vars.portalUrl, 'Ver solicitação'),
     )
   } catch (err) {
     status = 'FAILED'
