@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { FileSearch, Search } from 'lucide-react'
+import { FileSearch, Search, Send } from 'lucide-react'
 
 interface Config {
   whatsappEnabled?: boolean
@@ -139,6 +139,13 @@ export default function Notifications() {
     onError: () => toast.error('Erro ao salvar configurações'),
   })
 
+  const [testEmailTo, setTestEmailTo] = useState('')
+  const testEmailMutation = useMutation({
+    mutationFn: (to: string) => api.post('/notifications/config/test-email', { to }),
+    onSuccess: () => { toast.success('Email de teste enviado'); setTestEmailTo('') },
+    onError: () => toast.error('Erro ao enviar email de teste'),
+  })
+
   const filteredLogs = useMemo(() => {
     const q = logSearch.toLowerCase().trim()
     return logs.filter((l) => {
@@ -241,6 +248,28 @@ export default function Notifications() {
             <p className="text-xs text-gray-400">
               Os emails são enviados automaticamente pelo Tramita via <span className="font-medium">notificacoes@autohubs.com.br</span>.
             </p>
+            <div className={cn('space-y-1 transition-opacity', !form.emailEnabled && 'opacity-40 pointer-events-none')}>
+              <Label htmlFor="test-email-to">Enviar email de teste</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="test-email-to"
+                  type="email"
+                  value={testEmailTo}
+                  onChange={(e) => setTestEmailTo(e.target.value)}
+                  placeholder="destinatario@email.com"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!testEmailTo || testEmailMutation.isPending}
+                  onClick={() => testEmailMutation.mutate(testEmailTo)}
+                  className="flex items-center gap-1.5 flex-shrink-0"
+                >
+                  <Send size={14} />
+                  {testEmailMutation.isPending ? 'Enviando...' : 'Testar'}
+                </Button>
+              </div>
+            </div>
           </Section>
 
           <div className="flex justify-end pt-2">
