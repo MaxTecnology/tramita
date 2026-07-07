@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, Paperclip, MessageSquare, Clock } from 'lucide-react'
+import { X, Paperclip, MessageSquare, Clock, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Comments } from '@/components/shared/Comments'
@@ -22,12 +22,14 @@ const ACTION_LABELS: Record<string, string> = {
   updated_title: 'alterou título para',
   updated_assignee: 'alterou responsável para',
   updated_due_date: 'alterou vencimento para',
+  attachment_added: 'adicionou o anexo',
   attachment_deleted: 'removeu o anexo',
 }
 
 function formatHistoryAction(h: TaskHistory): string {
   const label = ACTION_LABELS[h.action] ?? h.action
   if (h.action === 'attachment_deleted' && h.fromValue) return `${label} "${h.fromValue}"`
+  if (h.action === 'attachment_added' && h.toValue) return `${label} "${h.toValue}"`
   if (h.toValue) return `${label} ${h.toValue}`
   return label
 }
@@ -256,53 +258,83 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
           )}
 
           {tab === 'attachments' && (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {attachments.length === 0 && (
                 <p className="text-sm text-gray-400">Nenhum anexo ainda.</p>
               )}
-              {attachments.map((a) => (
-                <div key={a.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Paperclip size={14} className="text-gray-400 flex-shrink-0" />
-                    <div className="min-w-0">
-                      <a
-                        href={a.signedUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:underline block truncate"
-                      >
-                        {a.filename}
-                      </a>
-                      <p className="text-xs text-gray-400">
-                        {(a.size / 1024).toFixed(0)} KB · {a.uploaderName}
-                      </p>
+              {attachments.map((a) => {
+                const isDeleted = !!a.deletedAt
+                return (
+                  <div
+                    key={a.id}
+                    className={cn(
+                      'flex items-start justify-between rounded-lg px-3 py-2.5 gap-2',
+                      isDeleted ? 'bg-red-50 border border-red-100' : 'bg-gray-50',
+                    )}
+                  >
+                    <div className="flex items-start gap-2 min-w-0">
+                      {isDeleted
+                        ? <Trash2 size={14} className="text-red-300 flex-shrink-0 mt-0.5" />
+                        : <Paperclip size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                      }
+                      <div className="min-w-0">
+                        {isDeleted ? (
+                          <span className="text-sm text-red-400 line-through block truncate">{a.filename}</span>
+                        ) : (
+                          <a
+                            href={a.signedUrl ?? '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 hover:underline block truncate"
+                          >
+                            {a.filename}
+                          </a>
+                        )}
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {(a.size / 1024).toFixed(0)} KB
+                          {' · '}
+                          <span>Adicionado por {a.uploaderName}</span>
+                          {' · '}
+                          {new Date(a.createdAt).toLocaleString('pt-BR')}
+                        </p>
+                        {isDeleted && (
+                          <p className="text-xs text-red-400 mt-0.5">
+                            Removido por {a.deletedByName} · {new Date(a.deletedAt!).toLocaleString('pt-BR')}
+                          </p>
+                        )}
+                      </div>
                     </div>
+                    {!isDeleted && isOrgRole(role) && (
+                      <button
+                        type="button"
+                        onClick={() => deleteAttachmentMutation.mutate(a.id)}
+                        className="text-xs text-red-400 hover:text-red-600 flex-shrink-0 mt-0.5"
+                      >
+                        Remover
+                      </button>
+                    )}
                   </div>
-                  {(isOrgRole(role) || a.uploadedByClient === currentUserId) && (
-                    <button
-                      type="button"
-                      onClick={() => deleteAttachmentMutation.mutate(a.id)}
-                      className="text-xs text-red-400 hover:text-red-600 ml-2 flex-shrink-0"
-                    >
-                      Remover
-                    </button>
-                  )}
-                </div>
-              ))}
-              <label className="flex items-center gap-2 cursor-pointer mt-2">
-                <input
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) uploadMutation.mutate(file)
-                    e.target.value = ''
-                  }}
-                />
-                <span className="text-sm text-blue-600 hover:underline">
-                  {uploadMutation.isPending ? 'Enviando...' : '+ Adicionar arquivo'}
-                </span>
-              </label>
+                )
+              })}
+              {!attachments.some((a) => !a.deletedAt) && attachments.length > 0 && (
+                <p className="text-xs text-gray-400 pt-1">Todos os anexos foram removidos.</p>
+              )}
+              {isOrgRole(role) && (
+                <label className="flex items-center gap-2 cursor-pointer pt-1">
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) uploadMutation.mutate(file)
+                      e.target.value = ''
+                    }}
+                  />
+                  <span className="text-sm text-blue-600 hover:underline">
+                    {uploadMutation.isPending ? 'Enviando...' : '+ Adicionar arquivo'}
+                  </span>
+                </label>
+              )}
             </div>
           )}
 

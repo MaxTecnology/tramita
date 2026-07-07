@@ -35,6 +35,13 @@ async function getOrgSlug(organizationId: string): Promise<string> {
   return org?.slug ?? organizationId
 }
 
+async function resolveActorName(actor: UploaderActor): Promise<string> {
+  if (actor.role === 'CLIENT') {
+    return (await prisma.client.findUnique({ where: { id: actor.id }, select: { name: true } }))?.name ?? 'Cliente'
+  }
+  return (await prisma.user.findUnique({ where: { id: actor.id }, select: { name: true } }))?.name ?? 'Colaborador'
+}
+
 export async function createAttachment(
   taskId: string,
   organizationId: string,
@@ -48,17 +55,33 @@ export async function createAttachment(
   const storageKey = `attachments/${orgSlug}/${taskId}/${Date.now()}-${payload.filename}`
   await uploadFile(storageKey, payload.buffer, payload.mimeType)
 
-  return prisma.attachment.create({
-    data: {
-      taskId,
-      filename: payload.filename,
-      mimeType: payload.mimeType,
-      size: payload.size,
-      storageKey,
-      uploadedBy: isClient ? undefined : actor.id,
-      uploadedByClient: isClient ? actor.id : undefined,
-    },
-  })
+  const actorName = await resolveActorName(actor)
+
+  const [attachment] = await prisma.$transaction([
+    prisma.attachment.create({
+      data: {
+        taskId,
+        filename: payload.filename,
+        mimeType: payload.mimeType,
+        size: payload.size,
+        storageKey,
+        uploadedBy: isClient ? undefined : actor.id,
+        uploadedByClient: isClient ? actor.id : undefined,
+      },
+    }),
+    prisma.taskHistory.create({
+      data: {
+        taskId,
+        action: 'attachment_added',
+        toValue: payload.filename,
+        actorType: isClient ? 'client' : 'user',
+        actorId: actor.id,
+        actorName,
+      },
+    }),
+  ])
+
+  return attachment
 }
 
 export async function listAttachments(
@@ -83,11 +106,12 @@ export async function listAttachments(
       filename: a.filename,
       mimeType: a.mimeType,
       size: a.size,
-      uploadedBy: a.uploadedBy,
-      uploadedByClient: a.uploadedByClient,
       uploaderName: a.uploader?.name ?? a.uploaderClient?.name ?? 'Desconhecido',
-      signedUrl: await getSignedDownloadUrl(a.storageKey),
       createdAt: a.createdAt,
+      deletedAt: a.deletedAt,
+      deletedByName: a.deletedByName,
+      // Signed URL only for active attachments — file is removed from B2 on delete
+      signedUrl: a.deletedAt ? null : await getSignedDownloadUrl(a.storageKey),
     })),
   )
 }
@@ -102,29 +126,33 @@ export async function deleteAttachment(
   await verifyTaskBelongsToOrg(taskId, organizationId, isClient ? actor.id : undefined)
 
   const attachment = await prisma.attachment.findFirst({
-    where: { id: attachmentId, taskId },
+    where: { id: attachmentId, taskId, deletedAt: null },
   })
   if (!attachment) throw new AppError(404, 'Anexo não encontrado')
 
-  // Cliente só pode deletar o próprio anexo
   if (isClient && attachment.uploadedByClient !== actor.id) {
     throw new AppError(403, 'Sem permissão para remover este anexo')
   }
 
-  const actorName = isClient
-    ? (await prisma.client.findUnique({ where: { id: actor.id }, select: { name: true } }))?.name ?? 'Cliente'
-    : (await prisma.user.findUnique({ where: { id: actor.id }, select: { name: true } }))?.name ?? 'Colaborador'
+  const actorName = await resolveActorName(actor)
 
   await deleteFile(attachment.storageKey)
 
   await prisma.$transaction([
-    prisma.attachment.delete({ where: { id: attachmentId } }),
+    prisma.attachment.update({
+      where: { id: attachmentId },
+      data: {
+        deletedAt: new Date(),
+        deletedBy: isClient ? undefined : actor.id,
+        deletedByClient: isClient ? actor.id : undefined,
+        deletedByName: actorName,
+      },
+    }),
     prisma.taskHistory.create({
       data: {
         taskId,
         action: 'attachment_deleted',
         fromValue: attachment.filename,
-        toValue: null,
         actorType: isClient ? 'client' : 'user',
         actorId: actor.id,
         actorName,

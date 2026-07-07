@@ -305,7 +305,7 @@ model TaskHistory {
 }
 
 model Attachment {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   taskId           String
   filename         String
   mimeType         String
@@ -313,7 +313,11 @@ model Attachment {
   storageKey       String
   uploadedBy       String?
   uploadedByClient String?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime  @default(now())
+  deletedAt        DateTime?
+  deletedBy        String?
+  deletedByClient  String?
+  deletedByName    String?
 
   task           Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
   uploader       User?   @relation(fields: [uploadedBy], references: [id])

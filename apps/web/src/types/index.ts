@@ -84,11 +84,11 @@ export interface Attachment {
   filename: string
   mimeType: string
   size: number
-  uploadedBy: string | null
-  uploadedByClient: string | null
   uploaderName: string
-  signedUrl: string
+  signedUrl: string | null
   createdAt: string
+  deletedAt: string | null
+  deletedByName: string | null
 }
 
 export interface TaskHistory {
