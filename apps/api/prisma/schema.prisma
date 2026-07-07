@@ -342,11 +342,6 @@ model NotificationConfig {
   maximizebotToken String?
   saveOnTicket     Boolean  @default(true)
   startChatbot     Boolean  @default(false)
-  smtpHost         String?
-  smtpPort         Int?
-  smtpUser         String?
-  smtpPass         String?
-  emailFrom        String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

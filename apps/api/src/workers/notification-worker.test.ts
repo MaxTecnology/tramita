@@ -156,11 +156,6 @@ describe('processNotificationJob', () => {
         organizationId: org.id,
         requestCreated: true,
         emailEnabled: true,
-        smtpHost: 'smtp.test.com',
-        smtpPort: 587,
-        smtpUser: 'test@test.com',
-        smtpPass: 'encrypted-or-plain-for-test',
-        emailFrom: 'Escritório <noreply@test.com>',
       },
     })
 

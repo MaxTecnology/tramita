@@ -1,24 +1,20 @@
-// apps/api/src/lib/mailer.ts
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
-export interface SmtpConfig {
-  host: string
-  port: number
-  user: string
-  pass: string  // já decriptografado antes de chamar esta função
-  from: string
-}
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+const EMAIL_FROM = process.env.EMAIL_FROM ?? 'Tramita <notificacoes@autohubs.com.br>'
 
 export async function sendEmail(
-  config: SmtpConfig,
   to: string,
   subject: string,
   body: string,
+  fromOverride?: string,
 ): Promise<void> {
-  const transporter = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    auth: { user: config.user, pass: config.pass },
+  const { error } = await resend.emails.send({
+    from: fromOverride ?? EMAIL_FROM,
+    to,
+    subject,
+    text: body,
   })
-  await transporter.sendMail({ from: config.from, to, subject, text: body })
+  if (error) throw new Error(error.message)
 }

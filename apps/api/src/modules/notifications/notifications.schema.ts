@@ -16,11 +16,6 @@ export const updateConfigSchema = z.object({
   maximizebotToken: z.string().optional(),
   saveOnTicket: z.boolean().optional(),
   startChatbot: z.boolean().optional(),
-  smtpHost: z.string().optional(),
-  smtpPort: z.number().int().optional(),
-  smtpUser: z.string().optional(),
-  smtpPass: z.string().optional(),
-  emailFrom: z.string().optional(),
 })
 
 export const upsertTemplateSchema = z.object({

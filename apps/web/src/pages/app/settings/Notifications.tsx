@@ -17,10 +17,6 @@ interface Config {
   dueDateAlert?: boolean
   maximizebotToken?: string        // write-only: sent on save, never returned by API
   maximizebotTokenPreview?: string | null  // read-only: masked preview returned by API
-  smtpHost?: string
-  smtpPort?: number
-  smtpUser?: string
-  emailFrom?: string
 }
 
 interface NotificationLog {
@@ -236,32 +232,15 @@ export default function Notifications() {
             </div>
           </Section>
 
-          <Section title="E-mail — SMTP">
+          <Section title="E-mail">
             <SwitchRow
               label="Habilitar E-mail"
               checked={form.emailEnabled ?? false}
               onChange={(v) => setForm({ ...form, emailEnabled: v })}
             />
-            <div className={cn('space-y-3 transition-opacity', !form.emailEnabled && 'opacity-40 pointer-events-none')}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="smtp-host">Host SMTP</Label>
-                  <Input id="smtp-host" value={form.smtpHost ?? ''} onChange={(e) => setForm({ ...form, smtpHost: e.target.value })} placeholder="smtp.gmail.com" />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="smtp-port">Porta</Label>
-                  <Input id="smtp-port" type="number" value={form.smtpPort ?? ''} onChange={(e) => setForm({ ...form, smtpPort: e.target.value ? Number(e.target.value) : undefined })} placeholder="587" />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="smtp-user">Usuário</Label>
-                  <Input id="smtp-user" value={form.smtpUser ?? ''} onChange={(e) => setForm({ ...form, smtpUser: e.target.value })} placeholder="seu@email.com" />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="smtp-from">Remetente</Label>
-                  <Input id="smtp-from" value={form.emailFrom ?? ''} onChange={(e) => setForm({ ...form, emailFrom: e.target.value })} placeholder="Tramita <noreply@...>" />
-                </div>
-              </div>
-            </div>
+            <p className="text-xs text-gray-400">
+              Os emails são enviados automaticamente pelo Tramita via <span className="font-medium">notificacoes@autohubs.com.br</span>.
+            </p>
           </Section>
 
           <div className="flex justify-end pt-2">

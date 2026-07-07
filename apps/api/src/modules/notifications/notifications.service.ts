@@ -1,7 +1,6 @@
 // apps/api/src/modules/notifications/notifications.service.ts
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
-import { encrypt, decrypt } from '@/lib/encryption'
 import { getTemplate, renderTemplate, PREVIEW_VARS } from '@/lib/template'
 import type { NotificationEvent, MessageChannel, NotificationStatus } from '@prisma/client'
 import type { UpdateConfigBody, UpsertTemplateBody } from './notifications.schema'
@@ -29,10 +28,6 @@ export async function getConfig(organizationId: string) {
       requestRejected: true,
       saveOnTicket: true,
       startChatbot: true,
-      smtpHost: true,
-      smtpPort: true,
-      smtpUser: true,
-      emailFrom: true,
       createdAt: true,
       updatedAt: true,
       maximizebotToken: true, // fetched only to produce the masked preview
@@ -50,7 +45,6 @@ export async function getConfig(organizationId: string) {
 
 export async function updateConfig(organizationId: string, data: UpdateConfigBody) {
   const toSave = { ...data }
-  if (toSave.smtpPass) toSave.smtpPass = encrypt(toSave.smtpPass)
   return prisma.notificationConfig.upsert({
     where: { organizationId },
     create: { organizationId, ...toSave },
@@ -127,19 +121,9 @@ export async function testWhatsApp(organizationId: string, number: string) {
   return { ok: true }
 }
 
-export async function testEmail(organizationId: string, to: string) {
-  const config = await prisma.notificationConfig.findUnique({ where: { organizationId } })
-  if (!config?.smtpHost || !config.smtpPort || !config.smtpUser || !config.smtpPass || !config.emailFrom) {
-    throw new AppError(422, 'SMTP não configurado completamente')
-  }
-  const pass = decrypt(config.smtpPass)
+export async function testEmail(_organizationId: string, to: string) {
   const { sendEmail } = await import('@/lib/mailer')
-  await sendEmail(
-    { host: config.smtpHost, port: config.smtpPort!, user: config.smtpUser!, pass, from: config.emailFrom! },
-    to,
-    'Teste de Email — Tramita AutoHubs',
-    'Este é um email de teste enviado pelo Tramita.',
-  )
+  await sendEmail(to, 'Teste de Email — Tramita AutoHubs', 'Este é um email de teste enviado pelo Tramita.')
   return { ok: true }
 }
 

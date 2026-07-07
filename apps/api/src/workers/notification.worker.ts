@@ -5,7 +5,6 @@ import { prisma } from '@/lib/prisma'
 import { renderTemplate, getTemplate, type TemplateVars } from '@/lib/template'
 import { sendWhatsApp } from '@/lib/maximizebot'
 import { sendEmail } from '@/lib/mailer'
-import { decrypt } from '@/lib/encryption'
 import type { NotificationConfig, NotificationEvent, MessageChannel } from '@prisma/client'
 import type { NotificationJob } from '@/lib/queue'
 
@@ -83,7 +82,7 @@ async function processClientNotification(
 
   const channels: MessageChannel[] = []
   if (config.whatsappEnabled && client.whatsapp && config.maximizebotToken) channels.push('WHATSAPP')
-  if (config.emailEnabled && config.smtpHost && config.smtpPass) channels.push('EMAIL')
+  if (config.emailEnabled) channels.push('EMAIL')
 
   for (const channel of channels) {
     const template = await getTemplate(organizationId, event as NotificationEvent, channel)
@@ -102,9 +101,7 @@ async function processClientNotification(
           linkPreview: true,
         })
       } else {
-        const pass = decrypt(config.smtpPass!)
         await sendEmail(
-          { host: config.smtpHost!, port: config.smtpPort!, user: config.smtpUser!, pass, from: config.emailFrom! },
           client.email,
           renderTemplate(template.subject ?? '', vars),
           rendered,
@@ -145,7 +142,7 @@ async function processUserNotification(
 ): Promise<void> {
   const { event, organizationId, userId, requestId, metadata } = params
 
-  if (!config.emailEnabled || !config.smtpHost || !config.smtpPass) return
+  if (!config.emailEnabled) return
 
   const [user, org] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
@@ -167,9 +164,7 @@ async function processUserNotification(
   let error: string | undefined
 
   try {
-    const pass = decrypt(config.smtpPass)
     await sendEmail(
-      { host: config.smtpHost, port: config.smtpPort!, user: config.smtpUser!, pass, from: config.emailFrom! },
       user.email,
       renderTemplate(template.subject ?? '', vars),
       rendered,
