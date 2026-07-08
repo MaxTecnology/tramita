@@ -153,11 +153,15 @@ async function processUserNotification(
   ])
   if (!user || !org || user.organizationId !== organizationId) return
 
+  const appUrl = process.env.APP_URL ?? 'https://tramita.autohubs.com.br'
   const vars: TemplateVars = {
     clientName: metadata.clientName ?? '',
     orgName: org.name,
+    taskTitle: metadata.taskTitle,
     requestTitle: metadata.requestTitle,
-    portalUrl: `${process.env.APP_URL ?? 'https://tramita.autohubs.com.br'}/app/requests`,
+    commentText: metadata.commentText,
+    commentAuthorName: metadata.commentAuthorName,
+    portalUrl: event === 'TASK_COMMENT_ADDED' ? `${appUrl}/app` : `${appUrl}/app/requests`,
   }
 
   const template = await getTemplate(organizationId, event as NotificationEvent, 'EMAIL')
