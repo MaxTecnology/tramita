@@ -86,13 +86,14 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization      Organization @relation(fields: [organizationId], references: [id])
-  assignedTasks     Task[]       @relation("TaskAssignee")
-  createdTasks      Task[]       @relation("TaskCreator")
-  reviewedRequests  Request[]    @relation("RequestReviewer")
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  assignedTasks     Task[]             @relation("TaskAssignee")
+  createdTasks      Task[]             @relation("TaskCreator")
+  reviewedRequests  Request[]          @relation("RequestReviewer")
   comments          Comment[]
   attachments       Attachment[]
-  responsibleBoards Board[]      @relation("BoardResponsible")
+  responsibleBoards Board[]            @relation("BoardResponsible")
+  clientAssignments ClientAssignment[]
 
   @@map("users")
 }
@@ -120,14 +121,28 @@ model Client {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  boards       Board[]
-  requests     Request[]
-  comments     Comment[]
-  attachments  Attachment[]
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  boards            Board[]
+  requests          Request[]
+  comments          Comment[]
+  attachments       Attachment[]
+  clientAssignments ClientAssignment[]
 
   @@unique([email, organizationId])
   @@map("clients")
+}
+
+model ClientAssignment {
+  id        String   @id @default(cuid())
+  clientId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, userId])
+  @@map("client_assignments")
 }
 
 model Board {

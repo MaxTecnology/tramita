@@ -15,5 +15,11 @@ export const updateUserSchema = z.object({
   phone: z.string().optional(),
 })
 
+export const updateMyProfileSchema = z.object({
+  name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').optional(),
+  phone: z.string().optional(),
+})
+
 export type CreateUserBody = z.infer<typeof createUserSchema>
 export type UpdateUserBody = z.infer<typeof updateUserSchema>
+export type UpdateMyProfileBody = z.infer<typeof updateMyProfileSchema>

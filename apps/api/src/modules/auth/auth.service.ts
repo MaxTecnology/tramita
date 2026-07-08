@@ -6,6 +6,7 @@ import { redis } from '@/lib/redis'
 import { generateAccessToken } from '@/lib/jwt'
 import { AppError } from '@/errors/AppError'
 import type { LoginResponse, Role } from '@/modules/auth/auth.types'
+import type { UpdateProfileBody } from '@/modules/auth/auth.schema'
 
 const REFRESH_TTL_SECONDS = 60 * 60 * 24 * 7 // 7 days
 const PASSWORD_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%'
@@ -83,6 +84,42 @@ export async function refreshSession(refreshToken: string): Promise<{ accessToke
 
 export async function logout(refreshToken: string): Promise<void> {
   await redis.del(`refresh:${refreshToken}`)
+}
+
+export async function getMyProfile(sub: string, role: string) {
+  if (role === 'CLIENT') {
+    const client = await prisma.client.findUnique({
+      where: { id: sub },
+      select: { id: true, name: true, email: true, phone: true, whatsapp: true },
+    })
+    if (!client) throw new AppError(404, 'Usuário não encontrado')
+    return { ...client, role: 'CLIENT' }
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: sub },
+    select: { id: true, name: true, email: true, phone: true, role: true },
+  })
+  if (!user) throw new AppError(404, 'Usuário não encontrado')
+  return user
+}
+
+export async function updateMyProfile(sub: string, role: string, data: UpdateProfileBody) {
+  if (role === 'CLIENT') {
+    const client = await prisma.client.findUnique({ where: { id: sub } })
+    if (!client) throw new AppError(404, 'Usuário não encontrado')
+    return prisma.client.update({
+      where: { id: sub },
+      data,
+      select: { id: true, name: true, email: true, phone: true, whatsapp: true },
+    })
+  }
+  const user = await prisma.user.findUnique({ where: { id: sub } })
+  if (!user) throw new AppError(404, 'Usuário não encontrado')
+  return prisma.user.update({
+    where: { id: sub },
+    data,
+    select: { id: true, name: true, email: true, phone: true, role: true },
+  })
 }
 
 export async function changePassword(

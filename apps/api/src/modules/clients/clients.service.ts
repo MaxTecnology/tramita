@@ -56,3 +56,42 @@ export async function deleteClient(id: string, organizationId: string) {
 
   return prisma.client.update({ where: { id }, data: { isActive: false }, select: SELECT })
 }
+
+export async function listAssignments(clientId: string, organizationId: string) {
+  const client = await prisma.client.findFirst({ where: { id: clientId, organizationId } })
+  if (!client) throw new AppError(404, 'Cliente não encontrado')
+
+  return prisma.clientAssignment.findMany({
+    where: { clientId },
+    select: {
+      id: true,
+      userId: true,
+      user: { select: { id: true, name: true, email: true, role: true } },
+    },
+  })
+}
+
+export async function setAssignments(clientId: string, organizationId: string, userIds: string[]) {
+  const client = await prisma.client.findFirst({ where: { id: clientId, organizationId } })
+  if (!client) throw new AppError(404, 'Cliente não encontrado')
+
+  if (userIds.length > 0) {
+    const validUsers = await prisma.user.findMany({
+      where: { id: { in: userIds }, organizationId, isActive: true },
+      select: { id: true },
+    })
+    if (validUsers.length !== userIds.length) throw new AppError(400, 'Um ou mais usuários inválidos')
+  }
+
+  await prisma.$transaction([
+    prisma.clientAssignment.deleteMany({ where: { clientId } }),
+    ...(userIds.length > 0
+      ? [prisma.clientAssignment.createMany({
+          data: userIds.map((userId) => ({ clientId, userId })),
+          skipDuplicates: true,
+        })]
+      : []),
+  ])
+
+  return listAssignments(clientId, organizationId)
+}

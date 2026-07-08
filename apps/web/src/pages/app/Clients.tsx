@@ -8,6 +8,105 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { cn } from '@/lib/utils'
 import type { Client } from '@/types'
 import { toast } from 'sonner'
+import { UserCheck } from 'lucide-react'
+
+interface OrgUser { id: string; name: string; email: string; role: string }
+interface Assignment { id: string; userId: string; user: OrgUser }
+
+const ROLE_LABEL: Record<string, string> = {
+  ORG_ADMIN: 'Admin', ORG_MANAGER: 'Gerente', ORG_MEMBER: 'Colaborador',
+}
+
+function AssignmentsSection({ clientId }: { clientId: string }) {
+  const queryClient = useQueryClient()
+
+  const { data: users = [] } = useQuery<OrgUser[]>({
+    queryKey: ['users'],
+    queryFn: () => api.get('/users').then((r) => r.data),
+  })
+
+  const { data: assignments = [] } = useQuery<Assignment[]>({
+    queryKey: ['client-assignments', clientId],
+    queryFn: () => api.get(`/clients/${clientId}/assignments`).then((r) => r.data),
+  })
+
+  const assignedIds = assignments.map((a) => a.userId)
+
+  const saveMutation = useMutation({
+    mutationFn: (userIds: string[]) =>
+      api.put(`/clients/${clientId}/assignments`, { userIds }).then((r) => r.data),
+    onSuccess: () => {
+      toast.success('Responsáveis atualizados')
+      queryClient.invalidateQueries({ queryKey: ['client-assignments', clientId] })
+    },
+    onError: () => toast.error('Erro ao salvar responsáveis'),
+  })
+
+  function toggle(userId: string) {
+    const next = assignedIds.includes(userId)
+      ? assignedIds.filter((id) => id !== userId)
+      : [...assignedIds, userId]
+    saveMutation.mutate(next)
+  }
+
+  const eligibleUsers = users.filter((u) => ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'].includes(u.role))
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        <UserCheck size={14} className="text-gray-400" />
+        <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Responsáveis</Label>
+      </div>
+      <p className="text-xs text-gray-400">
+        Quando definido, só os responsáveis recebem notificações deste cliente.
+        Sem responsável, notifica todos os admins e gerentes.
+      </p>
+      <div className="space-y-1">
+        {eligibleUsers.map((u) => {
+          const active = assignedIds.includes(u.id)
+          return (
+            <button
+              key={u.id}
+              type="button"
+              onClick={() => toggle(u.id)}
+              disabled={saveMutation.isPending}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors',
+                active
+                  ? 'border-[#185FA5] bg-blue-50'
+                  : 'border-gray-200 bg-white hover:bg-gray-50',
+              )}
+            >
+              <div className={cn(
+                'w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border',
+                active ? 'bg-[#185FA5] border-[#185FA5]' : 'border-gray-300',
+              )}>
+                {active && (
+                  <svg viewBox="0 0 10 8" className="w-2.5 h-2 fill-white">
+                    <path d="M1 4l3 3L9 1" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className={cn('text-sm font-medium truncate', active ? 'text-[#185FA5]' : 'text-gray-800')}>{u.name}</p>
+                <p className="text-xs text-gray-400 truncate">{u.email}</p>
+              </div>
+              <span className={cn(
+                'text-xs px-1.5 py-0.5 rounded flex-shrink-0',
+                active ? 'bg-blue-100 text-[#185FA5]' : 'bg-gray-100 text-gray-500',
+              )}>
+                {ROLE_LABEL[u.role] ?? u.role}
+              </span>
+            </button>
+          )
+        })}
+        {eligibleUsers.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-3">Nenhum usuário cadastrado.</p>
+        )}
+      </div>
+    </div>
+  )
+}
 
 type ClientType = 'PF' | 'PJ'
 
@@ -383,6 +482,8 @@ export default function Clients() {
               onChange={(patch) => setEditForm((f) => ({ ...f, ...patch }))}
               idPrefix="e"
             />
+            <hr className="border-gray-100" />
+            {editingClient && <AssignmentsSection clientId={editingClient.id} />}
             {updateMutation.isError && (
               <p className="text-sm text-red-600">Erro ao salvar. Tente novamente.</p>
             )}

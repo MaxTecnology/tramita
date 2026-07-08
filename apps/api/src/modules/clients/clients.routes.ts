@@ -4,8 +4,8 @@ import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { checkPlanLimit } from '@/middlewares/checkPlanLimit'
 import { AppError } from '@/errors/AppError'
-import { createClientSchema, updateClientSchema, listClientsQuerySchema } from './clients.schema'
-import { listClients, createClient, updateClient, deleteClient } from './clients.service'
+import { createClientSchema, updateClientSchema, listClientsQuerySchema, setAssignmentsSchema } from './clients.schema'
+import { listClients, createClient, updateClient, deleteClient, listAssignments, setAssignments } from './clients.service'
 
 export async function clientsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
@@ -41,5 +41,21 @@ export async function clientsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(await deleteClient(id, request.user.organizationId!))
+  })
+
+  app.get('/:id/assignments', {
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    return reply.send(await listAssignments(id, request.user.organizationId!))
+  })
+
+  app.put('/:id/assignments', {
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const result = setAssignmentsSchema.safeParse(request.body)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(await setAssignments(id, request.user.organizationId!, result.data.userIds))
   })
 }

@@ -21,17 +21,26 @@ export async function createRequest(
     data: { organizationId, clientId, title: data.title, description: data.description },
   })
 
-  const admins = await prisma.user.findMany({
-    where: { organizationId, role: { in: ['ORG_ADMIN', 'ORG_MANAGER'] }, isActive: true },
+  // Notifica responsáveis atribuídos ao cliente; fallback para ORG_ADMIN + ORG_MANAGER
+  const assignments = await prisma.clientAssignment.findMany({
+    where: { clientId },
+    select: { userId: true },
   })
 
+  const recipientIds = assignments.length > 0
+    ? assignments.map((a) => a.userId)
+    : await prisma.user.findMany({
+        where: { organizationId, role: { in: ['ORG_ADMIN', 'ORG_MANAGER'] }, isActive: true },
+        select: { id: true },
+      }).then((users) => users.map((u) => u.id))
+
   await Promise.all(
-    admins.map((admin) =>
+    recipientIds.map((userId) =>
       enqueueNotification({
         event: 'REQUEST_CREATED',
         organizationId,
         recipientType: 'USER',
-        userId: admin.id,
+        userId,
         requestId: request.id,
         metadata: { clientName: client.name, requestTitle: request.title },
       }),

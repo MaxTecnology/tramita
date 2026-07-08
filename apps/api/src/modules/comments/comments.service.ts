@@ -90,19 +90,26 @@ export async function createComment(
     : (comment.user?.name ?? 'Colaborador')
 
   if (isClient) {
-    // Client commented → notify org collaborators (admin + manager)
-    const collaborators = await prisma.user.findMany({
-      where: { organizationId: actor.organizationId, role: { in: ['ORG_ADMIN', 'ORG_MANAGER'] }, isActive: true },
-      select: { id: true },
+    // Client commented → notify assigned collaborators; fallback to admin + manager
+    const assignments = await prisma.clientAssignment.findMany({
+      where: { clientId: actor.id },
+      select: { userId: true },
     })
+    const recipientIds = assignments.length > 0
+      ? assignments.map((a) => a.userId)
+      : await prisma.user.findMany({
+          where: { organizationId: actor.organizationId, role: { in: ['ORG_ADMIN', 'ORG_MANAGER'] }, isActive: true },
+          select: { id: true },
+        }).then((users) => users.map((u) => u.id))
+
     await Promise.all(
-      collaborators.map((u) =>
+      recipientIds.map((userId) =>
         enqueueNotification({
           event: 'TASK_COMMENT_ADDED',
           taskId,
           organizationId: actor.organizationId,
           recipientType: 'USER',
-          userId: u.id,
+          userId,
           metadata: {
             taskTitle: task.title,
             commentText: data.content,

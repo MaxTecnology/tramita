@@ -1,12 +1,13 @@
 import type { FastifyInstance } from 'fastify'
 import { AppError } from '@/errors/AppError'
-import { login, refreshSession, logout, changePassword } from '@/modules/auth/auth.service'
+import { login, refreshSession, logout, changePassword, getMyProfile, updateMyProfile } from '@/modules/auth/auth.service'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import {
   loginBodySchema,
   refreshBodySchema,
   logoutBodySchema,
   changePasswordSchema,
+  updateProfileSchema,
 } from '@/modules/auth/auth.schema'
 
 export async function authRoutes(app: FastifyInstance) {
@@ -42,5 +43,15 @@ export async function authRoutes(app: FastifyInstance) {
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     await changePassword(request.user.sub, request.user.role, result.data.currentPassword, result.data.newPassword)
     return reply.status(204).send()
+  })
+
+  app.get('/me', { preHandler: verifyJWT }, async (request, reply) => {
+    return reply.send(await getMyProfile(request.user.sub, request.user.role))
+  })
+
+  app.patch('/me', { preHandler: verifyJWT }, async (request, reply) => {
+    const result = updateProfileSchema.safeParse(request.body)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(await updateMyProfile(request.user.sub, request.user.role, result.data))
   })
 }

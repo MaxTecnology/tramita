@@ -32,7 +32,7 @@ export async function processNotificationJob(job: { data: NotificationJob }): Pr
 
   if (recipientType === 'USER') {
     if (!userId) return
-    await processUserNotification(config, { event, organizationId, userId, requestId, metadata })
+    await processUserNotification(config, { event, organizationId, userId, taskId, requestId, metadata })
     return
   }
 
@@ -139,11 +139,12 @@ async function processUserNotification(
     event: string
     organizationId: string
     userId: string
+    taskId?: string
     requestId?: string
     metadata: Record<string, string | undefined>
   },
 ): Promise<void> {
-  const { event, organizationId, userId, requestId, metadata } = params
+  const { event, organizationId, userId, taskId, requestId, metadata } = params
 
   if (!config.emailEnabled) return
 
@@ -188,6 +189,7 @@ async function processUserNotification(
       organizationId,
       event: event as NotificationEvent,
       channel: 'EMAIL',
+      taskId,
       requestId,
       recipient: user.email,
       message: rendered,

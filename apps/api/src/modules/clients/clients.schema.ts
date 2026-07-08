@@ -30,4 +30,9 @@ export const listClientsQuerySchema = z.object({
   includeInactive: z.coerce.boolean().default(false),
 })
 
+export const setAssignmentsSchema = z.object({
+  userIds: z.array(z.string()).default([]),
+})
+
 export type ListClientsQuery = z.infer<typeof listClientsQuerySchema>
+export type SetAssignmentsBody = z.infer<typeof setAssignmentsSchema>
