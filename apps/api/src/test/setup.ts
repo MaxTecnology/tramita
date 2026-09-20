@@ -6,6 +6,9 @@ import { buildApp } from '@/server'
 // 32 bytes of zeros in hex — test-only encryption key
 process.env.ENCRYPTION_KEY = '0'.repeat(64)
 
+// Dummy key — Resend real API is never called in tests (mocked via vi.spyOn on Resend.prototype.post)
+process.env.RESEND_API_KEY = process.env.RESEND_API_KEY ?? 're_test_dummy_key'
+
 // Generate RS256 key pair for tests — must run before any module reads process.env for JWT
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 process.env.JWT_PRIVATE_KEY = privateKey
