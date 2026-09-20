@@ -4,6 +4,7 @@ import { enqueueNotification } from '@/lib/queue'
 import { publishOrgEvent } from '@/lib/sse'
 import { createBoard } from '@/modules/boards/boards.service'
 import { createTask } from '@/modules/tasks/tasks.service'
+import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
 import type { CreateRequestBody, ApproveRequestBody, RejectRequestBody } from './requests.schema'
 import type { RequestStatus } from '@prisma/client'
 
@@ -16,6 +17,7 @@ export async function createRequest(
     where: { id: clientId, organizationId, isActive: true },
   })
   if (!client) throw new AppError(404, 'Cliente não encontrado')
+  if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
 
   const request = await prisma.request.create({
     data: {

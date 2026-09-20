@@ -16,6 +16,7 @@ import {
   createTestBoard,
   createTestColumn,
   createTestTask,
+  createTestDepartment,
 } from '@/test/helpers'
 
 describe('moveTask', () => {
@@ -125,6 +126,26 @@ describe('createTask', () => {
       createTask(col.id, orgB.id, { title: 'X', priority: 'MEDIUM', tags: [] }, { id: user.id, type: 'user' }),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
+
+  it('throws 404 when departmentId belongs to a different organization', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id)
+    const user = await createTestUser(orgA.id)
+    const client = await createTestClient(orgA.id)
+    const board = await createTestBoard(orgA.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const departmentOfB = await createTestDepartment(orgB.id)
+
+    await expect(
+      createTask(
+        col.id,
+        orgA.id,
+        { title: 'X', priority: 'MEDIUM', tags: [], departmentId: departmentOfB.id },
+        { id: user.id, type: 'user' },
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 })
+  })
 })
 
 describe('updateTask', () => {
@@ -190,6 +211,22 @@ describe('updateTask', () => {
 
     await expect(
       updateTask(task.id, orgB.id, { title: 'X' }, { id: user.id, type: 'user' }),
+    ).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  it('throws 404 when departmentId belongs to a different organization', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id)
+    const user = await createTestUser(orgA.id)
+    const client = await createTestClient(orgA.id)
+    const board = await createTestBoard(orgA.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    const departmentOfB = await createTestDepartment(orgB.id)
+
+    await expect(
+      updateTask(task.id, orgA.id, { departmentId: departmentOfB.id }, { id: user.id, type: 'user' }),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 })

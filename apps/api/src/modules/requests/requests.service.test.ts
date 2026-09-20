@@ -55,6 +55,18 @@ describe('createRequest', () => {
 
     await expect(createRequest(org.id, client.id, { title: 'X' })).rejects.toMatchObject({ statusCode: 404 })
   })
+
+  it('lança 404 se o departmentId pertence a outra organização', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const otherOrg = await createTestOrg(plan.id, { slug: 'other-org-dept' })
+    const client = await createTestClient(org.id)
+    const departmentOfOther = await createTestDepartment(otherOrg.id)
+
+    await expect(
+      createRequest(org.id, client.id, { title: 'X', departmentId: departmentOfOther.id }),
+    ).rejects.toMatchObject({ statusCode: 404 })
+  })
 })
 
 describe('listRequestsForOrg / listRequestsForClient / getRequestById', () => {

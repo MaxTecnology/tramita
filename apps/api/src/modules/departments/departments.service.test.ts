@@ -5,7 +5,15 @@ import {
   updateDepartment,
   deleteDepartment,
 } from '@/modules/departments/departments.service'
-import { createTestPlan, createTestOrg, createTestClient, createTestUser } from '@/test/helpers'
+import {
+  createTestPlan,
+  createTestOrg,
+  createTestClient,
+  createTestUser,
+  createTestBoard,
+  createTestColumn,
+  createTestTask,
+} from '@/test/helpers'
 
 describe('createDepartment', () => {
   it('creates a department for the organization', async () => {
@@ -108,5 +116,31 @@ describe('deleteDepartment', () => {
     const department = await prisma.department.create({ data: { name: 'Fiscal', organizationId: orgA.id } })
 
     await expect(deleteDepartment(department.id, orgB.id)).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  it('throws 409 when the department is referenced by a task', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const department = await prisma.department.create({ data: { name: 'Fiscal', organizationId: org.id } })
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    await createTestTask(column.id, user.id)
+    await prisma.task.updateMany({ where: { columnId: column.id }, data: { departmentId: department.id } })
+
+    await expect(deleteDepartment(department.id, org.id)).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('throws 409 when the department is referenced by a request', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const department = await prisma.department.create({ data: { name: 'Fiscal', organizationId: org.id } })
+    const client = await createTestClient(org.id)
+    await prisma.request.create({
+      data: { organizationId: org.id, clientId: client.id, title: 'Pedido', departmentId: department.id },
+    })
+
+    await expect(deleteDepartment(department.id, org.id)).rejects.toMatchObject({ statusCode: 409 })
   })
 })

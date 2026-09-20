@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const createDepartmentSchema = z.object({
-  name: z.string().min(1, 'Nome obrigatório'),
+  name: z.string().trim().min(1, 'Nome obrigatório'),
 })
 
 export const updateDepartmentSchema = createDepartmentSchema.partial()

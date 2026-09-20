@@ -1,3 +1,11 @@
+-- WARNING: hand-written migration (Prisma CLI refuses non-interactive destructive
+-- migrations). Assumes "client_assignments" is EMPTY at migration time — the
+-- "departmentId" column below is added NOT NULL with no DEFAULT, which will fail
+-- if the table already has rows. Verified empty in dev/test before this was applied
+-- (2026-09-20). If deploying to an environment with existing client_assignments data,
+-- this migration must be rewritten to backfill departmentId before adding the
+-- NOT NULL constraint.
+
 -- CreateTable
 CREATE TABLE "departments" (
   "id"             TEXT NOT NULL,

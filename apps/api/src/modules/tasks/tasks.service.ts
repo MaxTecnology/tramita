@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
 import { publishBoardEvent } from '@/lib/sse'
+import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
 import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody } from './tasks.schema'
 
 export interface Actor {
@@ -52,6 +53,7 @@ export async function createTask(
   actor: Actor,
 ) {
   const column = await verifyColumnBelongsToOrg(columnId, organizationId)
+  if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
   const actorName = await resolveActorName(actor.id, actor.type)
 
   const task = await prisma.$transaction(async (tx) => {
@@ -175,6 +177,7 @@ export async function updateTask(
   actor: Actor,
 ) {
   const task = await verifyTaskBelongsToOrg(id, organizationId)
+  if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
   const actorName = await resolveActorName(actor.id, actor.type)
 
   const historyEntries: Array<{ action: string; fromValue?: string; toValue?: string }> = []

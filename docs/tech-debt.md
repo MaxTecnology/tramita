@@ -37,3 +37,16 @@ Cobertura global final: 82.76% linhas / 78.09% branches / 81.25% funções (248 
 **Contexto:** ao editar o título de uma tarefa pelo `TaskDrawer` (`apps/web/src/components/shared/TaskDrawer.tsx`) — clicar no `<h2>`, editar o `<input>` inline, `Enter`/blur dispara `updateMutation.mutate({ title })` — a mutação persiste corretamente e o card da tarefa na coluna do Kanban atualiza (a query do board é invalidada e refaz o fetch), mas o próprio `<h2>` dentro do drawer continua mostrando o título antigo até o drawer ser fechado e reaberto. Encontrado depurando `apps/web/e2e/flows/org-board.spec.ts` — o teste de edição de título precisou verificar o card no Kanban em vez do heading do drawer por causa disso (ver comentário no teste).
 
 **Pendente:** investigar se o `task` exibido no `TaskDrawer` vem de uma referência memorizada no componente pai (ex.: `useState` setado só no clique de abrir, nunca ressincronizado com o resultado da query do board) em vez de derivado ao vivo da query por id — se for isso, o fix é passar/derivar o `task` atualizado do cache do react-query em vez de um snapshot fixo.
+
+## Migration `20260920160000_add_departments` assume `client_assignments` vazia (encontrado em 2026-09-20)
+
+**Contexto:** essa migration foi escrita à mão (o CLI do Prisma recusa migrations destrutivas não-interativas) e adiciona `client_assignments.departmentId` como `NOT NULL` sem `DEFAULT`. Isso só é seguro porque a tabela foi verificada vazia em dev/test antes da migration rodar — o arquivo agora tem um comentário de aviso no topo (`apps/api/prisma/migrations/20260920160000_add_departments/migration.sql`).
+
+**Pendente:** se este repositório for implantado em um ambiente com dados reais em `client_assignments` antes de uma reescrita, a migration falhará. Nesse caso, ela precisa ser reescrita com um passo de backfill de `departmentId` antes de adicionar a constraint `NOT NULL`.
+
+## Departamentos — itens parqueados na revisão de 2026-09-20
+
+**Contexto:** revisão de branch completa do feature de Departamentos (responsabilidade por departamento) encontrou dois itens Medium considerados de baixo risco no volume atual de dados, parqueados deliberadamente em vez de corrigidos junto com os Important:
+
+- Falta `@@index([departmentId])` em `Task` e `Request` no `schema.prisma` — sem problema no volume de dados atual; revisitar se queries filtradas por departamento aparecerem em logs de slow query.
+- `updateTask` em `tasks.service.ts` não grava uma entrada de `TaskHistory` quando `departmentId` muda (diferente de `priority`/`assigneeId`) — decisão explícita e revisada para esta fase (2a); estender quando o item 2c/2d do roadmap (motor de recorrência / modelo de status expandido) tocar essa função novamente.

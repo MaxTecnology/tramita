@@ -2,6 +2,11 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { CreateDepartmentInput, UpdateDepartmentInput } from './departments.schema'
 
+export async function assertDepartmentBelongsToOrg(departmentId: string, organizationId: string) {
+  const department = await prisma.department.findFirst({ where: { id: departmentId, organizationId } })
+  if (!department) throw new AppError(404, 'Departamento não encontrado')
+}
+
 export async function listDepartments(organizationId: string) {
   return prisma.department.findMany({
     where: { organizationId },
@@ -40,9 +45,16 @@ export async function deleteDepartment(id: string, organizationId: string) {
   const department = await prisma.department.findFirst({ where: { id, organizationId } })
   if (!department) throw new AppError(404, 'Departamento não encontrado')
 
-  const assignmentsCount = await prisma.clientAssignment.count({ where: { departmentId: id } })
-  if (assignmentsCount > 0) {
-    throw new AppError(409, 'Departamento em uso — remova as atribuições de responsável antes de excluir')
+  const [assignmentsCount, tasksCount, requestsCount] = await Promise.all([
+    prisma.clientAssignment.count({ where: { departmentId: id } }),
+    prisma.task.count({ where: { departmentId: id } }),
+    prisma.request.count({ where: { departmentId: id } }),
+  ])
+  if (assignmentsCount > 0 || tasksCount > 0 || requestsCount > 0) {
+    throw new AppError(
+      409,
+      'Departamento em uso — remova as atribuições de responsável e desvincule tarefas/solicitações antes de excluir',
+    )
   }
 
   await prisma.department.delete({ where: { id } })
