@@ -6,7 +6,7 @@ describe('sendEmail', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('sends email via Resend without error', async () => {
-    vi.spyOn(Resend.prototype, 'post').mockResolvedValue({ data: { id: 'test-id' }, error: null })
+    vi.spyOn(Resend.prototype, 'post').mockResolvedValue({ data: { id: 'test-id' }, error: null, headers: null })
 
     await expect(sendEmail('cliente@exemplo.com', 'Assunto', 'Corpo')).resolves.not.toThrow()
   })
@@ -14,7 +14,8 @@ describe('sendEmail', () => {
   it('throws when Resend returns an error', async () => {
     vi.spyOn(Resend.prototype, 'post').mockResolvedValue({
       data: null,
-      error: { message: 'API error', name: 'api_error' },
+      error: { message: 'API error', name: 'application_error', statusCode: 500 },
+      headers: null,
     })
 
     await expect(sendEmail('to@test.com', 'subject', 'body')).rejects.toThrow('API error')
