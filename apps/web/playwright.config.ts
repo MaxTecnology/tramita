@@ -12,6 +12,7 @@ export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: false, // sequential to avoid DB conflicts
+  workers: 1, // fullyParallel:false only serializes within one file — this enforces it across all files too
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
