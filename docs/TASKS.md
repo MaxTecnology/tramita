@@ -204,3 +204,27 @@ browser headless completo), em sessão futura.
   - [x] TLS automático (Let's Encrypt via Traefik, gerenciado pelo Dokploy)
 - [x] Healthchecks nos containers
 - [x] Script de seed: planos padrão (`prisma/seed.ts`, placeholder Starter/Pro/Enterprise — editar valores reais pelo painel Master) + usuário MASTER, verificado idempotente rodando duas vezes contra o banco de teste. Org G2A como primeiro cliente fica isolada em `prisma/e2e-seed.ts` (self-contained via upsert, só roda em banco de teste/E2E, nunca em produção)
+
+## Fase 10 — Evolução de Produto (decidido em sessão de brainstorming, 2026-09-20)
+
+Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (automação de documentos, portal do cliente, integração financeira) e no **Gestta Processos** (gestão de tarefas/workflow, produtividade, SLA), mas com identidade própria — não uma cópia de nenhum dos dois. Escopo grande demais pra uma spec só — decompõe em sub-projetos independentes, cada um com seu próprio ciclo spec → plano → implementação.
+
+### Fora do radar por enquanto (decisão explícita do usuário — não construir agora)
+- Monitoramento de CND (certidões negativas — integração recorrente com Receita e outros órgãos)
+- Recálculo de guias pelo cliente (DAS/DARF) — depende de integração com sistema de cálculo fiscal (Domínio ou API própria), provavelmente fora de alcance sem parceria/API oficial
+- Assinatura digital (integração com provedor terceiro tipo Clicksign/D4Sign)
+- Importação financeira (integração bancária/open finance — escopo grande e regulatório)
+
+### Confirmado como evolução do que já existe (não é greenfield)
+- "Ordem de Serviço" (conceito do Gestta) = evolução do módulo **Solicitações** (`Requests`, já implementado na Fase 6/7) — quando essa frente entrar em brainstorming, começar pelo que já existe, não do zero.
+
+### Roadmap de sub-projetos ativos (ordem de prioridade ainda em aberto, exceto o item 1)
+1. [x] **Redesign visual premium — fundação** (concluído em 2026-09-20) — tokens de design (paleta petróleo/âmbar/teal/danger, dark mode nativo via `prefers-color-scheme`, fonte Inter), aplicado a `AppLayout` (com o menu reagrupado sob "Configurações") + `DashboardMetrics` + `Processes` + `Board` + componentes base `shadcn/ui`. Ver `docs/superpowers/specs/2026-09-20-visual-redesign-foundation-design.md` e `docs/superpowers/plans/2026-09-20-visual-redesign-foundation.md`. Pendente pra fases futuras do redesign: Portal do cliente, Clientes/Usuários, Master, telas de Configurações, `TaskCard.tsx` (ver `docs/tech-debt.md`).
+2. [ ] Tarefas recorrentes (semanal/mensal/trimestral/anual) + Calendário mensal — pedido original do usuário que iniciou essa sessão de brainstorming
+3. [ ] SLA e alertas de prazo (visual/sonoro) — estende o modelo de Task/Board já existente
+4. [ ] Métricas de produtividade por usuário/departamento — depende dos itens 2 e 3 existirem primeiro
+5. [ ] Evolução de Solicitações → Ordem de Serviço
+6. [ ] Automação de documentos (robô que lê/classifica documentos do cliente, inspirado no Nibo) — maior risco técnico, decidir fonte de dados (upload manual vs. leitura de pasta) antes de especificar
+7. [ ] Protocolo digital com validade jurídica + IP — estende o sistema de notificação/tracking já existente
+
+Próximo passo: usuário escolhe qual item do roadmap (2-7) entra em brainstorming a seguir.
