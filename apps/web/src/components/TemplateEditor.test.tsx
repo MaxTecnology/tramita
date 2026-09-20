@@ -34,7 +34,7 @@ it('renders preview in real time when clicking preview button', async () => {
   // Wait for template to load
   await waitFor(() => screen.getByDisplayValue('Olá, {{clientName}}!'))
 
-  await userEvent.click(screen.getByRole('button', { name: 'Prévia' }))
+  await userEvent.click(screen.getByRole('button', { name: '↗ Ver prévia' }))
 
   await waitFor(() => {
     expect(screen.getByText(/João Silva/)).toBeInTheDocument()
@@ -59,7 +59,7 @@ it('shows save button and submits PUT on click', async () => {
   render(<TemplateEditor event="TASK_MOVED" channel="WHATSAPP" />, { wrapper })
 
   await waitFor(() => screen.getByDisplayValue('Template atual'))
-  await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Salvar template' }))
 
   await waitFor(() => {
     expect(capturedBody).toMatchObject({ body: 'Template atual' })
