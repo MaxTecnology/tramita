@@ -1,15 +1,13 @@
 // apps/api/src/lib/maximizebot.test.ts
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect, afterEach } from 'vitest'
 import axios from 'axios'
 import { sendWhatsApp } from '@/lib/maximizebot'
 
-vi.mock('axios')
-
 describe('sendWhatsApp', () => {
-  beforeEach(() => vi.clearAllMocks())
+  afterEach(() => vi.restoreAllMocks())
 
   it('calls MaximizeBot API with correct URL, payload and Authorization header', async () => {
-    vi.mocked(axios.post).mockResolvedValue({ data: {} })
+    vi.spyOn(axios, 'post').mockResolvedValue({ data: {} })
 
     await sendWhatsApp('Bearer test-token', {
       number: '5582999990001',
@@ -33,7 +31,7 @@ describe('sendWhatsApp', () => {
   })
 
   it('throws when axios rejects', async () => {
-    vi.mocked(axios.post).mockRejectedValue(new Error('Network error'))
+    vi.spyOn(axios, 'post').mockRejectedValue(new Error('Network error'))
     await expect(
       sendWhatsApp('Bearer token', { number: '55829', body: 'test' }),
     ).rejects.toThrow('Network error')
