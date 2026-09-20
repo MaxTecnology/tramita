@@ -11,7 +11,7 @@ import { toast } from 'sonner'
 import { UserCheck } from 'lucide-react'
 
 interface OrgUser { id: string; name: string; email: string; role: string }
-interface Assignment { id: string; userId: string; user: OrgUser }
+interface Assignment { id: string; departmentId: string; userId: string; department: { id: string; name: string }; user: OrgUser }
 
 const ROLE_LABEL: Record<string, string> = {
   ORG_ADMIN: 'Admin', ORG_MANAGER: 'Gerente', ORG_MEMBER: 'Colaborador',
@@ -19,6 +19,11 @@ const ROLE_LABEL: Record<string, string> = {
 
 function AssignmentsSection({ clientId }: { clientId: string }) {
   const queryClient = useQueryClient()
+
+  const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['departments'],
+    queryFn: () => api.get('/departments').then((r) => r.data),
+  })
 
   const { data: users = [] } = useQuery<OrgUser[]>({
     queryKey: ['users'],
@@ -30,11 +35,9 @@ function AssignmentsSection({ clientId }: { clientId: string }) {
     queryFn: () => api.get(`/clients/${clientId}/assignments`).then((r) => r.data),
   })
 
-  const assignedIds = assignments.map((a) => a.userId)
-
   const saveMutation = useMutation({
-    mutationFn: (userIds: string[]) =>
-      api.put(`/clients/${clientId}/assignments`, { userIds }).then((r) => r.data),
+    mutationFn: ({ departmentId, userId }: { departmentId: string; userId: string | null }) =>
+      api.put(`/clients/${clientId}/assignments`, { departmentId, userId }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Responsáveis atualizados')
       queryClient.invalidateQueries({ queryKey: ['client-assignments', clientId] })
@@ -42,68 +45,44 @@ function AssignmentsSection({ clientId }: { clientId: string }) {
     onError: () => toast.error('Erro ao salvar responsáveis'),
   })
 
-  function toggle(userId: string) {
-    const next = assignedIds.includes(userId)
-      ? assignedIds.filter((id) => id !== userId)
-      : [...assignedIds, userId]
-    saveMutation.mutate(next)
-  }
-
   const eligibleUsers = users.filter((u) => ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'].includes(u.role))
+
+  function responsibleFor(departmentId: string) {
+    return assignments.find((a) => a.departmentId === departmentId)?.userId ?? ''
+  }
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1.5">
         <UserCheck size={14} className="text-gray-400" />
-        <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Responsáveis</Label>
+        <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Responsáveis por departamento</Label>
       </div>
       <p className="text-xs text-gray-400">
-        Quando definido, só os responsáveis recebem notificações deste cliente.
+        Quando definido, só o responsável do departamento recebe notificações daquela área.
         Sem responsável, notifica todos os admins e gerentes.
       </p>
-      <div className="space-y-1">
-        {eligibleUsers.map((u) => {
-          const active = assignedIds.includes(u.id)
-          return (
-            <button
-              key={u.id}
-              type="button"
-              onClick={() => toggle(u.id)}
-              disabled={saveMutation.isPending}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors',
-                active
-                  ? 'border-[#185FA5] bg-blue-50'
-                  : 'border-gray-200 bg-white hover:bg-gray-50',
-              )}
-            >
-              <div className={cn(
-                'w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border',
-                active ? 'bg-[#185FA5] border-[#185FA5]' : 'border-gray-300',
-              )}>
-                {active && (
-                  <svg viewBox="0 0 10 8" className="w-2.5 h-2 fill-white">
-                    <path d="M1 4l3 3L9 1" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className={cn('text-sm font-medium truncate', active ? 'text-[#185FA5]' : 'text-gray-800')}>{u.name}</p>
-                <p className="text-xs text-gray-400 truncate">{u.email}</p>
-              </div>
-              <span className={cn(
-                'text-xs px-1.5 py-0.5 rounded flex-shrink-0',
-                active ? 'bg-blue-100 text-[#185FA5]' : 'bg-gray-100 text-gray-500',
-              )}>
-                {ROLE_LABEL[u.role] ?? u.role}
-              </span>
-            </button>
-          )
-        })}
-        {eligibleUsers.length === 0 && (
-          <p className="text-xs text-gray-400 text-center py-3">Nenhum usuário cadastrado.</p>
-        )}
-      </div>
+      {departments.length === 0 ? (
+        <p className="text-xs text-gray-400 text-center py-3">Nenhum departamento cadastrado.</p>
+      ) : (
+        <div className="space-y-2">
+          {departments.map((d) => (
+            <div key={d.id} className="flex items-center gap-2">
+              <span className="text-sm text-gray-700 flex-1 min-w-0 truncate">{d.name}</span>
+              <select
+                value={responsibleFor(d.id)}
+                onChange={(e) => saveMutation.mutate({ departmentId: d.id, userId: e.target.value || null })}
+                disabled={saveMutation.isPending}
+                className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Sem responsável</option>
+                {eligibleUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name} ({ROLE_LABEL[u.role] ?? u.role})</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
