@@ -1,30 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import {
-  register, getOrgSubscription, changePlan, getOrganization,
+  register, getOrgSubscription, changePlan, getOrganization, createOrganizationByMaster,
 } from '@/modules/organizations/organizations.service'
 import { createTestPlan, createTestOrg, createTestUser } from '@/test/helpers'
-
-// vi.hoisted ensures the mock refs are available inside the vi.mock factory
-const { mockCreateCustomer, mockCreateSubscription, mockCancelSubscription } = vi.hoisted(() => ({
-  mockCreateCustomer: vi.fn(),
-  mockCreateSubscription: vi.fn(),
-  mockCancelSubscription: vi.fn(),
-}))
-
-vi.mock('@/lib/asaas', () => ({
-  createCustomer: mockCreateCustomer,
-  createSubscription: mockCreateSubscription,
-  cancelSubscription: mockCancelSubscription,
-}))
+import * as asaas from '@/lib/asaas'
 
 beforeEach(() => {
-  mockCreateCustomer.mockResolvedValue({ id: 'cus_test123', name: 'Test', email: 'test@test.com' })
-  mockCreateSubscription.mockResolvedValue({ id: 'sub_test123', status: 'ACTIVE' })
-  mockCancelSubscription.mockResolvedValue(undefined)
+  vi.spyOn(asaas, 'createCustomer').mockResolvedValue({ id: 'cus_test123', name: 'Test', email: 'test@test.com' })
+  vi.spyOn(asaas, 'createSubscription').mockResolvedValue({ id: 'sub_test123', status: 'ACTIVE' })
+  vi.spyOn(asaas, 'cancelSubscription').mockResolvedValue(undefined)
 })
 
-afterEach(() => vi.clearAllMocks())
+afterEach(() => vi.restoreAllMocks())
 
 describe('register', () => {
   it('creates organization, ORG_ADMIN user, and calls Asaas', async () => {
@@ -40,10 +28,10 @@ describe('register', () => {
 
     expect(result.organization.name).toBe('Contabilidade ABC')
     expect(result.user.role).toBe('ORG_ADMIN')
-    expect(mockCreateCustomer).toHaveBeenCalledWith(
+    expect(asaas.createCustomer).toHaveBeenCalledWith(
       expect.objectContaining({ email: result.organization.email }),
     )
-    expect(mockCreateSubscription).toHaveBeenCalledWith(
+    expect(asaas.createSubscription).toHaveBeenCalledWith(
       expect.objectContaining({ customer: 'cus_test123', cycle: 'MONTHLY' }),
     )
 
@@ -93,7 +81,7 @@ describe('register', () => {
 
     expect(result.organization.subscriptionStatus).toBe('TRIAL')
     expect(result.organization.trialEndsAt).toBeTruthy()
-    expect(mockCreateCustomer).not.toHaveBeenCalled()
+    expect(asaas.createCustomer).not.toHaveBeenCalled()
   })
 })
 
@@ -131,8 +119,6 @@ describe('changePlan', () => {
   })
 })
 
-import { createOrganizationByMaster } from '@/modules/organizations/organizations.service'
-
 describe('createOrganizationByMaster', () => {
   it('creates organization with ACTIVE status and a generated password, without calling Asaas', async () => {
     const plan = await createTestPlan({ name: 'Pro' })
@@ -149,7 +135,7 @@ describe('createOrganizationByMaster', () => {
     expect(result.organization.asaasCustomerId).toBeNull()
     expect(result.user.role).toBe('ORG_ADMIN')
     expect(result.temporaryPassword).toHaveLength(12)
-    expect(mockCreateCustomer).not.toHaveBeenCalled()
+    expect(asaas.createCustomer).not.toHaveBeenCalled()
 
     const stored = await prisma.user.findUnique({ where: { id: result.user.id } })
     expect(stored?.passwordHash).not.toBe(result.temporaryPassword)
@@ -167,16 +153,16 @@ describe('createOrganizationByMaster', () => {
       createAsaasSubscription: true,
     })
 
-    expect(mockCreateCustomer).toHaveBeenCalledWith(
+    expect(asaas.createCustomer).toHaveBeenCalledWith(
       expect.objectContaining({ cpfCnpj: '12345678000190' }),
     )
-    expect(mockCreateSubscription).toHaveBeenCalled()
+    expect(asaas.createSubscription).toHaveBeenCalled()
     expect(result.organization.asaasCustomerId).toBe('cus_test123')
   })
 
   it('rolls back organization and user when Asaas fails', async () => {
     const plan = await createTestPlan({ name: 'Pro' })
-    mockCreateCustomer.mockRejectedValueOnce(new Error('Asaas down'))
+    vi.mocked(asaas.createCustomer).mockRejectedValueOnce(new Error('Asaas down'))
 
     await expect(
       createOrganizationByMaster({
