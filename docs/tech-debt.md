@@ -1,12 +1,17 @@
 # Débito Técnico — Tramita
 
-## Mocking de dependências externas em testes — padronizar em `vi.spyOn`
+## Mocking de dependências externas em testes — padronizado em `vi.spyOn` ✅ (resolvido em 2026-09-20)
 
-**Contexto:** `apps/api/src/test/setup.ts` cria uma única instância `buildApp()` no carregamento do módulo, antes que os `vi.mock(module, factory)` de cada arquivo de teste tenham chance de fazer hoist. Quando uma rota nova passa a importar de verdade um service que outro arquivo de teste mockava via `vi.mock(...)` (ex.: `portal.routes.ts` importando `requests.service`/`request-attachments.service` na Fase de Requests), o app compartilhado já capturou o binding real, e o `vi.mock` do outro arquivo deixa de interceptar — causando chamadas reais (rede, fila) vazarem em testes que pareciam isolados.
+**Contexto original:** `apps/api/src/test/setup.ts` cria uma única instância `buildApp()` no carregamento do módulo, antes que os `vi.mock(module, factory)` de cada arquivo de teste tenham chance de fazer hoist. Quando uma rota nova passa a importar de verdade um service que outro arquivo de teste mockava via `vi.mock(...)`, o app compartilhado já capturou o binding real, e o `vi.mock` do outro arquivo deixa de interceptar — causando chamadas reais (rede, fila) vazarem em testes que pareciam isolados.
 
-**Já corrigido pontualmente em:** `requests.service.test.ts` e `request-attachments.service.test.ts`, convertidos de `vi.mock(module, factory)` para `vi.spyOn(namespaceImport, 'fn')` em `beforeEach`/`afterEach` — mesmo padrão já usado em `attachments.service.test.ts`.
+**Resolvido:** todos os arquivos de teste que mockavam dependências externas via `vi.mock(module, factory)` foram convertidos para `vi.spyOn(namespaceImport, 'fn')` em `beforeEach`/`afterEach`:
+- `attachments.service.test.ts`, `requests.service.test.ts`, `request-attachments.service.test.ts` (já corrigidos anteriormente)
+- `maximizebot.test.ts` — `vi.spyOn(axios, 'post')`
+- `mailer.test.ts` — `vi.spyOn(Resend.prototype, 'post')` (seam de rede real do SDK `resend`, já que a classe `Emails` não é exportada)
+- `notification-worker.test.ts` — `vi.spyOn` em `maximizebot`, `mailer` e `encryption`
+- `organizations.service.test.ts` — `vi.spyOn(asaas, ...)` (não estava listado originalmente, mas seguia o mesmo padrão frágil)
 
-**Pendente:** padronizar todos os arquivos de teste que mockam dependências externas (queue, b2, mailer, maximizebot) para `vi.spyOn`, evitando que a mesma fragilidade volte a aparecer quando uma rota nova importar um desses services pela primeira vez. Alternativa a avaliar: `isolate: true` no Vitest por arquivo (tem custo de performance por recriar `buildApp()` a cada arquivo — avaliar trade-off antes de adotar).
+Nenhum arquivo de teste em `apps/api/src` usa mais `vi.mock(module, factory)` para dependência externa.
 
 ## `tsc-alias --resolve-full-paths` depende de `moduleResolution: "bundler"` ficar como está
 
