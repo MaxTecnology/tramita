@@ -15,8 +15,10 @@ export async function createTestPlan(overrides?: Partial<{ name: string; maxClie
   })
 }
 
+let testOrgCounter = 0
+
 export async function createTestOrg(planId: string, overrides?: Partial<{ slug: string }>) {
-  const unique = Date.now()
+  const unique = `${Date.now()}-${++testOrgCounter}`
   return prisma.organization.create({
     data: {
       name: 'Test Org',
