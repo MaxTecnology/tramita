@@ -27,7 +27,7 @@ import { toast } from 'sonner'
 function DroppableColumn({ id, children }: { id: string; children: React.ReactNode }) {
   const { setNodeRef } = useDroppable({ id })
   return (
-    <div ref={setNodeRef} className="flex flex-col gap-2 min-h-[4rem] rounded-lg bg-gray-50 p-2">
+    <div ref={setNodeRef} className="flex flex-col gap-2 min-h-[4rem] rounded-lg bg-neutral-bg p-2">
       {children}
     </div>
   )
@@ -121,25 +121,25 @@ export default function Board() {
     moveTask({ taskId, columnId: targetColumn.id, position })
   }
 
-  if (isLoading) return <div className="p-8 text-gray-500">Carregando board...</div>
-  if (!board) return <div className="p-8 text-gray-500">Board não encontrado.</div>
+  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando board...</div>
+  if (!board) return <div className="p-8 text-muted-foreground">Board não encontrado.</div>
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 bg-white flex-shrink-0">
-        <Link to="/app/processes" aria-label="Voltar para Processos" className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+      <div className="flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 border-b border-border bg-white flex-shrink-0">
+        <Link to="/app/processes" aria-label="Voltar para Processos" className="text-muted-foreground hover:text-foreground flex-shrink-0">
           <ArrowLeft size={18} />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-base md:text-lg font-semibold text-gray-900 truncate">{board.title}</h1>
-          <p className="text-xs md:text-sm text-gray-500 truncate">{board.client.name}</p>
+          <h1 className="text-base md:text-lg font-semibold text-foreground truncate">{board.title}</h1>
+          <p className="text-xs md:text-sm text-muted-foreground truncate">{board.client.name}</p>
         </div>
         {boardDueDate && (
           <span className={cn(
             'text-xs px-2 py-1 rounded-full font-medium flex-shrink-0',
             boardDueDateOverdue
-              ? 'bg-red-100 text-red-700'
-              : 'bg-amber-50 text-amber-700'
+              ? 'bg-danger-bg text-danger-text'
+              : 'bg-warning-bg text-warning-text'
           )}>
             {boardDueDateOverdue ? '⚠ ' : ''}{boardDueDate.toLocaleDateString('pt-BR')}
           </span>
@@ -147,18 +147,18 @@ export default function Board() {
       </div>
 
       {/* Search bar */}
-      <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-2 border-b border-gray-100 bg-white">
+      <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-2 border-b border-border bg-white">
         <input
           type="text"
           placeholder="Buscar tarefas..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-0 h-8 rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 min-w-0 h-8 rounded-md border border-border bg-white px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
         />
         <select
           value={filterPriority}
           onChange={(e) => setFilterPriority(e.target.value)}
-          className="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="h-8 rounded-md border border-border bg-white px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         >
           <option value="">Prioridade</option>
           <option value="LOW">Baixa</option>
@@ -173,7 +173,7 @@ export default function Board() {
               setSearch('')
               setFilterPriority('')
             }}
-            className="text-xs text-gray-500 hover:text-gray-700 underline"
+            className="text-xs text-muted-foreground hover:text-foreground underline"
           >
             Limpar
           </button>
@@ -182,17 +182,17 @@ export default function Board() {
 
       {/* Search results */}
       {hasFilters && searchResults && (
-        <div className="px-4 md:px-6 py-3 border-b border-gray-100 bg-yellow-50">
-          <p className="text-xs text-gray-500 mb-2">{searchResults.length} resultado(s)</p>
+        <div className="px-4 md:px-6 py-3 border-b border-border bg-yellow-50">
+          <p className="text-xs text-muted-foreground mb-2">{searchResults.length} resultado(s)</p>
           <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
             {searchResults.map((task) => (
               <div
                 key={task.id}
                 onClick={() => setSelectedTask(task)}
-                className="bg-white rounded-lg p-2.5 border border-gray-200 cursor-pointer hover:shadow-sm text-sm flex items-center justify-between"
+                className="bg-white rounded-lg p-2.5 border border-border cursor-pointer hover:shadow-sm text-sm flex items-center justify-between"
               >
-                <span className="font-medium text-gray-800">{task.title}</span>
-                <span className="text-xs text-gray-400 ml-2">{task.priority}</span>
+                <span className="font-medium text-foreground">{task.title}</span>
+                <span className="text-xs text-muted-foreground ml-2">{task.priority}</span>
               </div>
             ))}
           </div>
@@ -205,8 +205,8 @@ export default function Board() {
             {board.columns.map((column) => (
               <div key={column.id} className="flex-shrink-0 w-[280px] md:w-64">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-700">{column.title}</h3>
-                  <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
+                  <h3 className="text-sm font-semibold text-foreground">{column.title}</h3>
+                  <span className="text-xs text-muted-foreground bg-neutral-bg rounded-full px-2 py-0.5">
                     {column.tasks.length}
                   </span>
                 </div>
@@ -237,19 +237,19 @@ export default function Board() {
                         if (e.key === 'Escape') { setAddingToColumn(null); setNewTaskTitle('') }
                       }}
                       placeholder="Nome da tarefa..."
-                      className="w-full text-sm rounded-md border border-gray-300 bg-white px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full text-sm rounded-md border border-border bg-white px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                     <div className="flex gap-2 mt-1.5">
                       <button
                         onClick={() => handleAddTask(column.id)}
                         disabled={!newTaskTitle.trim() || createTaskMutation.isPending}
-                        className="text-xs bg-[#185FA5] text-white px-3 py-1 rounded hover:bg-[#0C447C] disabled:opacity-50"
+                        className="text-xs bg-accent text-white px-3 py-1 rounded hover:bg-accent-hover disabled:opacity-50"
                       >
                         {createTaskMutation.isPending ? '...' : 'Adicionar'}
                       </button>
                       <button
                         onClick={() => { setAddingToColumn(null); setNewTaskTitle('') }}
-                        className="text-xs text-gray-500 hover:text-gray-700"
+                        className="text-xs text-muted-foreground hover:text-foreground"
                       >
                         Cancelar
                       </button>
@@ -258,7 +258,7 @@ export default function Board() {
                 ) : (
                   <button
                     onClick={() => { setAddingToColumn(column.id); setNewTaskTitle('') }}
-                    className="mt-2 w-full text-left text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1"
+                    className="mt-2 w-full text-left text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-neutral-bg flex items-center gap-1"
                   >
                     <Plus size={12} />
                     Adicionar tarefa
