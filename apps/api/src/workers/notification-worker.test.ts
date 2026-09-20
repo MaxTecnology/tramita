@@ -16,16 +16,14 @@ import {
 import type { NotificationJob } from '@/lib/queue'
 import bcrypt from 'bcryptjs'
 
-vi.mock('@/lib/maximizebot')
-vi.mock('@/lib/mailer')
-vi.mock('@/lib/encryption')
-
 type JobInput = { data: NotificationJob }
 
 describe('processNotificationJob', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    vi.mocked(encryption.decrypt).mockImplementation((encoded) => encoded)
+    vi.restoreAllMocks()
+    vi.spyOn(encryption, 'decrypt').mockImplementation((encoded) => encoded)
+    vi.spyOn(maximizebot, 'sendWhatsApp').mockResolvedValue(undefined)
+    vi.spyOn(mailer, 'sendEmail').mockResolvedValue(undefined)
   })
 
   it('does not send and creates no log when event is disabled in config', async () => {
