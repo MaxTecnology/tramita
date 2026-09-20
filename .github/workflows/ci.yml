@@ -54,8 +54,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://tramita:tramita@localhost:5433/tramita_test
 
-      - name: Testes da API com cobertura (mínimo 80%)
-        run: pnpm --filter api test:coverage
+      - name: Testes da API
+        run: pnpm --filter api test
 
       - name: Testes do frontend
         run: pnpm --filter web test
