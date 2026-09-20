@@ -48,6 +48,7 @@ model Organization {
   messageTemplates    MessageTemplate[]
   notificationLogs    NotificationLog[]
   subscriptionHistory SubscriptionHistory[]
+  departments         Department[]
 
   @@map("organizations")
 }
@@ -132,16 +133,34 @@ model Client {
   @@map("clients")
 }
 
+model Department {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientAssignments ClientAssignment[]
+  tasks             Task[]
+  requests          Request[]
+
+  @@unique([organizationId, name])
+  @@map("departments")
+}
+
 model ClientAssignment {
-  id        String   @id @default(cuid())
-  clientId  String
-  userId    String
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  clientId     String
+  departmentId String
+  userId       String
+  createdAt    DateTime @default(now())
 
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client     Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([clientId, userId])
+  @@unique([clientId, departmentId])
   @@map("client_assignments")
 }
 
@@ -173,6 +192,7 @@ model Request {
   description     String?
   status          RequestStatus @default(PENDING)
   taskId          String?       @unique
+  departmentId    String?
   rejectionReason String?
   reviewedById    String?
   reviewedAt      DateTime?
@@ -182,6 +202,7 @@ model Request {
   organization Organization        @relation(fields: [organizationId], references: [id])
   client       Client              @relation(fields: [clientId], references: [id])
   task         Task?               @relation(fields: [taskId], references: [id])
+  department   Department?         @relation(fields: [departmentId], references: [id])
   reviewedBy   User?               @relation("RequestReviewer", fields: [reviewedById], references: [id])
   attachments  RequestAttachment[]
 
@@ -239,6 +260,7 @@ model Task {
   assigneeId      String?
   creatorId       String
   sourceRequestId String?
+  departmentId    String?
   tags            String[]
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
@@ -246,6 +268,7 @@ model Task {
   column           Column        @relation(fields: [columnId], references: [id], onDelete: Cascade)
   assignee         User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
   creator          User          @relation("TaskCreator", fields: [creatorId], references: [id])
+  department       Department?   @relation(fields: [departmentId], references: [id])
   comments         Comment[]
   history          TaskHistory[]
   attachments      Attachment[]
