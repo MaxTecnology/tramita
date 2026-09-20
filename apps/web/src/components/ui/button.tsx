@@ -7,10 +7,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses = {
-  default: 'bg-accent text-white hover:bg-accent-hover',
+  default: 'bg-accent text-accent-foreground hover:bg-accent-hover',
   outline: 'border border-border bg-surface text-foreground hover:bg-neutral-bg',
   ghost: 'text-foreground hover:bg-neutral-bg',
-  destructive: 'bg-danger-text text-white hover:bg-danger-hover',
+  destructive: 'bg-danger-text text-danger-foreground hover:bg-danger-hover',
 }
 
 const sizeClasses = {

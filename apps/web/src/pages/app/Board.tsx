@@ -182,7 +182,7 @@ export default function Board() {
 
       {/* Search results */}
       {hasFilters && searchResults && (
-        <div className="px-4 md:px-6 py-3 border-b border-border bg-yellow-50">
+        <div className="px-4 md:px-6 py-3 border-b border-border bg-warning-bg">
           <p className="text-xs text-muted-foreground mb-2">{searchResults.length} resultado(s)</p>
           <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
             {searchResults.map((task) => (

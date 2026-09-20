@@ -187,7 +187,7 @@ function SidebarLink({
       {icon}
       <span className="flex-1">{label}</span>
       {!!badge && badge > 0 && (
-        <span className="flex-shrink-0 min-w-[1.25rem] h-5 px-1 rounded-full bg-danger-text text-white text-xs font-medium flex items-center justify-center">
+        <span className="flex-shrink-0 min-w-[1.25rem] h-5 px-1 rounded-full bg-danger-text text-danger-foreground text-xs font-medium flex items-center justify-center">
           {badge > 9 ? '9+' : badge}
         </span>
       )}

@@ -19,10 +19,13 @@
   --color-danger-bg: #FEE2E2;
   --color-danger-text: #DC2626;
   --color-danger-hover: #B91C1C;
+  --color-accent-foreground: #FFFFFF;
+  --color-danger-foreground: #FFFFFF;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --color-background: #0B1220;
     --color-surface: #131B2E;
     --color-border: #263449;
@@ -39,6 +42,8 @@
     --color-danger-bg: #450A0A;
     --color-danger-text: #F87171;
     --color-danger-hover: #FCA5A5;
+    --color-accent-foreground: #0B1220;
+    --color-danger-foreground: #0B1220;
   }
 }
 
