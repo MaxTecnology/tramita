@@ -1,0 +1,140 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tramita
+          POSTGRES_PASSWORD: tramita
+          POSTGRES_DB: tramita_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U tramita"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL_TEST: postgresql://tramita:tramita@localhost:5433/tramita_test
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Aplicar migrations no banco de teste
+        working-directory: apps/api
+        run: pnpm exec prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://tramita:tramita@localhost:5433/tramita_test
+
+      - name: Testes da API com cobertura (mínimo 80%)
+        run: pnpm --filter api test:coverage
+
+      - name: Testes do frontend
+        run: pnpm --filter web test
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tramita
+          POSTGRES_PASSWORD: tramita
+          POSTGRES_DB: tramita_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U tramita"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Instalar Chromium do Playwright
+        run: pnpm --filter web exec playwright install chromium --with-deps
+
+      - name: Gerar .env efêmero pra E2E (chaves e segredos sintéticos, só pra este job)
+        run: |
+          openssl genrsa -out /tmp/private.pem 2048
+          openssl rsa -in /tmp/private.pem -pubout -out /tmp/public.pem
+          JWT_PRIVATE_KEY=$(sed ':a;N;$!ba;s/\n/\\n/g' /tmp/private.pem)
+          JWT_PUBLIC_KEY=$(sed ':a;N;$!ba;s/\n/\\n/g' /tmp/public.pem)
+          ENCRYPTION_KEY=$(openssl rand -hex 32)
+          cat > .env <<EOF
+          DATABASE_URL=postgresql://tramita:tramita@localhost:5433/tramita_test
+          DATABASE_URL_TEST=postgresql://tramita:tramita@localhost:5433/tramita_test
+          REDIS_URL=redis://localhost:6379
+          JWT_PRIVATE_KEY=$JWT_PRIVATE_KEY
+          JWT_PUBLIC_KEY=$JWT_PUBLIC_KEY
+          ASAAS_API_KEY=ci-dummy
+          ASAAS_BASE_URL=https://api-sandbox.asaas.com/v3
+          ASAAS_WEBHOOK_SECRET=ci-dummy
+          B2_KEY_ID=ci-dummy
+          B2_APP_KEY=ci-dummy
+          B2_BUCKET_NAME=tramita-ci
+          B2_BUCKET_REGION=us-west-004
+          B2_ENDPOINT=https://s3.us-west-004.backblazeb2.com
+          PORT=3001
+          NODE_ENV=test
+          APP_URL=http://localhost:5173
+          MASTER_EMAIL=master@autohubs.com.br
+          MASTER_PASSWORD=Master@AutoHubs2025
+          RESEND_API_KEY=ci-dummy
+          EMAIL_FROM=Tramita <notificacoes@autohubs.com.br>
+          ENCRYPTION_KEY=$ENCRYPTION_KEY
+          VITE_API_URL=http://localhost:3001
+          EOF
+          rm /tmp/private.pem /tmp/public.pem
+
+      - name: Rodar suíte Playwright E2E
+        run: pnpm --filter web test:e2e
