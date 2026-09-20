@@ -49,19 +49,19 @@ function getCurrentStage(board: Board): string {
 }
 
 function formatDueDate(date: Date | null, now: Date): { label: string; cls: string } {
-  if (!date) return { label: '—', cls: 'text-gray-400' }
+  if (!date) return { label: '—', cls: 'text-muted-foreground' }
   const diff = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-  if (diff < 0) return { label: `Vencido há ${Math.abs(diff)}d`, cls: 'text-red-600 font-medium' }
-  if (diff === 0) return { label: 'Vence hoje', cls: 'text-red-600 font-medium' }
-  if (diff <= 7) return { label: `Em ${diff}d`, cls: 'text-amber-600 font-medium' }
-  return { label: date.toLocaleDateString('pt-BR'), cls: 'text-gray-500' }
+  if (diff < 0) return { label: `Vencido há ${Math.abs(diff)}d`, cls: 'text-danger-text font-medium' }
+  if (diff === 0) return { label: 'Vence hoje', cls: 'text-danger-text font-medium' }
+  if (diff <= 7) return { label: `Em ${diff}d`, cls: 'text-warning-text font-medium' }
+  return { label: date.toLocaleDateString('pt-BR'), cls: 'text-muted-foreground' }
 }
 
 function getProgressCls(progress: number, isOverdue: boolean): string {
-  if (progress === 100) return 'bg-green-500'
-  if (isOverdue) return 'bg-red-500'
-  if (progress >= 60) return 'bg-blue-500'
-  return 'bg-amber-500'
+  if (progress === 100) return 'bg-success-text'
+  if (isOverdue) return 'bg-danger-text'
+  if (progress >= 60) return 'bg-accent'
+  return 'bg-warning-text'
 }
 
 interface Group {
@@ -83,22 +83,22 @@ function BoardRow({ board, now }: { board: Board; now: Date }) {
   return (
     <Link
       to={`/app/board/${board.id}`}
-      className="block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+      className="block px-4 py-3 hover:bg-neutral-bg transition-colors border-b border-border last:border-0"
     >
       {/* Mobile: card layout */}
       <div className="md:hidden">
         <div className="flex items-start justify-between gap-2 mb-1">
-          <p className="text-sm font-medium text-gray-900 flex-1 min-w-0 truncate">{board.title}</p>
+          <p className="text-sm font-medium text-foreground flex-1 min-w-0 truncate">{board.title}</p>
           <span className={cn('text-xs flex-shrink-0', dueDateCls)}>{dueDateLabel}</span>
         </div>
-        <p className="text-xs text-gray-500 mb-2">{board.client.name}</p>
+        <p className="text-xs text-muted-foreground mb-2">{board.client.name}</p>
         <div className="flex items-center gap-3">
-          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{stage}</span>
+          <span className="text-xs bg-neutral-bg text-muted-foreground px-2 py-0.5 rounded-full">{stage}</span>
           <div className="flex-1 flex items-center gap-2">
-            <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progress}%` }} />
+            <div className="flex-1 h-1.5 bg-neutral-bg rounded-full overflow-hidden">
+              <div className="h-full bg-accent rounded-full" style={{ width: `${progress}%` }} />
             </div>
-            <span className="text-xs text-gray-500 w-8 text-right">{progress}%</span>
+            <span className="text-xs text-muted-foreground w-8 text-right">{progress}%</span>
           </div>
         </div>
       </div>
@@ -106,22 +106,22 @@ function BoardRow({ board, now }: { board: Board; now: Date }) {
       {/* Desktop: table row */}
       <div className="hidden md:flex items-center gap-3">
         <div className="flex-[2] min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">{board.title}</p>
+          <p className="text-sm font-medium text-foreground truncate">{board.title}</p>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-600 truncate">{board.client.name}</p>
+          <p className="text-sm text-muted-foreground truncate">{board.client.name}</p>
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full truncate">{stage}</span>
+          <span className="text-xs bg-neutral-bg text-muted-foreground px-2 py-0.5 rounded-full truncate">{stage}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-500 truncate">{board.responsibleUser?.name ?? '—'}</p>
+          <p className="text-sm text-muted-foreground truncate">{board.responsibleUser?.name ?? '—'}</p>
         </div>
         <div className="flex-1 flex items-center gap-2">
-          <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${progress}%` }} />
+          <div className="flex-1 h-1.5 bg-neutral-bg rounded-full overflow-hidden">
+            <div className="h-full bg-accent rounded-full" style={{ width: `${progress}%` }} />
           </div>
-          <span className="text-xs text-gray-500 w-8 text-right">{progress}%</span>
+          <span className="text-xs text-muted-foreground w-8 text-right">{progress}%</span>
         </div>
         <div className="w-24 text-right">
           <span className={cn('text-xs', dueDateCls)}>{dueDateLabel}</span>
@@ -135,7 +135,7 @@ function BoardGroup({ group, now }: { group: Group; now: Date }) {
   const [open, setOpen] = useState(group.defaultOpen)
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -149,13 +149,13 @@ function BoardGroup({ group, now }: { group: Group; now: Date }) {
 
       {open && (
         <>
-          <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-gray-50/80 border-b border-gray-100">
-            <div className="flex-[2] text-xs font-semibold text-gray-400 uppercase tracking-wide">Processo</div>
-            <div className="flex-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Cliente</div>
-            <div className="flex-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Etapa</div>
-            <div className="flex-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Responsável</div>
-            <div className="flex-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Progresso</div>
-            <div className="w-24 text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Prazo</div>
+          <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-neutral-bg/80 border-b border-border">
+            <div className="flex-[2] text-xs font-semibold text-muted-foreground uppercase tracking-wide">Processo</div>
+            <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cliente</div>
+            <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Etapa</div>
+            <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Responsável</div>
+            <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Progresso</div>
+            <div className="w-24 text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right">Prazo</div>
           </div>
           {group.boards.map((board) => (
             <BoardRow key={board.id} board={board} now={now} />
@@ -271,8 +271,8 @@ export default function Processes() {
             if (!db) return -1
             return da.getTime() - db.getTime()
           }),
-          headerCls: 'bg-gray-100 text-gray-700',
-          accentCls: 'border-l-gray-300',
+          headerCls: 'bg-neutral-bg text-muted-foreground',
+          accentCls: 'border-l-border',
           icon: <Search size={14} />,
           defaultOpen: true,
         },
@@ -285,14 +285,14 @@ export default function Processes() {
     const completed = filtered.filter((b) => getProgress(b) === 100)
 
     return [
-      { label: 'Atrasados',      boards: overdue,     headerCls: 'bg-red-50 text-red-700',     accentCls: 'border-l-red-500',   icon: <AlertTriangle size={14} />, defaultOpen: true },
-      { label: 'Vence em 7 dias', boards: dueSoon,    headerCls: 'bg-amber-50 text-amber-700', accentCls: 'border-l-amber-500', icon: <Clock size={14} />,         defaultOpen: true },
-      { label: 'Em andamento',    boards: inProgress, headerCls: 'bg-blue-50 text-blue-700',   accentCls: 'border-l-blue-500',  icon: <ClipboardList size={14} />, defaultOpen: true },
-      { label: 'Concluídos',      boards: completed,  headerCls: 'bg-green-50 text-green-700', accentCls: 'border-l-green-500', icon: <CheckCircle2 size={14} />,  defaultOpen: false },
+      { label: 'Atrasados',      boards: overdue,     headerCls: 'bg-danger-bg text-danger-text',     accentCls: 'border-l-danger-text',   icon: <AlertTriangle size={14} />, defaultOpen: true },
+      { label: 'Vence em 7 dias', boards: dueSoon,    headerCls: 'bg-warning-bg text-warning-text', accentCls: 'border-l-warning-text', icon: <Clock size={14} />,         defaultOpen: true },
+      { label: 'Em andamento',    boards: inProgress, headerCls: 'bg-accent/10 text-accent',   accentCls: 'border-l-accent',  icon: <ClipboardList size={14} />, defaultOpen: true },
+      { label: 'Concluídos',      boards: completed,  headerCls: 'bg-success-bg text-success-text', accentCls: 'border-l-success-text', icon: <CheckCircle2 size={14} />,  defaultOpen: false },
     ].filter((g) => g.boards.length > 0)
   }, [filtered, hasActiveFilter, now, in7days])
 
-  if (isLoading) return <div className="p-8 text-gray-500">Carregando processos...</div>
+  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando processos...</div>
 
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -300,13 +300,13 @@ export default function Processes() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg md:text-xl font-bold text-gray-900">Processos</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Acompanhe o andamento dos processos dos seus clientes.</p>
+          <h1 className="text-lg md:text-xl font-bold text-foreground">Processos</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Acompanhe o andamento dos processos dos seus clientes.</p>
         </div>
         {MANAGER_ROLES.includes(user?.role ?? '') && (
           <Button
             onClick={() => setNewProcessOpen(true)}
-            className="bg-[#185FA5] hover:bg-[#0C447C] text-white gap-2 shadow-sm"
+            className="bg-accent hover:bg-accent-hover text-white gap-2 shadow-sm"
           >
             <Plus size={16} />
             Novo Processo
@@ -315,22 +315,22 @@ export default function Processes() {
       </div>
 
       {/* Card de filtros */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+      <div className="bg-white rounded-xl border border-border shadow-sm p-4">
         <div className="flex flex-wrap gap-2 items-center">
           <div className="relative w-full sm:w-60">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar processo ou cliente..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 border-gray-200 focus:ring-[#185FA5]"
+              className="pl-8 border-border focus:ring-accent"
             />
           </div>
 
           <select
             value={filterClient}
             onChange={(e) => setFilterClient(e.target.value)}
-            className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
+            className="h-9 rounded-lg border border-border bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="">Cliente</option>
             {uniqueClients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -340,7 +340,7 @@ export default function Processes() {
             <select
               value={filterResponsible}
               onChange={(e) => setFilterResponsible(e.target.value)}
-              className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
+              className="h-9 rounded-lg border border-border bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
             >
               <option value="">Colaborador</option>
               {uniqueResponsible.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -350,7 +350,7 @@ export default function Processes() {
           <select
             value={filterStage}
             onChange={(e) => setFilterStage(e.target.value)}
-            className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
+            className="h-9 rounded-lg border border-border bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="">Etapa</option>
             {uniqueStages.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -362,8 +362,8 @@ export default function Processes() {
             className={cn(
               'h-9 px-3 rounded-lg text-sm font-medium border transition-colors flex items-center gap-1.5',
               showOnlyOverdue
-                ? 'bg-red-500 text-white border-red-500 shadow-sm'
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50',
+                ? 'bg-danger-text text-white border-danger-text shadow-sm'
+                : 'bg-white text-muted-foreground border-border hover:bg-neutral-bg',
             )}
           >
             <AlertTriangle size={13} />
@@ -374,7 +374,7 @@ export default function Processes() {
             <button
               type="button"
               onClick={() => { setSearch(''); setFilterClient(''); setFilterResponsible(''); setFilterStage(''); setShowOnlyOverdue(false) }}
-              className="h-9 px-2 text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+              className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
             >
               <X size={13} />
               Limpar
@@ -385,19 +385,19 @@ export default function Processes() {
 
       {/* Resumo */}
       {stats.total > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400 px-1">
-          <span className="text-gray-600 font-medium">{stats.total} processo{stats.total !== 1 ? 's' : ''}</span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground px-1">
+          <span className="text-foreground font-medium">{stats.total} processo{stats.total !== 1 ? 's' : ''}</span>
           {stats.overdue > 0 && (
-            <span className="text-red-500 font-medium flex items-center gap-1">
+            <span className="text-danger-text font-medium flex items-center gap-1">
               <AlertTriangle size={11} /> {stats.overdue} atrasado{stats.overdue !== 1 ? 's' : ''}
             </span>
           )}
           {stats.dueSoon > 0 && (
-            <span className="text-amber-500 flex items-center gap-1">
+            <span className="text-warning-text flex items-center gap-1">
               <Clock size={11} /> {stats.dueSoon} vence{stats.dueSoon !== 1 ? 'm' : ''} esta semana
             </span>
           )}
-          <span className="text-green-600 flex items-center gap-1">
+          <span className="text-success-text flex items-center gap-1">
             <CheckCircle2 size={11} /> {stats.rate}% concluídos
           </span>
         </div>
@@ -407,9 +407,9 @@ export default function Processes() {
       <div className="space-y-3">
         {groups.length === 0 ? (
           <div className="text-center py-16">
-            <FileSearch size={40} className="mx-auto mb-3 text-gray-300" />
-            <p className="text-base font-medium text-gray-500 mb-1">Nenhum processo encontrado</p>
-            <p className="text-sm text-gray-400">Ajuste os filtros ou crie um novo processo</p>
+            <FileSearch size={40} className="mx-auto mb-3 text-muted-foreground" />
+            <p className="text-base font-medium text-muted-foreground mb-1">Nenhum processo encontrado</p>
+            <p className="text-sm text-muted-foreground">Ajuste os filtros ou crie um novo processo</p>
           </div>
         ) : (
           groups.map((group) => <BoardGroup key={group.label} group={group} now={now} />)
@@ -441,7 +441,7 @@ export default function Processes() {
                 value={newProcessForm.clientId}
                 onChange={(e) => setNewProcessForm({ ...newProcessForm, clientId: e.target.value })}
                 required
-                className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="flex h-9 w-full rounded-md border border-border bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <option value="">Selecione um cliente</option>
                 {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -455,16 +455,16 @@ export default function Processes() {
                 value={newProcessForm.dueDate}
                 onChange={(e) => setNewProcessForm({ ...newProcessForm, dueDate: e.target.value })}
               />
-              <p className="text-xs text-gray-400">Opcional — você poderá alterar depois</p>
+              <p className="text-xs text-muted-foreground">Opcional — você poderá alterar depois</p>
             </div>
-            <p className="text-xs text-gray-400">3 colunas padrão serão criadas automaticamente: Pendente → Em andamento → Concluído</p>
-            {createMutation.isError && <p className="text-sm text-red-600">Erro ao criar processo. Tente novamente.</p>}
+            <p className="text-xs text-muted-foreground">3 colunas padrão serão criadas automaticamente: Pendente → Em andamento → Concluído</p>
+            {createMutation.isError && <p className="text-sm text-danger-text">Erro ao criar processo. Tente novamente.</p>}
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setNewProcessOpen(false)}>Cancelar</Button>
               <Button
                 type="submit"
                 disabled={createMutation.isPending || !newProcessForm.title.trim() || !newProcessForm.clientId}
-                className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+                className="bg-accent hover:bg-accent-hover text-white"
               >
                 {createMutation.isPending ? 'Criando...' : 'Criar processo'}
               </Button>
