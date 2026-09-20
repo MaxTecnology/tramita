@@ -7,8 +7,7 @@ async function main() {
   // Plano interno só para satisfazer o vínculo obrigatório Organization.planId
   // da própria org AutoHubs — isActive: false o esconde da listagem pública de
   // registro (GET /organizations/plans), só aparece pro Master no painel
-  // interno de planos. Os planos reais (Starter/Pro/Enterprise) e a primeira
-  // org cliente (ex: G2A) são cadastrados depois, pelo próprio painel.
+  // interno de planos.
   const internalPlan = await prisma.plan.upsert({
     where: { id: 'plan-internal-autohubs' },
     update: {},
@@ -21,6 +20,21 @@ async function main() {
       isActive: false,
     },
   })
+
+  // Planos públicos — valores placeholder, editáveis pelo painel Master
+  // (/master/plans) sem precisar de redeploy.
+  const publicPlans = [
+    { id: 'plan-starter', name: 'Starter', maxClients: 10, priceMonthly: 97 },
+    { id: 'plan-pro', name: 'Pro', maxClients: 50, priceMonthly: 197 },
+    { id: 'plan-enterprise', name: 'Enterprise', maxClients: 500, priceMonthly: 497 },
+  ]
+  for (const plan of publicPlans) {
+    await prisma.plan.upsert({
+      where: { id: plan.id },
+      update: {},
+      create: { ...plan, features: {}, isActive: true },
+    })
+  }
 
   // Master org (AutoHubs itself)
   const masterOrg = await prisma.organization.upsert({
@@ -53,7 +67,9 @@ async function main() {
     },
   })
 
-  console.log(`Seed concluído: org AutoHubs + usuário MASTER (${masterEmail})`)
+  console.log(
+    `Seed concluído: org AutoHubs + usuário MASTER (${masterEmail}) + ${publicPlans.length} planos públicos`,
+  )
 }
 
 main()
