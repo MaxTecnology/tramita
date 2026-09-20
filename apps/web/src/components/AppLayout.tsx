@@ -41,7 +41,7 @@ export default function AppLayout() {
   useRequestsBadgeStream()
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -53,27 +53,33 @@ export default function AppLayout() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-56 bg-white border-r border-gray-200 flex flex-col',
+          'fixed inset-y-0 left-0 z-50 w-56 bg-surface border-r border-border flex flex-col',
           'transition-transform duration-200',
           'md:relative md:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         )}
       >
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <div className="min-w-0">
-            <h1 className="text-lg font-bold text-blue-600">Tramita</h1>
-            <p className="text-xs text-gray-500 truncate">{user?.name}</p>
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <div className="min-w-0 flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-accent to-accent-hover flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-foreground leading-none">Tramita</h1>
+              <p className="text-xs text-muted-foreground truncate">{user?.name}</p>
+            </div>
           </div>
           <button
             aria-label="Fechar menu"
             onClick={() => setSidebarOpen(false)}
-            className="md:hidden p-1 text-gray-400 hover:text-gray-600"
+            className="md:hidden p-1 text-muted-foreground hover:text-foreground"
           >
             <X size={18} />
           </button>
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+          {ORG_ROLES.includes(role) && (
+            <SidebarSectionLabel>Geral</SidebarSectionLabel>
+          )}
           {ORG_ROLES.includes(role) && (
             <SidebarLink to="/app/dashboard" icon={<LayoutDashboard size={16} />} label="Dashboard" onClick={handleNavClick} />
           )}
@@ -95,6 +101,10 @@ export default function AppLayout() {
           {ADMIN_ROLES.includes(role) && (
             <SidebarLink to="/app/users" icon={<Users size={16} />} label="Usuários" onClick={handleNavClick} />
           )}
+
+          {ADMIN_ROLES.includes(role) && (
+            <SidebarSectionLabel>Configurações</SidebarSectionLabel>
+          )}
           {ADMIN_ROLES.includes(role) && (
             <SidebarLink to="/app/settings/templates" icon={<Settings size={16} />} label="Templates" onClick={handleNavClick} />
           )}
@@ -106,11 +116,11 @@ export default function AppLayout() {
           )}
         </nav>
 
-        <div className="p-3 border-t border-gray-200 space-y-1">
+        <div className="p-3 border-t border-border space-y-1">
           <SidebarLink to="/app/perfil" icon={<UserCircle size={16} />} label="Meu Perfil" onClick={handleNavClick} />
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-100"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-neutral-bg"
           >
             <LogOut size={16} />
             Sair
@@ -121,21 +131,29 @@ export default function AppLayout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top-bar */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-surface border-b border-border flex-shrink-0">
           <button
             aria-label="Abrir menu de navegação"
             onClick={() => setSidebarOpen(true)}
-            className="p-1 text-gray-500 hover:text-gray-700"
+            className="p-1 text-muted-foreground hover:text-foreground"
           >
             <Menu size={22} />
           </button>
-          <h1 className="text-base font-bold text-blue-600">Tramita</h1>
+          <h1 className="text-base font-bold text-accent">Tramita</h1>
         </header>
 
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
       </div>
+    </div>
+  )
+}
+
+function SidebarSectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-3 mb-1.5 mt-3 first:mt-0">
+      {children}
     </div>
   )
 }
@@ -161,15 +179,15 @@ function SidebarLink({
         cn(
           'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
           isActive
-            ? 'bg-blue-50 text-blue-700 font-medium'
-            : 'text-gray-600 hover:bg-gray-100',
+            ? 'bg-neutral-bg text-accent font-medium'
+            : 'text-muted-foreground hover:bg-neutral-bg',
         )
       }
     >
       {icon}
       <span className="flex-1">{label}</span>
       {!!badge && badge > 0 && (
-        <span className="flex-shrink-0 min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-xs font-medium flex items-center justify-center">
+        <span className="flex-shrink-0 min-w-[1.25rem] h-5 px-1 rounded-full bg-danger-text text-white text-xs font-medium flex items-center justify-center">
           {badge > 9 ? '9+' : badge}
         </span>
       )}
