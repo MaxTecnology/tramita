@@ -1,1 +1,49 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+
+  --color-background: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-border: #E7ECF3;
+  --color-foreground: #0F1D2E;
+  --color-muted-foreground: #64748B;
+  --color-accent: #1E3A5F;
+  --color-accent-hover: #2563A8;
+  --color-warning-bg: #FEF3C7;
+  --color-warning-text: #B45309;
+  --color-success-bg: #ECFDF9;
+  --color-success-text: #0D9488;
+  --color-neutral-bg: #F1F5F9;
+  --color-neutral-text: #64748B;
+  --color-danger-bg: #FEE2E2;
+  --color-danger-text: #DC2626;
+  --color-danger-hover: #B91C1C;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: #0B1220;
+    --color-surface: #131B2E;
+    --color-border: #263449;
+    --color-foreground: #F1F5F9;
+    --color-muted-foreground: #94A3B8;
+    --color-accent: #3B82F6;
+    --color-accent-hover: #93C5FD;
+    --color-warning-bg: #452C0A;
+    --color-warning-text: #FBBF24;
+    --color-success-bg: #0F2E2A;
+    --color-success-text: #2DD4BF;
+    --color-neutral-bg: #1E293B;
+    --color-neutral-text: #94A3B8;
+    --color-danger-bg: #450A0A;
+    --color-danger-text: #F87171;
+    --color-danger-hover: #FCA5A5;
+  }
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
