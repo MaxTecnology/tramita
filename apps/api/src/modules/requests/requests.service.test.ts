@@ -6,6 +6,7 @@ import {
   createTestOrg,
   createTestUser,
   createTestClient,
+  createTestDepartment,
 } from '@/test/helpers'
 import * as queue from '@/lib/queue'
 import {
@@ -188,6 +189,39 @@ describe('approveRequest', () => {
     await expect(
       approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' }),
     ).rejects.toMatchObject({ statusCode: 422 })
+  })
+
+  it('mode NEW_BOARD herda o departmentId da request para a task criada', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Abertura de LTDA', departmentId: department.id })
+
+    const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
+
+    const task = await prisma.task.findUnique({ where: { id: approved.taskId! } })
+    expect(task?.departmentId).toBe(department.id)
+  })
+
+  it('mode EXISTING_BOARD herda o departmentId da request para a task criada', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const existingBoard = await createBoard(org.id, admin.id, 'ORG_ADMIN', { title: 'Processo já aberto', clientId: client.id })
+    const request = await createRequest(org.id, client.id, { title: 'Documento extra', departmentId: department.id })
+
+    const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', {
+      mode: 'EXISTING_BOARD',
+      boardId: existingBoard.id,
+      columnId: existingBoard.columns[0].id,
+    })
+
+    const task = await prisma.task.findUnique({ where: { id: approved.taskId! } })
+    expect(task?.departmentId).toBe(department.id)
   })
 })
 

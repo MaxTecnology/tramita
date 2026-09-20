@@ -1,6 +1,16 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { deleteComment, listComments } from './comments.service'
+import * as queue from '@/lib/queue'
+import { deleteComment, listComments, createComment } from './comments.service'
+import {
+  createTestPlan,
+  createTestOrg,
+  createTestUser,
+  createTestClient,
+  createTestBoard,
+  createTestColumn,
+  createTestDepartment,
+} from '@/test/helpers'
 
 async function createPlan() {
   return prisma.plan.create({
@@ -121,5 +131,80 @@ describe('listComments - soft delete visibility', () => {
 
     const resultAdmin = await listComments(task.id, org.id, 'ORG_ADMIN')
     expect((resultAdmin[0] as any).deletedContent).toBe('Segredo')
+  })
+})
+
+describe('createComment - roteamento de notificação por departamento', () => {
+  beforeEach(() => {
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue(undefined)
+  })
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it('com departmentId na task, notifica apenas o responsável daquele departamento', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id, { position: 0 })
+    const departmentA = await createTestDepartment(org.id, { name: `Dept A ${Date.now()}` })
+    const departmentB = await createTestDepartment(org.id, { name: `Dept B ${Date.now()}` })
+    const userA = await createTestUser(org.id, { email: `a-${Date.now()}@test.com` })
+    const userB = await createTestUser(org.id, { email: `b-${Date.now()}@test.com` })
+    await prisma.clientAssignment.create({
+      data: { clientId: client.id, departmentId: departmentA.id, userId: userA.id },
+    })
+    await prisma.clientAssignment.create({
+      data: { clientId: client.id, departmentId: departmentB.id, userId: userB.id },
+    })
+    const task = await prisma.task.create({
+      data: {
+        title: 'Tarefa com departamento',
+        position: 0,
+        columnId: column.id,
+        creatorId: userA.id,
+        departmentId: departmentA.id,
+      },
+    })
+
+    await createComment(task.id, { content: 'Olá' }, { id: client.id, role: 'CLIENT', organizationId: org.id })
+
+    expect(queue.enqueueNotification).toHaveBeenCalledTimes(1)
+    expect(queue.enqueueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: userA.id }),
+    )
+  })
+
+  it('sem departmentId na task, cai no fallback e notifica todos os responsáveis do cliente', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id, { position: 0 })
+    const departmentA = await createTestDepartment(org.id, { name: `Dept A ${Date.now()}` })
+    const departmentB = await createTestDepartment(org.id, { name: `Dept B ${Date.now()}` })
+    const userA = await createTestUser(org.id, { email: `a-${Date.now()}@test.com` })
+    const userB = await createTestUser(org.id, { email: `b-${Date.now()}@test.com` })
+    await prisma.clientAssignment.create({
+      data: { clientId: client.id, departmentId: departmentA.id, userId: userA.id },
+    })
+    await prisma.clientAssignment.create({
+      data: { clientId: client.id, departmentId: departmentB.id, userId: userB.id },
+    })
+    const task = await prisma.task.create({
+      data: {
+        title: 'Tarefa sem departamento',
+        position: 0,
+        columnId: column.id,
+        creatorId: userA.id,
+      },
+    })
+
+    await createComment(task.id, { content: 'Olá' }, { id: client.id, role: 'CLIENT', organizationId: org.id })
+
+    expect(queue.enqueueNotification).toHaveBeenCalledTimes(2)
+    const notifiedUserIds = vi.mocked(queue.enqueueNotification).mock.calls.map((c) => c[0].userId)
+    expect(notifiedUserIds).toContain(userA.id)
+    expect(notifiedUserIds).toContain(userB.id)
   })
 })
