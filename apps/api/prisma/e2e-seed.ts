@@ -5,8 +5,34 @@ import bcrypt from 'bcryptjs'
 const prisma = new PrismaClient()
 
 async function main() {
-  const org = await prisma.organization.findUniqueOrThrow({ where: { slug: 'g2a' } })
-  const admin = await prisma.user.findUniqueOrThrow({ where: { email: 'admin@g2a.com.br' } })
+  // Depende do seed base (prisma/seed.ts) já ter rodado antes — usa o plano
+  // "Pro" criado lá. A org G2A só existe em banco de teste/E2E, nunca em
+  // produção — por isso fica isolada aqui em vez de em prisma/seed.ts.
+  const plan = await prisma.plan.findFirstOrThrow({ where: { name: 'Pro' } })
+
+  const org = await prisma.organization.upsert({
+    where: { slug: 'g2a' },
+    update: {},
+    create: {
+      name: 'G2A Contabilidade',
+      slug: 'g2a',
+      email: 'contato@g2a.com.br',
+      planId: plan.id,
+      subscriptionStatus: 'ACTIVE',
+    },
+  })
+
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@g2a.com.br' },
+    update: {},
+    create: {
+      name: 'Admin G2A',
+      email: 'admin@g2a.com.br',
+      passwordHash: await bcrypt.hash('G2A@Admin2025', 10),
+      role: 'ORG_ADMIN',
+      organizationId: org.id,
+    },
+  })
 
   // Remove stale E2E data to guarantee a clean slate
   const staleBoards = await prisma.board.findMany({
@@ -71,7 +97,7 @@ async function main() {
     },
   })
 
-  console.log('E2E seed concluído: cliente@g2a.com.br + board "Processo E2E"')
+  console.log('E2E seed concluído: org G2A + admin@g2a.com.br + cliente@g2a.com.br + board "Processo E2E"')
 }
 
 main()
