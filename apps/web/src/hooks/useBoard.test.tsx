@@ -38,6 +38,7 @@ const mockBoard: Board = {
           dueDate: null,
           description: null,
           sourceRequestId: null,
+          departmentId: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },

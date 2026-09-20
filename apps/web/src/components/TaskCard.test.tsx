@@ -17,6 +17,7 @@ const baseTask: Task = {
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   sourceRequestId: null,
+  departmentId: null,
 }
 
 it('renders task title', () => {

@@ -17,6 +17,7 @@ import Templates from '@/pages/app/settings/Templates'
 import Notifications from '@/pages/app/settings/Notifications'
 import AppSubscription from '@/pages/app/settings/Subscription'
 import Profile from '@/pages/app/settings/Profile'
+import Departments from '@/pages/app/settings/Departments'
 import DashboardMetrics from '@/pages/app/DashboardMetrics'
 import Processes from '@/pages/app/Processes'
 import Requests from '@/pages/app/Requests'
@@ -96,6 +97,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <AppSubscription />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/departments',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <Departments />
           </ProtectedRoute>
         ),
       },

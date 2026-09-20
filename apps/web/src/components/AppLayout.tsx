@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { useRequestsBadgeStream } from '@/hooks/useRequestsBadgeStream'
 import { api } from '@/lib/api'
-import { LayoutDashboard, Users, UserCheck, Bell, CreditCard, Settings, LogOut, ClipboardList, Inbox, Menu, X, UserCircle } from 'lucide-react'
+import { LayoutDashboard, Users, UserCheck, Bell, CreditCard, Settings, LogOut, ClipboardList, Inbox, Menu, X, UserCircle, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER']
@@ -113,6 +113,9 @@ export default function AppLayout() {
           )}
           {ADMIN_ROLES.includes(role) && (
             <SidebarLink to="/app/settings/subscription" icon={<CreditCard size={16} />} label="Assinatura" onClick={handleNavClick} />
+          )}
+          {ADMIN_ROLES.includes(role) && (
+            <SidebarLink to="/app/settings/departments" icon={<Building2 size={16} />} label="Departamentos" onClick={handleNavClick} />
           )}
         </nav>
 

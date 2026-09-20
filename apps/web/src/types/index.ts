@@ -13,6 +13,7 @@ export interface Task {
   createdAt: string
   updatedAt: string
   sourceRequestId: string | null
+  departmentId: string | null
 }
 
 export interface Column {
@@ -115,7 +116,15 @@ export interface ClientRequest {
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
   rejectionReason: string | null
   taskId: string | null
+  departmentId: string | null
   createdAt: string
   attachments?: RequestAttachment[]
   client?: { id: string; name: string }
+}
+
+export interface Department {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
 }
