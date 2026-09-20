@@ -65,8 +65,8 @@ jobs:
       - name: Type-check do frontend
         run: pnpm --filter web exec tsc --noEmit
 
-      - name: Testes da API
-        run: pnpm --filter api test
+      - name: Testes da API com cobertura (mínimo 80%)
+        run: pnpm --filter api test:coverage
 
       - name: Testes do frontend
         run: pnpm --filter web test

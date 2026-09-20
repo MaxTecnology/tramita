@@ -19,17 +19,18 @@ Nenhum arquivo de teste em `apps/api/src` usa mais `vi.mock(module, factory)` pa
 
 **Pendente (não é uma ação urgente, só uma nota pra quem tocar isso no futuro):** se o `moduleResolution` da API for trocado pra `NodeNext`/`Node16` (mais correto para ESM puro), os `import` statements em `src/` passariam a exigir extensão `.js` explícita no próprio código-fonte (regra do NodeNext), e a flag `--resolve-full-paths` deixaria de ser necessária — mas não seria prejudicial mantê-la mesmo assim.
 
-## Cobertura de testes da API abaixo do threshold configurado (80%) (registrado em 2026-09-20)
+## Cobertura de testes da API abaixo do threshold configurado (80%) ✅ (resolvido em 2026-09-20)
 
-**Contexto:** `apps/api/vitest.config.ts` já define `coverage.thresholds: { lines: 80, functions: 80 }`, mas a cobertura real hoje é 71.73% (linhas) e 68.05% (funções) — `pnpm --filter api test:coverage` falha com `ERROR: Coverage ... does not meet global threshold`. Por isso o job de CI roda `pnpm --filter api test` (sem `--coverage`), sem bloquear por esse threshold por enquanto.
+**Contexto original:** `apps/api/vitest.config.ts` já define `coverage.thresholds: { lines: 80, functions: 80 }`, mas a cobertura real estava em 71.73% (linhas) e 68.05% (funções) — `pnpm --filter api test:coverage` falhava com `ERROR: Coverage ... does not meet global threshold`. O job de CI rodava `pnpm --filter api test` (sem `--coverage`), sem bloquear por esse threshold.
 
-**Onde a cobertura está mais baixa (lógica de negócio, não rotas simples):**
-- `modules/users/users.service.ts` — 36% (geração de senha temporária, CRUD de usuários internos)
-- `modules/organizations/organizations.service.ts` — 55% (vínculo com Asaas, criação manual pelo Master, rollback em falha)
-- `modules/tasks/tasks.service.ts` — 61% (movimentação, histórico automático)
-- `modules/portal/portal.routes.ts` — 65% (mistura rota simples com alguma lógica de acesso do cliente)
+**Resolvido:** escritos testes de borda (casos de falha, isolamento por organização, não apenas caminho feliz) para os services de lógica de negócio mais fracos, sem tocar em rotas/controllers simples (política deste projeto):
+- `modules/dashboard/dashboard.service.ts` — 0.8% → 98.52% (não tinha nenhum teste; agregação de KPIs, detecção de atraso, ordenação de `atRisk`)
+- `modules/clients/clients.service.ts` — 21.95% → cobertura completa dos fluxos de CRUD, e-mail duplicado por organização, `setAssignments`/`listAssignments`
+- `modules/columns/columns.service.ts` — 6.25% → cobertura completa de CRUD + isolamento por organização
+- `modules/users/users.service.ts` — 36% → cobertura de `createUser`, `updateUser`, `deleteUser`, `getMyProfile`, `updateMyProfile` (antes só `resetUserPassword` era testado)
+- `modules/tasks/tasks.service.ts` — 61% → cobertura de `createTask`, `updateTask` (histórico condicional), `reorderTasks`, `deleteTask`, `getTaskHistory` (antes só `moveTask` era testado)
 
-**Pendente:** escrever testes de borda para os services acima (não para rotas/controllers simples, seguindo a política deste projeto de só testar lógica crítica de negócio), até a cobertura real passar de 80%, e então trocar `test` por `test:coverage` de volta no `.github/workflows/ci.yml`.
+Cobertura global final: 82.76% linhas / 78.09% branches / 81.25% funções (248 testes, 35 arquivos). `pnpm --filter api test:coverage` passa com exit 0. `.github/workflows/ci.yml` voltou a rodar `test:coverage` (enforcement reativado).
 
 ## `TaskDrawer` não atualiza o próprio título após salvar edição inline (encontrado em 2026-09-20)
 
