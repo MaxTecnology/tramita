@@ -5,9 +5,15 @@ import {
   updateClient,
   deleteClient,
   listAssignments,
-  setAssignments,
+  setAssignment,
 } from '@/modules/clients/clients.service'
-import { createTestPlan, createTestOrg, createTestUser, createTestClient } from '@/test/helpers'
+import {
+  createTestPlan,
+  createTestOrg,
+  createTestUser,
+  createTestClient,
+  createTestDepartment,
+} from '@/test/helpers'
 
 describe('createClient', () => {
   it('creates a client with hashed password, scoped to the organization', async () => {
@@ -97,58 +103,91 @@ describe('deleteClient', () => {
   })
 })
 
-describe('setAssignments / listAssignments', () => {
-  it('assigns users to a client and lists them back', async () => {
+describe('setAssignment / listAssignments', () => {
+  it('assigns a user to a client department and lists it back', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
     const user = await createTestUser(org.id)
 
-    const result = await setAssignments(client.id, org.id, [user.id])
+    const result = await setAssignment(client.id, org.id, department.id, user.id)
 
     expect(result).toHaveLength(1)
     expect(result[0].userId).toBe(user.id)
+    expect(result[0].departmentId).toBe(department.id)
 
     const listed = await listAssignments(client.id, org.id)
     expect(listed).toHaveLength(1)
   })
 
-  it('replaces previous assignments instead of appending', async () => {
+  it('replaces the previous assignment for the same department instead of appending', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
     const userA = await createTestUser(org.id, { email: `a-${Date.now()}@test.com` })
     const userB = await createTestUser(org.id, { email: `b-${Date.now()}@test.com` })
 
-    await setAssignments(client.id, org.id, [userA.id])
-    const result = await setAssignments(client.id, org.id, [userB.id])
+    await setAssignment(client.id, org.id, department.id, userA.id)
+    const result = await setAssignment(client.id, org.id, department.id, userB.id)
 
     expect(result).toHaveLength(1)
     expect(result[0].userId).toBe(userB.id)
   })
 
-  it('clears assignments when given an empty list', async () => {
+  it('keeps assignments across different departments independent', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
-    const user = await createTestUser(org.id)
-    await setAssignments(client.id, org.id, [user.id])
+    const departmentA = await createTestDepartment(org.id, { name: `Dept A ${Date.now()}` })
+    const departmentB = await createTestDepartment(org.id, { name: `Dept B ${Date.now()}` })
+    const userA = await createTestUser(org.id, { email: `a-${Date.now()}@test.com` })
+    const userB = await createTestUser(org.id, { email: `b-${Date.now()}@test.com` })
 
-    const result = await setAssignments(client.id, org.id, [])
+    await setAssignment(client.id, org.id, departmentA.id, userA.id)
+    const result = await setAssignment(client.id, org.id, departmentB.id, userB.id)
+
+    expect(result).toHaveLength(2)
+  })
+
+  it('clears the assignment for a department when userId is null', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const user = await createTestUser(org.id)
+    await setAssignment(client.id, org.id, department.id, user.id)
+
+    const result = await setAssignment(client.id, org.id, department.id, null)
 
     expect(result).toHaveLength(0)
   })
 
-  it('throws 400 when a userId does not belong to the organization', async () => {
+  it('throws 400 when userId does not belong to the organization', async () => {
     const plan = await createTestPlan()
     const orgA = await createTestOrg(plan.id)
     const orgB = await createTestOrg(plan.id)
     const client = await createTestClient(orgA.id)
+    const department = await createTestDepartment(orgA.id)
     const foreignUser = await createTestUser(orgB.id)
 
     await expect(
-      setAssignments(client.id, orgA.id, [foreignUser.id]),
+      setAssignment(client.id, orgA.id, department.id, foreignUser.id),
     ).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  it('throws 404 when departmentId does not belong to the organization', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id)
+    const client = await createTestClient(orgA.id)
+    const user = await createTestUser(orgA.id)
+    const foreignDepartment = await createTestDepartment(orgB.id)
+
+    await expect(
+      setAssignment(client.id, orgA.id, foreignDepartment.id, user.id),
+    ).rejects.toMatchObject({ statusCode: 404 })
   })
 
   it('throws 404 when client belongs to a different organization', async () => {

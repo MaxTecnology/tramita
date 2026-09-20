@@ -128,6 +128,18 @@ export async function createTestTask(
   })
 }
 
+export async function createTestDepartment(
+  organizationId: string,
+  overrides?: Partial<{ name: string }>,
+) {
+  return prisma.department.create({
+    data: {
+      name: overrides?.name ?? `Test Department ${Date.now()}`,
+      organizationId,
+    },
+  })
+}
+
 // Convenience: returns "Bearer <accessToken>"
 export async function getAuthHeader(email: string, password: string): Promise<string> {
   const res = await loginAs(email, password)

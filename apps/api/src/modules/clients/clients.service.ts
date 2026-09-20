@@ -65,33 +65,42 @@ export async function listAssignments(clientId: string, organizationId: string) 
     where: { clientId },
     select: {
       id: true,
+      departmentId: true,
       userId: true,
+      department: { select: { id: true, name: true } },
       user: { select: { id: true, name: true, email: true, role: true } },
     },
   })
 }
 
-export async function setAssignments(clientId: string, organizationId: string, userIds: string[]) {
+export async function setAssignment(
+  clientId: string,
+  organizationId: string,
+  departmentId: string,
+  userId: string | null,
+) {
   const client = await prisma.client.findFirst({ where: { id: clientId, organizationId } })
   if (!client) throw new AppError(404, 'Cliente não encontrado')
 
-  if (userIds.length > 0) {
-    const validUsers = await prisma.user.findMany({
-      where: { id: { in: userIds }, organizationId, isActive: true },
-      select: { id: true },
-    })
-    if (validUsers.length !== userIds.length) throw new AppError(400, 'Um ou mais usuários inválidos')
+  const department = await prisma.department.findFirst({ where: { id: departmentId, organizationId } })
+  if (!department) throw new AppError(404, 'Departamento não encontrado')
+
+  if (userId === null) {
+    await prisma.clientAssignment.deleteMany({ where: { clientId, departmentId } })
+    return listAssignments(clientId, organizationId)
   }
 
-  await prisma.$transaction([
-    prisma.clientAssignment.deleteMany({ where: { clientId } }),
-    ...(userIds.length > 0
-      ? [prisma.clientAssignment.createMany({
-          data: userIds.map((userId) => ({ clientId, userId })),
-          skipDuplicates: true,
-        })]
-      : []),
-  ])
+  const validUser = await prisma.user.findFirst({
+    where: { id: userId, organizationId, isActive: true },
+    select: { id: true },
+  })
+  if (!validUser) throw new AppError(400, 'Usuário inválido')
+
+  await prisma.clientAssignment.upsert({
+    where: { clientId_departmentId: { clientId, departmentId } },
+    update: { userId },
+    create: { clientId, departmentId, userId },
+  })
 
   return listAssignments(clientId, organizationId)
 }
