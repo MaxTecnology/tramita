@@ -19,7 +19,7 @@ Nenhum arquivo de teste em `apps/api/src` usa mais `vi.mock(module, factory)` pa
 
 **Pendente (não é uma ação urgente, só uma nota pra quem tocar isso no futuro):** se o `moduleResolution` da API for trocado pra `NodeNext`/`Node16` (mais correto para ESM puro), os `import` statements em `src/` passariam a exigir extensão `.js` explícita no próprio código-fonte (regra do NodeNext), e a flag `--resolve-full-paths` deixaria de ser necessária — mas não seria prejudicial mantê-la mesmo assim.
 
-## Cobertura de testes da API abaixo do threshold configurado (80%)
+## Cobertura de testes da API abaixo do threshold configurado (80%) (registrado em 2026-09-20)
 
 **Contexto:** `apps/api/vitest.config.ts` já define `coverage.thresholds: { lines: 80, functions: 80 }`, mas a cobertura real hoje é 71.73% (linhas) e 68.05% (funções) — `pnpm --filter api test:coverage` falha com `ERROR: Coverage ... does not meet global threshold`. Por isso o job de CI roda `pnpm --filter api test` (sem `--coverage`), sem bloquear por esse threshold por enquanto.
 

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { hashPassword, generateRandomPassword } from '@/modules/auth/auth.service'
+import * as asaas from '@/lib/asaas'
 import type {
   UpdateOrgBody, RegisterOrgBody, CreateOrgByMasterBody,
 } from '@/modules/organizations/organizations.schema'
@@ -80,10 +81,8 @@ export async function register(data: RegisterOrgBody) {
   })
 
   try {
-    // Dynamic import so vi.mock() can intercept in tests
-    const { createCustomer, createSubscription } = await import('@/lib/asaas')
-    const customer = await createCustomer({ name: data.name, email: data.email, cpfCnpj: data.cnpj })
-    const subscription = await createSubscription({
+    const customer = await asaas.createCustomer({ name: data.name, email: data.email, cpfCnpj: data.cnpj })
+    const subscription = await asaas.createSubscription({
       customer: customer.id,
       billingType: 'BOLETO',
       value: Number(plan.priceMonthly),
@@ -135,9 +134,8 @@ export async function createOrganizationByMaster(data: CreateOrgByMasterBody) {
 
   if (data.createAsaasSubscription) {
     try {
-      const { createCustomer, createSubscription } = await import('@/lib/asaas')
-      const customer = await createCustomer({ name: data.name, email: data.email, cpfCnpj: data.cnpj })
-      const subscription = await createSubscription({
+      const customer = await asaas.createCustomer({ name: data.name, email: data.email, cpfCnpj: data.cnpj })
+      const subscription = await asaas.createSubscription({
         customer: customer.id,
         billingType: 'BOLETO',
         value: Number(plan.priceMonthly),

@@ -51,6 +51,9 @@ async function main() {
 
   // MASTER user — update always re-hashes so reruns respect the current MASTER_PASSWORD
   const masterEmail = process.env.MASTER_EMAIL ?? 'master@autohubs.com.br'
+  if (!process.env.MASTER_PASSWORD && process.env.NODE_ENV === 'production') {
+    throw new Error('MASTER_PASSWORD precisa estar definida em produção — não usar o valor padrão de desenvolvimento.')
+  }
   const masterPasswordHash = await bcrypt.hash(
     process.env.MASTER_PASSWORD ?? 'Master@AutoHubs2025',
     10,

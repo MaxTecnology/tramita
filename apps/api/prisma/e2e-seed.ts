@@ -2,6 +2,14 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
+const dbUrl = process.env.DATABASE_URL ?? ''
+if (!dbUrl.includes('_test') || process.env.NODE_ENV === 'production') {
+  throw new Error(
+    'e2e-seed.ts só pode rodar contra um banco de teste (DATABASE_URL precisa apontar para um banco cujo nome contenha "_test", e NODE_ENV não pode ser "production"). ' +
+    `DATABASE_URL atual: ${dbUrl.replace(/:[^:@]+@/, ':***@')}`,
+  )
+}
+
 const prisma = new PrismaClient()
 
 async function main() {
