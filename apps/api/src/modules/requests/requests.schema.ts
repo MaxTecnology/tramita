@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const createRequestSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
+  departmentId: z.string().cuid().optional(),
 })
 
 export const approveRequestSchema = z.discriminatedUnion('mode', [

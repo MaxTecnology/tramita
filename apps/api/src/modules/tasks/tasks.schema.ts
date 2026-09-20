@@ -7,6 +7,7 @@ export const createTaskSchema = z.object({
   assigneeId: z.string().cuid().optional(),
   dueDate: z.string().datetime().optional(),
   tags: z.array(z.string()).default([]),
+  departmentId: z.string().cuid().optional(),
 })
 
 export const updateTaskSchema = z.object({
@@ -16,6 +17,7 @@ export const updateTaskSchema = z.object({
   assigneeId: z.string().cuid().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   tags: z.array(z.string()).optional(),
+  departmentId: z.string().cuid().nullable().optional(),
 })
 
 export const moveTaskSchema = z.object({

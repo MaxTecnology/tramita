@@ -65,6 +65,7 @@ export async function createTask(
         assigneeId: data.assigneeId,
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
         tags: data.tags,
+        departmentId: data.departmentId,
         position,
         columnId,
         creatorId: actor.id,
@@ -206,6 +207,7 @@ export async function updateTask(
           : data.dueDate !== undefined ? new Date(data.dueDate)
           : undefined,
         tags: data.tags,
+        departmentId: data.departmentId,
       },
     })
 

@@ -92,7 +92,9 @@ export async function createComment(
   if (isClient) {
     // Client commented → notify assigned collaborators; fallback to admin + manager
     const assignments = await prisma.clientAssignment.findMany({
-      where: { clientId: actor.id },
+      where: task.departmentId
+        ? { clientId: actor.id, departmentId: task.departmentId }
+        : { clientId: actor.id },
       select: { userId: true },
     })
     const recipientIds = assignments.length > 0

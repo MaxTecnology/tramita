@@ -18,12 +18,20 @@ export async function createRequest(
   if (!client) throw new AppError(404, 'Cliente não encontrado')
 
   const request = await prisma.request.create({
-    data: { organizationId, clientId, title: data.title, description: data.description },
+    data: {
+      organizationId,
+      clientId,
+      title: data.title,
+      description: data.description,
+      departmentId: data.departmentId,
+    },
   })
 
   // Notifica responsáveis atribuídos ao cliente; fallback para ORG_ADMIN + ORG_MANAGER
   const assignments = await prisma.clientAssignment.findMany({
-    where: { clientId },
+    where: request.departmentId
+      ? { clientId, departmentId: request.departmentId }
+      : { clientId },
     select: { userId: true },
   })
 
@@ -125,7 +133,13 @@ export async function approveRequest(
   const task = await createTask(
     columnId,
     organizationId,
-    { title: request.title, description: request.description ?? undefined, priority: 'MEDIUM', tags: [] },
+    {
+      title: request.title,
+      description: request.description ?? undefined,
+      priority: 'MEDIUM',
+      tags: [],
+      departmentId: request.departmentId ?? undefined,
+    },
     { id: reviewerId, type: 'user' },
   )
 
