@@ -27,20 +27,29 @@ const STATUS_STYLE: Record<ClientRequest['status'], string> = {
 export default function PortalRequests() {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ title: '', description: '' })
+  const [form, setForm] = useState({ title: '', description: '', departmentId: '' })
 
   const { data: requests = [], isLoading } = useQuery<ClientRequest[]>({
     queryKey: ['portal-requests'],
     queryFn: () => api.get('/portal/requests').then((r) => r.data),
   })
 
+  const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['portal-departments'],
+    queryFn: () => api.get('/portal/departments').then((r) => r.data),
+  })
+
   const createMutation = useMutation({
-    mutationFn: () => api.post('/portal/requests', form).then((r) => r.data),
+    mutationFn: () => api.post('/portal/requests', {
+      title: form.title,
+      description: form.description,
+      departmentId: form.departmentId || undefined,
+    }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Solicitação enviada')
       qc.invalidateQueries({ queryKey: ['portal-requests'] })
       setOpen(false)
-      setForm({ title: '', description: '' })
+      setForm({ title: '', description: '', departmentId: '' })
     },
     onError: () => toast.error('Erro ao enviar solicitação'),
   })
@@ -130,6 +139,20 @@ export default function PortalRequests() {
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 resize-none"
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="req-department">Departamento (opcional)</Label>
+              <select
+                id="req-department"
+                value={form.departmentId}
+                onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
+                className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <option value="">Não sei / Geral</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
             </div>
             {createMutation.isError && <p className="text-sm text-red-600">Erro ao enviar. Tente novamente.</p>}
             <div className="flex justify-end gap-2 pt-2">

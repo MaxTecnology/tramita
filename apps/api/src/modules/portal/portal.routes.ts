@@ -6,6 +6,7 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { updateProfileSchema } from './portal.schema'
 import { getClientProfile, updateClientProfile, getTaskHistory } from './portal.service'
+import { listDepartments } from '@/modules/departments/departments.service'
 import { createRequestSchema } from '@/modules/requests/requests.schema'
 import {
   createRequest,
@@ -36,6 +37,10 @@ export async function portalRoutes(app: FastifyInstance) {
   app.get('/tasks/:taskId/history', async (request, reply) => {
     const { taskId } = request.params as { taskId: string }
     return reply.send(await getTaskHistory(taskId, request.user.organizationId!))
+  })
+
+  app.get('/departments', async (request, reply) => {
+    return reply.send(await listDepartments(request.user.organizationId!))
   })
 
   app.post('/requests', { preHandler: [checkSubscription] }, async (request, reply) => {

@@ -66,8 +66,14 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
 
   const canEdit = isOrgRole(role)
 
+  const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['departments'],
+    queryFn: () => api.get('/departments').then((r) => r.data),
+    enabled: canEdit,
+  })
+
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<Pick<Task, 'title' | 'priority' | 'description' | 'dueDate'>>) =>
+    mutationFn: (data: Partial<Pick<Task, 'title' | 'priority' | 'description' | 'dueDate' | 'departmentId'>>) =>
       api.patch(`/tasks/${task.id}`, data).then((r) => r.data),
     onSuccess: () => {
       toast.success('Tarefa atualizada')
@@ -179,6 +185,19 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
               <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', PRIORITY_COLOR[task.priority])}>
                 {PRIORITY_LABEL[task.priority]}
               </span>
+            )}
+
+            {canEdit && (
+              <select
+                value={task.departmentId ?? ''}
+                onChange={(e) => updateMutation.mutate({ departmentId: e.target.value || null })}
+                className="text-xs font-medium px-2 py-0.5 rounded-full border border-gray-200 text-gray-600 cursor-pointer bg-white"
+              >
+                <option value="">Sem departamento</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
             )}
 
             {canEdit ? (
