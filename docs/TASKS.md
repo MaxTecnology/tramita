@@ -220,11 +220,16 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
 
 ### Roadmap de sub-projetos ativos (ordem de prioridade ainda em aberto, exceto o item 1)
 1. [x] **Redesign visual premium — fundação** (concluído em 2026-09-20) — tokens de design (paleta petróleo/âmbar/teal/danger, dark mode nativo via `prefers-color-scheme`, fonte Inter), aplicado a `AppLayout` (com o menu reagrupado sob "Configurações") + `DashboardMetrics` + `Processes` + `Board` + componentes base `shadcn/ui`. Ver `docs/superpowers/specs/2026-09-20-visual-redesign-foundation-design.md` e `docs/superpowers/plans/2026-09-20-visual-redesign-foundation.md`. Pendente pra fases futuras do redesign: Portal do cliente, Clientes/Usuários, Master, telas de Configurações, `TaskCard.tsx` (ver `docs/tech-debt.md`).
-2. [ ] Tarefas recorrentes (semanal/mensal/trimestral/anual) + Calendário mensal — pedido original do usuário que iniciou essa sessão de brainstorming
+2. Tarefas recorrentes (semanal/mensal/trimestral/anual) + Calendário mensal — pedido original do usuário que iniciou essa sessão de brainstorming. Escopo grande demais pra uma spec só, decomposto em sub-fases durante o brainstorming (cada uma com spec/plano próprios):
+   - [x] **2a. Departamentos + responsabilidade por cliente** (concluído em 2026-09-20) — fundação organizacional: `Department` (configurável por organização), `ClientAssignment` por cliente+departamento (exatamente um responsável por par, antes era genérico), `departmentId` opcional em `Task`/`Request`, roteamento de notificação por departamento em comentário de cliente e Solicitação (com fallback pro comportamento antigo quando não há departamento), tela de CRUD de Departamentos sob Configurações, seleção de departamento no `TaskDrawer` e no formulário de nova Solicitação do portal. Ver `docs/superpowers/specs/2026-09-20-departments-responsibility-design.md` e `docs/superpowers/plans/2026-09-20-departments-responsibility.md`.
+   - [ ] 2b. Motor de recorrência + status expandido (Aberto/Concluído/Desconsiderado/Com Impedimento) — depende de 2a
+   - [ ] 2c. Visão em lista cross-cliente com filtros (ex: "Folha de pagamento de todos os clientes esse mês") — depende de 2a e 2b
+   - [ ] 2d. Calendário mensal — depende de 2b
+   - [ ] 2e. Sinalização de "impedimento" no portal do cliente — depende de 2b
 3. [ ] SLA e alertas de prazo (visual/sonoro) — estende o modelo de Task/Board já existente
 4. [ ] Métricas de produtividade por usuário/departamento — depende dos itens 2 e 3 existirem primeiro
 5. [ ] Evolução de Solicitações → Ordem de Serviço
 6. [ ] Automação de documentos (robô que lê/classifica documentos do cliente, inspirado no Nibo) — maior risco técnico, decidir fonte de dados (upload manual vs. leitura de pasta) antes de especificar
 7. [ ] Protocolo digital com validade jurídica + IP — estende o sistema de notificação/tracking já existente
 
-Próximo passo: usuário escolhe qual item do roadmap (2-7) entra em brainstorming a seguir.
+Próximo passo: usuário escolhe entre seguir com 2b (motor de recorrência, dado que 2a já está pronto) ou outro item do roadmap (3-7) pra entrar em brainstorming a seguir.
