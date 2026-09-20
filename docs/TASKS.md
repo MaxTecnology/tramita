@@ -190,11 +190,11 @@ browser headless completo), em sessão futura.
 
 ## Fase 9 — Infra e Deploy
 ### Testes da Fase 9
-- [ ] Rodar suite completa no CI (GitHub Actions) a cada push
-- [ ] `docker compose up` + `pnpm test` passam sem erros no ambiente limpo
-- [ ] Cobertura mínima 80% em `apps/api/src/modules/*/` e `apps/api/src/lib/`
-- [ ] Playwright E2E: login escritório → criar tarefa → mover → mensagem no log de notificações
-- [ ] Playwright E2E: login cliente → ver board → comentar → receber notificação (mock MaximizeBot)
+- [ ] Rodar suite completa no CI (GitHub Actions) a cada push — workflow criado em `.github/workflows/ci.yml` (jobs `test` e `e2e`), mas ainda não validado rodando de fato no GitHub: o branch de trabalho foi enviado (`git push`), mas abrir PR falhou por falta de permissão do token do `gh` CLI (`Resource not accessible by personal access token`), e o workflow só dispara em push na `main` ou em Pull Request. Validar rodando de verdade assim que o PR for aberto (manualmente, pelo GitHub, ou com um token com escopo `pull_request`)
+- [x] `docker compose up` + `pnpm test` passam sem erros no ambiente limpo — verificado localmente (API 197/197 + Web 11/11 passando)
+- [ ] Cobertura mínima 80% em `apps/api/src/modules/*/` e `apps/api/src/lib/` — threshold já configurado em `vitest.config.ts`, mas cobertura real hoje é 71.73% linhas / 68.05% funções; CI roda a suíte sem `--coverage` por enquanto (débito documentado em `docs/tech-debt.md`)
+- [ ] Playwright E2E: login escritório → criar tarefa → mover → mensagem no log de notificações — specs já existiam antes desta sessão (`apps/web/e2e/flows/org-board.spec.ts`); `prisma/e2e-seed.ts` foi corrigido para ser self-contained (cria a org G2A via upsert), mas a suíte Playwright completa (`pnpm --filter web test:e2e`, precisa do Chromium instalado) não foi executada nesta sessão — validar em sessão futura
+- [ ] Playwright E2E: login cliente → ver board → comentar → receber notificação (mock MaximizeBot) — mesma observação acima (`apps/web/e2e/flows/portal-client.spec.ts`)
 - [x] `docker-compose.prod.yml`: api, web, worker (postgres/redis já existem no Dokploy)
 - [x] Dockerfiles multi-stage (api + web)
 - [x] `.env.example` completo
@@ -203,4 +203,4 @@ browser headless completo), em sessão futura.
   - [x] `tramitaapi.autohubs.com.br` → api Fastify
   - [x] TLS automático (Let's Encrypt via Traefik, gerenciado pelo Dokploy)
 - [x] Healthchecks nos containers
-- [ ] Script de seed: planos padrão, usuário MASTER, org G2A como primeiro cliente
+- [x] Script de seed: planos padrão (`prisma/seed.ts`, placeholder Starter/Pro/Enterprise — editar valores reais pelo painel Master) + usuário MASTER, verificado idempotente rodando duas vezes contra o banco de teste. Org G2A como primeiro cliente fica isolada em `prisma/e2e-seed.ts` (self-contained via upsert, só roda em banco de teste/E2E, nunca em produção)
