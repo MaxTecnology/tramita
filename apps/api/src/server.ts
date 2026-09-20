@@ -18,6 +18,7 @@ import { streamRoutes } from '@/modules/stream/stream.routes'
 import { attachmentsRoutes } from '@/modules/attachments/attachments.routes'
 import { requestsRoutes } from '@/modules/requests/requests.routes'
 import { dashboardRoutes } from '@/modules/dashboard/dashboard.routes'
+import { departmentsRoutes } from '@/modules/departments/departments.routes'
 import { AppError } from '@/errors/AppError'
 
 export function buildApp() {
@@ -45,6 +46,7 @@ export function buildApp() {
   app.register(attachmentsRoutes)
   app.register(requestsRoutes, { prefix: '/requests' })
   app.register(dashboardRoutes, { prefix: '/dashboard' })
+  app.register(departmentsRoutes, { prefix: '/departments' })
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     if (error instanceof AppError) {
