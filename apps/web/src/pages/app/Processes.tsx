@@ -135,7 +135,7 @@ function BoardGroup({ group, now }: { group: Group; now: Date }) {
   const [open, setOpen] = useState(group.defaultOpen)
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+    <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -315,7 +315,7 @@ export default function Processes() {
       </div>
 
       {/* Card de filtros */}
-      <div className="bg-white rounded-xl border border-border shadow-sm p-4">
+      <div className="bg-surface rounded-xl border border-border shadow-sm p-4">
         <div className="flex flex-wrap gap-2 items-center">
           <div className="relative w-full sm:w-60">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -330,7 +330,7 @@ export default function Processes() {
           <select
             value={filterClient}
             onChange={(e) => setFilterClient(e.target.value)}
-            className="h-9 rounded-lg border border-border bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            className="h-9 rounded-lg border border-border bg-surface px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="">Cliente</option>
             {uniqueClients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -340,7 +340,7 @@ export default function Processes() {
             <select
               value={filterResponsible}
               onChange={(e) => setFilterResponsible(e.target.value)}
-              className="h-9 rounded-lg border border-border bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className="h-9 rounded-lg border border-border bg-surface px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
             >
               <option value="">Colaborador</option>
               {uniqueResponsible.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -350,7 +350,7 @@ export default function Processes() {
           <select
             value={filterStage}
             onChange={(e) => setFilterStage(e.target.value)}
-            className="h-9 rounded-lg border border-border bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            className="h-9 rounded-lg border border-border bg-surface px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="">Etapa</option>
             {uniqueStages.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -363,7 +363,7 @@ export default function Processes() {
               'h-9 px-3 rounded-lg text-sm font-medium border transition-colors flex items-center gap-1.5',
               showOnlyOverdue
                 ? 'bg-danger-text text-white border-danger-text shadow-sm'
-                : 'bg-white text-muted-foreground border-border hover:bg-neutral-bg',
+                : 'bg-surface text-muted-foreground border-border hover:bg-neutral-bg',
             )}
           >
             <AlertTriangle size={13} />
@@ -441,7 +441,7 @@ export default function Processes() {
                 value={newProcessForm.clientId}
                 onChange={(e) => setNewProcessForm({ ...newProcessForm, clientId: e.target.value })}
                 required
-                className="flex h-9 w-full rounded-md border border-border bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="flex h-9 w-full rounded-md border border-border bg-surface px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <option value="">Selecione um cliente</option>
                 {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}

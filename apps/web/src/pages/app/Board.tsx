@@ -126,7 +126,7 @@ export default function Board() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 border-b border-border bg-white flex-shrink-0">
+      <div className="flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 border-b border-border bg-surface flex-shrink-0">
         <Link to="/app/processes" aria-label="Voltar para Processos" className="text-muted-foreground hover:text-foreground flex-shrink-0">
           <ArrowLeft size={18} />
         </Link>
@@ -147,18 +147,18 @@ export default function Board() {
       </div>
 
       {/* Search bar */}
-      <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-2 border-b border-border bg-white">
+      <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-2 border-b border-border bg-surface">
         <input
           type="text"
           placeholder="Buscar tarefas..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-0 h-8 rounded-md border border-border bg-white px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+          className="flex-1 min-w-0 h-8 rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
         />
         <select
           value={filterPriority}
           onChange={(e) => setFilterPriority(e.target.value)}
-          className="h-8 rounded-md border border-border bg-white px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         >
           <option value="">Prioridade</option>
           <option value="LOW">Baixa</option>
@@ -189,7 +189,7 @@ export default function Board() {
               <div
                 key={task.id}
                 onClick={() => setSelectedTask(task)}
-                className="bg-white rounded-lg p-2.5 border border-border cursor-pointer hover:shadow-sm text-sm flex items-center justify-between"
+                className="bg-surface rounded-lg p-2.5 border border-border cursor-pointer hover:shadow-sm text-sm flex items-center justify-between"
               >
                 <span className="font-medium text-foreground">{task.title}</span>
                 <span className="text-xs text-muted-foreground ml-2">{task.priority}</span>
@@ -237,7 +237,7 @@ export default function Board() {
                         if (e.key === 'Escape') { setAddingToColumn(null); setNewTaskTitle('') }
                       }}
                       placeholder="Nome da tarefa..."
-                      className="w-full text-sm rounded-md border border-border bg-white px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent"
+                      className="w-full text-sm rounded-md border border-border bg-surface px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                     <div className="flex gap-2 mt-1.5">
                       <button
