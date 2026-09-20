@@ -30,3 +30,9 @@ Nenhum arquivo de teste em `apps/api/src` usa mais `vi.mock(module, factory)` pa
 - `modules/portal/portal.routes.ts` — 65% (mistura rota simples com alguma lógica de acesso do cliente)
 
 **Pendente:** escrever testes de borda para os services acima (não para rotas/controllers simples, seguindo a política deste projeto de só testar lógica crítica de negócio), até a cobertura real passar de 80%, e então trocar `test` por `test:coverage` de volta no `.github/workflows/ci.yml`.
+
+## `TaskDrawer` não atualiza o próprio título após salvar edição inline (encontrado em 2026-09-20)
+
+**Contexto:** ao editar o título de uma tarefa pelo `TaskDrawer` (`apps/web/src/components/shared/TaskDrawer.tsx`) — clicar no `<h2>`, editar o `<input>` inline, `Enter`/blur dispara `updateMutation.mutate({ title })` — a mutação persiste corretamente e o card da tarefa na coluna do Kanban atualiza (a query do board é invalidada e refaz o fetch), mas o próprio `<h2>` dentro do drawer continua mostrando o título antigo até o drawer ser fechado e reaberto. Encontrado depurando `apps/web/e2e/flows/org-board.spec.ts` — o teste de edição de título precisou verificar o card no Kanban em vez do heading do drawer por causa disso (ver comentário no teste).
+
+**Pendente:** investigar se o `task` exibido no `TaskDrawer` vem de uma referência memorizada no componente pai (ex.: `useState` setado só no clique de abrir, nunca ressincronizado com o resultado da query do board) em vez de derivado ao vivo da query por id — se for isso, o fix é passar/derivar o `task` atualizado do cache do react-query em vez de um snapshot fixo.
