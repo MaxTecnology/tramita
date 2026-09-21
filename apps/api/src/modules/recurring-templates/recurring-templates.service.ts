@@ -3,6 +3,7 @@ import { AppError } from '@/errors/AppError'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
 import { Prisma, type MessageChannel } from '@prisma/client'
 import { enqueueNotification } from '@/lib/queue'
+import { logger } from '@/lib/logger'
 import {
   computeDueDate,
   computeTargetDate,
@@ -288,14 +289,26 @@ export async function generateTaskForAssignment(
       const channels: MessageChannel[] = []
       if (template.notifyViaWhatsapp) channels.push('WHATSAPP')
       if (template.notifyViaEmail) channels.push('EMAIL')
-      await enqueueNotification({
-        event: 'TASK_CREATED',
-        organizationId: template.organizationId,
-        clientId: assignment.clientId,
-        taskId,
-        channels,
-        metadata: { taskTitle: template.title },
-      })
+      // Best-effort: a Task e o log SUCCESS já foram commitados na transação acima. Uma falha
+      // aqui (ex.: blip de conectividade com o Redis) é só um problema de notificação — nunca
+      // pode ser tratada pelo catch genérico abaixo, que reescreveria o log pra FAILED e reabriria
+      // a chave de idempotência, permitindo uma segunda Task pra mesma competência na próxima
+      // tentativa. Isolada no seu próprio try/catch: loga e segue, geração continua SUCCESS.
+      try {
+        await enqueueNotification({
+          event: 'TASK_CREATED',
+          organizationId: template.organizationId,
+          clientId: assignment.clientId,
+          taskId,
+          channels,
+          metadata: { taskTitle: template.title },
+        })
+      } catch (notifyErr) {
+        logger.error(
+          { err: notifyErr, taskId, templateId, clientId: assignment.clientId },
+          'Falha ao enfileirar notificação TASK_CREATED — geração da tarefa já foi concluída com sucesso',
+        )
+      }
     }
 
     return { status: 'SUCCESS', taskId }

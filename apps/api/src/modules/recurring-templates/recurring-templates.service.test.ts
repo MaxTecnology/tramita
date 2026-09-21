@@ -323,6 +323,35 @@ describe('generateTaskForAssignment', () => {
     spy.mockRestore()
   })
 
+  it('falha ao enfileirar TASK_CREATED (ex.: blip do Redis) não reverte o SUCCESS nem reabre a idempotência', async () => {
+    const { template, assignment } = await setup()
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockRejectedValueOnce(new Error('ECONNREFUSED'))
+
+    const competence = new Date(Date.UTC(2026, 1, 1))
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+
+    // (a) a função continua retornando SUCCESS mesmo com a notificação falhando
+    expect(outcome.status).toBe('SUCCESS')
+    if (outcome.status !== 'SUCCESS') throw new Error('unreachable')
+
+    // (b) o log de geração continua SUCCESS — não foi sobrescrito pra FAILED pelo catch genérico
+    const log = await prisma.recurringGenerationLog.findUnique({
+      where: { templateId_clientId_competence: { templateId: template.id, clientId: assignment.clientId, competence } },
+    })
+    expect(log?.status).toBe('SUCCESS')
+    expect(log?.taskId).toBe(outcome.taskId)
+
+    // (c) a chave de idempotência não foi reaberta — uma segunda tentativa continua bloqueada
+    spy.mockResolvedValue()
+    const second = await generateTaskForAssignment(template.id, assignment.id, competence)
+    expect(second.status).toBe('ALREADY_EXISTS')
+
+    const count = await prisma.task.count({ where: { recurringTemplateId: template.id } })
+    expect(count).toBe(1)
+
+    spy.mockRestore()
+  })
+
   it('idempotência: chamar duas vezes pra mesma competência não cria segunda tarefa', async () => {
     const { template, assignment } = await setup()
     vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
