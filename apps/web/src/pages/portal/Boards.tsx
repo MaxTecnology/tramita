@@ -28,7 +28,7 @@ interface BoardSummary {
 function getProgress(board: BoardSummary): number {
   const tasks = board.columns
     .flatMap((c) => c.tasks)
-    .filter((t) => t.status !== 'CANCELLED')
+    .filter((t) => t.status !== 'DISREGARDED')
   if (tasks.length === 0) return 0
   const maxPos = board.columns.length - 1
   if (maxPos <= 0) return 0
@@ -41,7 +41,7 @@ function getProgress(board: BoardSummary): number {
 
 function getCurrentStage(board: BoardSummary): string {
   const active = board.columns.find((c) =>
-    c.tasks.some((t) => t.status !== 'DONE' && t.status !== 'CANCELLED'),
+    c.tasks.some((t) => t.status !== 'DONE' && t.status !== 'DISREGARDED'),
   )
   return active?.title ?? board.columns.at(-1)?.title ?? '—'
 }

@@ -12,9 +12,9 @@ interface Metrics {
   }
   tasksByStatus: {
     OPEN: number
-    IN_PROGRESS: number
-    REVIEW: number
+    BLOCKED: number
     DONE: number
+    DISREGARDED: number
   }
   atRisk: Array<{
     boardId: string
@@ -27,19 +27,16 @@ interface Metrics {
 
 const STATUS_LABELS: Record<string, string> = {
   OPEN: 'Aberto',
-  IN_PROGRESS: 'Andamento',
-  REVIEW: 'Revisão',
+  BLOCKED: 'Com Impedimento',
   DONE: 'Concluído',
+  DISREGARDED: 'Desconsiderado',
 }
 
-// REVIEW usa roxo (bg-violet-400) intencionalmente fora dos tokens — é só uma
-// cor categórica de gráfico (4 status distintos), não um estado semântico
-// (warning/success/danger) reaproveitado em outro lugar do app.
 const STATUS_COLORS: Record<string, string> = {
   OPEN: 'bg-accent',
-  IN_PROGRESS: 'bg-warning-text',
-  REVIEW: 'bg-violet-400',
+  BLOCKED: 'bg-danger-text',
   DONE: 'bg-success-text',
+  DISREGARDED: 'bg-neutral-text',
 }
 
 function formatDaysOverdue(daysOverdue: number, dueDate: string | null): string {

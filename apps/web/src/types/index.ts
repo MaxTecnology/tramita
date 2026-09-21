@@ -3,7 +3,7 @@ export interface Task {
   title: string
   description: string | null
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
-  status: 'OPEN' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'CANCELLED'
+  status: 'OPEN' | 'DONE' | 'DISREGARDED' | 'BLOCKED'
   position: number
   columnId: string
   assigneeId: string | null

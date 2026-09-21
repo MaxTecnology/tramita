@@ -107,13 +107,13 @@ describe('getDashboardMetrics', () => {
 
     const t1 = await createTestTask(col.id, user.id, { position: 0 })
     const t2 = await createTestTask(col.id, user.id, { position: 1 })
-    await prisma.task.update({ where: { id: t2.id }, data: { status: 'IN_PROGRESS' } })
+    await prisma.task.update({ where: { id: t2.id }, data: { status: 'BLOCKED' } })
     void t1
 
     const result = await getDashboardMetrics(org.id)
 
     expect(result.tasksByStatus.OPEN).toBe(1)
-    expect(result.tasksByStatus.IN_PROGRESS).toBe(1)
+    expect(result.tasksByStatus.BLOCKED).toBe(1)
   })
 
   it('sorts atRisk boards by daysOverdue descending (most overdue first)', async () => {

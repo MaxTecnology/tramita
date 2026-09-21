@@ -7,9 +7,9 @@ export interface DashboardMetrics {
   }
   tasksByStatus: {
     OPEN: number
-    IN_PROGRESS: number
-    REVIEW: number
+    BLOCKED: number
     DONE: number
+    DISREGARDED: number
   }
   atRisk: Array<{
     boardId: string

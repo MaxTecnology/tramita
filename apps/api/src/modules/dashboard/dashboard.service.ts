@@ -24,7 +24,7 @@ export async function getDashboardMetrics(organizationId: string) {
             columns: {
               some: {
                 tasks: {
-                  some: { dueDate: { lt: now }, status: { notIn: ['DONE', 'CANCELLED'] } },
+                  some: { dueDate: { lt: now }, status: { notIn: ['DONE', 'DISREGARDED'] } },
                 },
               },
             },
@@ -45,7 +45,7 @@ export async function getDashboardMetrics(organizationId: string) {
     prisma.task.count({
       where: {
         priority: 'URGENT',
-        status: { notIn: ['DONE', 'CANCELLED'] },
+        status: { notIn: ['DONE', 'DISREGARDED'] },
         column: { board: { organizationId, isActive: true } },
       },
     }),
@@ -65,7 +65,7 @@ export async function getDashboardMetrics(organizationId: string) {
             columns: {
               some: {
                 tasks: {
-                  some: { dueDate: { lte: in7days }, status: { notIn: ['DONE', 'CANCELLED'] } },
+                  some: { dueDate: { lte: in7days }, status: { notIn: ['DONE', 'DISREGARDED'] } },
                 },
               },
             },
@@ -81,7 +81,7 @@ export async function getDashboardMetrics(organizationId: string) {
         columns: {
           select: {
             tasks: {
-              where: { dueDate: { not: null }, status: { notIn: ['DONE', 'CANCELLED'] } },
+              where: { dueDate: { not: null }, status: { notIn: ['DONE', 'DISREGARDED'] } },
               select: { dueDate: true },
               orderBy: { dueDate: 'asc' },
             },
@@ -126,9 +126,9 @@ export async function getDashboardMetrics(organizationId: string) {
     },
     tasksByStatus: {
       OPEN: statusMap['OPEN'] ?? 0,
-      IN_PROGRESS: statusMap['IN_PROGRESS'] ?? 0,
-      REVIEW: statusMap['REVIEW'] ?? 0,
+      BLOCKED: statusMap['BLOCKED'] ?? 0,
       DONE: statusMap['DONE'] ?? 0,
+      DISREGARDED: statusMap['DISREGARDED'] ?? 0,
     },
     atRisk,
   }

@@ -32,7 +32,7 @@ export async function listBoards(
             columns: {
               some: {
                 title: { contains: query.columnTitle, mode: 'insensitive' },
-                tasks: { some: { status: { notIn: ['DONE', 'CANCELLED'] } } },
+                tasks: { some: { status: { notIn: ['DONE', 'DISREGARDED'] } } },
               },
             },
           }
@@ -42,7 +42,7 @@ export async function listBoards(
             columns: {
               some: {
                 tasks: {
-                  some: { dueDate: { lt: now }, status: { notIn: ['DONE', 'CANCELLED'] } },
+                  some: { dueDate: { lt: now }, status: { notIn: ['DONE', 'DISREGARDED'] } },
                 },
               },
             },
@@ -55,7 +55,7 @@ export async function listBoards(
                 tasks: {
                   some: {
                     dueDate: { gte: now, lte: in7days },
-                    status: { notIn: ['DONE', 'CANCELLED'] },
+                    status: { notIn: ['DONE', 'DISREGARDED'] },
                   },
                 },
               },

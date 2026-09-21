@@ -21,7 +21,7 @@ export type UpdateBoardBody = z.infer<typeof updateBoardSchema>
 export const searchQuerySchema = z.object({
   q: z.string().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
-  status: z.enum(['OPEN', 'IN_PROGRESS', 'REVIEW', 'DONE', 'CANCELLED']).optional(),
+  status: z.enum(['OPEN', 'DONE', 'DISREGARDED', 'BLOCKED']).optional(),
   assigneeId: z.string().cuid().optional(),
   dueBefore: z.string().datetime().optional(),
   dueAfter: z.string().datetime().optional(),

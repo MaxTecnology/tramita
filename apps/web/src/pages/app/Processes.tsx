@@ -17,7 +17,7 @@ const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
 function getProgress(board: Board): number {
   const tasks = board.columns
     .flatMap((c) => c.tasks)
-    .filter((t) => t.status !== 'CANCELLED')
+    .filter((t) => t.status !== 'DISREGARDED')
   if (tasks.length === 0) return 0
   const maxPos = board.columns.length - 1
   if (maxPos <= 0) return 0
@@ -31,7 +31,7 @@ function getProgress(board: Board): number {
 function getMostUrgentDueDate(board: Board): Date | null {
   const dates = board.columns
     .flatMap((c) => c.tasks)
-    .filter((t) => t.dueDate && t.status !== 'DONE' && t.status !== 'CANCELLED')
+    .filter((t) => t.dueDate && t.status !== 'DONE' && t.status !== 'DISREGARDED')
     .map((t) => new Date(t.dueDate!))
     .sort((a, b) => a.getTime() - b.getTime())
   return dates[0] ?? null
@@ -42,7 +42,7 @@ function getCurrentStage(board: Board): string {
   if (all.length === 0) return '—'
   const counts = board.columns.map((col) => ({
     title: col.title,
-    count: col.tasks.filter((t) => t.status !== 'DONE' && t.status !== 'CANCELLED').length,
+    count: col.tasks.filter((t) => t.status !== 'DONE' && t.status !== 'DISREGARDED').length,
   }))
   const active = counts.filter((c) => c.count > 0).sort((a, b) => b.count - a.count)
   return active[0]?.title ?? 'Concluído'
@@ -240,7 +240,7 @@ export default function Processes() {
       if (filterStage && !b.columns.some((c) => c.title.toLowerCase().includes(filterStage.toLowerCase()))) return false
       if (showOnlyOverdue) {
         const hasOverdue = b.columns.some((c) =>
-          c.tasks.some((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'DONE' && t.status !== 'CANCELLED'),
+          c.tasks.some((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'DONE' && t.status !== 'DISREGARDED'),
         )
         if (!hasOverdue) return false
       }
