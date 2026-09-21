@@ -34,7 +34,10 @@ export async function boardsRoutes(app: FastifyInstance) {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    return reply.send(await getBoardById(id, request.user.organizationId!, request.user.role === 'CLIENT'))
+    const isClient = request.user.role === 'CLIENT'
+    return reply.send(
+      await getBoardById(id, request.user.organizationId!, isClient, isClient ? request.user.sub : undefined),
+    )
   })
 
   app.get('/:id/tasks/search', {

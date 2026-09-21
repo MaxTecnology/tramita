@@ -26,6 +26,10 @@ export async function listComments(
     where: { id: taskId, column: { board: boardWhere } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
+  // Cliente nunca pode saber que uma tarefa não-visível existe, mesmo já sabendo o id dela
+  // (ex.: enumeração de board) — trata como "não encontrada", igual verifyTaskAccess em
+  // task-documents.service.ts.
+  if (role === 'CLIENT' && clientId && !task.visibleToClient) throw new AppError(404, 'Tarefa não encontrada')
 
   const comments = await prisma.comment.findMany({
     where: { taskId },
@@ -65,6 +69,9 @@ export async function createComment(
     include: { column: { include: { board: { select: { id: true, clientId: true } } } } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
+  // Mesmo gate de visibilidade de listComments: cliente não pode comentar (nem saber que existe)
+  // uma tarefa não-visível.
+  if (isClient && !task.visibleToClient) throw new AppError(404, 'Tarefa não encontrada')
 
   const comment = await prisma.comment.create({
     data: {

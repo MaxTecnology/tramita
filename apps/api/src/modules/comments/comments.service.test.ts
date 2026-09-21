@@ -134,6 +134,40 @@ describe('listComments - soft delete visibility', () => {
   })
 })
 
+describe('visibilidade (visibleToClient) — comments', () => {
+  it('listComments lança 404 pro cliente quando a tarefa não é visível', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id, { position: 0 })
+    const task = await prisma.task.create({
+      data: { title: 'Tarefa oculta', position: 0, columnId: column.id, creatorId: admin.id, visibleToClient: false },
+    })
+
+    await expect(listComments(task.id, org.id, 'CLIENT', client.id)).rejects.toMatchObject({ statusCode: 404 })
+    // do lado do escritório continua acessível
+    await expect(listComments(task.id, org.id, 'ORG_ADMIN')).resolves.toBeDefined()
+  })
+
+  it('createComment lança 404 quando o cliente tenta comentar em tarefa não-visível', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id, { position: 0 })
+    const task = await prisma.task.create({
+      data: { title: 'Tarefa oculta', position: 0, columnId: column.id, creatorId: admin.id, visibleToClient: false },
+    })
+
+    await expect(
+      createComment(task.id, { content: 'Olá' }, { id: client.id, role: 'CLIENT', organizationId: org.id }),
+    ).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
 describe('createComment - roteamento de notificação por departamento', () => {
   beforeEach(() => {
     vi.spyOn(queue, 'enqueueNotification').mockResolvedValue(undefined)

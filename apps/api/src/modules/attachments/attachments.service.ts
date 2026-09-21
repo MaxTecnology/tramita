@@ -24,6 +24,9 @@ async function verifyTaskBelongsToOrg(
     where: { id: taskId, column: { board: boardWhere } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
+  // Cliente não pode ver/anexar/apagar anexos de uma tarefa não-visível, mesmo já sabendo o id
+  // dela — mesmo gate usado em task-documents.service.ts::verifyTaskAccess e comments.service.ts.
+  if (clientId && !task.visibleToClient) throw new AppError(404, 'Tarefa não encontrada')
   return task
 }
 

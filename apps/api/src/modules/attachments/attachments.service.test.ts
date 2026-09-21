@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as b2Module from '@/lib/b2'
+import { prisma } from '@/lib/prisma'
 import {
   createTestPlan,
   createTestOrg,
@@ -62,5 +63,42 @@ describe('attachments.service', () => {
     const list = await listAttachments(task.id, org.id)
     expect(list).toHaveLength(1)
     expect(list[0].signedUrl).toBe('https://signed-url/file')
+  })
+
+  it('listAttachments lança 404 pro cliente quando a tarefa não é visível', async () => {
+    vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined)
+    vi.spyOn(b2Module, 'getSignedDownloadUrl').mockResolvedValue('https://signed-url')
+
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { visibleToClient: false } })
+
+    await expect(listAttachments(task.id, org.id, client.id)).rejects.toMatchObject({ statusCode: 404 })
+    // do lado do escritório (sem clientId) continua acessível
+    await expect(listAttachments(task.id, org.id)).resolves.toBeDefined()
+  })
+
+  it('createAttachment lança 404 quando o cliente tenta anexar em tarefa não-visível', async () => {
+    vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined)
+
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { visibleToClient: false } })
+
+    await expect(
+      createAttachment(task.id, org.id, { id: client.id, role: 'CLIENT' }, {
+        filename: 'x.pdf', mimeType: 'application/pdf', size: 10, buffer: Buffer.from(''),
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 })
   })
 })

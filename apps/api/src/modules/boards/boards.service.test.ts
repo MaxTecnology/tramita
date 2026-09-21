@@ -27,4 +27,21 @@ describe('getBoardById (visibilidade)', () => {
     const taskIdsAsOrg = asOrg.columns.flatMap((c) => c.tasks).map((t) => t.id)
     expect(taskIdsAsOrg).toContain(hiddenTask.id)
   })
+
+  it('lança 404 quando um cliente tenta acessar o board de outro cliente na mesma org', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const clientA = await createTestClient(org.id)
+    const clientB = await createTestClient(org.id)
+    const boardOfB = await createTestBoard(org.id, clientB.id)
+
+    await expect(
+      getBoardById(boardOfB.id, org.id, false, clientA.id),
+    ).rejects.toMatchObject({ statusCode: 404 })
+
+    // O próprio cliente B consegue acessar o próprio board normalmente
+    await expect(
+      getBoardById(boardOfB.id, org.id, true, clientB.id),
+    ).resolves.toBeDefined()
+  })
 })
