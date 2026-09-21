@@ -1,11 +1,14 @@
+import axios from 'axios'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { hashPassword } from '@/modules/auth/auth.service'
+import { lookupCnpj, type CnpjLookupResult } from '@/lib/cnpjws'
 import type { CreateClientBody, UpdateClientBody } from './clients.schema'
 
 const SELECT = {
   id: true, name: true, clientType: true, cnpj: true, cpf: true,
   email: true, whatsapp: true, phone: true, notes: true,
+  cep: true, estado: true, cidade: true, bairro: true, logradouro: true, numero: true, complemento: true,
   isActive: true, createdAt: true,
 }
 
@@ -37,6 +40,13 @@ export async function createClient(organizationId: string, data: CreateClientBod
       whatsapp: data.whatsapp,
       phone: data.phone,
       notes: data.notes,
+      cep: data.cep,
+      estado: data.estado,
+      cidade: data.cidade,
+      bairro: data.bairro,
+      logradouro: data.logradouro,
+      numero: data.numero,
+      complemento: data.complemento,
       organizationId,
     },
     select: SELECT,
@@ -55,6 +65,21 @@ export async function deleteClient(id: string, organizationId: string) {
   if (!client) throw new AppError(404, 'Cliente não encontrado')
 
   return prisma.client.update({ where: { id }, data: { isActive: false }, select: SELECT })
+}
+
+export async function lookupClientByCnpj(cnpj: string): Promise<CnpjLookupResult> {
+  const digits = cnpj.replace(/\D/g, '')
+  if (digits.length !== 14) throw new AppError(400, 'CNPJ inválido')
+
+  try {
+    return await lookupCnpj(digits)
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      if (err.response?.status === 429) throw new AppError(429, 'Limite de consultas de CNPJ atingido, tente novamente em instantes')
+      if (err.response?.status === 404) throw new AppError(404, 'CNPJ não encontrado')
+    }
+    throw new AppError(502, 'Erro ao consultar CNPJ')
+  }
 }
 
 export async function listAssignments(clientId: string, organizationId: string) {

@@ -1,11 +1,13 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
+import * as cnpjws from '@/lib/cnpjws'
 import {
   createClient,
   updateClient,
   deleteClient,
   listAssignments,
   setAssignment,
+  lookupClientByCnpj,
 } from '@/modules/clients/clients.service'
 import {
   createTestPlan,
@@ -197,5 +199,53 @@ describe('setAssignment / listAssignments', () => {
     const client = await createTestClient(orgA.id)
 
     await expect(listAssignments(client.id, orgB.id)).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
+describe('lookupClientByCnpj', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('returns the mapped address when the CNPJ is valid', async () => {
+    vi.spyOn(cnpjws, 'lookupCnpj').mockResolvedValue({
+      razaoSocial: 'Cliente Teste LTDA',
+      nomeFantasia: null,
+      cep: '57000-000',
+      estado: 'AL',
+      cidade: 'Maceió',
+      bairro: 'Centro',
+      logradouro: 'RUA das Flores',
+      numero: '123',
+      complemento: null,
+    })
+
+    const result = await lookupClientByCnpj('11.222.333/0001-81')
+
+    expect(cnpjws.lookupCnpj).toHaveBeenCalledWith('11222333000181')
+    expect(result.razaoSocial).toBe('Cliente Teste LTDA')
+    expect(result.cidade).toBe('Maceió')
+  })
+
+  it('throws 400 when the CNPJ does not have 14 digits', async () => {
+    await expect(lookupClientByCnpj('123')).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  it('throws 404 when the external API responds with 404', async () => {
+    const err = Object.assign(new Error('Not Found'), {
+      isAxiosError: true,
+      response: { status: 404 },
+    })
+    vi.spyOn(cnpjws, 'lookupCnpj').mockRejectedValue(err)
+
+    await expect(lookupClientByCnpj('11222333000181')).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  it('throws 429 when the external API responds with 429 (rate limit)', async () => {
+    const err = Object.assign(new Error('Too Many Requests'), {
+      isAxiosError: true,
+      response: { status: 429 },
+    })
+    vi.spyOn(cnpjws, 'lookupCnpj').mockRejectedValue(err)
+
+    await expect(lookupClientByCnpj('11222333000181')).rejects.toMatchObject({ statusCode: 429 })
   })
 })

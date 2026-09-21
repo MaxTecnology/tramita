@@ -1,5 +1,15 @@
 import { z } from 'zod'
 
+const addressFields = {
+  cep: z.string().optional(),
+  estado: z.string().optional(),
+  cidade: z.string().optional(),
+  bairro: z.string().optional(),
+  logradouro: z.string().optional(),
+  numero: z.string().optional(),
+  complemento: z.string().optional(),
+}
+
 export const createClientSchema = z.object({
   name: z.string().min(2),
   clientType: z.enum(['PF', 'PJ']).default('PJ'),
@@ -10,6 +20,7 @@ export const createClientSchema = z.object({
   whatsapp: z.string().optional(),
   phone: z.string().optional(),
   notes: z.string().optional(),
+  ...addressFields,
 })
 
 export const updateClientSchema = z.object({
@@ -21,6 +32,7 @@ export const updateClientSchema = z.object({
   whatsapp: z.string().optional(),
   phone: z.string().optional(),
   notes: z.string().optional(),
+  ...addressFields,
 })
 
 export type CreateClientBody = z.infer<typeof createClientSchema>

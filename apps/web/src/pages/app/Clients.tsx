@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { cn } from '@/lib/utils'
 import type { Client } from '@/types'
 import { toast } from 'sonner'
-import { UserCheck } from 'lucide-react'
+import { UserCheck, Search } from 'lucide-react'
 
 interface OrgUser { id: string; name: string; email: string; role: string }
 interface Assignment { id: string; departmentId: string; userId: string; department: { id: string; name: string }; user: OrgUser }
@@ -89,19 +89,27 @@ function AssignmentsSection({ clientId }: { clientId: string }) {
 
 type ClientType = 'PF' | 'PJ'
 
-type CreateForm = {
+interface AddressFields {
+  cep: string; estado: string; cidade: string; bairro: string; logradouro: string; numero: string; complemento: string
+}
+
+const EMPTY_ADDRESS: AddressFields = {
+  cep: '', estado: '', cidade: '', bairro: '', logradouro: '', numero: '', complemento: '',
+}
+
+type CreateForm = AddressFields & {
   name: string; clientType: ClientType; cnpj: string; cpf: string
   email: string; password: string; whatsapp: string; phone: string; notes: string
 }
 
-type EditForm = {
+type EditForm = AddressFields & {
   name: string; clientType: ClientType; cnpj: string; cpf: string
   email: string; whatsapp: string; phone: string; notes: string
 }
 
 const EMPTY_CREATE: CreateForm = {
   name: '', clientType: 'PJ', cnpj: '', cpf: '',
-  email: '', password: '', whatsapp: '', phone: '', notes: '',
+  email: '', password: '', whatsapp: '', phone: '', notes: '', ...EMPTY_ADDRESS,
 }
 
 function TypeToggle({ value, onChange }: { value: ClientType; onChange: (v: ClientType) => void }) {
@@ -124,7 +132,19 @@ function TypeToggle({ value, onChange }: { value: ClientType; onChange: (v: Clie
   )
 }
 
-function ClientFields<T extends { clientType: ClientType; cnpj: string; cpf: string; whatsapp: string; phone: string; notes: string }>({
+interface CnpjLookupResult {
+  razaoSocial: string
+  nomeFantasia: string | null
+  cep: string | null
+  estado: string | null
+  cidade: string | null
+  bairro: string | null
+  logradouro: string | null
+  numero: string | null
+  complemento: string | null
+}
+
+function ClientFields<T extends { name: string; clientType: ClientType; cnpj: string; cpf: string; whatsapp: string; phone: string; notes: string } & AddressFields>({
   form,
   onChange,
   idPrefix,
@@ -133,6 +153,29 @@ function ClientFields<T extends { clientType: ClientType; cnpj: string; cpf: str
   onChange: (patch: Partial<T>) => void
   idPrefix: string
 }) {
+  const lookupMutation = useMutation({
+    mutationFn: () => api.get<CnpjLookupResult>(`/clients/lookup-cnpj/${form.cnpj}`).then((r) => r.data),
+    onSuccess: (data) => {
+      toast.success('Dados do CNPJ carregados')
+      onChange({
+        name: form.name || data.razaoSocial,
+        cep: data.cep ?? form.cep,
+        estado: data.estado ?? form.estado,
+        cidade: data.cidade ?? form.cidade,
+        bairro: data.bairro ?? form.bairro,
+        logradouro: data.logradouro ?? form.logradouro,
+        numero: data.numero ?? form.numero,
+        complemento: data.complemento ?? form.complemento,
+      } as Partial<T>)
+    },
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(message ?? 'Erro ao consultar CNPJ')
+    },
+  })
+
+  const cnpjDigits = form.cnpj.replace(/\D/g, '')
+
   return (
     <>
       <div className="space-y-1">
@@ -143,7 +186,19 @@ function ClientFields<T extends { clientType: ClientType; cnpj: string; cpf: str
       {form.clientType === 'PJ' ? (
         <div className="space-y-1">
           <Label htmlFor={`${idPrefix}-cnpj`}>CNPJ</Label>
-          <Input id={`${idPrefix}-cnpj`} value={form.cnpj} onChange={(e) => onChange({ cnpj: e.target.value } as Partial<T>)} placeholder="00.000.000/0001-00" />
+          <div className="flex gap-2">
+            <Input id={`${idPrefix}-cnpj`} value={form.cnpj} onChange={(e) => onChange({ cnpj: e.target.value } as Partial<T>)} placeholder="00.000.000/0001-00" className="flex-1" />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={cnpjDigits.length !== 14 || lookupMutation.isPending}
+              onClick={() => lookupMutation.mutate()}
+              className="gap-1.5 flex-shrink-0"
+            >
+              <Search size={14} />
+              {lookupMutation.isPending ? 'Buscando...' : 'Buscar CNPJ'}
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="space-y-1">
@@ -173,6 +228,41 @@ function ClientFields<T extends { clientType: ClientType; cnpj: string; cpf: str
           className="flex w-full rounded-md border border-border bg-surface text-foreground px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-none"
         />
       </div>
+
+      <div className="pt-2 border-t border-border">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Endereço</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label htmlFor={`${idPrefix}-cep`}>CEP</Label>
+          <Input id={`${idPrefix}-cep`} value={form.cep} onChange={(e) => onChange({ cep: e.target.value } as Partial<T>)} placeholder="57000-000" />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`${idPrefix}-estado`}>Estado</Label>
+          <Input id={`${idPrefix}-estado`} value={form.estado} onChange={(e) => onChange({ estado: e.target.value } as Partial<T>)} placeholder="AL" maxLength={2} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`${idPrefix}-cidade`}>Cidade</Label>
+          <Input id={`${idPrefix}-cidade`} value={form.cidade} onChange={(e) => onChange({ cidade: e.target.value } as Partial<T>)} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`${idPrefix}-bairro`}>Bairro</Label>
+          <Input id={`${idPrefix}-bairro`} value={form.bairro} onChange={(e) => onChange({ bairro: e.target.value } as Partial<T>)} />
+        </div>
+        <div className="space-y-1 sm:col-span-2">
+          <Label htmlFor={`${idPrefix}-logradouro`}>Logradouro</Label>
+          <Input id={`${idPrefix}-logradouro`} value={form.logradouro} onChange={(e) => onChange({ logradouro: e.target.value } as Partial<T>)} placeholder="Rua das Flores" />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`${idPrefix}-numero`}>Número</Label>
+          <Input id={`${idPrefix}-numero`} value={form.numero} onChange={(e) => onChange({ numero: e.target.value } as Partial<T>)} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`${idPrefix}-complemento`}>Complemento</Label>
+          <Input id={`${idPrefix}-complemento`} value={form.complemento} onChange={(e) => onChange({ complemento: e.target.value } as Partial<T>)} />
+        </div>
+      </div>
     </>
   )
 }
@@ -185,7 +275,7 @@ export default function Clients() {
 
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [editForm, setEditForm] = useState<EditForm>({
-    name: '', clientType: 'PJ', cnpj: '', cpf: '', email: '', whatsapp: '', phone: '', notes: '',
+    name: '', clientType: 'PJ', cnpj: '', cpf: '', email: '', whatsapp: '', phone: '', notes: '', ...EMPTY_ADDRESS,
   })
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -225,6 +315,13 @@ export default function Clients() {
         whatsapp: createForm.whatsapp || undefined,
         phone: createForm.phone || undefined,
         notes: createForm.notes || undefined,
+        cep: createForm.cep || undefined,
+        estado: createForm.estado || undefined,
+        cidade: createForm.cidade || undefined,
+        bairro: createForm.bairro || undefined,
+        logradouro: createForm.logradouro || undefined,
+        numero: createForm.numero || undefined,
+        complemento: createForm.complemento || undefined,
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Cliente cadastrado com sucesso')
@@ -248,6 +345,13 @@ export default function Clients() {
         whatsapp: data.whatsapp || undefined,
         phone: data.phone || undefined,
         notes: data.notes || undefined,
+        cep: data.cep || undefined,
+        estado: data.estado || undefined,
+        cidade: data.cidade || undefined,
+        bairro: data.bairro || undefined,
+        logradouro: data.logradouro || undefined,
+        numero: data.numero || undefined,
+        complemento: data.complemento || undefined,
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Cliente atualizado')
@@ -278,6 +382,13 @@ export default function Clients() {
       whatsapp: client.whatsapp ?? '',
       phone: client.phone ?? '',
       notes: client.notes ?? '',
+      cep: client.cep ?? '',
+      estado: client.estado ?? '',
+      cidade: client.cidade ?? '',
+      bairro: client.bairro ?? '',
+      logradouro: client.logradouro ?? '',
+      numero: client.numero ?? '',
+      complemento: client.complemento ?? '',
     })
   }
 

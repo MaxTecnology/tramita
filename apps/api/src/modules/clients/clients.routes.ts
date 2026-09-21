@@ -5,7 +5,7 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { checkPlanLimit } from '@/middlewares/checkPlanLimit'
 import { AppError } from '@/errors/AppError'
 import { createClientSchema, updateClientSchema, listClientsQuerySchema, setAssignmentSchema } from './clients.schema'
-import { listClients, createClient, updateClient, deleteClient, listAssignments, setAssignment } from './clients.service'
+import { listClients, createClient, updateClient, deleteClient, listAssignments, setAssignment, lookupClientByCnpj } from './clients.service'
 
 export async function clientsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
@@ -16,6 +16,14 @@ export async function clientsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { includeInactive } = listClientsQuerySchema.parse(request.query)
     return reply.send(await listClients(request.user.organizationId!, includeInactive))
+  })
+
+  // Rota fixa antes de "/:id" — evita colisão com o parâmetro de rota
+  app.get('/lookup-cnpj/:cnpj', {
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER')],
+  }, async (request, reply) => {
+    const { cnpj } = request.params as { cnpj: string }
+    return reply.send(await lookupClientByCnpj(cnpj))
   })
 
   // Apenas Admin e Gerente criam, editam e excluem clientes

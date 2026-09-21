@@ -130,12 +130,20 @@ Cadastro de novo escritório (público — sem autenticação).
 ### GET `/clients` _(ORG_ADMIN | ORG_MANAGER)_
 ### POST `/clients` _(ORG_ADMIN | ORG_MANAGER)_
 ```json
-{ "name": "string", "cnpj": "string?", "email": "string", "password": "string", "whatsapp": "string?" }
+{
+  "name": "string", "cnpj": "string?", "email": "string", "password": "string", "whatsapp": "string?",
+  "cep": "string?", "estado": "string?", "cidade": "string?", "bairro": "string?",
+  "logradouro": "string?", "numero": "string?", "complemento": "string?"
+}
 ```
 → Middleware `checkPlanLimit` valida `clientsCount < plan.maxClients` antes de criar
 
 ### PATCH `/clients/:id`
 ### DELETE `/clients/:id` — soft delete (não conta no limite ao desativar)
+
+### GET `/clients/lookup-cnpj/:cnpj` _(ORG_ADMIN | ORG_MANAGER)_ — consulta a API pública do CNPJ.ws e retorna razão social + endereço pra preencher o formulário de cadastro
+→ Sem autenticação própria, proxied pelo backend (`src/lib/cnpjws.ts`) pra evitar CORS e centralizar o tratamento de erro
+→ Limite de 3 requisições/minuto por IP no plano gratuito da API pública — mapeado pra 429 com mensagem amigável
 
 ---
 

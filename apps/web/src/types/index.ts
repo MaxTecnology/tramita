@@ -64,6 +64,13 @@ export interface Client {
   whatsapp: string | null
   phone: string | null
   notes: string | null
+  cep: string | null
+  estado: string | null
+  cidade: string | null
+  bairro: string | null
+  logradouro: string | null
+  numero: string | null
+  complemento: string | null
   isActive: boolean
   createdAt: string
 }
