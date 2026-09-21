@@ -4,11 +4,13 @@ config({ path: resolve(import.meta.dirname, '../../../.env') })
 
 import { startNotificationWorker } from '@/workers/notification.worker'
 import { startDueDateCronWorker } from '@/workers/duedate.cron'
+import { startRecurringTasksCronWorker } from '@/workers/recurring-tasks.cron'
 
 async function main() {
   startNotificationWorker()
   await startDueDateCronWorker()
-  console.log('[worker] Notification worker + duedate cron iniciados')
+  await startRecurringTasksCronWorker()
+  console.log('[worker] Notification worker + duedate cron + recurring tasks cron iniciados')
 }
 
 main().catch((err) => {
