@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { cn } from '@/lib/utils'
 import type { Client } from '@/types'
 import { toast } from 'sonner'
-import { UserCheck, Search } from 'lucide-react'
+import { UserCheck, Search, Trash2 } from 'lucide-react'
 
 interface OrgUser { id: string; name: string; email: string; role: string }
 interface Assignment { id: string; departmentId: string; userId: string; department: { id: string; name: string }; user: OrgUser }
@@ -97,19 +97,128 @@ const EMPTY_ADDRESS: AddressFields = {
   cep: '', estado: '', cidade: '', bairro: '', logradouro: '', numero: '', complemento: '',
 }
 
+interface ClientUserLink {
+  existingId?: string
+  name?: string
+  email?: string
+  password?: string
+  departmentIds: string[]
+}
+
+interface ClientUserSearchResult { id: string; name: string; email: string }
+
+function ClientUsersSection({ links, onChange }: {
+  links: ClientUserLink[]
+  onChange: (links: ClientUserLink[]) => void
+}) {
+  const [search, setSearch] = useState('')
+  const [mode, setMode] = useState<'search' | 'create'>('search')
+  const [draft, setDraft] = useState({ name: '', email: '', password: '' })
+  const [draftDepartmentIds, setDraftDepartmentIds] = useState<string[]>([])
+
+  const { data: results = [] } = useQuery<ClientUserSearchResult[]>({
+    queryKey: ['client-user-search', search],
+    queryFn: () => api.get('/clients/search-users', { params: { q: search } }).then((r) => r.data),
+    enabled: search.trim().length >= 2,
+  })
+
+  const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['departments'],
+    queryFn: () => api.get('/departments').then((r) => r.data),
+  })
+
+  function toggleDept(id: string) {
+    setDraftDepartmentIds((ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id])
+  }
+
+  function addExisting(u: ClientUserSearchResult) {
+    if (draftDepartmentIds.length === 0) return
+    onChange([...links, { existingId: u.id, departmentIds: draftDepartmentIds }])
+    setSearch(''); setDraftDepartmentIds([])
+  }
+
+  function addNew() {
+    if (!draft.name || !draft.email || !draft.password || draftDepartmentIds.length === 0) return
+    onChange([...links, { name: draft.name, email: draft.email, password: draft.password, departmentIds: draftDepartmentIds }])
+    setDraft({ name: '', email: '', password: '' }); setDraftDepartmentIds([])
+  }
+
+  return (
+    <div className="pt-2 border-t border-border space-y-2">
+      <Label>Usuários com acesso *</Label>
+
+      <div className="flex rounded-md border border-border overflow-hidden w-fit">
+        {(['search', 'create'] as const).map((m) => (
+          <button key={m} type="button" onClick={() => setMode(m)}
+            className={cn('px-3 py-1.5 text-sm font-medium', mode === m ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}>
+            {m === 'search' ? 'Buscar existente' : 'Criar novo'}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {departments.map((d) => (
+          <button key={d.id} type="button" onClick={() => toggleDept(d.id)}
+            className={cn('text-xs px-2 py-1 rounded-full border', draftDepartmentIds.includes(d.id) ? 'bg-[#185FA5] text-white border-[#185FA5]' : 'bg-surface text-muted-foreground border-border')}>
+            {d.name}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'search' ? (
+        <div className="space-y-1.5">
+          <Input placeholder="Buscar por nome ou e-mail..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          {results.length > 0 && (
+            <ul className="border border-border rounded-md divide-y divide-border">
+              {results.map((u) => (
+                <li key={u.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                  <span>{u.name} — {u.email}</span>
+                  <Button type="button" size="sm" variant="outline" disabled={draftDepartmentIds.length === 0} onClick={() => addExisting(u)}>Adicionar</Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <Input placeholder="Nome" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <Input placeholder="E-mail" type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
+          <Input placeholder="Senha" type="password" value={draft.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} />
+          <Button type="button" variant="outline" className="sm:col-span-3" disabled={draftDepartmentIds.length === 0} onClick={addNew}>Adicionar usuário</Button>
+        </div>
+      )}
+
+      {links.length === 0 ? (
+        <p className="text-xs text-danger-text">Adicione pelo menos um usuário.</p>
+      ) : (
+        <ul className="space-y-1">
+          {links.map((l, i) => (
+            <li key={i} className="flex items-center justify-between text-sm bg-neutral-bg rounded px-2 py-1.5">
+              <span>{l.name ?? 'Usuário existente'} — {l.departmentIds.length} depto(s)</span>
+              <button type="button" onClick={() => onChange(links.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-danger-text">
+                <Trash2 size={12} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 type CreateForm = AddressFields & {
   name: string; clientType: ClientType; cnpj: string; cpf: string
-  email: string; password: string; whatsapp: string; phone: string; notes: string
+  whatsapp: string; phone: string; notes: string; clientUsers: ClientUserLink[]
 }
 
 type EditForm = AddressFields & {
   name: string; clientType: ClientType; cnpj: string; cpf: string
-  email: string; whatsapp: string; phone: string; notes: string
+  whatsapp: string; phone: string; notes: string; clientUsers: ClientUserLink[]
 }
 
 const EMPTY_CREATE: CreateForm = {
   name: '', clientType: 'PJ', cnpj: '', cpf: '',
-  email: '', password: '', whatsapp: '', phone: '', notes: '', ...EMPTY_ADDRESS,
+  whatsapp: '', phone: '', notes: '', clientUsers: [], ...EMPTY_ADDRESS,
 }
 
 function TypeToggle({ value, onChange }: { value: ClientType; onChange: (v: ClientType) => void }) {
@@ -275,7 +384,7 @@ export default function Clients() {
 
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [editForm, setEditForm] = useState<EditForm>({
-    name: '', clientType: 'PJ', cnpj: '', cpf: '', email: '', whatsapp: '', phone: '', notes: '', ...EMPTY_ADDRESS,
+    name: '', clientType: 'PJ', cnpj: '', cpf: '', whatsapp: '', phone: '', notes: '', clientUsers: [], ...EMPTY_ADDRESS,
   })
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -296,7 +405,6 @@ export default function Clients() {
       const matchSearch =
         !q ||
         c.name.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) ||
         (c.cnpj ?? '').toLowerCase().includes(q) ||
         (c.cpf ?? '').toLowerCase().includes(q)
       return matchType && matchSearch
@@ -310,8 +418,6 @@ export default function Clients() {
         clientType: createForm.clientType,
         cnpj: createForm.cnpj || undefined,
         cpf: createForm.cpf || undefined,
-        email: createForm.email,
-        password: createForm.password,
         whatsapp: createForm.whatsapp || undefined,
         phone: createForm.phone || undefined,
         notes: createForm.notes || undefined,
@@ -322,6 +428,7 @@ export default function Clients() {
         logradouro: createForm.logradouro || undefined,
         numero: createForm.numero || undefined,
         complemento: createForm.complemento || undefined,
+        clientUsers: createForm.clientUsers,
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Cliente cadastrado com sucesso')
@@ -341,7 +448,6 @@ export default function Clients() {
         clientType: data.clientType,
         cnpj: data.cnpj || undefined,
         cpf: data.cpf || undefined,
-        email: data.email,
         whatsapp: data.whatsapp || undefined,
         phone: data.phone || undefined,
         notes: data.notes || undefined,
@@ -352,6 +458,7 @@ export default function Clients() {
         logradouro: data.logradouro || undefined,
         numero: data.numero || undefined,
         complemento: data.complemento || undefined,
+        clientUsers: data.clientUsers,
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Cliente atualizado')
@@ -378,7 +485,6 @@ export default function Clients() {
       clientType: client.clientType ?? 'PJ',
       cnpj: client.cnpj ?? '',
       cpf: client.cpf ?? '',
-      email: client.email,
       whatsapp: client.whatsapp ?? '',
       phone: client.phone ?? '',
       notes: client.notes ?? '',
@@ -389,6 +495,7 @@ export default function Clients() {
       logradouro: client.logradouro ?? '',
       numero: client.numero ?? '',
       complemento: client.complemento ?? '',
+      clientUsers: [],
     })
   }
 
@@ -467,14 +574,6 @@ export default function Clients() {
               <Label htmlFor="c-name">Nome *</Label>
               <Input id="c-name" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="c-email">E-mail *</Label>
-              <Input id="c-email" type="email" value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="c-password">Senha do portal *</Label>
-              <Input id="c-password" type="password" value={createForm.password} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} />
-            </div>
           </div>
 
           <ClientFields
@@ -483,13 +582,18 @@ export default function Clients() {
             idPrefix="c"
           />
 
+          <ClientUsersSection
+            links={createForm.clientUsers}
+            onChange={(v) => setCreateForm({ ...createForm, clientUsers: v })}
+          />
+
           {createMutation.isError && (
             <p className="text-sm text-red-600">Erro ao cadastrar. Verifique os dados.</p>
           )}
           <div className="flex gap-2 pt-1">
             <Button
               onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending || !createForm.name || !createForm.email || !createForm.password}
+              disabled={createMutation.isPending || !createForm.name || createForm.clientUsers.length === 0}
               className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
             >
               {createMutation.isPending ? 'Cadastrando...' : 'Cadastrar'}
@@ -520,7 +624,6 @@ export default function Clients() {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground truncate">{client.email}</p>
               {(client.cnpj || client.cpf || client.whatsapp || client.phone) && (
                 <p className="text-xs text-muted-foreground truncate mt-0.5">
                   {[client.cnpj, client.cpf, client.whatsapp, client.phone].filter(Boolean).join(' · ')}
@@ -563,14 +666,14 @@ export default function Clients() {
               <Label htmlFor="e-name">Nome *</Label>
               <Input id="e-name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="e-email">E-mail *</Label>
-              <Input id="e-email" type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
-            </div>
             <ClientFields
               form={editForm}
               onChange={(patch) => setEditForm((f) => ({ ...f, ...patch }))}
               idPrefix="e"
+            />
+            <ClientUsersSection
+              links={editForm.clientUsers}
+              onChange={(v) => setEditForm({ ...editForm, clientUsers: v })}
             />
             <hr className="border-border" />
             {editingClient && <AssignmentsSection clientId={editingClient.id} />}
@@ -581,7 +684,7 @@ export default function Clients() {
               <Button variant="outline" onClick={() => setEditingClient(null)}>Cancelar</Button>
               <Button
                 onClick={() => { if (editingClient) updateMutation.mutate({ ...editForm, id: editingClient.id }) }}
-                disabled={updateMutation.isPending || !editForm.name || !editForm.email}
+                disabled={updateMutation.isPending || !editForm.name || editForm.clientUsers.length === 0}
                 className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
               >
                 {updateMutation.isPending ? 'Salvando...' : 'Salvar'}

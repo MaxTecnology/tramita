@@ -60,7 +60,6 @@ export interface Client {
   clientType: 'PF' | 'PJ'
   cnpj: string | null
   cpf: string | null
-  email: string
   whatsapp: string | null
   phone: string | null
   notes: string | null
