@@ -90,7 +90,10 @@ export default function Board() {
       const params = new URLSearchParams()
       if (search.trim()) params.set('q', search.trim())
       if (filterPriority) params.set('priority', filterPriority)
-      if (filterCompetence) params.set('competence', new Date(filterCompetence + '-01T00:00:00').toISOString())
+      if (filterCompetence) {
+        const [year, month] = filterCompetence.split('-').map(Number)
+        params.set('competence', new Date(Date.UTC(year, month - 1, 1)).toISOString())
+      }
       return api.get(`/boards/${boardId}/tasks/search?${params}`).then((r) => r.data)
     },
     enabled: !!boardId && hasFilters,
