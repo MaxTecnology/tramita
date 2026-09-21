@@ -39,16 +39,17 @@ model Organization {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
-  plan                Plan                  @relation(fields: [planId], references: [id])
-  users               User[]
-  clients             Client[]
-  boards              Board[]
-  requests            Request[]
-  notificationConfig  NotificationConfig?
-  messageTemplates    MessageTemplate[]
-  notificationLogs    NotificationLog[]
-  subscriptionHistory SubscriptionHistory[]
-  departments         Department[]
+  plan                   Plan                    @relation(fields: [planId], references: [id])
+  users                  User[]
+  clients                Client[]
+  boards                 Board[]
+  requests               Request[]
+  notificationConfig     NotificationConfig?
+  messageTemplates       MessageTemplate[]
+  notificationLogs       NotificationLog[]
+  subscriptionHistory    SubscriptionHistory[]
+  departments            Department[]
+  recurringTaskTemplates RecurringTaskTemplate[]
 
   @@map("organizations")
 }
@@ -87,14 +88,16 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization      Organization       @relation(fields: [organizationId], references: [id])
-  assignedTasks     Task[]             @relation("TaskAssignee")
-  createdTasks      Task[]             @relation("TaskCreator")
-  reviewedRequests  Request[]          @relation("RequestReviewer")
-  comments          Comment[]
-  attachments       Attachment[]
-  responsibleBoards Board[]            @relation("BoardResponsible")
-  clientAssignments ClientAssignment[]
+  organization                 Organization              @relation(fields: [organizationId], references: [id])
+  assignedTasks                Task[]                    @relation("TaskAssignee")
+  createdTasks                 Task[]                    @relation("TaskCreator")
+  reviewedRequests             Request[]                 @relation("RequestReviewer")
+  comments                     Comment[]
+  attachments                  Attachment[]
+  responsibleBoards            Board[]                   @relation("BoardResponsible")
+  clientAssignments            ClientAssignment[]
+  reviewedDocumentRequirements TaskDocumentRequirement[]
+  deliveredDeliverables        TaskDeliverable[]
 
   @@map("users")
 }
@@ -122,12 +125,13 @@ model Client {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization      Organization       @relation(fields: [organizationId], references: [id])
-  boards            Board[]
-  requests          Request[]
-  comments          Comment[]
-  attachments       Attachment[]
-  clientAssignments ClientAssignment[]
+  organization             Organization              @relation(fields: [organizationId], references: [id])
+  boards                   Board[]
+  requests                 Request[]
+  comments                 Comment[]
+  attachments              Attachment[]
+  clientAssignments        ClientAssignment[]
+  recurringTaskAssignments RecurringTaskAssignment[]
 
   @@unique([email, organizationId])
   @@map("clients")
@@ -140,10 +144,11 @@ model Department {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  clientAssignments ClientAssignment[]
-  tasks             Task[]
-  requests          Request[]
+  organization           Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientAssignments      ClientAssignment[]
+  tasks                  Task[]
+  requests               Request[]
+  recurringTaskTemplates RecurringTaskTemplate[]
 
   @@unique([organizationId, name])
   @@map("departments")
@@ -176,10 +181,11 @@ model Board {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  organization    Organization @relation(fields: [organizationId], references: [id])
-  client          Client       @relation(fields: [clientId], references: [id])
-  responsibleUser User?        @relation("BoardResponsible", fields: [responsibleUserId], references: [id])
-  columns         Column[]
+  organization             Organization              @relation(fields: [organizationId], references: [id])
+  client                   Client                    @relation(fields: [clientId], references: [id])
+  responsibleUser          User?                     @relation("BoardResponsible", fields: [responsibleUserId], references: [id])
+  columns                  Column[]
+  recurringTaskAssignments RecurringTaskAssignment[]
 
   @@map("boards")
 }
@@ -242,42 +248,52 @@ model Column {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  tasks Task[]
+  board                    Board                     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks                    Task[]
+  recurringTaskAssignments RecurringTaskAssignment[]
 
   @@map("columns")
 }
 
 model Task {
-  id              String     @id @default(cuid())
-  title           String
-  description     String?
-  position        Int
-  priority        Priority   @default(MEDIUM)
-  status          TaskStatus @default(OPEN)
-  dueDate         DateTime?
-  columnId        String
-  assigneeId      String?
-  creatorId       String
-  sourceRequestId String?
-  departmentId    String?
-  tags            String[]
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  id                  String     @id @default(cuid())
+  title               String
+  description         String?
+  position            Int
+  priority            Priority   @default(MEDIUM)
+  status              TaskStatus @default(OPEN)
+  dueDate             DateTime?
+  columnId            String
+  assigneeId          String?
+  creatorId           String?
+  sourceRequestId     String?
+  departmentId        String?
+  tags                String[]
+  competence          DateTime?
+  targetDate          DateTime?
+  recurringTemplateId String?
+  visibleToClient     Boolean    @default(true)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
-  column           Column        @relation(fields: [columnId], references: [id], onDelete: Cascade)
-  assignee         User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  creator          User          @relation("TaskCreator", fields: [creatorId], references: [id])
-  department       Department?   @relation(fields: [departmentId], references: [id])
-  comments         Comment[]
-  history          TaskHistory[]
-  attachments      Attachment[]
-  sourceForRequest Request?
+  column               Column                    @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  assignee             User?                     @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creator              User?                     @relation("TaskCreator", fields: [creatorId], references: [id])
+  department           Department?               @relation(fields: [departmentId], references: [id])
+  comments             Comment[]
+  history              TaskHistory[]
+  attachments          Attachment[]
+  sourceForRequest     Request?
+  recurringTemplate    RecurringTaskTemplate?    @relation(fields: [recurringTemplateId], references: [id])
+  documentRequirements TaskDocumentRequirement[]
+  deliverables         TaskDeliverable[]
 
   @@index([status])
   @@index([priority])
   @@index([dueDate])
   @@index([title])
+  @@index([competence])
+  @@index([targetDate])
   @@map("tasks")
 }
 
@@ -290,10 +306,153 @@ enum Priority {
 
 enum TaskStatus {
   OPEN
-  IN_PROGRESS
-  REVIEW
   DONE
-  CANCELLED
+  DISREGARDED
+  BLOCKED
+}
+
+model RecurringTaskTemplate {
+  id             String                @id @default(cuid())
+  organizationId String
+  departmentId   String
+  title          String
+  description    String?
+  periodicity    RecurrencePeriodicity
+
+  dueMonthOffset       Int     @default(0)
+  dueDayOfPeriod       Int
+  dueRollToBusinessDay Boolean @default(false)
+
+  targetOffsetDays        Int     @default(0)
+  targetRollToBusinessDay Boolean @default(false)
+
+  generationMonthOffset Int @default(1)
+  generationDayOfPeriod Int
+
+  autoCompleteOnAllActivitiesDone Boolean @default(false)
+
+  notifyViaWhatsapp Boolean @default(true)
+  notifyViaEmail    Boolean @default(false)
+
+  visibleToClient Boolean @default(true)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization       Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department         Department                      @relation(fields: [departmentId], references: [id])
+  documentRequests   RecurringTaskTemplateDocument[] @relation("TemplateDocumentRequests")
+  documentDeliveries RecurringTaskTemplateDocument[] @relation("TemplateDocumentDeliveries")
+  assignments        RecurringTaskAssignment[]
+  tasks              Task[]
+  generationLogs     RecurringGenerationLog[]
+
+  @@map("recurring_task_templates")
+}
+
+enum RecurrencePeriodicity {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+model RecurringTaskTemplateDocument {
+  id                 String  @id @default(cuid())
+  requestTemplateId  String?
+  deliveryTemplateId String?
+  name               String
+  position           Int
+
+  requestTemplate  RecurringTaskTemplate? @relation("TemplateDocumentRequests", fields: [requestTemplateId], references: [id], onDelete: Cascade)
+  deliveryTemplate RecurringTaskTemplate? @relation("TemplateDocumentDeliveries", fields: [deliveryTemplateId], references: [id], onDelete: Cascade)
+
+  @@map("recurring_task_template_documents")
+}
+
+model RecurringTaskAssignment {
+  id         String   @id @default(cuid())
+  templateId String
+  clientId   String
+  boardId    String
+  columnId   String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  template RecurringTaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  client   Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  board    Board                 @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column   Column                @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, clientId])
+  @@map("recurring_task_assignments")
+}
+
+model RecurringGenerationLog {
+  id           String           @id @default(cuid())
+  templateId   String
+  clientId     String
+  competence   DateTime
+  status       GenerationStatus
+  taskId       String?
+  errorMessage String?
+  createdAt    DateTime         @default(now())
+
+  template RecurringTaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, clientId, competence])
+  @@map("recurring_generation_logs")
+}
+
+enum GenerationStatus {
+  SUCCESS
+  FAILED
+}
+
+model TaskDocumentRequirement {
+  id              String                    @id @default(cuid())
+  taskId          String
+  name            String
+  status          DocumentRequirementStatus @default(PENDING)
+  attachmentId    String?                   @unique
+  rejectionReason String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  position        Int
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  task       Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  attachment Attachment? @relation(fields: [attachmentId], references: [id])
+  reviewedBy User?       @relation(fields: [reviewedById], references: [id])
+
+  @@map("task_document_requirements")
+}
+
+enum DocumentRequirementStatus {
+  PENDING
+  UPLOADED
+  APPROVED
+  REJECTED
+}
+
+model TaskDeliverable {
+  id            String    @id @default(cuid())
+  taskId        String
+  name          String
+  attachmentId  String?   @unique
+  deliveredById String?
+  deliveredAt   DateTime?
+  position      Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  attachment  Attachment? @relation(fields: [attachmentId], references: [id])
+  deliveredBy User?       @relation(fields: [deliveredById], references: [id])
+
+  @@map("task_deliverables")
 }
 
 model Comment {
@@ -357,31 +516,35 @@ model Attachment {
   deletedByClient  String?
   deletedByName    String?
 
-  task           Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  uploader       User?   @relation(fields: [uploadedBy], references: [id])
-  uploaderClient Client? @relation(fields: [uploadedByClient], references: [id])
+  task                Task                     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader            User?                    @relation(fields: [uploadedBy], references: [id])
+  uploaderClient      Client?                  @relation(fields: [uploadedByClient], references: [id])
+  documentRequirement TaskDocumentRequirement?
+  deliverable         TaskDeliverable?
 
   @@map("attachments")
 }
 
 model NotificationConfig {
-  id               String   @id @default(cuid())
-  organizationId   String   @unique
-  whatsappEnabled  Boolean  @default(true)
-  emailEnabled     Boolean  @default(true)
-  taskCreated      Boolean  @default(false)
-  taskMoved        Boolean  @default(true)
-  taskCompleted    Boolean  @default(true)
-  commentAdded     Boolean  @default(true)
-  dueDateAlert     Boolean  @default(true)
-  requestCreated   Boolean  @default(true)
-  requestApproved  Boolean  @default(true)
-  requestRejected  Boolean  @default(true)
-  maximizebotToken String?
-  saveOnTicket     Boolean  @default(true)
-  startChatbot     Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  organizationId            String   @unique
+  whatsappEnabled           Boolean  @default(true)
+  emailEnabled              Boolean  @default(true)
+  taskCreated               Boolean  @default(false)
+  taskMoved                 Boolean  @default(true)
+  taskCompleted             Boolean  @default(true)
+  commentAdded              Boolean  @default(true)
+  dueDateAlert              Boolean  @default(true)
+  requestCreated            Boolean  @default(true)
+  requestApproved           Boolean  @default(true)
+  requestRejected           Boolean  @default(true)
+  maximizebotToken          String?
+  saveOnTicket              Boolean  @default(true)
+  startChatbot              Boolean  @default(false)
+  recurringGenerationFailed Boolean  @default(true)
+  documentRejected          Boolean  @default(true)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
 
@@ -414,6 +577,8 @@ enum NotificationEvent {
   REQUEST_CREATED
   REQUEST_APPROVED
   REQUEST_REJECTED
+  RECURRING_GENERATION_FAILED
+  DOCUMENT_REJECTED
 }
 
 enum MessageChannel {
