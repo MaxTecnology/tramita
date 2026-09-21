@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { prisma } from '@/lib/prisma'
+import * as queue from '@/lib/queue'
 import {
   createTemplate,
   updateTemplate,
@@ -6,6 +8,8 @@ import {
   getTemplateById,
   createAssignment,
   deleteAssignment,
+  generateTaskForAssignment,
+  generateManually,
 } from './recurring-templates.service'
 import {
   createTestOrg,
@@ -14,6 +18,7 @@ import {
   createTestClient,
   createTestBoard,
   createTestColumn,
+  createTestUser,
 } from '@/test/helpers'
 
 describe('createTemplate', () => {
@@ -269,5 +274,152 @@ describe('deleteTemplate (com assignment vinculado)', () => {
     await createAssignment(template.id, org.id, { clientId: client.id, boardId: board.id, columnId: col.id })
 
     await expect(deleteTemplate(template.id, org.id)).rejects.toMatchObject({ statusCode: 409 })
+  })
+})
+
+describe('generateTaskForAssignment', () => {
+  async function setup() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'Folha de pagamento', periodicity: 'MONTHLY',
+      dueMonthOffset: 1, dueDayOfPeriod: 15, dueRollToBusinessDay: false,
+      targetOffsetDays: -2, targetRollToBusinessDay: false,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
+      visibleToClient: true, isActive: true,
+      documentRequests: [{ name: 'Ponto' }], documentDeliveries: [{ name: 'Resumo' }],
+    })
+    const assignment = await createAssignment(template.id, org.id, {
+      clientId: client.id, boardId: board.id, columnId: col.id,
+    })
+    return { org, dept, client, board, col, template, assignment }
+  }
+
+  it('gera a tarefa com checklist copiado do template, dueDate/targetDate calculados e status BLOCKED (tem documento a cobrar)', async () => {
+    const { template, assignment } = await setup()
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const competence = new Date(Date.UTC(2026, 1, 1)) // fevereiro
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+
+    expect(outcome.status).toBe('SUCCESS')
+    if (outcome.status !== 'SUCCESS') throw new Error('unreachable')
+
+    const task = await prisma.task.findUniqueOrThrow({
+      where: { id: outcome.taskId },
+      include: { documentRequirements: true, deliverables: true },
+    })
+    expect(task.status).toBe('BLOCKED')
+    expect(task.dueDate?.toISOString().slice(0, 10)).toBe('2026-03-15')
+    expect(task.documentRequirements).toHaveLength(1)
+    expect(task.deliverables).toHaveLength(1)
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ event: 'TASK_CREATED', channels: ['WHATSAPP'] }))
+
+    spy.mockRestore()
+  })
+
+  it('idempotência: chamar duas vezes pra mesma competência não cria segunda tarefa', async () => {
+    const { template, assignment } = await setup()
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const competence = new Date(Date.UTC(2026, 1, 1))
+    const first = await generateTaskForAssignment(template.id, assignment.id, competence)
+    const second = await generateTaskForAssignment(template.id, assignment.id, competence)
+
+    expect(first.status).toBe('SUCCESS')
+    expect(second.status).toBe('ALREADY_EXISTS')
+
+    const count = await prisma.task.count({ where: { recurringTemplateId: template.id } })
+    expect(count).toBe(1)
+
+    vi.restoreAllMocks()
+  })
+
+  it('isolamento de falha: coluna do vínculo não existe mais, grava FAILED e notifica ORG_ADMIN', async () => {
+    const { org, template, assignment } = await setup()
+    await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+    // A coluna do vínculo tem onDelete: Cascade em RecurringTaskAssignment — apagar a coluna
+    // de verdade apagaria o próprio vínculo junto (o assignment sairia com ela), e a função
+    // retornaria cedo com "Vínculo não encontrado", nunca chegando no bloco try/catch que este
+    // teste quer exercitar. Simula o mesmo sintoma ("coluna sumiu entre o fetch do vínculo e o
+    // da coluna") sem violar a integridade referencial do banco. `vi.spyOn` não serve aqui:
+    // o client do Prisma usa proxies internamente e `mockRestore()` deixa o método `undefined`
+    // permanentemente pro resto do processo de teste (confirmado — quebrava os testes seguintes
+    // do arquivo); por isso a troca/restauração é feita com atribuição direta de propriedade.
+    const originalFindUnique = prisma.column.findUnique
+    ;(prisma.column as unknown as { findUnique: typeof prisma.column.findUnique }).findUnique = (async () =>
+      null) as unknown as typeof prisma.column.findUnique
+
+    try {
+      const competence = new Date(Date.UTC(2026, 1, 1))
+      const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+
+      expect(outcome.status).toBe('FAILED')
+
+      const log = await prisma.recurringGenerationLog.findUnique({
+        where: { templateId_clientId_competence: { templateId: template.id, clientId: assignment.clientId, competence } },
+      })
+      expect(log?.status).toBe('FAILED')
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ event: 'RECURRING_GENERATION_FAILED' }))
+    } finally {
+      ;(prisma.column as unknown as { findUnique: typeof prisma.column.findUnique }).findUnique = originalFindUnique
+      spy.mockRestore()
+    }
+  })
+
+  it('reprocessamento manual: gera com sucesso depois de um FAILED anterior pra mesma competência', async () => {
+    const { org, template, assignment, col } = await setup()
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const competence = new Date(Date.UTC(2026, 1, 1))
+    await prisma.recurringGenerationLog.create({
+      data: { templateId: template.id, clientId: assignment.clientId, competence, status: 'FAILED', errorMessage: 'erro antigo' },
+    })
+
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+    expect(outcome.status).toBe('SUCCESS')
+
+    vi.restoreAllMocks()
+  })
+})
+
+describe('generateManually', () => {
+  async function setupTemplate() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'X', periodicity: 'MONTHLY',
+      dueMonthOffset: 0, dueDayOfPeriod: 10, dueRollToBusinessDay: false,
+      targetOffsetDays: 0, targetRollToBusinessDay: false,
+      generationMonthOffset: 1, generationDayOfPeriod: 5,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    const assignment = await createAssignment(template.id, org.id, { clientId: client.id, boardId: board.id, columnId: col.id })
+    return { template, assignment }
+  }
+
+  it('lança 409 se já existe SUCCESS pra essa competência', async () => {
+    const { template, assignment } = await setupTemplate()
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const competence = new Date().toISOString()
+    await generateManually(template.id, assignment.id, template.organizationId, competence)
+
+    await expect(
+      generateManually(template.id, assignment.id, template.organizationId, competence),
+    ).rejects.toMatchObject({ statusCode: 409 })
+
+    vi.restoreAllMocks()
   })
 })

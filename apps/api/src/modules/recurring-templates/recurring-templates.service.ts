@@ -1,6 +1,14 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
+import { Prisma, type MessageChannel } from '@prisma/client'
+import { enqueueNotification } from '@/lib/queue'
+import {
+  computeDueDate,
+  computeTargetDate,
+  computeCurrentPeriodStart,
+  type RecurrenceDateRules,
+} from './recurrence-dates'
 import type {
   CreateTemplateBody,
   UpdateTemplateBody,
@@ -168,4 +176,193 @@ export async function deleteAssignment(templateId: string, assignmentId: string,
   await getAssignmentOrThrow(templateId, assignmentId, organizationId)
   await prisma.recurringTaskAssignment.delete({ where: { id: assignmentId } })
   return { ok: true }
+}
+
+export type GenerationOutcome =
+  | { status: 'SUCCESS'; taskId: string }
+  | { status: 'ALREADY_EXISTS' }
+  | { status: 'FAILED'; errorMessage: string }
+
+function isDuplicateGenerationLogError(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    err.code === 'P2002' &&
+    Array.isArray(err.meta?.target) &&
+    (err.meta!.target as string[]).includes('templateId')
+  )
+}
+
+export async function generateTaskForAssignment(
+  templateId: string,
+  assignmentId: string,
+  competence: Date,
+): Promise<GenerationOutcome> {
+  const template = await prisma.recurringTaskTemplate.findUnique({
+    where: { id: templateId },
+    include: { documentRequests: true, documentDeliveries: true },
+  })
+  if (!template) return { status: 'FAILED', errorMessage: 'Template não encontrado' }
+
+  const assignment = await prisma.recurringTaskAssignment.findUnique({ where: { id: assignmentId } })
+  if (!assignment || assignment.templateId !== templateId) {
+    return { status: 'FAILED', errorMessage: 'Vínculo não encontrado' }
+  }
+
+  const logKey = {
+    templateId_clientId_competence: { templateId, clientId: assignment.clientId, competence },
+  }
+  const existingLog = await prisma.recurringGenerationLog.findUnique({ where: logKey })
+  if (existingLog?.status === 'SUCCESS') return { status: 'ALREADY_EXISTS' }
+
+  try {
+    const column = await prisma.column.findUnique({ where: { id: assignment.columnId } })
+    if (!column) throw new Error('Coluna do vínculo não existe mais')
+
+    const rules: RecurrenceDateRules = template
+    const dueDate = computeDueDate(competence, rules)
+    const targetDate = computeTargetDate(dueDate, rules)
+    const initialStatus = template.documentRequests.length > 0 ? 'BLOCKED' : 'OPEN'
+
+    const taskId = await prisma.$transaction(async (tx) => {
+      const position = await tx.task.count({ where: { columnId: assignment.columnId } })
+
+      const task = await tx.task.create({
+        data: {
+          title: template.title,
+          description: template.description,
+          priority: 'MEDIUM',
+          status: initialStatus,
+          columnId: assignment.columnId,
+          departmentId: template.departmentId,
+          competence,
+          dueDate,
+          targetDate,
+          recurringTemplateId: template.id,
+          visibleToClient: template.visibleToClient,
+          position,
+          tags: [],
+        },
+      })
+
+      if (template.documentRequests.length > 0) {
+        await tx.taskDocumentRequirement.createMany({
+          data: template.documentRequests.map((d, i) => ({ taskId: task.id, name: d.name, position: i })),
+        })
+      }
+      if (template.documentDeliveries.length > 0) {
+        await tx.taskDeliverable.createMany({
+          data: template.documentDeliveries.map((d, i) => ({ taskId: task.id, name: d.name, position: i })),
+        })
+      }
+
+      await tx.taskHistory.create({
+        data: {
+          taskId: task.id,
+          action: 'created',
+          toValue: task.title,
+          actorType: 'system',
+          actorId: 'system',
+          actorName: 'Sistema (recorrência)',
+        },
+      })
+
+      // Reserva a chave de idempotência por último, dentro da mesma transação: se outra
+      // execução concorrente já reservou essa combinação (templateId, clientId, competence)
+      // entre a checagem acima e aqui, o unique constraint derruba a transação inteira —
+      // a Task recém-criada é revertida junto, nada fica duplicado no banco.
+      if (existingLog) {
+        await tx.recurringGenerationLog.update({
+          where: logKey,
+          data: { status: 'SUCCESS', taskId: task.id, errorMessage: null },
+        })
+      } else {
+        await tx.recurringGenerationLog.create({
+          data: { templateId, clientId: assignment.clientId, competence, status: 'SUCCESS', taskId: task.id },
+        })
+      }
+
+      return task.id
+    })
+
+    if (template.notifyViaWhatsapp || template.notifyViaEmail) {
+      const channels: MessageChannel[] = []
+      if (template.notifyViaWhatsapp) channels.push('WHATSAPP')
+      if (template.notifyViaEmail) channels.push('EMAIL')
+      await enqueueNotification({
+        event: 'TASK_CREATED',
+        organizationId: template.organizationId,
+        clientId: assignment.clientId,
+        taskId,
+        channels,
+        metadata: { taskTitle: template.title },
+      })
+    }
+
+    return { status: 'SUCCESS', taskId }
+  } catch (err) {
+    if (isDuplicateGenerationLogError(err)) {
+      // Perdeu a corrida pra outra execução concorrente que gerou essa competência primeiro
+      // — não é uma falha real, é o próprio mecanismo de idempotência funcionando.
+      return { status: 'ALREADY_EXISTS' }
+    }
+
+    const errorMessage = err instanceof Error ? err.message : String(err)
+
+    await prisma.recurringGenerationLog.upsert({
+      where: logKey,
+      create: { templateId, clientId: assignment.clientId, competence, status: 'FAILED', errorMessage },
+      update: { status: 'FAILED', errorMessage, taskId: null },
+    })
+
+    const admins = await prisma.user.findMany({
+      where: { organizationId: template.organizationId, role: 'ORG_ADMIN', isActive: true },
+      select: { id: true },
+    })
+    await Promise.all(
+      admins.map((admin) =>
+        enqueueNotification({
+          event: 'RECURRING_GENERATION_FAILED',
+          organizationId: template.organizationId,
+          recipientType: 'USER',
+          userId: admin.id,
+          metadata: { templateTitle: template.title, errorMessage },
+        }),
+      ),
+    )
+
+    return { status: 'FAILED', errorMessage }
+  }
+}
+
+export async function generateManually(
+  templateId: string,
+  assignmentId: string,
+  organizationId: string,
+  competenceOverride?: string,
+) {
+  const template = await getTemplateById(templateId, organizationId)
+  const assignment = await getAssignmentOrThrow(templateId, assignmentId, organizationId)
+
+  const competence = competenceOverride
+    ? new Date(competenceOverride)
+    : computeCurrentPeriodStart(new Date(), template.periodicity)
+
+  const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+
+  if (outcome.status === 'ALREADY_EXISTS') {
+    throw new AppError(409, 'Já existe tarefa gerada pra essa competência e esse cliente')
+  }
+  if (outcome.status === 'FAILED') {
+    throw new AppError(422, `Falha ao gerar: ${outcome.errorMessage}`)
+  }
+  return { taskId: outcome.taskId }
+}
+
+export async function listGenerationLog(templateId: string, organizationId: string) {
+  await getTemplateById(templateId, organizationId)
+  return prisma.recurringGenerationLog.findMany({
+    where: { templateId },
+    include: { template: { select: { title: true } } },
+    orderBy: { createdAt: 'desc' },
+  })
 }

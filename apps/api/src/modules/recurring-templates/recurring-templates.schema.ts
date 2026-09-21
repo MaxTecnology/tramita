@@ -51,3 +51,9 @@ export const updateAssignmentSchema = z.object({
 
 export type CreateAssignmentBody = z.infer<typeof createAssignmentSchema>
 export type UpdateAssignmentBody = z.infer<typeof updateAssignmentSchema>
+
+export const manualGenerateSchema = z.object({
+  competence: z.string().datetime().optional(),
+})
+
+export type ManualGenerateBody = z.infer<typeof manualGenerateSchema>
