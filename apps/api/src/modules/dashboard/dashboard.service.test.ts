@@ -24,7 +24,7 @@ describe('getDashboardMetrics', () => {
       completedTasksThisMonth: 0,
       urgentOpenTasks: 0,
     })
-    expect(result.tasksByStatus).toEqual({ OPEN: 0, IN_PROGRESS: 0, REVIEW: 0, DONE: 0 })
+    expect(result.tasksByStatus).toEqual({ OPEN: 0, BLOCKED: 0, DONE: 0, DISREGARDED: 0 })
     expect(result.atRisk).toEqual([])
   })
 
