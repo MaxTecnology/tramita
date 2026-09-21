@@ -19,6 +19,7 @@ import AppSubscription from '@/pages/app/settings/Subscription'
 import Profile from '@/pages/app/settings/Profile'
 import Departments from '@/pages/app/settings/Departments'
 import RecurringTemplates from '@/pages/app/settings/RecurringTemplates'
+import RecurringTemplateForm from '@/pages/app/settings/RecurringTemplateForm'
 import DashboardMetrics from '@/pages/app/DashboardMetrics'
 import Processes from '@/pages/app/Processes'
 import Requests from '@/pages/app/Requests'
@@ -114,6 +115,22 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <RecurringTemplates />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/recurring-templates/new',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <RecurringTemplateForm />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/recurring-templates/:id/edit',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <RecurringTemplateForm />
           </ProtectedRoute>
         ),
       },
