@@ -183,7 +183,7 @@ describe('POST /portal/requests', () => {
     expect(res.statusCode).toBe(400)
   })
 
-  it('clientId fora do escopo do usuário — 403', async () => {
+  it('clientId fora do escopo do usuário — 404', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
@@ -200,7 +200,7 @@ describe('POST /portal/requests', () => {
       payload: { clientId: otherClient.id, title: 'Fora do escopo' },
     })
 
-    expect(res.statusCode).toBe(403)
+    expect(res.statusCode).toBe(404)
   })
 })
 
@@ -228,7 +228,7 @@ describe('GET /portal/requests', () => {
     expect(list[0].title).toBe('Da A')
   })
 
-  it('clientId fora do escopo do usuário — 403', async () => {
+  it('clientId fora do escopo do usuário — 404', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const clientA = await createTestClient(org.id, { name: 'Empresa A' })
@@ -239,7 +239,7 @@ describe('GET /portal/requests', () => {
     const authA = await getAuthHeader(clientUserA.email, passwordA)
 
     const res = await app.inject({ method: 'GET', url: `/portal/requests?clientId=${clientB.id}`, headers: { authorization: authA } })
-    expect(res.statusCode).toBe(403)
+    expect(res.statusCode).toBe(404)
   })
 })
 

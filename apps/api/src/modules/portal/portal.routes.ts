@@ -93,7 +93,7 @@ export async function portalRoutes(app: FastifyInstance) {
     const result = createRequestSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     const scope = await getClientAccessScope(request.user.sub)
-    if (!scope.clientIds.includes(result.data.clientId)) throw new AppError(403, 'Acesso negado')
+    if (!scope.clientIds.includes(result.data.clientId)) throw new AppError(404, 'Empresa não encontrada')
     return reply.status(201).send(
       await createRequest(request.user.organizationId!, result.data.clientId, result.data),
     )
@@ -103,7 +103,7 @@ export async function portalRoutes(app: FastifyInstance) {
     const { clientId } = request.query as { clientId?: string }
     if (!clientId) throw new AppError(400, 'clientId é obrigatório')
     const scope = await getClientAccessScope(request.user.sub)
-    if (!scope.clientIds.includes(clientId)) throw new AppError(403, 'Acesso negado')
+    if (!scope.clientIds.includes(clientId)) throw new AppError(404, 'Empresa não encontrada')
     return reply.send(await listRequestsForClient(request.user.organizationId!, clientId))
   })
 
