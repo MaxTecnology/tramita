@@ -84,7 +84,7 @@ model RecurringTaskTemplate {
 
   // Geração antecipada — gatilho único
   generationMonthOffset Int      @default(1)  // meses ANTES do início da competência que a geração roda (mensal/trimestral/anual); ignorado em WEEKLY (sempre 1 semana antes)
-  generationDayOfPeriod Int                    // dia do mês da geração (dentro do mês definido acima), ou dia da semana 1-7 (semanal)
+  generationDayOfPeriod Int                    // dia do mês (1-31) em que o gatilho de geração roda — mesmo campo, mesma semântica, pras 4 periodicidades (inclusive semanal, ver exemplo abaixo)
 
   // Conclusão automática
   autoCompleteOnAllActivitiesDone Boolean @default(false) // liga/desliga: quando todas as atividades (documentos cobrados aprovados + documentos entregues) estiverem resolvidas, marca a tarefa como Concluído sozinho
@@ -125,7 +125,7 @@ enum RecurrencePeriodicity {
 
 **Exemplo trimestral**: competência Q1 (jan-mar), vence dia 10 do 3º mês do trimestre (março), gera 1 mês antes do trimestre começar (dezembro) dia 20 → `dueMonthOffset=2, dueDayOfPeriod=10, generationMonthOffset=1, generationDayOfPeriod=20`. Mesma fórmula do mensal, sem caso especial.
 
-**Exemplo semanal**: vencimento sempre dentro da própria semana da competência (`dueMonthOffset` ignorado, `dueDayOfPeriod` = dia da semana, ex: 5 = sexta); geração sempre exatamente 1 semana antes (`generationMonthOffset` ignorado — regra fixa "sempre a semana anterior"), `generationDayOfPeriod` = dia da semana em que o cron dispara a leva do mês. Decisão do brainstorming: **um único gatilho por template no dia configurado do mês** — quando esse dia bate, o motor gera de uma vez todas as ocorrências da periodicidade daquele template que caem dentro do próximo mês (pra semanal, isso normalmente é 4 ou 5 tarefas geradas na mesma execução; pra mensal, é 1; pra trimestral/anual, só gera quando o próximo mês inicia um novo trimestre/ano, senão essa execução não faz nada pra esse template). Ver "Motor de geração" abaixo.
+**Exemplo semanal**: vencimento sempre dentro da própria semana da competência (`dueMonthOffset` ignorado, `dueDayOfPeriod` = dia da semana, ex: 5 = sexta); `generationMonthOffset` também ignorado (não existe "mês antes" pra semanal — a geração está sempre atrelada ao mês corrente via `generationDayOfPeriod`, igual às outras periodicidades). Decisão do brainstorming (esclarecida depois de uma primeira proposta incorreta minha, corrigida pelo usuário): **um único gatilho por template, sempre dia-do-mês, pras 4 periodicidades** — quando `generationDayOfPeriod` bate com o dia corrente, o motor gera de uma vez todas as ocorrências da periodicidade daquele template que caem dentro do próximo mês inteiro (pra semanal, isso normalmente é 4 ou 5 tarefas geradas na mesma execução — uma por cada dia-da-semana `dueDayOfPeriod` que cai no mês seguinte; pra mensal, é 1; pra trimestral/anual, só gera quando o próximo mês inicia um novo trimestre/ano, senão essa execução não faz nada pra esse template). Ver "Motor de geração" abaixo.
 
 ### `RecurringTaskTemplateDocument` — novo (duas listas: cobrar do cliente / entregar ao cliente)
 
@@ -260,7 +260,7 @@ Ambos (`TaskDocumentRequirement` e `TaskDeliverable`) ficam disponíveis em **qu
 
 ### Cron (worker, mesmo padrão de `duedate.cron.ts`)
 
-Roda diariamente. Pra cada `RecurringTaskTemplate` ativo, verifica se o dia de hoje bate com `generationDayOfPeriod` (dia do mês pra mensal/trimestral/anual; dia da semana pra semanal, checado toda semana). Quando bate:
+Roda diariamente. Pra cada `RecurringTaskTemplate` ativo, verifica se o dia de hoje bate com `generationDayOfPeriod` (dia do mês — mesmo campo, mesma checagem, pras 4 periodicidades). Quando bate:
 
 - **MONTHLY**: gera 1 tarefa, `competence` = 1º dia do mês seguinte.
 - **WEEKLY**: gera uma tarefa pra **cada** semana (dia configurado) que cai dentro do mês seguinte inteiro — normalmente 4 ou 5 de uma vez.
