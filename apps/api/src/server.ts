@@ -19,6 +19,7 @@ import { attachmentsRoutes } from '@/modules/attachments/attachments.routes'
 import { requestsRoutes } from '@/modules/requests/requests.routes'
 import { dashboardRoutes } from '@/modules/dashboard/dashboard.routes'
 import { departmentsRoutes } from '@/modules/departments/departments.routes'
+import { recurringTemplatesRoutes } from '@/modules/recurring-templates/recurring-templates.routes'
 import { AppError } from '@/errors/AppError'
 
 export function buildApp() {
@@ -47,6 +48,7 @@ export function buildApp() {
   app.register(requestsRoutes, { prefix: '/requests' })
   app.register(dashboardRoutes, { prefix: '/dashboard' })
   app.register(departmentsRoutes, { prefix: '/departments' })
+  app.register(recurringTemplatesRoutes, { prefix: '/recurring-templates' })
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     if (error instanceof AppError) {
