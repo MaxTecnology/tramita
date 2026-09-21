@@ -126,3 +126,15 @@ export function computeCurrentPeriodStart(today: Date, periodicity: Periodicity)
       return new Date(Date.UTC(today.getUTCFullYear(), 0, 1))
   }
 }
+
+/**
+ * Dado um instante arbitrário (não necessariamente "hoje"), retorna o início canônico do
+ * período (semana/mês/trimestre/ano) em que ele cai. `computeCurrentPeriodStart` já opera
+ * sobre uma data qualquer passada por parâmetro — nunca lê o relógio internamente — então essa
+ * função é só um alias semântico pro mesmo cálculo, usado onde a entrada não é "hoje" mas um
+ * `competenceOverride` arbitrário vindo da API (Task 7: geração manual) que precisa ser
+ * canonicalizado pra bater com a chave de idempotência que o cron geraria pro mesmo período real.
+ */
+export function normalizeToPeriodStart(date: Date, periodicity: Periodicity): Date {
+  return computeCurrentPeriodStart(date, periodicity)
+}

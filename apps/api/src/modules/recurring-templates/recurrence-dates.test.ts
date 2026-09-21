@@ -4,6 +4,7 @@ import {
   computeTargetDate,
   computeCompetencesToGenerate,
   computeCurrentPeriodStart,
+  normalizeToPeriodStart,
   type RecurrenceDateRules,
 } from './recurrence-dates'
 
@@ -144,5 +145,27 @@ describe('computeCurrentPeriodStart', () => {
   it('anual: início do ano corrente', () => {
     const today = new Date(Date.UTC(2026, 7, 1))
     expect(computeCurrentPeriodStart(today, 'ANNUAL').toISOString().slice(0, 10)).toBe('2026-01-01')
+  })
+})
+
+describe('normalizeToPeriodStart', () => {
+  it('mensal: canonicaliza um instante qualquer do mês pro dia 1 do mesmo mês', () => {
+    const arbitrary = new Date(Date.UTC(2026, 8, 17, 13, 22, 0)) // 2026-09-17T13:22:00Z
+    expect(normalizeToPeriodStart(arbitrary, 'MONTHLY').toISOString().slice(0, 10)).toBe('2026-09-01')
+  })
+
+  it('semanal: canonicaliza um instante qualquer da semana pra segunda-feira daquela semana', () => {
+    const arbitrary = new Date(Date.UTC(2026, 8, 18, 23, 59, 0)) // sexta-feira 2026-09-18
+    expect(normalizeToPeriodStart(arbitrary, 'WEEKLY').toISOString().slice(0, 10)).toBe('2026-09-14')
+  })
+
+  it('trimestral: canonicaliza um instante qualquer do trimestre pro início do trimestre', () => {
+    const arbitrary = new Date(Date.UTC(2026, 8, 30, 5, 0, 0)) // setembro -> Q3 começa em julho
+    expect(normalizeToPeriodStart(arbitrary, 'QUARTERLY').toISOString().slice(0, 10)).toBe('2026-07-01')
+  })
+
+  it('anual: canonicaliza um instante qualquer do ano pro dia 1º de janeiro', () => {
+    const arbitrary = new Date(Date.UTC(2026, 8, 17, 13, 22, 0))
+    expect(normalizeToPeriodStart(arbitrary, 'ANNUAL').toISOString().slice(0, 10)).toBe('2026-01-01')
   })
 })
