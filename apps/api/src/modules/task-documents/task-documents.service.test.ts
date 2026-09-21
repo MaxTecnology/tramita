@@ -12,6 +12,7 @@ import {
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClient,
   createTestBoard, createTestColumn, createTestTask, createTestDepartment,
+  createTestClientUser, grantClientAccess,
 } from '@/test/helpers'
 
 beforeEach(() => {
@@ -61,11 +62,13 @@ describe('checklist de documento — impedimento automático', () => {
     const board = await createTestBoard(org.id, client.id)
     const col = await createTestColumn(board.id, { position: 0 })
     const task = await createTestTask(col.id, user.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, task.departmentId)
     const requirement = await addDocumentRequirement(task.id, org.id, 'Ponto')
     await recalculateTaskStatus(task.id)
 
     await uploadForRequirement(
-      task.id, requirement.id, org.id, { id: client.id, type: 'client' }, client.id,
+      task.id, requirement.id, org.id, { id: clientUser.id, type: 'client' }, clientUser.id,
       { filename: 'ponto.pdf', mimeType: 'application/pdf', size: 100, buffer: Buffer.from('x') },
     )
     await reviewDocumentRequirement(task.id, requirement.id, org.id, user.id, 'APPROVED', undefined)
@@ -82,9 +85,11 @@ describe('checklist de documento — impedimento automático', () => {
     const board = await createTestBoard(org.id, client.id)
     const col = await createTestColumn(board.id, { position: 0 })
     const task = await createTestTask(col.id, user.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, task.departmentId)
     const requirement = await addDocumentRequirement(task.id, org.id, 'Ponto')
     await uploadForRequirement(
-      task.id, requirement.id, org.id, { id: client.id, type: 'client' }, client.id,
+      task.id, requirement.id, org.id, { id: clientUser.id, type: 'client' }, clientUser.id,
       { filename: 'ponto.pdf', mimeType: 'application/pdf', size: 100, buffer: Buffer.from('x') },
     )
 
@@ -126,8 +131,10 @@ describe('checklist de documento — impedimento automático', () => {
     if (outcome.status !== 'SUCCESS') throw new Error('geração falhou no setup do teste')
 
     const requirement = await prisma.taskDocumentRequirement.findFirstOrThrow({ where: { taskId: outcome.taskId } })
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, dept.id)
     await uploadForRequirement(
-      outcome.taskId, requirement.id, org.id, { id: client.id, type: 'client' }, client.id,
+      outcome.taskId, requirement.id, org.id, { id: clientUser.id, type: 'client' }, clientUser.id,
       { filename: 'ponto.pdf', mimeType: 'application/pdf', size: 100, buffer: Buffer.from('x') },
     )
     await reviewDocumentRequirement(outcome.taskId, requirement.id, org.id, user.id, 'APPROVED', undefined)
@@ -148,10 +155,35 @@ describe('verifyTaskAccess (visibilidade no portal)', () => {
     const board = await createTestBoard(org.id, client.id)
     const col = await createTestColumn(board.id, { position: 0 })
     const task = await createTestTask(col.id, user.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, task.departmentId)
     await prisma.task.update({ where: { id: task.id }, data: { visibleToClient: false } })
 
-    await expect(listTaskDocuments(task.id, org.id, client.id)).rejects.toMatchObject({ statusCode: 404 })
-    // do lado do escritório (sem clientId), continua acessível
+    await expect(listTaskDocuments(task.id, org.id, clientUser.id)).rejects.toMatchObject({ statusCode: 404 })
+    // do lado do escritório (sem clientUserId), continua acessível
     await expect(listTaskDocuments(task.id, org.id)).resolves.toBeDefined()
+  })
+
+  it('cliente com acesso a clientA+deptFiscal recebe 404 ao acessar/enviar documento de tarefa de clientA marcada deptPessoal', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const clientA = await createTestClient(org.id, { name: 'Cliente A' })
+    const deptFiscal = await createTestDepartment(org.id, { name: `Fiscal ${Date.now()}` })
+    const deptPessoal = await createTestDepartment(org.id, { name: `Pessoal ${Date.now()}` })
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, clientA.id, deptFiscal.id)
+    const board = await createTestBoard(org.id, clientA.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id, { departmentId: deptPessoal.id })
+    const requirement = await addDocumentRequirement(task.id, org.id, 'Ponto')
+
+    await expect(listTaskDocuments(task.id, org.id, clientUser.id)).rejects.toMatchObject({ statusCode: 404 })
+    await expect(
+      uploadForRequirement(
+        task.id, requirement.id, org.id, { id: clientUser.id, type: 'client' }, clientUser.id,
+        { filename: 'ponto.pdf', mimeType: 'application/pdf', size: 100, buffer: Buffer.from('x') },
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 })
   })
 })

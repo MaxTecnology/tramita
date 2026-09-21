@@ -58,8 +58,9 @@ export async function portalRoutes(app: FastifyInstance) {
 
   app.get('/tasks/:taskId/documents', async (request, reply) => {
     const { taskId } = request.params as { taskId: string }
-    const clientId = await resolveClientId(request.user.sub)
-    return reply.send(await listTaskDocuments(taskId, request.user.organizationId!, clientId))
+    // task-documents.service.ts now resolves the ClientUser's full access scope (multiple
+    // companies/departments) itself — pass the raw clientUserId, not a pre-resolved Client.id.
+    return reply.send(await listTaskDocuments(taskId, request.user.organizationId!, request.user.sub))
   })
 
   app.post('/tasks/:taskId/documents/requests/:reqId/upload', async (request, reply) => {
@@ -80,10 +81,11 @@ export async function portalRoutes(app: FastifyInstance) {
     const buffer = await file.toBuffer()
     if (buffer.length > MAX_FILE_SIZE) throw new AppError(413, 'Arquivo excede o limite de 20MB')
 
-    const clientId = await resolveClientId(request.user.sub)
+    // task-documents.service.ts resolves the real Client.id itself from the task's board —
+    // actor.id here no longer needs to be a company id, just an identifier for the actor type.
     return reply.status(201).send(
       await uploadForRequirement(
-        taskId, reqId, request.user.organizationId!, { id: clientId, type: 'client' }, clientId,
+        taskId, reqId, request.user.organizationId!, { id: request.user.sub, type: 'client' }, request.user.sub,
         { filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer },
       ),
     )

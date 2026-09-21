@@ -178,6 +178,35 @@ describe('visibilidade (visibleToClient) — comments', () => {
   })
 })
 
+describe('acesso por departamento (canSeeTask) — comments', () => {
+  it('cliente com acesso a clientA+deptFiscal recebe 404 ao acessar/comentar/apagar comentário de tarefa de clientA marcada deptPessoal', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const clientA = await createTestClient(org.id, { name: 'Cliente A' })
+    const deptFiscal = await createTestDepartment(org.id, { name: `Fiscal ${Date.now()}` })
+    const deptPessoal = await createTestDepartment(org.id, { name: `Pessoal ${Date.now()}` })
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, clientA.id, deptFiscal.id)
+    const board = await createTestBoard(org.id, clientA.id)
+    const column = await createTestColumn(board.id, { position: 0 })
+    const task = await prisma.task.create({
+      data: { title: 'Folha de pagamento', position: 0, columnId: column.id, creatorId: admin.id, departmentId: deptPessoal.id },
+    })
+    const comment = await prisma.comment.create({
+      data: { content: 'Confidencial', taskId: task.id, authorType: 'USER', userId: admin.id },
+    })
+
+    await expect(listComments(task.id, org.id, 'CLIENT', clientUser.id)).rejects.toMatchObject({ statusCode: 404 })
+    await expect(
+      createComment(task.id, { content: 'Olá' }, { id: clientUser.id, role: 'CLIENT', organizationId: org.id }),
+    ).rejects.toMatchObject({ statusCode: 404 })
+    await expect(
+      deleteComment(comment.id, { id: clientUser.id, role: 'CLIENT', organizationId: org.id }),
+    ).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
 describe('createComment - roteamento de notificação por departamento', () => {
   beforeEach(() => {
     vi.spyOn(queue, 'enqueueNotification').mockResolvedValue(undefined)

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { uploadFile, getSignedDownloadUrl, deleteFile } from '@/lib/b2'
 import { AppError } from '@/errors/AppError'
+import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 
 interface UploadPayload {
   filename: string
@@ -10,6 +11,9 @@ interface UploadPayload {
 }
 
 interface UploaderActor {
+  // For role === 'CLIENT' this is a ClientUser id, not a Client id — a ClientUser may have
+  // access to more than one company, so resolving the actual company always goes through
+  // `getClientAccessScope`.
   id: string
   role: string
 }
@@ -17,17 +21,22 @@ interface UploaderActor {
 async function verifyTaskBelongsToOrg(
   taskId: string,
   organizationId: string,
-  clientId?: string,
+  clientUserId?: string,
 ) {
-  const boardWhere = clientId ? { organizationId, clientId } : { organizationId }
+  const scope = clientUserId ? await getClientAccessScope(clientUserId) : undefined
+  const boardWhere = scope ? { organizationId, clientId: { in: scope.clientIds } } : { organizationId }
   const task = await prisma.task.findFirst({
     where: { id: taskId, column: { board: boardWhere } },
+    include: { column: { include: { board: { select: { clientId: true } } } } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
-  // Cliente não pode ver/anexar/apagar anexos de uma tarefa não-visível, mesmo já sabendo o id
-  // dela — mesmo gate usado em task-documents.service.ts::verifyTaskAccess e comments.service.ts.
-  if (clientId && !task.visibleToClient) throw new AppError(404, 'Tarefa não encontrada')
-  return task
+  // Cliente não pode ver/anexar/apagar anexos de uma tarefa não-visível ou fora do
+  // departamento a que tem acesso, mesmo já sabendo o id dela — mesmo gate usado em
+  // task-documents.service.ts::verifyTaskAccess e comments.service.ts.
+  if (scope && (!task.visibleToClient || !canSeeTask(scope, task.column.board.clientId, task.departmentId))) {
+    throw new AppError(404, 'Tarefa não encontrada')
+  }
+  return task // task.column.board.clientId is the resolved company id
 }
 
 async function getOrgSlug(organizationId: string): Promise<string> {
@@ -40,7 +49,7 @@ async function getOrgSlug(organizationId: string): Promise<string> {
 
 async function resolveActorName(actor: UploaderActor): Promise<string> {
   if (actor.role === 'CLIENT') {
-    return (await prisma.client.findUnique({ where: { id: actor.id }, select: { name: true } }))?.name ?? 'Cliente'
+    return (await prisma.clientUser.findUnique({ where: { id: actor.id }, select: { name: true } }))?.name ?? 'Cliente'
   }
   return (await prisma.user.findUnique({ where: { id: actor.id }, select: { name: true } }))?.name ?? 'Colaborador'
 }
@@ -52,7 +61,8 @@ export async function createAttachment(
   payload: UploadPayload,
 ) {
   const isClient = actor.role === 'CLIENT'
-  await verifyTaskBelongsToOrg(taskId, organizationId, isClient ? actor.id : undefined)
+  const task = await verifyTaskBelongsToOrg(taskId, organizationId, isClient ? actor.id : undefined)
+  const resolvedClientId = task.column.board.clientId
 
   const orgSlug = await getOrgSlug(organizationId)
   const storageKey = `attachments/${orgSlug}/${taskId}/${Date.now()}-${payload.filename}`
@@ -69,7 +79,7 @@ export async function createAttachment(
         size: payload.size,
         storageKey,
         uploadedBy: isClient ? undefined : actor.id,
-        uploadedByClient: isClient ? actor.id : undefined,
+        uploadedByClient: isClient ? resolvedClientId : undefined,
       },
     }),
     prisma.taskHistory.create({
@@ -90,9 +100,9 @@ export async function createAttachment(
 export async function listAttachments(
   taskId: string,
   organizationId: string,
-  clientId?: string,
+  clientUserId?: string,
 ) {
-  await verifyTaskBelongsToOrg(taskId, organizationId, clientId)
+  await verifyTaskBelongsToOrg(taskId, organizationId, clientUserId)
 
   const attachments = await prisma.attachment.findMany({
     where: { taskId },
@@ -126,14 +136,18 @@ export async function deleteAttachment(
   actor: UploaderActor,
 ) {
   const isClient = actor.role === 'CLIENT'
-  await verifyTaskBelongsToOrg(taskId, organizationId, isClient ? actor.id : undefined)
+  const task = await verifyTaskBelongsToOrg(taskId, organizationId, isClient ? actor.id : undefined)
 
   const attachment = await prisma.attachment.findFirst({
     where: { id: attachmentId, taskId, deletedAt: null },
   })
   if (!attachment) throw new AppError(404, 'Anexo não encontrado')
 
-  if (isClient && attachment.uploadedByClient !== actor.id) {
+  // An attachment uploaded by "the client" is attributed to the company, not to a single
+  // ClientUser — any ClientUser with access to that company (and department, enforced above
+  // by verifyTaskBelongsToOrg) counts as the author for permission purposes (matches the
+  // pre-existing single-shared-login behavior — see comments.service.ts::deleteComment).
+  if (isClient && attachment.uploadedByClient !== task.column.board.clientId) {
     throw new AppError(403, 'Sem permissão para remover este anexo')
   }
 

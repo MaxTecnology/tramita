@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { uploadFile, getSignedDownloadUrl } from '@/lib/b2'
 import { enqueueNotification } from '@/lib/queue'
+import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 import type { TaskStatus } from '@prisma/client'
 
 export interface UploadPayload {
@@ -16,20 +17,26 @@ async function getOrgSlug(organizationId: string): Promise<string> {
   return org?.slug ?? organizationId
 }
 
-export async function verifyTaskAccess(taskId: string, organizationId: string, clientId?: string) {
-  const boardWhere = clientId ? { organizationId, clientId } : { organizationId }
-  const task = await prisma.task.findFirst({ where: { id: taskId, column: { board: boardWhere } } })
+export async function verifyTaskAccess(taskId: string, organizationId: string, clientUserId?: string) {
+  const scope = clientUserId ? await getClientAccessScope(clientUserId) : undefined
+  const boardWhere = scope ? { organizationId, clientId: { in: scope.clientIds } } : { organizationId }
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, column: { board: boardWhere } },
+    include: { column: { include: { board: { select: { clientId: true } } } } },
+  })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
-  // clientId presente = chamada vindo do portal — tarefa marcada como não-visível pro
-  // cliente (ex: SPED, controle interno) responde 404 igual "não existe", nunca 403
-  // (não revela que a tarefa existe). Chamada do lado do escritório (clientId ausente)
-  // nunca é filtrada por isso.
-  if (clientId && !task.visibleToClient) throw new AppError(404, 'Tarefa não encontrada')
+  // clientUserId presente = chamada vindo do portal — tarefa marcada como não-visível pro
+  // cliente (ex: SPED, controle interno), ou fora do departamento a que o ClientUser tem
+  // acesso, responde 404 igual "não existe", nunca 403 (não revela que a tarefa existe).
+  // Chamada do lado do escritório (clientUserId ausente) nunca é filtrada por isso.
+  if (scope && (!task.visibleToClient || !canSeeTask(scope, task.column.board.clientId, task.departmentId))) {
+    throw new AppError(404, 'Tarefa não encontrada')
+  }
   return task
 }
 
-export async function listTaskDocuments(taskId: string, organizationId: string, clientId?: string) {
-  await verifyTaskAccess(taskId, organizationId, clientId)
+export async function listTaskDocuments(taskId: string, organizationId: string, clientUserId?: string) {
+  await verifyTaskAccess(taskId, organizationId, clientUserId)
 
   const [requirements, deliverables] = await Promise.all([
     prisma.taskDocumentRequirement.findMany({ where: { taskId }, orderBy: { position: 'asc' }, include: { attachment: true } }),
@@ -69,10 +76,10 @@ export async function uploadForRequirement(
   requirementId: string,
   organizationId: string,
   actor: { id: string; type: 'user' | 'client' },
-  clientId: string | undefined,
+  clientUserId: string | undefined,
   payload: UploadPayload,
 ) {
-  await verifyTaskAccess(taskId, organizationId, clientId)
+  const task = await verifyTaskAccess(taskId, organizationId, clientUserId)
   const requirement = await prisma.taskDocumentRequirement.findFirst({ where: { id: requirementId, taskId } })
   if (!requirement) throw new AppError(404, 'Documento não encontrado')
 
@@ -88,7 +95,7 @@ export async function uploadForRequirement(
       size: payload.size,
       storageKey,
       uploadedBy: actor.type === 'user' ? actor.id : undefined,
-      uploadedByClient: actor.type === 'client' ? actor.id : undefined,
+      uploadedByClient: actor.type === 'client' ? task.column.board.clientId : undefined,
     },
   })
 

@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { publishBoardEvent } from '@/lib/sse'
 import { enqueueNotification } from '@/lib/queue'
-import { getClientAccessScope } from '@/modules/client-users/client-access'
+import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 import type { CreateCommentBody } from './comments.schema'
 
 interface CommentActor {
@@ -28,12 +28,15 @@ export async function listComments(
 
   const task = await prisma.task.findFirst({
     where: { id: taskId, column: { board: boardWhere } },
+    include: { column: { include: { board: { select: { clientId: true } } } } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
-  // Cliente nunca pode saber que uma tarefa não-visível existe, mesmo já sabendo o id dela
-  // (ex.: enumeração de board) — trata como "não encontrada", igual verifyTaskAccess em
-  // task-documents.service.ts.
-  if (scope && !task.visibleToClient) throw new AppError(404, 'Tarefa não encontrada')
+  // Cliente nunca pode saber que uma tarefa não-visível ou fora do departamento a que tem
+  // acesso existe, mesmo já sabendo o id dela (ex.: enumeração de board) — trata como "não
+  // encontrada", igual verifyTaskAccess em task-documents.service.ts.
+  if (scope && (!task.visibleToClient || !canSeeTask(scope, task.column.board.clientId, task.departmentId))) {
+    throw new AppError(404, 'Tarefa não encontrada')
+  }
 
   const comments = await prisma.comment.findMany({
     where: { taskId },
@@ -74,11 +77,12 @@ export async function createComment(
     include: { column: { include: { board: { select: { id: true, clientId: true } } } } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
-  // Mesmo gate de visibilidade de listComments: cliente não pode comentar (nem saber que existe)
-  // uma tarefa não-visível.
-  if (isClient && !task.visibleToClient) throw new AppError(404, 'Tarefa não encontrada')
-
   const clientId = task.column.board.clientId
+  // Mesmo gate de visibilidade/departamento de listComments: cliente não pode comentar (nem
+  // saber que existe) uma tarefa não-visível ou fora do departamento a que tem acesso.
+  if (isClient && (!task.visibleToClient || !canSeeTask(scope!, clientId, task.departmentId))) {
+    throw new AppError(404, 'Tarefa não encontrada')
+  }
 
   const comment = await prisma.comment.create({
     data: {
@@ -172,12 +176,12 @@ export async function deleteComment(id: string, actor: CommentActor) {
     throw new AppError(403, 'Acesso negado')
   }
 
-  // For CLIENT role, also validate that this ClientUser has access to the board's client.
-  // 404, not 403: a ClientUser outside the scope must never learn this comment exists
-  // (same "never reveal" rule as listComments/createComment).
+  // For CLIENT role, also validate that this ClientUser has access to the board's client AND
+  // to the task's department. 404, not 403: a ClientUser outside the scope must never learn
+  // this comment exists (same "never reveal" rule as listComments/createComment).
   if (actor.role === 'CLIENT') {
     const scope = await getClientAccessScope(actor.id)
-    if (!scope.clientIds.includes(comment.task.column.board.clientId)) {
+    if (!canSeeTask(scope, comment.task.column.board.clientId, comment.task.departmentId)) {
       throw new AppError(404, 'Comentário não encontrado')
     }
   }
