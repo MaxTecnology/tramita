@@ -71,14 +71,14 @@ export default function PortalProfile() {
   return (
     <div className="p-4 md:p-6 max-w-lg space-y-6">
       <div>
-        <h1 className="text-lg md:text-xl font-bold text-gray-900">Meu Perfil</h1>
-        <p className="text-sm text-gray-500 mt-1">Gerencie suas informações pessoais e senha.</p>
+        <h1 className="text-lg md:text-xl font-bold text-foreground">Meu Perfil</h1>
+        <p className="text-sm text-muted-foreground mt-1">Gerencie suas informações pessoais e senha.</p>
       </div>
 
       {/* Dados pessoais */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Informações pessoais</p>
+      <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-border bg-neutral-bg">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Informações pessoais</p>
         </div>
         <div className="px-5 py-5 space-y-4">
           <div className="flex items-center gap-4">
@@ -89,8 +89,8 @@ export default function PortalProfile() {
               {user?.name ? getInitials(user.name) : '?'}
             </div>
             <div>
-              <p className="text-sm font-semibold text-gray-900">{profile?.name ?? user?.name}</p>
-              {user?.orgName && <p className="text-xs text-gray-500">{user.orgName}</p>}
+              <p className="text-sm font-semibold text-foreground">{profile?.name ?? user?.name}</p>
+              {user?.orgName && <p className="text-xs text-muted-foreground">{user.orgName}</p>}
             </div>
           </div>
 
@@ -102,10 +102,10 @@ export default function PortalProfile() {
           <div className="space-y-1">
             <Label htmlFor="p-email">E-mail</Label>
             <div className="relative">
-              <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <Input id="p-email" value={profile?.email ?? ''} disabled className="pl-8 bg-gray-50 text-gray-500 cursor-not-allowed" />
+              <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input id="p-email" value={profile?.email ?? ''} disabled className="pl-8 bg-neutral-bg text-muted-foreground cursor-not-allowed" />
             </div>
-            <p className="text-xs text-gray-400">O e-mail não pode ser alterado.</p>
+            <p className="text-xs text-muted-foreground">O e-mail não pode ser alterado.</p>
           </div>
 
           <div className="space-y-1">
@@ -116,8 +116,8 @@ export default function PortalProfile() {
           {profile?.whatsapp && (
             <div className="space-y-1">
               <Label>WhatsApp</Label>
-              <p className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">{profile.whatsapp}</p>
-              <p className="text-xs text-gray-400">O WhatsApp é gerenciado pelo escritório.</p>
+              <p className="text-sm text-foreground bg-neutral-bg border border-border rounded-md px-3 py-2">{profile.whatsapp}</p>
+              <p className="text-xs text-muted-foreground">O WhatsApp é gerenciado pelo escritório.</p>
             </div>
           )}
 
@@ -134,15 +134,15 @@ export default function PortalProfile() {
       </div>
 
       {/* Alterar senha */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Alterar senha</p>
+      <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-border bg-neutral-bg">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Alterar senha</p>
         </div>
         <div className="px-5 py-5 space-y-4">
           <div className="space-y-1">
             <Label htmlFor="pw-current">Senha atual</Label>
             <div className="relative">
-              <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="pw-current"
                 type="password"

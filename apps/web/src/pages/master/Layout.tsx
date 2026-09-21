@@ -23,7 +23,7 @@ export default function MasterLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background">
       <aside className="w-56 bg-[#0C447C] flex flex-col flex-shrink-0">
         {/* Logo */}
         <div className="px-4 py-5 border-b border-[#185FA5]">

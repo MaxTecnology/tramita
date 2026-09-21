@@ -63,12 +63,12 @@ export default function PortalRequests() {
     onError: () => toast.error('Erro ao cancelar'),
   })
 
-  if (isLoading) return <div className="p-6 text-gray-500 text-sm">Carregando...</div>
+  if (isLoading) return <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
 
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg md:text-xl font-bold text-gray-900">Minhas Solicitações</h1>
+        <h1 className="text-lg md:text-xl font-bold text-foreground">Minhas Solicitações</h1>
         <Button onClick={() => setOpen(true)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white gap-2">
           <Plus size={16} />
           Nova solicitação
@@ -76,7 +76,7 @@ export default function PortalRequests() {
       </div>
 
       {requests.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center text-gray-400">
+        <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
           <Inbox size={48} className="mb-3 opacity-40" />
           <p className="text-sm font-medium">Nenhuma solicitação ainda</p>
           <p className="text-xs mt-1">Use o botão acima para pedir algo ao seu escritório.</p>
@@ -84,11 +84,11 @@ export default function PortalRequests() {
       ) : (
         <div className="space-y-2">
           {requests.map((r) => (
-            <div key={r.id} className="bg-white rounded-lg border border-gray-200 px-4 py-3">
+            <div key={r.id} className="bg-surface rounded-lg border border-border px-4 py-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{r.title}</p>
-                  {r.description && <p className="text-xs text-gray-500 mt-0.5">{r.description}</p>}
+                  <p className="text-sm font-medium text-foreground">{r.title}</p>
+                  {r.description && <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>}
                   {r.status === 'REJECTED' && r.rejectionReason && (
                     <p className="text-xs text-red-500 mt-1 italic">Motivo: {r.rejectionReason}</p>
                   )}
@@ -137,7 +137,7 @@ export default function PortalRequests() {
                 placeholder="Detalhe o que você precisa..."
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 resize-none"
+                className="flex w-full rounded-md border border-border bg-surface text-foreground px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-none"
               />
             </div>
             <div className="space-y-1.5">
@@ -146,7 +146,7 @@ export default function PortalRequests() {
                 id="req-department"
                 value={form.departmentId}
                 onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
-                className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <option value="">Não sei / Geral</option>
                 {departments.map((d) => (

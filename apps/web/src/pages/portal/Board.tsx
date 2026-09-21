@@ -30,8 +30,8 @@ export default function PortalBoard() {
     enabled: !!boardId,
   })
 
-  if (isLoading) return <div className="p-8 text-gray-500">Carregando...</div>
-  if (!board) return <div className="p-8 text-gray-500">Processo não encontrado.</div>
+  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando...</div>
+  if (!board) return <div className="p-8 text-muted-foreground">Processo não encontrado.</div>
 
   const tasks = board.columns.flatMap((c) => c.tasks).filter((t) => t.status !== 'DISREGARDED')
   const maxPos = board.columns.length - 1
@@ -55,34 +55,34 @@ export default function PortalBoard() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 bg-white">
-        <Link to="/portal/board" aria-label="Voltar para processos" className="text-gray-400 hover:text-gray-600">
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-border bg-surface">
+        <Link to="/portal/board" aria-label="Voltar para processos" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft size={18} />
         </Link>
         <div className="flex-1">
-          <h1 className="text-lg font-semibold text-gray-900">{board.title}</h1>
+          <h1 className="text-lg font-semibold text-foreground">{board.title}</h1>
           <div className="flex items-center gap-3 mt-1">
-            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="flex-1 h-1.5 bg-neutral-bg rounded-full overflow-hidden">
               <div
                 className={cn('h-full rounded-full transition-all', progress >= 80 ? 'bg-green-500' : 'bg-[#185FA5]')}
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <span className="text-xs text-gray-500 flex-shrink-0">{progress}% concluído</span>
+            <span className="text-xs text-muted-foreground flex-shrink-0">{progress}% concluído</span>
           </div>
         </div>
       </div>
 
       {/* Title search */}
-      <div className="px-4 md:px-6 py-2 border-b border-gray-100 bg-white">
+      <div className="px-4 md:px-6 py-2 border-b border-border bg-surface">
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             placeholder="Buscar por título..."
             value={titleSearch}
             onChange={(e) => setTitleSearch(e.target.value)}
-            className="w-full h-8 rounded-md border border-gray-300 bg-white pl-8 pr-3 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
+            className="w-full h-8 rounded-md border border-border bg-surface text-foreground pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
       </div>
@@ -95,8 +95,8 @@ export default function PortalBoard() {
                 className="flex items-center justify-between mb-3 pb-2 border-b-2"
                 style={{ borderBottomColor: column.color ?? '#e5e7eb' }}
               >
-                <h3 className="text-sm font-semibold text-gray-700">{column.title}</h3>
-                <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
+                <h3 className="text-sm font-semibold text-foreground">{column.title}</h3>
+                <span className="text-xs text-muted-foreground bg-neutral-bg rounded-full px-2 py-0.5">
                   {column.tasks.length}
                 </span>
               </div>
@@ -117,11 +117,11 @@ export default function PortalBoard() {
                       onClick={() => setSelectedTask(task)}
                       onKeyDown={(e) => e.key === 'Enter' && setSelectedTask(task)}
                       className={cn(
-                        'bg-white rounded-lg p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow',
-                        isOverdue ? 'border-red-400' : 'border-gray-200',
+                        'bg-surface rounded-lg p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow',
+                        isOverdue ? 'border-red-400' : 'border-border',
                       )}
                     >
-                      <p className="text-sm font-medium text-gray-800 line-clamp-2">{task.title}</p>
+                      <p className="text-sm font-medium text-foreground line-clamp-2">{task.title}</p>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <span className={cn(
                           'text-xs font-medium px-2 py-0.5 rounded-full',
@@ -135,7 +135,7 @@ export default function PortalBoard() {
                           {PRIORITY_LABELS[task.priority] ?? task.priority}
                         </span>
                         {task.dueDate && (
-                          <span className={cn('text-xs', isOverdue ? 'text-red-500 font-medium' : 'text-gray-400')}>
+                          <span className={cn('text-xs', isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground')}>
                             {isOverdue ? '⚠ ' : ''}{formatDateOnlyUTC(task.dueDate)}
                           </span>
                         )}
