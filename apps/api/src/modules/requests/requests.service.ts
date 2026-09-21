@@ -11,7 +11,7 @@ import type { RequestStatus } from '@prisma/client'
 export async function createRequest(
   organizationId: string,
   clientId: string,
-  data: CreateRequestBody,
+  data: Omit<CreateRequestBody, 'clientId'>,
 ) {
   const client = await prisma.client.findFirst({
     where: { id: clientId, organizationId, isActive: true },

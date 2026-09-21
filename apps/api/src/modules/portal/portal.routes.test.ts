@@ -70,7 +70,7 @@ describe('PATCH /portal/profile', () => {
       method: 'PATCH',
       url: '/portal/profile',
       headers: { authorization: auth },
-      payload: { whatsapp: '5582999999999' },
+      payload: { phone: '5582999999999' },
     })
     expect(res.statusCode).toBe(200)
     expect(JSON.parse(res.body).phone).toBe('5582999999999')
@@ -86,9 +86,34 @@ describe('PATCH /portal/profile', () => {
       method: 'PATCH',
       url: '/portal/profile',
       headers: { authorization: auth },
-      payload: { whatsapp: '5582999999999' },
+      payload: { phone: '5582999999999' },
     })
     expect(res.statusCode).toBe(403)
+  })
+})
+
+describe('GET /portal/clients', () => {
+  it('retorna apenas as empresas às quais o ClientUser tem acesso', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const clientA = await createTestClient(org.id, { name: 'Empresa A' })
+    const clientB = await createTestClient(org.id, { name: 'Empresa B' })
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, clientA.id, department.id)
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/portal/clients',
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const list = JSON.parse(res.body)
+    expect(list).toHaveLength(1)
+    expect(list[0].id).toBe(clientA.id)
+    expect(list.some((c: { id: string }) => c.id === clientB.id)).toBe(false)
   })
 })
 
@@ -130,13 +155,52 @@ describe('POST /portal/requests', () => {
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: auth },
-      payload: { title: 'Abertura de empresa', description: 'Quero abrir uma LTDA' },
+      payload: { clientId: client.id, title: 'Abertura de empresa', description: 'Quero abrir uma LTDA' },
     })
 
     expect(res.statusCode).toBe(201)
     const body = JSON.parse(res.body)
     expect(body.status).toBe('PENDING')
     expect(body.title).toBe('Abertura de empresa')
+  })
+
+  it('sem clientId no body — 400', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const auth = await getAuthHeader(clientUser.email, password)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/portal/requests',
+      headers: { authorization: auth },
+      payload: { title: 'Sem empresa' },
+    })
+
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('clientId fora do escopo do usuário — 403', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const otherClient = await createTestClient(org.id, { name: 'Fora do escopo' })
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const auth = await getAuthHeader(clientUser.email, password)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/portal/requests',
+      headers: { authorization: auth },
+      payload: { clientId: otherClient.id, title: 'Fora do escopo' },
+    })
+
+    expect(res.statusCode).toBe(403)
   })
 })
 
@@ -155,13 +219,27 @@ describe('GET /portal/requests', () => {
     const authA = await getAuthHeader(clientUserA.email, passwordA)
     const authB = await getAuthHeader(clientUserB.email, passwordB)
 
-    await app.inject({ method: 'POST', url: '/portal/requests', headers: { authorization: authA }, payload: { title: 'Da A' } })
-    await app.inject({ method: 'POST', url: '/portal/requests', headers: { authorization: authB }, payload: { title: 'Da B' } })
+    await app.inject({ method: 'POST', url: '/portal/requests', headers: { authorization: authA }, payload: { clientId: clientA.id, title: 'Da A' } })
+    await app.inject({ method: 'POST', url: '/portal/requests', headers: { authorization: authB }, payload: { clientId: clientB.id, title: 'Da B' } })
 
-    const res = await app.inject({ method: 'GET', url: '/portal/requests', headers: { authorization: authA } })
+    const res = await app.inject({ method: 'GET', url: `/portal/requests?clientId=${clientA.id}`, headers: { authorization: authA } })
     const list = JSON.parse(res.body)
     expect(list).toHaveLength(1)
     expect(list[0].title).toBe('Da A')
+  })
+
+  it('clientId fora do escopo do usuário — 403', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const clientA = await createTestClient(org.id, { name: 'Empresa A' })
+    const clientB = await createTestClient(org.id, { name: 'Empresa B' })
+    const departmentA = await createTestDepartment(org.id, { name: 'Depto A' })
+    const { clientUser: clientUserA, password: passwordA } = await createTestClientUser(org.id, { email: 'scope-a@test.com' })
+    await grantClientAccess(clientUserA.id, clientA.id, departmentA.id)
+    const authA = await getAuthHeader(clientUserA.email, passwordA)
+
+    const res = await app.inject({ method: 'GET', url: `/portal/requests?clientId=${clientB.id}`, headers: { authorization: authA } })
+    expect(res.statusCode).toBe(403)
   })
 })
 
@@ -179,7 +257,7 @@ describe('PATCH /portal/requests/:id/cancel', () => {
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: auth },
-      payload: { title: 'Pedido a cancelar' },
+      payload: { clientId: client.id, title: 'Pedido a cancelar' },
     })
     const request = JSON.parse(created.body)
 
@@ -210,7 +288,7 @@ describe('PATCH /portal/requests/:id/cancel', () => {
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: authA },
-      payload: { title: 'Da A' },
+      payload: { clientId: clientA.id, title: 'Da A' },
     })
     const request = JSON.parse(created.body)
 

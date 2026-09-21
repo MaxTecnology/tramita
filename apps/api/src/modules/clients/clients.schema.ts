@@ -10,6 +10,19 @@ const addressFields = {
   complemento: z.string().optional(),
 }
 
+const clientUserLinkSchema = z.union([
+  z.object({
+    existingId: z.string().cuid(),
+    departmentIds: z.array(z.string().cuid()).min(1),
+  }),
+  z.object({
+    name: z.string().min(2),
+    email: z.string().email(),
+    password: z.string().min(8),
+    departmentIds: z.array(z.string().cuid()).min(1),
+  }),
+])
+
 export const createClientSchema = z.object({
   name: z.string().min(2),
   clientType: z.enum(['PF', 'PJ']).default('PJ'),
@@ -19,6 +32,7 @@ export const createClientSchema = z.object({
   phone: z.string().optional(),
   notes: z.string().optional(),
   ...addressFields,
+  clientUsers: z.array(clientUserLinkSchema).min(1, 'Adicione pelo menos um usuário'),
 })
 
 export const updateClientSchema = z.object({
@@ -30,6 +44,7 @@ export const updateClientSchema = z.object({
   phone: z.string().optional(),
   notes: z.string().optional(),
   ...addressFields,
+  clientUsers: z.array(clientUserLinkSchema).min(1, 'Adicione pelo menos um usuário').optional(),
 })
 
 export type CreateClientBody = z.infer<typeof createClientSchema>

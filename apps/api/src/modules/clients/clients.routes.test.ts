@@ -72,3 +72,18 @@ describe('GET /clients', () => {
     expect(body).toHaveLength(1)
   })
 })
+
+describe('POST /clients', () => {
+  it('returns 400 when clientUsers is missing', async () => {
+    const { auth } = await setup()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/clients',
+      headers: { authorization: auth },
+      payload: { name: 'Cliente Sem Usuário', clientType: 'PJ' },
+    })
+
+    expect(res.statusCode).toBe(400)
+  })
+})

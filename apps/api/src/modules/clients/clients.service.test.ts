@@ -14,6 +14,7 @@ import {
   createTestOrg,
   createTestUser,
   createTestClient,
+  createTestClientUser,
   createTestDepartment,
 } from '@/test/helpers'
 
@@ -21,12 +22,53 @@ describe('createClient', () => {
   it('creates a client scoped to the organization', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
+    const department = await createTestDepartment(org.id)
 
-    const result = await createClient(org.id, { name: 'Cliente Novo', clientType: 'PJ' })
+    const result = await createClient(org.id, {
+      name: 'Cliente Novo',
+      clientType: 'PJ',
+      clientUsers: [{ name: 'Portal User', email: `portal-${Date.now()}@test.com`, password: 'Test@1234', departmentIds: [department.id] }],
+    })
 
     expect(result.clientType).toBe('PJ')
     const stored = await prisma.client.findUnique({ where: { id: result.id } })
     expect(stored?.organizationId).toBe(org.id)
+  })
+
+  it('links an existing ClientUser via existingId without creating a duplicate', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+
+    const result = await createClient(org.id, {
+      name: 'Cliente Novo',
+      clientType: 'PJ',
+      clientUsers: [{ existingId: clientUser.id, departmentIds: [department.id] }],
+    })
+
+    const count = await prisma.clientUser.count({ where: { organizationId: org.id } })
+    expect(count).toBe(1)
+    const access = await prisma.clientUserAccess.findFirst({
+      where: { clientUserId: clientUser.id, clientId: result.id, departmentId: department.id },
+    })
+    expect(access).not.toBeNull()
+  })
+
+  it('throws 404 when existingId belongs to a ClientUser from another organization', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id)
+    const department = await createTestDepartment(orgA.id)
+    const { clientUser: foreignClientUser } = await createTestClientUser(orgB.id)
+
+    await expect(
+      createClient(orgA.id, {
+        name: 'Cliente Novo',
+        clientType: 'PJ',
+        clientUsers: [{ existingId: foreignClientUser.id, departmentIds: [department.id] }],
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 })
   })
 })
 
