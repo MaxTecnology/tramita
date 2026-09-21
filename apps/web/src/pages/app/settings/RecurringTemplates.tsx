@@ -480,7 +480,7 @@ function ManageTemplateDialog({ template, onClose }: { template: RecurringTaskTe
               <div className="space-y-1 mt-2 max-h-40 overflow-y-auto">
                 {logs.map((l) => (
                   <div key={l.id} className={`text-xs rounded px-2 py-1 ${l.status === 'FAILED' ? 'bg-danger-bg text-danger-text' : 'bg-success-bg text-success-text'}`}>
-                    {new Date(l.competence).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} — {l.status === 'FAILED' ? l.errorMessage : 'Gerado com sucesso'}
+                    {new Date(l.competence).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })} — {l.status === 'FAILED' ? l.errorMessage : 'Gerado com sucesso'}
                   </div>
                 ))}
               </div>

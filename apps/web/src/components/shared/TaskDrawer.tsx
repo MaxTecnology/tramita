@@ -336,13 +336,13 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
             ) : (
               task.targetDate && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" title="Meta interna">
-                  Meta: {new Date(task.targetDate).toLocaleDateString('pt-BR')}
+                  Meta: {new Date(task.targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
                 </span>
               )
             )}
             {task.competence && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" title="Competência">
-                Competência: {new Date(task.competence).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                Competência: {new Date(task.competence).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })}
               </span>
             )}
 
