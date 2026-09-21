@@ -51,6 +51,7 @@ model Task {
   competence           DateTime?   // primeiro dia do período de referência (ex: 2026-02-01 = competência fevereiro)
   targetDate           DateTime?   // "meta" interna — pode ser antes do vencimento legal
   recurringTemplateId  String?     // rastreabilidade — de qual template essa tarefa nasceu (null = manual)
+  visibleToClient      Boolean  @default(true)  // false = tarefa só de controle interno do escritório (ex: SPED), nunca aparece no portal
 
   recurringTemplate RecurringTaskTemplate? @relation(fields: [recurringTemplateId], references: [id])
 
@@ -59,7 +60,7 @@ model Task {
 }
 ```
 
-`dueDate` já existe — passa a ser preenchido automaticamente em tarefas geradas (calculado a partir do template), mas continua editável manualmente em qualquer tarefa, igual hoje.
+`dueDate` já existe — passa a ser preenchido automaticamente em tarefas geradas (calculado a partir do template), mas continua editável manualmente em qualquer tarefa, igual hoje. `visibleToClient` nasce com o valor do template (`RecurringTaskTemplate.visibleToClient`) nas tarefas geradas, e com `true` por padrão em tarefas manuais — mas é editável por tarefa em qualquer caso (o escritório pode esconder uma tarefa pontual do cliente mesmo vinda de um template visível, ou o contrário).
 
 ### `RecurringTaskTemplate` — novo
 
@@ -88,9 +89,12 @@ model RecurringTaskTemplate {
   // Conclusão automática
   autoCompleteOnAllActivitiesDone Boolean @default(false) // liga/desliga: quando todas as atividades (documentos cobrados aprovados + documentos entregues) estiverem resolvidas, marca a tarefa como Concluído sozinho
 
-  // Notificação ao cliente
-  notifyClient        Boolean @default(true)
-  notifyClientViaEmail Boolean @default(false)  // WhatsApp já é o canal padrão do projeto; e-mail é opcional, mesmo padrão do NotificationConfig existente
+  // Notificação ao cliente — canais independentes; os dois desligados = não notifica
+  notifyViaWhatsapp Boolean @default(true)
+  notifyViaEmail    Boolean @default(false)
+
+  // Visibilidade no portal — default herdado por toda tarefa gerada (editável por tarefa, ver `Task.visibleToClient`)
+  visibleToClient Boolean @default(true)
 
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -267,7 +271,7 @@ Pra cada tarefa a gerar, itera cada `RecurringTaskAssignment` ativo do template:
 
 1. Calcula `dueDate` = `competence` + `dueMonthOffset` meses, no dia `dueDayOfPeriod` (ajustado pro próximo dia útil se `dueRollToBusinessDay`).
 2. Calcula `targetDate` = `dueDate` + `targetOffsetDays` dias (ajustado pro próximo dia útil se `targetRollToBusinessDay`, independente do ajuste do vencimento).
-3. Numa única transação (`$transaction`): cria a `Task` (status `OPEN`, `columnId`/`boardId` do assignment, `departmentId` do template, `competence`/`dueDate`/`targetDate` calculados, `recurringTemplateId`), cria os `TaskDocumentRequirement`/`TaskDeliverable` a partir das listas do template, cria a entrada inicial em `TaskHistory` (`action: 'created'`), e grava `RecurringGenerationLog` com `status: SUCCESS` + `taskId`. Se `notifyClient`, dispara notificação de criação da tarefa (canal WhatsApp sempre, e-mail se `notifyClientViaEmail`).
+3. Numa única transação (`$transaction`): cria a `Task` (status `OPEN`, `columnId`/`boardId` do assignment, `departmentId` do template, `competence`/`dueDate`/`targetDate` calculados, `recurringTemplateId`, `visibleToClient` herdado do template), cria os `TaskDocumentRequirement`/`TaskDeliverable` a partir das listas do template, cria a entrada inicial em `TaskHistory` (`action: 'created'`), e grava `RecurringGenerationLog` com `status: SUCCESS` + `taskId`. Dispara notificação de criação da tarefa por WhatsApp se `notifyViaWhatsapp`, por e-mail se `notifyViaEmail` (os dois desligados = nenhuma notificação, sem depender de `visibleToClient` — uma tarefa pode notificar sem estar visível no portal, ou vice-versa, são decisões independentes).
 4. Se qualquer passo falhar (incluindo a constraint única do log pegando uma geração duplicada), a transação inteira reverte — nunca fica tarefa "pela metade" sem checklist ou sem log. O erro é capturado **por assignment** (try/catch no loop, não no cron inteiro): grava `RecurringGenerationLog` com `status: FAILED` + `errorMessage`, dispara `enqueueNotification` (evento novo `RECURRING_GENERATION_FAILED`) pro `ORG_ADMIN` do escritório, e o cron **continua pros próximos assignments** — uma falha isolada não trava o lote.
 
 ### Geração manual
@@ -302,11 +306,12 @@ Estrutura padrão do projeto:
 
 - `GET /portal/tasks/:id/documents` — cliente vê as duas listas: o que precisa enviar (nome + status + motivo de rejeição quando houver) e o que já foi entregue a ele (nome + link de download quando `deliveredAt` preenchido).
 - `POST /portal/tasks/:id/documents/requests/:reqId/upload` — cliente sobe arquivo contra um item específico da lista de cobrança (reaproveita o pipeline de attachment/B2 existente); item vai de `PENDING` pra `UPLOADED`.
+- **Gate de visibilidade**: `boards.service.ts`'s `getBoardById` hoje não distingue por role — devolve todas as tasks de todas as colunas pra quem quer que chame, inclusive `CLIENT` (`boards.routes.ts:33-38`). Isso precisa mudar: quando o chamador é `CLIENT`, o include de `tasks` passa a filtrar `where: { visibleToClient: true }`. Mesma regra vale pra qualquer endpoint client-facing que devolve uma task individual por id (`GET /portal/tasks/:id/history`, os dois novos endpoints de documentos acima) — todos precisam checar `task.visibleToClient` e responder 404 (não 403, pra não revelar que a task existe) quando for `false` e o chamador for `CLIENT`.
 
 ## Frontend
 
-- **Nova página "Tarefas Recorrentes"** em Configurações (`apps/web/src/pages/app/settings/RecurringTemplates.tsx`): CRUD de template — incluindo o seletor amigável de competência/vencimento/meta/geração (ver nota na seção de modelo de dados), os toggles de dia útil, conclusão automática e notificação, e os dois sub-formulários de lista de documentos (cobrar/entregar) — tela de vínculo cliente→board/coluna, e visualização do log de geração (com destaque visual pros `FAILED`, dado o requisito de confiabilidade).
-- **`TaskDrawer.tsx`**: dois blocos de checklist (documentos a cobrar — nome, badge de status, botão aprovar/rejeitar com campo de motivo; documentos a entregar — nome, botão de upload do colaborador, indicação de entregue); badge de status da tarefa atualizado pros 4 novos valores (`Aberto`=neutro, `Concluído`=verde, `Desconsiderado`=cinza, `Com Impedimento`=vermelho/laranja); campos de competência/vencimento/meta visíveis (editáveis manualmente também, não só em tarefas geradas).
+- **Nova página "Tarefas Recorrentes"** em Configurações (`apps/web/src/pages/app/settings/RecurringTemplates.tsx`): CRUD de template — incluindo o seletor amigável de competência/vencimento/meta/geração (ver nota na seção de modelo de dados), os toggles de dia útil, conclusão automática, os dois toggles independentes de notificação (WhatsApp/e-mail — os dois desligados = não notifica, sem toggle mestre separado) e o toggle "O cliente pode ver esta tarefa" (default ligado; quando desligado, tarefas geradas por esse template nascem como controle interno, nunca aparecem no portal — caso de uso citado: SPED, que o escritório cadastra e trabalha sem o cliente nunca saber), e os dois sub-formulários de lista de documentos (cobrar/entregar) — tela de vínculo cliente→board/coluna, e visualização do log de geração (com destaque visual pros `FAILED`, dado o requisito de confiabilidade).
+- **`TaskDrawer.tsx`**: mesmo toggle "O cliente pode ver esta tarefa" editável por tarefa individual (sobrescreve o default herdado do template); dois blocos de checklist (documentos a cobrar — nome, badge de status, botão aprovar/rejeitar com campo de motivo; documentos a entregar — nome, botão de upload do colaborador, indicação de entregue); badge de status da tarefa atualizado pros 4 novos valores (`Aberto`=neutro, `Concluído`=verde, `Desconsiderado`=cinza, `Com Impedimento`=vermelho/laranja); campos de competência/vencimento/meta visíveis (editáveis manualmente também, não só em tarefas geradas).
 - **Portal — detalhe da tarefa**: os dois checklists em modo cliente (upload só na lista de cobrança, sem aprovar/rejeitar, mostra motivo de rejeição quando houver; lista de entrega só com link de download quando disponível). A sinalização visual mais chamativa desse impedimento no portal (destaque na lista/dashboard do cliente) fica pra 2e — aqui só garante que o dado existe e é visível no detalhe.
 - **`Board.tsx`/`Processes.tsx`**: filtro por competência/vencimento/meta dentro do board de um cliente.
 
@@ -320,7 +325,8 @@ Lógica crítica (requisito explícito do usuário: "não pode haver falha" na g
 - Regra de conclusão automática: só dispara com `autoCompleteOnAllActivitiesDone = true` e todos os itens (cobrança + entrega) resolvidos; com o toggle desligado, tudo resolvido não muda o status sozinho.
 - `updateTask` grava `TaskHistory` em mudança de status manual e nas automáticas.
 - Geração manual retorna 409 se já existe `SUCCESS` pra aquela competência; permite reprocessar um `FAILED`.
-- Notificação `RECURRING_GENERATION_FAILED` e `DOCUMENT_REJECTED` disparadas nos momentos certos (via `vi.spyOn` no `enqueueNotification`, padrão já usado em 2a).
+- Notificação `RECURRING_GENERATION_FAILED` e `DOCUMENT_REJECTED` disparadas nos momentos certos (via `vi.spyOn` no `enqueueNotification`, padrão já usado em 2a); com `notifyViaWhatsapp=false` e `notifyViaEmail=false`, a criação da tarefa não dispara nenhuma notificação.
+- `getBoardById` (ou variante client-aware) filtra tasks com `visibleToClient: false` quando o chamador é `CLIENT`; endpoints client-facing de task individual (history, documentos) respondem 404 nesse caso, não 403.
 
 Sem teste novo pra CRUD de rotas simples, seguindo a política do projeto.
 
