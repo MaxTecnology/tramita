@@ -219,6 +219,15 @@ export async function updateTask(
           : undefined,
         tags: data.tags,
         departmentId: data.departmentId,
+        visibleToClient: data.visibleToClient,
+        targetDate:
+          data.targetDate === null ? null
+          : data.targetDate !== undefined ? new Date(data.targetDate)
+          : undefined,
+        competence:
+          data.competence === null ? null
+          : data.competence !== undefined ? new Date(data.competence)
+          : undefined,
       },
     })
 

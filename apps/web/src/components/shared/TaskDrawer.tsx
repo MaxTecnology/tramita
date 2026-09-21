@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, Paperclip, MessageSquare, Clock, Trash2 } from 'lucide-react'
+import { X, Paperclip, MessageSquare, Clock, Trash2, FileCheck } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Comments } from '@/components/shared/Comments'
-import type { Task, Attachment, TaskHistory, DrawerRole } from '@/types'
+import type { Task, Attachment, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable } from '@/types'
 import { toast } from 'sonner'
 
 interface Props {
@@ -24,6 +24,9 @@ const ACTION_LABELS: Record<string, string> = {
   updated_due_date: 'alterou vencimento para',
   attachment_added: 'adicionou o anexo',
   attachment_deleted: 'removeu o anexo',
+  status_changed: 'alterou status para',
+  priority_changed: 'alterou prioridade para',
+  assigned_to: 'alterou responsável para',
 }
 
 function formatHistoryAction(h: TaskHistory): string {
@@ -48,7 +51,21 @@ const PRIORITY_COLOR: Record<Task['priority'], string> = {
   URGENT: 'bg-red-100 text-red-600',
 }
 
-type Tab = 'comments' | 'attachments' | 'history'
+const STATUS_LABEL: Record<Task['status'], string> = {
+  OPEN: 'Aberto',
+  DONE: 'Concluído',
+  DISREGARDED: 'Desconsiderado',
+  BLOCKED: 'Com Impedimento',
+}
+
+const STATUS_COLOR: Record<Task['status'], string> = {
+  OPEN: 'bg-gray-100 text-gray-600',
+  DONE: 'bg-green-100 text-green-600',
+  DISREGARDED: 'bg-gray-200 text-gray-500',
+  BLOCKED: 'bg-red-100 text-red-600',
+}
+
+type Tab = 'comments' | 'documents' | 'attachments' | 'history'
 
 const isOrgRole = (role: DrawerRole): role is Exclude<DrawerRole, 'CLIENT'> => role !== 'CLIENT'
 
@@ -56,6 +73,11 @@ const historyEndpoint = (taskId: string, role: DrawerRole) =>
   role === 'CLIENT'
     ? `/portal/tasks/${taskId}/history`
     : `/tasks/${taskId}/history`
+
+const documentsEndpoint = (taskId: string, role: DrawerRole) =>
+  role === 'CLIENT'
+    ? `/portal/tasks/${taskId}/documents`
+    : `/tasks/${taskId}/documents`
 
 export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }: Props) {
   const queryClient = useQueryClient()
@@ -73,7 +95,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<Pick<Task, 'title' | 'priority' | 'description' | 'dueDate' | 'departmentId'>>) =>
+    mutationFn: (data: Partial<Pick<Task, 'title' | 'priority' | 'status' | 'description' | 'dueDate' | 'departmentId' | 'visibleToClient' | 'targetDate' | 'competence'>>) =>
       api.patch(`/tasks/${task.id}`, data).then((r) => r.data),
     onSuccess: () => {
       toast.success('Tarefa atualizada')
@@ -92,6 +114,61 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
     queryKey: ['task-history', task.id],
     queryFn: () => api.get(historyEndpoint(task.id, role)).then((r) => r.data),
     enabled: tab === 'history',
+  })
+
+  const { data: documents } = useQuery<{ requirements: TaskDocumentRequirement[]; deliverables: TaskDeliverable[] }>({
+    queryKey: ['task-documents', task.id],
+    queryFn: () => api.get(documentsEndpoint(task.id, role)).then((r) => r.data),
+    enabled: tab === 'documents',
+  })
+
+  const addRequirementMutation = useMutation({
+    mutationFn: (name: string) => api.post(`/tasks/${task.id}/documents/requests`, { name }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] }),
+  })
+
+  const addDeliverableMutation = useMutation({
+    mutationFn: (name: string) => api.post(`/tasks/${task.id}/documents/deliveries`, { name }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] }),
+  })
+
+  const uploadRequirementMutation = useMutation({
+    mutationFn: ({ reqId, file }: { reqId: string; file: File }) => {
+      const form = new FormData()
+      form.append('file', file)
+      const url = role === 'CLIENT'
+        ? `/portal/tasks/${task.id}/documents/requests/${reqId}/upload`
+        : `/tasks/${task.id}/documents/requests/${reqId}/upload`
+      return api.post(url, form)
+    },
+    onSuccess: () => {
+      toast.success('Arquivo enviado')
+      queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] })
+    },
+    onError: () => toast.error('Erro ao enviar arquivo'),
+  })
+
+  const reviewRequirementMutation = useMutation({
+    mutationFn: ({ reqId, decision, rejectionReason }: { reqId: string; decision: 'APPROVED' | 'REJECTED'; rejectionReason?: string }) =>
+      api.patch(`/tasks/${task.id}/documents/requests/${reqId}`, { decision, rejectionReason }),
+    onSuccess: () => {
+      toast.success('Documento avaliado')
+      queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] })
+    },
+    onError: () => toast.error('Erro ao avaliar documento'),
+  })
+
+  const deliverMutation = useMutation({
+    mutationFn: ({ reqId, file }: { reqId: string; file: File }) => {
+      const form = new FormData()
+      form.append('file', file)
+      return api.post(`/tasks/${task.id}/documents/deliveries/${reqId}/upload`, form)
+    },
+    onSuccess: () => {
+      toast.success('Documento entregue')
+      queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] })
+    },
+    onError: () => toast.error('Erro ao entregar documento'),
   })
 
   const uploadMutation = useMutation({
@@ -124,6 +201,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'comments', label: 'Comentários', icon: <MessageSquare size={14} /> },
+    { id: 'documents', label: 'Documentos', icon: <FileCheck size={14} /> },
     { id: 'attachments', label: 'Anexos', icon: <Paperclip size={14} /> },
     { id: 'history', label: 'Histórico', icon: <Clock size={14} /> },
   ]
@@ -187,6 +265,22 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
               </span>
             )}
 
+            {canEdit ? (
+              <select
+                value={task.status}
+                onChange={(e) => updateMutation.mutate({ status: e.target.value as Task['status'] })}
+                className={cn('text-xs font-medium px-2 py-0.5 rounded-full border-0 cursor-pointer', STATUS_COLOR[task.status])}
+              >
+                {(['OPEN', 'DONE', 'DISREGARDED', 'BLOCKED'] as Task['status'][]).map((s) => (
+                  <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                ))}
+              </select>
+            ) : (
+              <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', STATUS_COLOR[task.status])}>
+                {STATUS_LABEL[task.status]}
+              </span>
+            )}
+
             {canEdit && (
               <select
                 value={task.departmentId ?? ''}
@@ -226,6 +320,41 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                   {isOverdue ? '⚠ ' : ''}Prazo: {new Date(task.dueDate).toLocaleDateString('pt-BR')}
                 </span>
               )
+            )}
+
+            {canEdit ? (
+              <input
+                type="date"
+                defaultValue={task.targetDate ? task.targetDate.slice(0, 10) : ''}
+                onChange={(e) => {
+                  const val = e.target.value
+                  updateMutation.mutate({ targetDate: val ? new Date(val + 'T00:00:00').toISOString() : null })
+                }}
+                title="Meta interna"
+                className="text-xs border border-gray-300 rounded px-2 py-0.5 text-gray-700"
+              />
+            ) : (
+              task.targetDate && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" title="Meta interna">
+                  Meta: {new Date(task.targetDate).toLocaleDateString('pt-BR')}
+                </span>
+              )
+            )}
+            {task.competence && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" title="Competência">
+                Competência: {new Date(task.competence).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+              </span>
+            )}
+
+            {canEdit && (
+              <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={task.visibleToClient}
+                  onChange={(e) => updateMutation.mutate({ visibleToClient: e.target.checked })}
+                />
+                Cliente pode ver
+              </label>
             )}
           </div>
 
@@ -274,6 +403,113 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
 
           {tab === 'comments' && (
             <Comments taskId={task.id} currentUserId={currentUserId} role={role} />
+          )}
+
+          {tab === 'documents' && documents && (
+            <div className="space-y-5">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">A cobrar do cliente</p>
+                {documents.requirements.length === 0 && <p className="text-sm text-gray-400">Nenhum documento a cobrar.</p>}
+                <div className="space-y-2">
+                  {documents.requirements.map((r) => (
+                    <div key={r.id} className="bg-gray-50 rounded-lg px-3 py-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-700">{r.name}</span>
+                        <span className={cn(
+                          'text-xs font-medium px-2 py-0.5 rounded-full',
+                          r.status === 'PENDING' && 'bg-gray-100 text-gray-500',
+                          r.status === 'UPLOADED' && 'bg-blue-100 text-blue-600',
+                          r.status === 'APPROVED' && 'bg-green-100 text-green-600',
+                          r.status === 'REJECTED' && 'bg-red-100 text-red-600',
+                        )}>
+                          {{ PENDING: 'Pendente', UPLOADED: 'Enviado', APPROVED: 'Aprovado', REJECTED: 'Rejeitado' }[r.status]}
+                        </span>
+                      </div>
+                      {r.rejectionReason && <p className="text-xs text-red-500 mt-1">Motivo: {r.rejectionReason}</p>}
+                      {r.signedUrl && (
+                        <a href={r.signedUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 block">
+                          Ver arquivo enviado
+                        </a>
+                      )}
+                      {canEdit && r.status === 'UPLOADED' && (
+                        <div className="flex gap-2 mt-2">
+                          <button onClick={() => reviewRequirementMutation.mutate({ reqId: r.id, decision: 'APPROVED' })} className="text-xs text-green-600 hover:underline">
+                            Aprovar
+                          </button>
+                          <button
+                            onClick={() => {
+                              const reason = window.prompt('Motivo da rejeição:')
+                              if (reason?.trim()) reviewRequirementMutation.mutate({ reqId: r.id, decision: 'REJECTED', rejectionReason: reason.trim() })
+                            }}
+                            className="text-xs text-red-600 hover:underline"
+                          >
+                            Rejeitar
+                          </button>
+                        </div>
+                      )}
+                      {(r.status === 'PENDING' || r.status === 'REJECTED') && (
+                        <label className="inline-block mt-2 cursor-pointer">
+                          <input type="file" className="hidden" onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) uploadRequirementMutation.mutate({ reqId: r.id, file })
+                            e.target.value = ''
+                          }} />
+                          <span className="text-xs text-blue-600 hover:underline">Enviar arquivo</span>
+                        </label>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {canEdit && (
+                  <button
+                    onClick={() => { const name = window.prompt('Nome do documento a cobrar:'); if (name?.trim()) addRequirementMutation.mutate(name.trim()) }}
+                    className="text-xs text-blue-600 hover:underline mt-2"
+                  >
+                    + Adicionar documento a cobrar
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">A entregar ao cliente</p>
+                {documents.deliverables.length === 0 && <p className="text-sm text-gray-400">Nenhum documento a entregar.</p>}
+                <div className="space-y-2">
+                  {documents.deliverables.map((d) => (
+                    <div key={d.id} className="bg-gray-50 rounded-lg px-3 py-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-700">{d.name}</span>
+                        <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', d.deliveredAt ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500')}>
+                          {d.deliveredAt ? 'Entregue' : 'Pendente'}
+                        </span>
+                      </div>
+                      {d.signedUrl && (
+                        <a href={d.signedUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 block">
+                          Ver arquivo entregue
+                        </a>
+                      )}
+                      {canEdit && (
+                        <label className="inline-block mt-2 cursor-pointer">
+                          <input type="file" className="hidden" onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) deliverMutation.mutate({ reqId: d.id, file })
+                            e.target.value = ''
+                          }} />
+                          <span className="text-xs text-blue-600 hover:underline">{d.deliveredAt ? 'Substituir arquivo' : 'Enviar arquivo'}</span>
+                        </label>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {canEdit && (
+                  <button
+                    onClick={() => { const name = window.prompt('Nome do documento a entregar:'); if (name?.trim()) addDeliverableMutation.mutate(name.trim()) }}
+                    className="text-xs text-blue-600 hover:underline mt-2"
+                  >
+                    + Adicionar documento a entregar
+                  </button>
+                )}
+              </div>
+            </div>
           )}
 
           {tab === 'attachments' && (

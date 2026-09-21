@@ -19,6 +19,9 @@ export const updateTaskSchema = z.object({
   dueDate: z.string().datetime().nullable().optional(),
   tags: z.array(z.string()).optional(),
   departmentId: z.string().cuid().nullable().optional(),
+  visibleToClient: z.boolean().optional(),
+  targetDate: z.string().datetime().nullable().optional(),
+  competence: z.string().datetime().nullable().optional(),
 })
 
 export const moveTaskSchema = z.object({
