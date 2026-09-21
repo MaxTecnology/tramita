@@ -135,6 +135,36 @@ export async function searchClientUsers(organizationId: string, q: string) {
   })
 }
 
+export async function listClientUserLinks(clientId: string, organizationId: string) {
+  const client = await prisma.client.findFirst({ where: { id: clientId, organizationId } })
+  if (!client) throw new AppError(404, 'Cliente não encontrado')
+
+  const rows = await prisma.clientUserAccess.findMany({
+    where: { clientId },
+    select: {
+      departmentId: true,
+      clientUser: { select: { id: true, name: true, email: true } },
+    },
+  })
+
+  const byClientUserId = new Map<string, { existingId: string; name: string; email: string; departmentIds: string[] }>()
+  for (const row of rows) {
+    const existing = byClientUserId.get(row.clientUser.id)
+    if (existing) {
+      existing.departmentIds.push(row.departmentId)
+    } else {
+      byClientUserId.set(row.clientUser.id, {
+        existingId: row.clientUser.id,
+        name: row.clientUser.name,
+        email: row.clientUser.email,
+        departmentIds: [row.departmentId],
+      })
+    }
+  }
+
+  return Array.from(byClientUserId.values())
+}
+
 export async function listAssignments(clientId: string, organizationId: string) {
   const client = await prisma.client.findFirst({ where: { id: clientId, organizationId } })
   if (!client) throw new AppError(404, 'Cliente não encontrado')

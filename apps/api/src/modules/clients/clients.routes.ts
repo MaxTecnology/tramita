@@ -14,6 +14,7 @@ import {
   setAssignment,
   lookupClientByCnpj,
   searchClientUsers,
+  listClientUserLinks,
 } from './clients.service'
 
 export async function clientsRoutes(app: FastifyInstance) {
@@ -65,6 +66,13 @@ export async function clientsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(await deleteClient(id, request.user.organizationId!))
+  })
+
+  app.get('/:id/users', {
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER')],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    return reply.send(await listClientUserLinks(id, request.user.organizationId!))
   })
 
   app.get('/:id/assignments', {

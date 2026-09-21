@@ -8,6 +8,7 @@ import {
   listAssignments,
   setAssignment,
   lookupClientByCnpj,
+  listClientUserLinks,
 } from '@/modules/clients/clients.service'
 import {
   createTestPlan,
@@ -16,6 +17,7 @@ import {
   createTestClient,
   createTestClientUser,
   createTestDepartment,
+  grantClientAccess,
 } from '@/test/helpers'
 
 describe('createClient', () => {
@@ -210,6 +212,51 @@ describe('setAssignment / listAssignments', () => {
     const client = await createTestClient(orgA.id)
 
     await expect(listAssignments(client.id, orgB.id)).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
+describe('listClientUserLinks', () => {
+  it('returns one entry per ClientUser with all department ids for that client grouped together', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const deptA = await createTestDepartment(org.id)
+    const deptB = await createTestDepartment(org.id)
+
+    const { clientUser: singleDeptUser } = await createTestClientUser(org.id, { name: 'Single Dept', email: `single-${Date.now()}@test.com` })
+    await grantClientAccess(singleDeptUser.id, client.id, deptA.id)
+
+    const { clientUser: multiDeptUser } = await createTestClientUser(org.id, { name: 'Multi Dept', email: `multi-${Date.now()}@test.com` })
+    await grantClientAccess(multiDeptUser.id, client.id, deptA.id)
+    await grantClientAccess(multiDeptUser.id, client.id, deptB.id)
+
+    const result = await listClientUserLinks(client.id, org.id)
+
+    expect(result).toHaveLength(2)
+    const single = result.find((r) => r.existingId === singleDeptUser.id)
+    const multi = result.find((r) => r.existingId === multiDeptUser.id)
+    expect(single).toMatchObject({ name: 'Single Dept', departmentIds: [deptA.id] })
+    expect(multi?.name).toBe('Multi Dept')
+    expect(multi?.departmentIds.sort()).toEqual([deptA.id, deptB.id].sort())
+  })
+
+  it('returns an empty array when the client has no linked users', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+
+    const result = await listClientUserLinks(client.id, org.id)
+
+    expect(result).toEqual([])
+  })
+
+  it('throws 404 when client belongs to a different organization', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id)
+    const client = await createTestClient(orgA.id)
+
+    await expect(listClientUserLinks(client.id, orgB.id)).rejects.toMatchObject({ statusCode: 404 })
   })
 })
 

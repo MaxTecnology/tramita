@@ -5,6 +5,9 @@ import {
   createTestOrg,
   createTestUser,
   createTestClient,
+  createTestClientUser,
+  createTestDepartment,
+  grantClientAccess,
   getAuthHeader,
 } from '@/test/helpers'
 
@@ -85,5 +88,44 @@ describe('POST /clients', () => {
     })
 
     expect(res.statusCode).toBe(400)
+  })
+})
+
+describe('GET /clients/:id/users', () => {
+  it('returns the client user links grouped by user with their department ids', async () => {
+    const { org, auth } = await setup()
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id, { name: 'Portal User' })
+    await grantClientAccess(clientUser.id, client.id, department.id)
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/clients/${client.id}/users`,
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json<{ existingId: string; name: string; email: string; departmentIds: string[] }[]>()
+    expect(body).toHaveLength(1)
+    expect(body[0]).toMatchObject({ existingId: clientUser.id, name: 'Portal User', departmentIds: [department.id] })
+  })
+
+  it('returns 404 when the client belongs to another organization', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const userA = await createTestUser(orgA.id)
+    const authA = await getAuthHeader(userA.email, 'Test@1234')
+
+    const orgB = await createTestOrg(plan.id)
+    const client = await createTestClient(orgB.id)
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/clients/${client.id}/users`,
+      headers: { authorization: authA },
+    })
+
+    expect(res.statusCode).toBe(404)
   })
 })

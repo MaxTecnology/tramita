@@ -386,6 +386,7 @@ export default function Clients() {
   const [editForm, setEditForm] = useState<EditForm>({
     name: '', clientType: 'PJ', cnpj: '', cpf: '', whatsapp: '', phone: '', notes: '', clientUsers: [], ...EMPTY_ADDRESS,
   })
+  const [loadingEditUsers, setLoadingEditUsers] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'PF' | 'PJ'>('all')
@@ -478,8 +479,9 @@ export default function Clients() {
     onError: () => toast.error('Erro ao desativar cliente'),
   })
 
-  function openEdit(client: Client) {
+  async function openEdit(client: Client) {
     setEditingClient(client)
+    setLoadingEditUsers(true)
     setEditForm({
       name: client.name,
       clientType: client.clientType ?? 'PJ',
@@ -497,6 +499,15 @@ export default function Clients() {
       complemento: client.complemento ?? '',
       clientUsers: [],
     })
+
+    try {
+      const { data } = await api.get<ClientUserLink[]>(`/clients/${client.id}/users`)
+      setEditForm((f) => ({ ...f, clientUsers: data }))
+    } catch {
+      toast.error('Erro ao carregar usuários com acesso')
+    } finally {
+      setLoadingEditUsers(false)
+    }
   }
 
   if (isLoading) return <div className="p-8 text-muted-foreground">Carregando...</div>
@@ -671,10 +682,14 @@ export default function Clients() {
               onChange={(patch) => setEditForm((f) => ({ ...f, ...patch }))}
               idPrefix="e"
             />
-            <ClientUsersSection
-              links={editForm.clientUsers}
-              onChange={(v) => setEditForm({ ...editForm, clientUsers: v })}
-            />
+            {loadingEditUsers ? (
+              <p className="text-xs text-muted-foreground pt-2 border-t border-border">Carregando usuários com acesso...</p>
+            ) : (
+              <ClientUsersSection
+                links={editForm.clientUsers}
+                onChange={(v) => setEditForm({ ...editForm, clientUsers: v })}
+              />
+            )}
             <hr className="border-border" />
             {editingClient && <AssignmentsSection clientId={editingClient.id} />}
             {updateMutation.isError && (
