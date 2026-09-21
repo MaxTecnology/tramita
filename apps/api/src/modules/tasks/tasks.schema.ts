@@ -18,7 +18,7 @@ export const updateTaskSchema = z.object({
   assigneeId: z.string().cuid().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   tags: z.array(z.string()).optional(),
-  departmentId: z.string().cuid().nullable().optional(),
+  departmentId: z.string().cuid().optional(),
   visibleToClient: z.boolean().optional(),
   targetDate: z.string().datetime().nullable().optional(),
   competence: z.string().datetime().nullable().optional(),

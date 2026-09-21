@@ -97,24 +97,45 @@ async function processClientNotification(
     let status: 'SENT' | 'FAILED' = 'SENT'
     let error: string | undefined
 
-    try {
-      if (channel === 'WHATSAPP') {
-        await sendWhatsApp(config.maximizebotToken!, {
-          number: client.whatsapp!,
-          body: rendered,
-          saveOnTicket: config.saveOnTicket,
-          startChatbot: config.startChatbot,
-          linkPreview: true,
-        })
-      } else {
+    if (channel === 'EMAIL') {
+      const recipients = await prisma.clientUser.findMany({
+        where: { isActive: true, accesses: { some: { clientId } } },
+        select: { id: true, name: true, email: true },
+        distinct: ['id'],
+      })
+      for (const recipient of recipients) {
         const subject = renderTemplate(template.subject ?? '', vars)
-        await sendEmail(
-          client.email,
-          subject,
-          rendered,
-          wrapEmailHtml(subject, rendered, vars.portalUrl, 'Acessar portal'),
-        )
+        try {
+          await sendEmail(
+            recipient.email,
+            subject,
+            rendered,
+            wrapEmailHtml(subject, rendered, vars.portalUrl, 'Acessar portal'),
+          )
+          status = 'SENT'
+        } catch (err) {
+          status = 'FAILED'
+          error = err instanceof Error ? err.message : String(err)
+        }
+        await prisma.notificationLog.create({
+          data: {
+            organizationId, clientId, event: event as NotificationEvent, channel, taskId, requestId,
+            recipient: recipient.email, message: rendered, status, error,
+            sentAt: status === 'SENT' ? new Date() : undefined,
+          },
+        })
       }
+      continue // já logou por destinatário acima — pula o log único do fim do loop
+    }
+
+    try {
+      await sendWhatsApp(config.maximizebotToken!, {
+        number: client.whatsapp!,
+        body: rendered,
+        saveOnTicket: config.saveOnTicket,
+        startChatbot: config.startChatbot,
+        linkPreview: true,
+      })
     } catch (err) {
       status = 'FAILED'
       error = err instanceof Error ? err.message : String(err)
@@ -128,7 +149,7 @@ async function processClientNotification(
         channel,
         taskId,
         requestId,
-        recipient: channel === 'WHATSAPP' ? client.whatsapp! : client.email,
+        recipient: client.whatsapp!,
         message: rendered,
         status,
         error,

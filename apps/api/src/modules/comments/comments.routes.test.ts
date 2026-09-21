@@ -6,6 +6,9 @@ import {
   createTestOrg,
   createTestUser,
   createTestClient,
+  createTestClientUser,
+  createTestDepartment,
+  grantClientAccess,
   createTestBoard,
   createTestColumn,
   createTestTask,
@@ -42,11 +45,14 @@ describe('POST /tasks/:taskId/comments', () => {
     const org = await createTestOrg(plan.id)
     const user = await createTestUser(org.id)
     const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password: clientUserPassword } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
     const board = await createTestBoard(org.id, client.id)
     const col = await createTestColumn(board.id, { position: 0 })
-    const task = await createTestTask(col.id, user.id)
+    const task = await createTestTask(col.id, user.id, { departmentId: department.id })
 
-    const auth = await getAuthHeader(client.email, 'Client@1234')
+    const auth = await getAuthHeader(clientUser.email, clientUserPassword)
     const res = await app.inject({
       method: 'POST',
       url: `/tasks/${task.id}/comments`,
@@ -68,11 +74,14 @@ describe('POST /tasks/:taskId/comments', () => {
     const userOrg1 = await createTestUser(org1.id)
     const clientOrg1 = await createTestClient(org1.id)
     const clientOrg2 = await createTestClient(org2.id)
+    const departmentOrg2 = await createTestDepartment(org2.id)
+    const { clientUser: clientUserOrg2, password: clientUserOrg2Password } = await createTestClientUser(org2.id)
+    await grantClientAccess(clientUserOrg2.id, clientOrg2.id, departmentOrg2.id)
     const board = await createTestBoard(org1.id, clientOrg1.id)
     const col = await createTestColumn(board.id, { position: 0 })
     const task = await createTestTask(col.id, userOrg1.id)
 
-    const auth = await getAuthHeader(clientOrg2.email, 'Client@1234')
+    const auth = await getAuthHeader(clientUserOrg2.email, clientUserOrg2Password)
     const res = await app.inject({
       method: 'POST',
       url: `/tasks/${task.id}/comments`,

@@ -1,13 +1,12 @@
 import axios from 'axios'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
-import { hashPassword } from '@/modules/auth/auth.service'
 import { lookupCnpj, type CnpjLookupResult } from '@/lib/cnpjws'
 import type { CreateClientBody, UpdateClientBody } from './clients.schema'
 
 const SELECT = {
   id: true, name: true, clientType: true, cnpj: true, cpf: true,
-  email: true, whatsapp: true, phone: true, notes: true,
+  whatsapp: true, phone: true, notes: true,
   cep: true, estado: true, cidade: true, bairro: true, logradouro: true, numero: true, complemento: true,
   isActive: true, createdAt: true,
 }
@@ -24,19 +23,12 @@ export async function listClients(organizationId: string, includeInactive = fals
 }
 
 export async function createClient(organizationId: string, data: CreateClientBody) {
-  const existing = await prisma.client.findFirst({
-    where: { email: data.email, organizationId },
-  })
-  if (existing) throw new AppError(409, 'E-mail já cadastrado nesta organização')
-
   return prisma.client.create({
     data: {
       name: data.name,
       clientType: data.clientType ?? 'PJ',
       cnpj: data.cnpj,
       cpf: data.cpf,
-      email: data.email,
-      passwordHash: await hashPassword(data.password),
       whatsapp: data.whatsapp,
       phone: data.phone,
       notes: data.notes,

@@ -9,12 +9,15 @@ import {
   createTestPlan,
   createTestOrg,
   createTestUser,
+  createTestClient,
+  createTestClientUser,
+  grantClientAccess,
+  createTestDepartment,
   createTestBoard,
   createTestColumn,
   createTestTask,
 } from '@/test/helpers'
 import type { NotificationJob } from '@/lib/queue'
-import bcrypt from 'bcryptjs'
 
 type JobInput = { data: NotificationJob }
 
@@ -30,15 +33,7 @@ describe('processNotificationJob', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const user = await createTestUser(org.id)
-    const client = await prisma.client.create({
-      data: {
-        name: 'Cliente Teste',
-        email: `worker-client-${Date.now()}@test.com`,
-        passwordHash: await bcrypt.hash('pass', 4),
-        whatsapp: '5582999990001',
-        organizationId: org.id,
-      },
-    })
+    const client = await createTestClient(org.id, { name: 'Cliente Teste' })
     const board = await createTestBoard(org.id, client.id)
     const col = await createTestColumn(board.id, { position: 0 })
     const task = await createTestTask(col.id, user.id)
@@ -73,15 +68,8 @@ describe('processNotificationJob', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const user = await createTestUser(org.id)
-    const client = await prisma.client.create({
-      data: {
-        name: 'Cliente Falha',
-        email: `worker-fail-${Date.now()}@test.com`,
-        passwordHash: await bcrypt.hash('pass', 4),
-        whatsapp: '5582999990002',
-        organizationId: org.id,
-      },
-    })
+    const client = await createTestClient(org.id, { name: 'Cliente Falha' })
+    await prisma.client.update({ where: { id: client.id }, data: { whatsapp: '5582999990002' } })
     const board = await createTestBoard(org.id, client.id)
     const col = await createTestColumn(board.id, { position: 0 })
     const task = await createTestTask(col.id, user.id)
@@ -118,14 +106,7 @@ describe('processNotificationJob', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const user = await createTestUser(org.id)
-    const client = await prisma.client.create({
-      data: {
-        name: 'Cliente Sem Config',
-        email: `worker-noconf-${Date.now()}@test.com`,
-        passwordHash: await bcrypt.hash('pass', 4),
-        organizationId: org.id,
-      },
-    })
+    const client = await createTestClient(org.id, { name: 'Cliente Sem Config' })
     const board = await createTestBoard(org.id, client.id)
     const col = await createTestColumn(board.id, { position: 0 })
     const task = await createTestTask(col.id, user.id)
@@ -142,6 +123,45 @@ describe('processNotificationJob', () => {
 
     await expect(processNotificationJob(job)).resolves.toBeUndefined()
     expect(maximizebot.sendWhatsApp).not.toHaveBeenCalled()
+  })
+
+  it('TASK_MOVED envia email para cada ClientUser com acesso à empresa, não pro e-mail único antigo', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id, { name: 'Cliente Multi-usuário' })
+    const department = await createTestDepartment(org.id)
+    const { clientUser: clientUserA } = await createTestClientUser(org.id, { email: 'a@test.com' })
+    const { clientUser: clientUserB } = await createTestClientUser(org.id, { email: 'b@test.com' })
+    await grantClientAccess(clientUserA.id, client.id, department.id)
+    await grantClientAccess(clientUserB.id, client.id, department.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id, { departmentId: department.id })
+
+    await prisma.notificationConfig.create({
+      data: { organizationId: org.id, taskMoved: true, emailEnabled: true },
+    })
+
+    const job: JobInput = {
+      data: {
+        event: 'TASK_MOVED',
+        taskId: task.id,
+        organizationId: org.id,
+        clientId: client.id,
+        metadata: { taskTitle: task.title, fromColumn: 'A', toColumn: 'B' },
+      },
+    }
+
+    await processNotificationJob(job)
+
+    expect(mailer.sendEmail).toHaveBeenCalledTimes(2)
+    const recipients = vi.mocked(mailer.sendEmail).mock.calls.map((call) => call[0]).sort()
+    expect(recipients).toEqual([clientUserA.email, clientUserB.email].sort())
+
+    const logs = await prisma.notificationLog.findMany({ where: { taskId: task.id } })
+    expect(logs).toHaveLength(2)
+    expect(logs.every((l) => l.status === 'SENT')).toBe(true)
   })
 
   it('REQUEST_CREATED envia email para destinatário USER e grava log sem clientId', async () => {

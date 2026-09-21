@@ -89,8 +89,8 @@ describe('listRequestsForOrg / listRequestsForClient / getRequestById', () => {
   it('cliente só vê as próprias requests', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const clientA = await createTestClient(org.id, { email: 'a@test.com' })
-    const clientB = await createTestClient(org.id, { email: 'b@test.com' })
+    const clientA = await createTestClient(org.id, { name: 'a@test.com' })
+    const clientB = await createTestClient(org.id, { name: 'b@test.com' })
     await createRequest(org.id, clientA.id, { title: 'Da A' })
     await createRequest(org.id, clientB.id, { title: 'Da B' })
 
@@ -102,8 +102,8 @@ describe('listRequestsForOrg / listRequestsForClient / getRequestById', () => {
   it('getRequestById lança 404 quando clientId não é o dono', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const clientA = await createTestClient(org.id, { email: 'a2@test.com' })
-    const clientB = await createTestClient(org.id, { email: 'b2@test.com' })
+    const clientA = await createTestClient(org.id, { name: 'a2@test.com' })
+    const clientB = await createTestClient(org.id, { name: 'b2@test.com' })
     const request = await createRequest(org.id, clientA.id, { title: 'Da A' })
 
     await expect(getRequestById(request.id, org.id, clientB.id)).rejects.toMatchObject({ statusCode: 404 })
@@ -176,8 +176,8 @@ describe('approveRequest', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-    const clientA = await createTestClient(org.id, { email: 'a3@test.com' })
-    const clientB = await createTestClient(org.id, { email: 'b3@test.com' })
+    const clientA = await createTestClient(org.id, { name: 'a3@test.com' })
+    const clientB = await createTestClient(org.id, { name: 'b3@test.com' })
     const boardOfB = await createBoard(org.id, admin.id, 'ORG_ADMIN', { title: 'Board de B', clientId: clientB.id })
     const request = await createRequest(org.id, clientA.id, { title: 'Pedido de A' })
 

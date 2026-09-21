@@ -3,24 +3,26 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { UpdateProfileBody } from './portal.schema'
 
-export async function getClientProfile(clientId: string) {
-  const client = await prisma.client.findUnique({
-    where: { id: clientId },
-    select: { id: true, name: true, email: true, whatsapp: true },
+// clientId here is really request.user.sub — for role CLIENT that's now a
+// ClientUser.id (the portal login is per-person, not per-company).
+export async function getClientProfile(clientUserId: string) {
+  const clientUser = await prisma.clientUser.findUnique({
+    where: { id: clientUserId },
+    select: { id: true, name: true, email: true, phone: true },
   })
-  if (!client) throw new AppError(404, 'Cliente não encontrado')
-  return client
+  if (!clientUser) throw new AppError(404, 'Cliente não encontrado')
+  return clientUser
 }
 
-export async function updateClientProfile(clientId: string, data: UpdateProfileBody) {
-  const updateData: { whatsapp?: string; passwordHash?: string } = {}
-  if (data.whatsapp !== undefined) updateData.whatsapp = data.whatsapp
+export async function updateClientProfile(clientUserId: string, data: UpdateProfileBody) {
+  const updateData: { phone?: string; passwordHash?: string } = {}
+  if (data.whatsapp !== undefined) updateData.phone = data.whatsapp
   if (data.password) updateData.passwordHash = await bcrypt.hash(data.password, 10)
 
-  return prisma.client.update({
-    where: { id: clientId },
+  return prisma.clientUser.update({
+    where: { id: clientUserId },
     data: updateData,
-    select: { id: true, name: true, email: true, whatsapp: true },
+    select: { id: true, name: true, email: true, phone: true },
   })
 }
 

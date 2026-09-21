@@ -52,17 +52,36 @@ export async function createTestUser(
 
 export async function createTestClient(
   organizationId: string,
-  overrides: Partial<{ isActive: boolean; name: string; email: string }> = {},
+  overrides: Partial<{ isActive: boolean; name: string }> = {},
 ) {
   return prisma.client.create({
     data: {
       name: overrides.name ?? 'Test Client',
-      email: overrides.email ?? `client-${Date.now()}@test.com`,
-      passwordHash: await bcrypt.hash('Client@1234', 10),
       organizationId,
       isActive: overrides.isActive ?? true,
     },
   })
+}
+
+export async function createTestClientUser(
+  organizationId: string,
+  overrides?: Partial<{ name: string; email: string; password: string; isActive: boolean }>,
+) {
+  const password = overrides?.password ?? 'ClientUser@1234'
+  const clientUser = await prisma.clientUser.create({
+    data: {
+      name: overrides?.name ?? 'Test Client User',
+      email: overrides?.email ?? `client-user-${Date.now()}@test.com`,
+      passwordHash: await bcrypt.hash(password, 10),
+      isActive: overrides?.isActive ?? true,
+      organizationId,
+    },
+  })
+  return { clientUser, password }
+}
+
+export async function grantClientAccess(clientUserId: string, clientId: string, departmentId: string) {
+  return prisma.clientUserAccess.create({ data: { clientUserId, clientId, departmentId } })
 }
 
 // Returns { user, password } so the test can call loginAs(user.email, password)
@@ -117,8 +136,9 @@ export async function createTestColumn(
 export async function createTestTask(
   columnId: string,
   creatorId: string,
-  overrides?: Partial<{ title: string; position: number; priority: string }>,
+  overrides?: Partial<{ title: string; position: number; priority: string; departmentId: string }>,
 ) {
+  const departmentId = overrides?.departmentId ?? (await defaultDepartmentForColumn(columnId))
   return prisma.task.create({
     data: {
       title: overrides?.title ?? 'Test Task',
@@ -126,8 +146,21 @@ export async function createTestTask(
       position: overrides?.position ?? 0,
       columnId,
       creatorId,
+      departmentId,
     },
   })
+}
+
+async function defaultDepartmentForColumn(columnId: string): Promise<string> {
+  const column = await prisma.column.findUniqueOrThrow({
+    where: { id: columnId },
+    select: { board: { select: { organizationId: true } } },
+  })
+  const organizationId = column.board.organizationId
+  const existing = await prisma.department.findFirst({ where: { organizationId, name: 'Test Department (default)' } })
+  if (existing) return existing.id
+  const created = await prisma.department.create({ data: { organizationId, name: 'Test Department (default)' } })
+  return created.id
 }
 
 export async function createTestDepartment(

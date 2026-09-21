@@ -7,6 +7,8 @@ import {
   createTestOrg,
   createTestUser,
   createTestClient,
+  createTestClientUser,
+  grantClientAccess,
   createTestBoard,
   createTestColumn,
   createTestDepartment,
@@ -33,7 +35,7 @@ describe('deleteComment - soft delete', () => {
       data: { name: 'João', email: 'j@j.com', passwordHash: 'x', role: 'ORG_ADMIN', organizationId: org.id },
     })
     const client = await prisma.client.create({
-      data: { name: 'Empresa X', email: 'x@x.com', passwordHash: 'x', organizationId: org.id },
+      data: { name: 'Empresa X', organizationId: org.id },
     })
     const board = await prisma.board.create({
       data: { title: 'B', organizationId: org.id, clientId: client.id },
@@ -41,8 +43,9 @@ describe('deleteComment - soft delete', () => {
     const column = await prisma.column.create({
       data: { title: 'C', position: 0, boardId: board.id },
     })
+    const department = await createTestDepartment(org.id)
     const task = await prisma.task.create({
-      data: { title: 'T', position: 0, columnId: column.id, creatorId: user.id },
+      data: { title: 'T', position: 0, columnId: column.id, creatorId: user.id, departmentId: department.id },
     })
     const comment = await prisma.comment.create({
       data: { content: 'Texto importante', taskId: task.id, authorType: 'USER', userId: user.id },
@@ -67,10 +70,7 @@ describe('deleteComment - soft delete', () => {
       data: { name: 'J', email: 'j2@j.com', passwordHash: 'x', role: 'ORG_ADMIN', organizationId: org.id },
     })
     const client = await prisma.client.create({
-      data: { name: 'EmpY', email: 'y@y.com', passwordHash: 'x', organizationId: org.id },
-    })
-    const otherClient = await prisma.client.create({
-      data: { name: 'EmpZ', email: 'z@z.com', passwordHash: 'x', organizationId: org.id },
+      data: { name: 'EmpY', organizationId: org.id },
     })
     const board = await prisma.board.create({
       data: { title: 'B', organizationId: org.id, clientId: client.id },
@@ -78,16 +78,18 @@ describe('deleteComment - soft delete', () => {
     const column = await prisma.column.create({
       data: { title: 'C', position: 0, boardId: board.id },
     })
+    const department = await createTestDepartment(org.id)
     const task = await prisma.task.create({
-      data: { title: 'T', position: 0, columnId: column.id, creatorId: user.id },
+      data: { title: 'T', position: 0, columnId: column.id, creatorId: user.id, departmentId: department.id },
     })
     const comment = await prisma.comment.create({
       data: { content: 'Comentário do outro', taskId: task.id, authorType: 'CLIENT', clientId: client.id },
     })
 
-    // otherClient belongs to a different board — board isolation check fires first
+    // otherClientUser has no access grant to `client` — board isolation check fires first
+    const { clientUser: otherClientUser } = await createTestClientUser(org.id)
     await expect(
-      deleteComment(comment.id, { id: otherClient.id, role: 'CLIENT', organizationId: org.id })
+      deleteComment(comment.id, { id: otherClientUser.id, role: 'CLIENT', organizationId: org.id })
     ).rejects.toThrow('Acesso negado')
   })
 })
@@ -102,7 +104,7 @@ describe('listComments - soft delete visibility', () => {
       data: { name: 'Admin', email: 'a3@a.com', passwordHash: 'x', role: 'ORG_ADMIN', organizationId: org.id },
     })
     const client = await prisma.client.create({
-      data: { name: 'EmpW', email: 'w@w.com', passwordHash: 'x', organizationId: org.id },
+      data: { name: 'EmpW', organizationId: org.id },
     })
     const board = await prisma.board.create({
       data: { title: 'B', organizationId: org.id, clientId: client.id },
@@ -110,8 +112,9 @@ describe('listComments - soft delete visibility', () => {
     const column = await prisma.column.create({
       data: { title: 'C', position: 0, boardId: board.id },
     })
+    const department = await createTestDepartment(org.id)
     const task = await prisma.task.create({
-      data: { title: 'T', position: 0, columnId: column.id, creatorId: admin.id },
+      data: { title: 'T', position: 0, columnId: column.id, creatorId: admin.id, departmentId: department.id },
     })
     await prisma.comment.create({
       data: {
@@ -140,13 +143,16 @@ describe('visibilidade (visibleToClient) — comments', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
     const board = await createTestBoard(org.id, client.id)
     const column = await createTestColumn(board.id, { position: 0 })
     const task = await prisma.task.create({
-      data: { title: 'Tarefa oculta', position: 0, columnId: column.id, creatorId: admin.id, visibleToClient: false },
+      data: { title: 'Tarefa oculta', position: 0, columnId: column.id, creatorId: admin.id, departmentId: department.id, visibleToClient: false },
     })
 
-    await expect(listComments(task.id, org.id, 'CLIENT', client.id)).rejects.toMatchObject({ statusCode: 404 })
+    await expect(listComments(task.id, org.id, 'CLIENT', clientUser.id)).rejects.toMatchObject({ statusCode: 404 })
     // do lado do escritório continua acessível
     await expect(listComments(task.id, org.id, 'ORG_ADMIN')).resolves.toBeDefined()
   })
@@ -156,14 +162,17 @@ describe('visibilidade (visibleToClient) — comments', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
     const board = await createTestBoard(org.id, client.id)
     const column = await createTestColumn(board.id, { position: 0 })
     const task = await prisma.task.create({
-      data: { title: 'Tarefa oculta', position: 0, columnId: column.id, creatorId: admin.id, visibleToClient: false },
+      data: { title: 'Tarefa oculta', position: 0, columnId: column.id, creatorId: admin.id, departmentId: department.id, visibleToClient: false },
     })
 
     await expect(
-      createComment(task.id, { content: 'Olá' }, { id: client.id, role: 'CLIENT', organizationId: org.id }),
+      createComment(task.id, { content: 'Olá' }, { id: clientUser.id, role: 'CLIENT', organizationId: org.id }),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 })
@@ -179,10 +188,12 @@ describe('createComment - roteamento de notificação por departamento', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
-    const board = await createTestBoard(org.id, client.id)
-    const column = await createTestColumn(board.id, { position: 0 })
     const departmentA = await createTestDepartment(org.id, { name: `Dept A ${Date.now()}` })
     const departmentB = await createTestDepartment(org.id, { name: `Dept B ${Date.now()}` })
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, departmentA.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id, { position: 0 })
     const userA = await createTestUser(org.id, { email: `a-${Date.now()}@test.com` })
     const userB = await createTestUser(org.id, { email: `b-${Date.now()}@test.com` })
     await prisma.clientAssignment.create({
@@ -201,7 +212,7 @@ describe('createComment - roteamento de notificação por departamento', () => {
       },
     })
 
-    await createComment(task.id, { content: 'Olá' }, { id: client.id, role: 'CLIENT', organizationId: org.id })
+    await createComment(task.id, { content: 'Olá' }, { id: clientUser.id, role: 'CLIENT', organizationId: org.id })
 
     expect(queue.enqueueNotification).toHaveBeenCalledTimes(1)
     expect(queue.enqueueNotification).toHaveBeenCalledWith(
@@ -209,36 +220,8 @@ describe('createComment - roteamento de notificação por departamento', () => {
     )
   })
 
-  it('sem departmentId na task, cai no fallback e notifica todos os responsáveis do cliente', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const client = await createTestClient(org.id)
-    const board = await createTestBoard(org.id, client.id)
-    const column = await createTestColumn(board.id, { position: 0 })
-    const departmentA = await createTestDepartment(org.id, { name: `Dept A ${Date.now()}` })
-    const departmentB = await createTestDepartment(org.id, { name: `Dept B ${Date.now()}` })
-    const userA = await createTestUser(org.id, { email: `a-${Date.now()}@test.com` })
-    const userB = await createTestUser(org.id, { email: `b-${Date.now()}@test.com` })
-    await prisma.clientAssignment.create({
-      data: { clientId: client.id, departmentId: departmentA.id, userId: userA.id },
-    })
-    await prisma.clientAssignment.create({
-      data: { clientId: client.id, departmentId: departmentB.id, userId: userB.id },
-    })
-    const task = await prisma.task.create({
-      data: {
-        title: 'Tarefa sem departamento',
-        position: 0,
-        columnId: column.id,
-        creatorId: userA.id,
-      },
-    })
-
-    await createComment(task.id, { content: 'Olá' }, { id: client.id, role: 'CLIENT', organizationId: org.id })
-
-    expect(queue.enqueueNotification).toHaveBeenCalledTimes(2)
-    const notifiedUserIds = vi.mocked(queue.enqueueNotification).mock.calls.map((c) => c[0].userId)
-    expect(notifiedUserIds).toContain(userA.id)
-    expect(notifiedUserIds).toContain(userB.id)
-  })
+  // "sem departmentId" removida: Task.departmentId agora é obrigatório no schema (migration
+  // 20260921210100_task_department_required), então esse cenário não é mais produzível — o
+  // fallback "notifica todos os responsáveis" em comments.service.ts também deixou de ser
+  // alcançável e foi simplificado junto.
 })

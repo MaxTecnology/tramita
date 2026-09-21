@@ -42,6 +42,7 @@ model Organization {
   plan                   Plan                    @relation(fields: [planId], references: [id])
   users                  User[]
   clients                Client[]
+  clientUsers            ClientUser[]
   boards                 Board[]
   requests               Request[]
   notificationConfig     NotificationConfig?
@@ -110,16 +111,14 @@ enum UserRole {
 }
 
 model Client {
-  id           String  @id @default(cuid())
-  name         String
-  clientType   String  @default("PJ")
-  cnpj         String?
-  cpf          String?
-  email        String
-  passwordHash String
-  whatsapp     String?
-  phone        String?
-  notes        String?
+  id         String  @id @default(cuid())
+  name       String
+  clientType String  @default("PJ")
+  cnpj       String?
+  cpf        String?
+  whatsapp   String?
+  phone      String?
+  notes      String?
 
   cep         String?
   estado      String?
@@ -141,9 +140,41 @@ model Client {
   attachments              Attachment[]
   clientAssignments        ClientAssignment[]
   recurringTaskAssignments RecurringTaskAssignment[]
+  clientUserAccesses       ClientUserAccess[]
+
+  @@map("clients")
+}
+
+model ClientUser {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  email          String
+  passwordHash   String
+  phone          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  accesses     ClientUserAccess[]
 
   @@unique([email, organizationId])
-  @@map("clients")
+  @@map("client_users")
+}
+
+model ClientUserAccess {
+  id           String @id @default(cuid())
+  clientUserId String
+  clientId     String
+  departmentId String
+
+  clientUser ClientUser @relation(fields: [clientUserId], references: [id], onDelete: Cascade)
+  client     Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([clientUserId, clientId, departmentId])
+  @@map("client_user_accesses")
 }
 
 model Department {
@@ -158,6 +189,7 @@ model Department {
   tasks                  Task[]
   requests               Request[]
   recurringTaskTemplates RecurringTaskTemplate[]
+  clientUserAccesses     ClientUserAccess[]
 
   @@unique([organizationId, name])
   @@map("departments")
@@ -276,7 +308,7 @@ model Task {
   assigneeId          String?
   creatorId           String?
   sourceRequestId     String?
-  departmentId        String?
+  departmentId        String
   tags                String[]
   competence          DateTime?
   targetDate          DateTime?
@@ -288,7 +320,7 @@ model Task {
   column               Column                    @relation(fields: [columnId], references: [id], onDelete: Cascade)
   assignee             User?                     @relation("TaskAssignee", fields: [assigneeId], references: [id])
   creator              User?                     @relation("TaskCreator", fields: [creatorId], references: [id])
-  department           Department?               @relation(fields: [departmentId], references: [id])
+  department           Department                @relation(fields: [departmentId], references: [id])
   comments             Comment[]
   history              TaskHistory[]
   attachments          Attachment[]

@@ -2,9 +2,13 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { publishBoardEvent } from '@/lib/sse'
 import { enqueueNotification } from '@/lib/queue'
+import { getClientAccessScope } from '@/modules/client-users/client-access'
 import type { CreateCommentBody } from './comments.schema'
 
 interface CommentActor {
+  // For role === 'CLIENT' this is a ClientUser id, not a Client id — a ClientUser
+  // may have access to more than one company, so resolving the actual company
+  // always goes through `getClientAccessScope`.
   id: string
   role: string
   organizationId: string
@@ -16,11 +20,11 @@ export async function listComments(
   taskId: string,
   organizationId: string,
   role: string,
-  clientId?: string,
+  clientUserId?: string,
 ) {
-  // For CLIENT role, restrict to tasks whose board belongs to this client
-  const boardWhere =
-    role === 'CLIENT' && clientId ? { organizationId, clientId } : { organizationId }
+  // For CLIENT role, restrict to tasks whose board belongs to a client this ClientUser can access
+  const scope = role === 'CLIENT' && clientUserId ? await getClientAccessScope(clientUserId) : null
+  const boardWhere = scope ? { organizationId, clientId: { in: scope.clientIds } } : { organizationId }
 
   const task = await prisma.task.findFirst({
     where: { id: taskId, column: { board: boardWhere } },
@@ -29,7 +33,7 @@ export async function listComments(
   // Cliente nunca pode saber que uma tarefa não-visível existe, mesmo já sabendo o id dela
   // (ex.: enumeração de board) — trata como "não encontrada", igual verifyTaskAccess em
   // task-documents.service.ts.
-  if (role === 'CLIENT' && clientId && !task.visibleToClient) throw new AppError(404, 'Tarefa não encontrada')
+  if (scope && !task.visibleToClient) throw new AppError(404, 'Tarefa não encontrada')
 
   const comments = await prisma.comment.findMany({
     where: { taskId },
@@ -58,10 +62,11 @@ export async function createComment(
   actor: CommentActor,
 ) {
   const isClient = actor.role === 'CLIENT'
+  const scope = isClient ? await getClientAccessScope(actor.id) : null
 
-  // For CLIENT role, restrict to tasks whose board belongs to this client
-  const boardWhere = isClient
-    ? { organizationId: actor.organizationId, clientId: actor.id }
+  // For CLIENT role, restrict to tasks whose board belongs to a client this ClientUser can access
+  const boardWhere = scope
+    ? { organizationId: actor.organizationId, clientId: { in: scope.clientIds } }
     : { organizationId: actor.organizationId }
 
   const task = await prisma.task.findFirst({
@@ -73,13 +78,15 @@ export async function createComment(
   // uma tarefa não-visível.
   if (isClient && !task.visibleToClient) throw new AppError(404, 'Tarefa não encontrada')
 
+  const clientId = task.column.board.clientId
+
   const comment = await prisma.comment.create({
     data: {
       content: data.content,
       taskId,
       authorType: isClient ? 'CLIENT' : 'USER',
       userId: isClient ? undefined : actor.id,
-      clientId: isClient ? actor.id : undefined,
+      clientId: isClient ? clientId : undefined,
     },
     include: {
       user: { select: { id: true, name: true } },
@@ -99,9 +106,7 @@ export async function createComment(
   if (isClient) {
     // Client commented → notify assigned collaborators; fallback to admin + manager
     const assignments = await prisma.clientAssignment.findMany({
-      where: task.departmentId
-        ? { clientId: actor.id, departmentId: task.departmentId }
-        : { clientId: actor.id },
+      where: { clientId, departmentId: task.departmentId },
       select: { userId: true },
     })
     const recipientIds = assignments.length > 0
@@ -167,13 +172,19 @@ export async function deleteComment(id: string, actor: CommentActor) {
     throw new AppError(403, 'Acesso negado')
   }
 
-  // For CLIENT role, also validate that the board belongs to this client
-  if (actor.role === 'CLIENT' && comment.task.column.board.clientId !== actor.id) {
-    throw new AppError(403, 'Acesso negado')
+  // For CLIENT role, also validate that this ClientUser has access to the board's client
+  if (actor.role === 'CLIENT') {
+    const scope = await getClientAccessScope(actor.id)
+    if (!scope.clientIds.includes(comment.task.column.board.clientId)) {
+      throw new AppError(403, 'Acesso negado')
+    }
   }
 
+  // A comment authored by "the client" is attributed to the company (clientId), not to a
+  // single ClientUser — any ClientUser with access to that company counts as the author for
+  // permission purposes (matches the pre-existing single-shared-login behavior).
   const isAuthor =
-    (actor.role === 'CLIENT' && comment.clientId === actor.id) ||
+    (actor.role === 'CLIENT' && comment.clientId === comment.task.column.board.clientId) ||
     (actor.role !== 'CLIENT' && comment.userId === actor.id)
   const isAdmin = actor.role === 'ORG_ADMIN' || actor.role === 'ORG_MANAGER'
 

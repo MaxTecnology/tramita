@@ -38,8 +38,8 @@ describe('createRequestAttachment', () => {
   it('lança 404 se a request não pertence ao cliente', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const clientA = await createTestClient(org.id, { email: 'anexo-a@test.com' })
-    const clientB = await createTestClient(org.id, { email: 'anexo-b@test.com' })
+    const clientA = await createTestClient(org.id, { name: 'anexo-a@test.com' })
+    const clientB = await createTestClient(org.id, { name: 'anexo-b@test.com' })
     const request = await createRequest(org.id, clientA.id, { title: 'Da A' })
 
     await expect(

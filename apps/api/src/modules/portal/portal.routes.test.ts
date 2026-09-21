@@ -4,6 +4,9 @@ import {
   createTestPlan,
   createTestOrg,
   createTestClient,
+  createTestClientUser,
+  createTestDepartment,
+  grantClientAccess,
   createTestUser,
   createTestBoard,
   createTestColumn,
@@ -18,9 +21,12 @@ describe('Portal — isolamento de tenant', () => {
     const org2 = await createTestOrg(plan.id)
     const client1 = await createTestClient(org1.id)
     const client2 = await createTestClient(org2.id)
+    const department2 = await createTestDepartment(org2.id)
+    const { clientUser: clientUser2, password: clientUser2Password } = await createTestClientUser(org2.id)
+    await grantClientAccess(clientUser2.id, client2.id, department2.id)
     const board = await createTestBoard(org1.id, client1.id)
 
-    const auth = await getAuthHeader(client2.email, 'Client@1234')
+    const auth = await getAuthHeader(clientUser2.email, clientUser2Password)
     const res = await app.inject({
       method: 'GET',
       url: `/boards/${board.id}`,
@@ -34,12 +40,15 @@ describe('Portal — isolamento de tenant', () => {
     const org = await createTestOrg(plan.id)
     const user = await createTestUser(org.id)
     const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password: clientUserPassword } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
     const board = await createTestBoard(org.id, client.id)
     const col1 = await createTestColumn(board.id, { position: 0 })
     const col2 = await createTestColumn(board.id, { position: 1 })
-    const task = await createTestTask(col1.id, user.id)
+    const task = await createTestTask(col1.id, user.id, { departmentId: department.id })
 
-    const auth = await getAuthHeader(client.email, 'Client@1234')
+    const auth = await getAuthHeader(clientUser.email, clientUserPassword)
     const res = await app.inject({
       method: 'PATCH',
       url: `/tasks/${task.id}/move`,
@@ -51,12 +60,12 @@ describe('Portal — isolamento de tenant', () => {
 })
 
 describe('PATCH /portal/profile', () => {
-  it('CLIENT atualiza próprio whatsapp — 200', async () => {
+  it('CLIENT atualiza próprio telefone — 200', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const client = await createTestClient(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
 
-    const auth = await getAuthHeader(client.email, 'Client@1234')
+    const auth = await getAuthHeader(clientUser.email, password)
     const res = await app.inject({
       method: 'PATCH',
       url: '/portal/profile',
@@ -64,7 +73,7 @@ describe('PATCH /portal/profile', () => {
       payload: { whatsapp: '5582999999999' },
     })
     expect(res.statusCode).toBe(200)
-    expect(JSON.parse(res.body).whatsapp).toBe('5582999999999')
+    expect(JSON.parse(res.body).phone).toBe('5582999999999')
   })
 
   it('ORG_MEMBER não acessa /portal/profile (403)', async () => {
@@ -89,11 +98,14 @@ describe('GET /portal/tasks/:id/history', () => {
     const org = await createTestOrg(plan.id)
     const user = await createTestUser(org.id)
     const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
     const board = await createTestBoard(org.id, client.id)
     const col = await createTestColumn(board.id, { position: 0 })
-    const task = await createTestTask(col.id, user.id)
+    const task = await createTestTask(col.id, user.id, { departmentId: department.id })
 
-    const auth = await getAuthHeader(client.email, 'Client@1234')
+    const auth = await getAuthHeader(clientUser.email, password)
     const res = await app.inject({
       method: 'GET',
       url: `/portal/tasks/${task.id}/history`,
@@ -109,7 +121,10 @@ describe('POST /portal/requests', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
-    const auth = await getAuthHeader(client.email, 'Client@1234')
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const auth = await getAuthHeader(clientUser.email, password)
 
     const res = await app.inject({
       method: 'POST',
@@ -129,10 +144,16 @@ describe('GET /portal/requests', () => {
   it('cliente só vê as próprias requests, não as de outro cliente da mesma org', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const clientA = await createTestClient(org.id, { email: 'porta-a@test.com' })
-    const clientB = await createTestClient(org.id, { email: 'porta-b@test.com' })
-    const authA = await getAuthHeader(clientA.email, 'Client@1234')
-    const authB = await getAuthHeader(clientB.email, 'Client@1234')
+    const clientA = await createTestClient(org.id, { name: 'Empresa A' })
+    const clientB = await createTestClient(org.id, { name: 'Empresa B' })
+    const departmentA = await createTestDepartment(org.id, { name: 'Depto A' })
+    const departmentB = await createTestDepartment(org.id, { name: 'Depto B' })
+    const { clientUser: clientUserA, password: passwordA } = await createTestClientUser(org.id, { email: 'porta-a@test.com' })
+    const { clientUser: clientUserB, password: passwordB } = await createTestClientUser(org.id, { email: 'porta-b@test.com' })
+    await grantClientAccess(clientUserA.id, clientA.id, departmentA.id)
+    await grantClientAccess(clientUserB.id, clientB.id, departmentB.id)
+    const authA = await getAuthHeader(clientUserA.email, passwordA)
+    const authB = await getAuthHeader(clientUserB.email, passwordB)
 
     await app.inject({ method: 'POST', url: '/portal/requests', headers: { authorization: authA }, payload: { title: 'Da A' } })
     await app.inject({ method: 'POST', url: '/portal/requests', headers: { authorization: authB }, payload: { title: 'Da B' } })
@@ -149,7 +170,10 @@ describe('PATCH /portal/requests/:id/cancel', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
-    const auth = await getAuthHeader(client.email, 'Client@1234')
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const auth = await getAuthHeader(clientUser.email, password)
 
     const created = await app.inject({
       method: 'POST',
@@ -171,10 +195,16 @@ describe('PATCH /portal/requests/:id/cancel', () => {
   it('cliente não pode cancelar request de outro cliente (404)', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const clientA = await createTestClient(org.id, { email: 'cancel-a@test.com' })
-    const clientB = await createTestClient(org.id, { email: 'cancel-b@test.com' })
-    const authA = await getAuthHeader(clientA.email, 'Client@1234')
-    const authB = await getAuthHeader(clientB.email, 'Client@1234')
+    const clientA = await createTestClient(org.id, { name: 'Empresa A' })
+    const clientB = await createTestClient(org.id, { name: 'Empresa B' })
+    const departmentA = await createTestDepartment(org.id, { name: 'Depto A' })
+    const departmentB = await createTestDepartment(org.id, { name: 'Depto B' })
+    const { clientUser: clientUserA, password: passwordA } = await createTestClientUser(org.id, { email: 'cancel-a@test.com' })
+    const { clientUser: clientUserB, password: passwordB } = await createTestClientUser(org.id, { email: 'cancel-b@test.com' })
+    await grantClientAccess(clientUserA.id, clientA.id, departmentA.id)
+    await grantClientAccess(clientUserB.id, clientB.id, departmentB.id)
+    const authA = await getAuthHeader(clientUserA.email, passwordA)
+    const authB = await getAuthHeader(clientUserB.email, passwordB)
 
     const created = await app.inject({
       method: 'POST',

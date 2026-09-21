@@ -37,13 +37,19 @@ export async function login(email: string, password: string): Promise<LoginRespo
     return buildSession(user.id, user.name, user.role as Role, user.organizationId, user.organization?.name ?? null)
   }
 
-  // Fall back to Client table
-  const client = await prisma.client.findFirst({
-    where: { email },
+  // Fall back to ClientUser table (portal login)
+  const clientUser = await prisma.clientUser.findFirst({
+    where: { email, isActive: true },
     include: { organization: { select: { name: true } } },
   })
-  if (client && (await verifyPassword(password, client.passwordHash))) {
-    return buildSession(client.id, client.name, 'CLIENT', client.organizationId, client.organization?.name ?? null)
+  if (clientUser && (await verifyPassword(password, clientUser.passwordHash))) {
+    return buildSession(
+      clientUser.id,
+      clientUser.name,
+      'CLIENT',
+      clientUser.organizationId,
+      clientUser.organization?.name ?? null,
+    )
   }
 
   throw new AppError(401, 'Credenciais inválidas')
@@ -88,12 +94,12 @@ export async function logout(refreshToken: string): Promise<void> {
 
 export async function getMyProfile(sub: string, role: string) {
   if (role === 'CLIENT') {
-    const client = await prisma.client.findUnique({
+    const clientUser = await prisma.clientUser.findUnique({
       where: { id: sub },
-      select: { id: true, name: true, email: true, phone: true, whatsapp: true },
+      select: { id: true, name: true, email: true, phone: true },
     })
-    if (!client) throw new AppError(404, 'Usuário não encontrado')
-    return { ...client, role: 'CLIENT' }
+    if (!clientUser) throw new AppError(404, 'Usuário não encontrado')
+    return { ...clientUser, role: 'CLIENT' }
   }
   const user = await prisma.user.findUnique({
     where: { id: sub },
@@ -105,12 +111,12 @@ export async function getMyProfile(sub: string, role: string) {
 
 export async function updateMyProfile(sub: string, role: string, data: UpdateProfileBody) {
   if (role === 'CLIENT') {
-    const client = await prisma.client.findUnique({ where: { id: sub } })
-    if (!client) throw new AppError(404, 'Usuário não encontrado')
-    return prisma.client.update({
+    const clientUser = await prisma.clientUser.findUnique({ where: { id: sub } })
+    if (!clientUser) throw new AppError(404, 'Usuário não encontrado')
+    return prisma.clientUser.update({
       where: { id: sub },
       data,
-      select: { id: true, name: true, email: true, phone: true, whatsapp: true },
+      select: { id: true, name: true, email: true, phone: true },
     })
   }
   const user = await prisma.user.findUnique({ where: { id: sub } })
@@ -129,12 +135,12 @@ export async function changePassword(
   newPassword: string,
 ): Promise<void> {
   if (role === 'CLIENT') {
-    const client = await prisma.client.findUnique({ where: { id: sub } })
-    if (!client) throw new AppError(404, 'Usuário não encontrado')
-    if (!(await verifyPassword(currentPassword, client.passwordHash))) {
+    const clientUser = await prisma.clientUser.findUnique({ where: { id: sub } })
+    if (!clientUser) throw new AppError(404, 'Usuário não encontrado')
+    if (!(await verifyPassword(currentPassword, clientUser.passwordHash))) {
       throw new AppError(400, 'Senha atual incorreta')
     }
-    await prisma.client.update({ where: { id: sub }, data: { passwordHash: await hashPassword(newPassword) } })
+    await prisma.clientUser.update({ where: { id: sub }, data: { passwordHash: await hashPassword(newPassword) } })
   } else {
     const user = await prisma.user.findUnique({ where: { id: sub } })
     if (!user) throw new AppError(404, 'Usuário não encontrado')

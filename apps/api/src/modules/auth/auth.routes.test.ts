@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { verifyAccessToken } from '@/lib/jwt'
 import { app } from '@/test/setup'
-import { createTestPlan, createTestOrg } from '@/test/helpers'
+import { createTestPlan, createTestOrg, createTestClientUser } from '@/test/helpers'
 
 let orgId: string
 
@@ -94,14 +94,7 @@ describe('POST /auth/login', () => {
   })
 
   it('returns CLIENT role for client login', async () => {
-    await prisma.client.create({
-      data: {
-        name: 'Cliente',
-        email: 'cliente@test.com',
-        passwordHash: await bcrypt.hash('Pass@123', 10),
-        organizationId: orgId,
-      },
-    })
+    await createTestClientUser(orgId, { email: 'cliente@test.com', password: 'Pass@123' })
     const res = await app.inject({
       method: 'POST',
       url: '/auth/login',

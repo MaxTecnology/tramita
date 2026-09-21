@@ -20,6 +20,19 @@ async function resolveActorName(actorId: string, actorType: 'user' | 'client'): 
   return c?.name ?? 'Unknown'
 }
 
+// Task.departmentId is required at the DB level; callers that don't specify one
+// (e.g. requests approved without a department) fall back to the org's first
+// department, auto-creating a generic one if the org has none yet.
+async function defaultDepartmentForOrg(organizationId: string): Promise<string> {
+  const existing = await prisma.department.findFirst({
+    where: { organizationId },
+    orderBy: { createdAt: 'asc' },
+  })
+  if (existing) return existing.id
+  const created = await prisma.department.create({ data: { organizationId, name: 'Geral' } })
+  return created.id
+}
+
 async function verifyColumnBelongsToOrg(columnId: string, organizationId: string) {
   const column = await prisma.column.findFirst({
     where: { id: columnId },
@@ -54,6 +67,7 @@ export async function createTask(
 ) {
   const column = await verifyColumnBelongsToOrg(columnId, organizationId)
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
+  const departmentId = data.departmentId ?? (await defaultDepartmentForOrg(organizationId))
   const actorName = await resolveActorName(actor.id, actor.type)
 
   const task = await prisma.$transaction(async (tx) => {
@@ -67,7 +81,7 @@ export async function createTask(
         assigneeId: data.assigneeId,
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
         tags: data.tags,
-        departmentId: data.departmentId,
+        departmentId,
         position,
         columnId,
         creatorId: actor.id,

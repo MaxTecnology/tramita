@@ -18,46 +18,15 @@ import {
 } from '@/test/helpers'
 
 describe('createClient', () => {
-  it('creates a client with hashed password, scoped to the organization', async () => {
+  it('creates a client scoped to the organization', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
 
-    const result = await createClient(org.id, {
-      name: 'Cliente Novo',
-      clientType: 'PJ',
-      email: `cliente-${Date.now()}@test.com`,
-      password: 'Senha@1234',
-    })
+    const result = await createClient(org.id, { name: 'Cliente Novo', clientType: 'PJ' })
 
     expect(result.clientType).toBe('PJ')
     const stored = await prisma.client.findUnique({ where: { id: result.id } })
     expect(stored?.organizationId).toBe(org.id)
-    expect(stored?.passwordHash).not.toBe('Senha@1234')
-  })
-
-  it('throws 409 when email is already registered in the same organization', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const email = `dup-${Date.now()}@test.com`
-    await createTestClient(org.id, { email })
-
-    await expect(
-      createClient(org.id, { name: 'Outro', clientType: 'PJ', email, password: 'Senha@1234' }),
-    ).rejects.toMatchObject({ statusCode: 409 })
-  })
-
-  it('allows the same email across different organizations', async () => {
-    const plan = await createTestPlan()
-    const orgA = await createTestOrg(plan.id)
-    const orgB = await createTestOrg(plan.id)
-    const email = `shared-${Date.now()}@test.com`
-    await createTestClient(orgA.id, { email })
-
-    const result = await createClient(orgB.id, {
-      name: 'Cliente B', clientType: 'PJ', email, password: 'Senha@1234',
-    })
-
-    expect(result.email).toBe(email)
   })
 })
 

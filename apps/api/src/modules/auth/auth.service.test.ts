@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import bcrypt from 'bcryptjs'
-import { prisma } from '@/lib/prisma'
 import { redis } from '@/lib/redis'
 import { generateAccessToken, verifyAccessToken } from '@/lib/jwt'
 import {
@@ -11,7 +10,7 @@ import {
   logout,
   generateRandomPassword,
 } from '@/modules/auth/auth.service'
-import { createTestPlan, createTestOrg, createTestUser } from '@/test/helpers'
+import { createTestPlan, createTestOrg, createTestUser, createTestClientUser } from '@/test/helpers'
 import { AppError } from '@/errors/AppError'
 
 describe('hashPassword', () => {
@@ -75,16 +74,9 @@ describe('login', () => {
     expect(stored).toBeTruthy()
   })
 
-  it('returns CLIENT role for client credentials', async () => {
+  it('returns CLIENT role for client user credentials', async () => {
     const clientEmail = `client-${Date.now()}@test.com`
-    await prisma.client.create({
-      data: {
-        name: 'Test Client',
-        email: clientEmail,
-        passwordHash: await bcrypt.hash('Client@123', 10),
-        organizationId: orgId,
-      },
-    })
+    await createTestClientUser(orgId, { email: clientEmail, password: 'Client@123' })
 
     const result = await login(clientEmail, 'Client@123')
 
