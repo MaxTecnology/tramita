@@ -37,6 +37,22 @@ describe('checklist de documento — impedimento automático', () => {
     expect(updated.status).toBe('BLOCKED')
   })
 
+  it('addDocumentRequirement por si só já recalcula o status pra BLOCKED (sem chamada manual a recalculateTaskStatus)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    expect(task.status).toBe('OPEN')
+
+    await addDocumentRequirement(task.id, org.id, 'Extrato bancário')
+
+    const updated = await prisma.task.findUniqueOrThrow({ where: { id: task.id } })
+    expect(updated.status).toBe('BLOCKED')
+  })
+
   it('volta pra OPEN quando o único documento pendente é aprovado', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

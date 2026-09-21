@@ -51,7 +51,11 @@ export async function listTaskDocuments(taskId: string, organizationId: string, 
 export async function addDocumentRequirement(taskId: string, organizationId: string, name: string) {
   await verifyTaskAccess(taskId, organizationId)
   const position = await prisma.taskDocumentRequirement.count({ where: { taskId } })
-  return prisma.taskDocumentRequirement.create({ data: { taskId, name, position } })
+  const requirement = await prisma.taskDocumentRequirement.create({ data: { taskId, name, position } })
+
+  await recalculateTaskStatus(taskId)
+
+  return requirement
 }
 
 export async function addDeliverable(taskId: string, organizationId: string, name: string) {
