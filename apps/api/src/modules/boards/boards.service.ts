@@ -160,6 +160,9 @@ export async function searchTasks(boardId: string, organizationId: string, filte
       ...(filters.assigneeId ? { assigneeId: filters.assigneeId } : {}),
       ...(filters.dueBefore ? { dueDate: { lte: new Date(filters.dueBefore) } } : {}),
       ...(filters.dueAfter ? { dueDate: { gte: new Date(filters.dueAfter) } } : {}),
+      ...(filters.competence ? { competence: new Date(filters.competence) } : {}),
+      ...(filters.targetBefore ? { targetDate: { lte: new Date(filters.targetBefore) } } : {}),
+      ...(filters.targetAfter ? { targetDate: { gte: new Date(filters.targetAfter) } } : {}),
     },
     orderBy: { position: 'asc' },
   })

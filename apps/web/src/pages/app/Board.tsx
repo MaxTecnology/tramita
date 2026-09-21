@@ -58,7 +58,8 @@ export default function Board() {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [search, setSearch] = useState('')
   const [filterPriority, setFilterPriority] = useState('')
-  const hasFilters = search.trim() !== '' || filterPriority !== ''
+  const [filterCompetence, setFilterCompetence] = useState('')
+  const hasFilters = search.trim() !== '' || filterPriority !== '' || filterCompetence !== ''
   const [addingToColumn, setAddingToColumn] = useState<string | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
 
@@ -84,11 +85,12 @@ export default function Board() {
   }
 
   const { data: searchResults } = useQuery<Task[]>({
-    queryKey: ['board-search', boardId, search, filterPriority],
+    queryKey: ['board-search', boardId, search, filterPriority, filterCompetence],
     queryFn: () => {
       const params = new URLSearchParams()
       if (search.trim()) params.set('q', search.trim())
       if (filterPriority) params.set('priority', filterPriority)
+      if (filterCompetence) params.set('competence', new Date(filterCompetence + '-01T00:00:00').toISOString())
       return api.get(`/boards/${boardId}/tasks/search?${params}`).then((r) => r.data)
     },
     enabled: !!boardId && hasFilters,
@@ -166,12 +168,20 @@ export default function Board() {
           <option value="HIGH">Alta</option>
           <option value="URGENT">Urgente</option>
         </select>
+        <input
+          type="month"
+          value={filterCompetence}
+          onChange={(e) => setFilterCompetence(e.target.value)}
+          title="Filtrar por competência"
+          className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+        />
         {hasFilters && (
           <button
             type="button"
             onClick={() => {
               setSearch('')
               setFilterPriority('')
+              setFilterCompetence('')
             }}
             className="text-xs text-muted-foreground hover:text-foreground underline"
           >

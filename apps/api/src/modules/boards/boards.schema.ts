@@ -25,6 +25,9 @@ export const searchQuerySchema = z.object({
   assigneeId: z.string().cuid().optional(),
   dueBefore: z.string().datetime().optional(),
   dueAfter: z.string().datetime().optional(),
+  competence: z.string().datetime().optional(),
+  targetBefore: z.string().datetime().optional(),
+  targetAfter: z.string().datetime().optional(),
 })
 
 export type SearchQuery = z.infer<typeof searchQuerySchema>
