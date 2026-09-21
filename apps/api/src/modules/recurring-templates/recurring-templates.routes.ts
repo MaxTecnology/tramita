@@ -3,13 +3,22 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
-import { createTemplateSchema, updateTemplateSchema } from './recurring-templates.schema'
+import {
+  createTemplateSchema,
+  updateTemplateSchema,
+  createAssignmentSchema,
+  updateAssignmentSchema,
+} from './recurring-templates.schema'
 import {
   listTemplates,
   getTemplateById,
   createTemplate,
   updateTemplate,
   deleteTemplate,
+  listAssignments,
+  createAssignment,
+  updateAssignment,
+  deleteAssignment,
 } from './recurring-templates.service'
 
 export async function recurringTemplatesRoutes(app: FastifyInstance) {
@@ -26,6 +35,13 @@ export async function recurringTemplatesRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(await getTemplateById(id, request.user.organizationId!))
+  })
+
+  app.get('/:id/assignments', {
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER')],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    return reply.send(await listAssignments(id, request.user.organizationId!))
   })
 
   app.addHook('preHandler', requireRole('ORG_ADMIN'))
@@ -46,5 +62,24 @@ export async function recurringTemplatesRoutes(app: FastifyInstance) {
   app.delete('/:id', { preHandler: [checkSubscription] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(await deleteTemplate(id, request.user.organizationId!))
+  })
+
+  app.post('/:id/assignments', { preHandler: [checkSubscription] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const result = createAssignmentSchema.safeParse(request.body)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.status(201).send(await createAssignment(id, request.user.organizationId!, result.data))
+  })
+
+  app.patch('/:id/assignments/:assignmentId', { preHandler: [checkSubscription] }, async (request, reply) => {
+    const { id, assignmentId } = request.params as { id: string; assignmentId: string }
+    const result = updateAssignmentSchema.safeParse(request.body)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(await updateAssignment(id, assignmentId, request.user.organizationId!, result.data))
+  })
+
+  app.delete('/:id/assignments/:assignmentId', { preHandler: [checkSubscription] }, async (request, reply) => {
+    const { id, assignmentId } = request.params as { id: string; assignmentId: string }
+    return reply.send(await deleteAssignment(id, assignmentId, request.user.organizationId!))
   })
 }

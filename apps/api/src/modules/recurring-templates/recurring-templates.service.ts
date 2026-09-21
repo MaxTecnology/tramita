@@ -1,7 +1,12 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
-import type { CreateTemplateBody, UpdateTemplateBody } from './recurring-templates.schema'
+import type {
+  CreateTemplateBody,
+  UpdateTemplateBody,
+  CreateAssignmentBody,
+  UpdateAssignmentBody,
+} from './recurring-templates.schema'
 
 function assertDayOfPeriodValid(periodicity: string, dueDayOfPeriod: number, generationDayOfPeriod: number) {
   if (periodicity === 'WEEKLY') {
@@ -90,5 +95,77 @@ export async function deleteTemplate(id: string, organizationId: string) {
   }
 
   await prisma.recurringTaskTemplate.delete({ where: { id } })
+  return { ok: true }
+}
+
+async function assertClientBoardColumnBelongToOrg(
+  organizationId: string,
+  clientId: string,
+  boardId: string,
+  columnId: string,
+) {
+  const client = await prisma.client.findFirst({ where: { id: clientId, organizationId } })
+  if (!client) throw new AppError(404, 'Cliente não encontrado')
+
+  const board = await prisma.board.findFirst({ where: { id: boardId, organizationId, clientId } })
+  if (!board) throw new AppError(404, 'Processo não encontrado para este cliente')
+
+  const column = await prisma.column.findFirst({ where: { id: columnId, boardId } })
+  if (!column) throw new AppError(404, 'Coluna não encontrada neste processo')
+}
+
+export async function listAssignments(templateId: string, organizationId: string) {
+  await getTemplateById(templateId, organizationId)
+  return prisma.recurringTaskAssignment.findMany({
+    where: { templateId },
+    include: { client: { select: { id: true, name: true } }, board: { select: { id: true, title: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+}
+
+export async function createAssignment(templateId: string, organizationId: string, data: CreateAssignmentBody) {
+  await getTemplateById(templateId, organizationId)
+  await assertClientBoardColumnBelongToOrg(organizationId, data.clientId, data.boardId, data.columnId)
+
+  const existing = await prisma.recurringTaskAssignment.findFirst({
+    where: { templateId, clientId: data.clientId },
+  })
+  if (existing) throw new AppError(409, 'Este cliente já está vinculado a este template')
+
+  return prisma.recurringTaskAssignment.create({ data: { templateId, ...data } })
+}
+
+async function getAssignmentOrThrow(templateId: string, assignmentId: string, organizationId: string) {
+  await getTemplateById(templateId, organizationId)
+  const assignment = await prisma.recurringTaskAssignment.findFirst({
+    where: { id: assignmentId, templateId },
+  })
+  if (!assignment) throw new AppError(404, 'Vínculo não encontrado')
+  return assignment
+}
+
+export async function updateAssignment(
+  templateId: string,
+  assignmentId: string,
+  organizationId: string,
+  data: UpdateAssignmentBody,
+) {
+  const assignment = await getAssignmentOrThrow(templateId, assignmentId, organizationId)
+
+  if (data.boardId || data.columnId) {
+    await assertClientBoardColumnBelongToOrg(
+      organizationId,
+      assignment.clientId,
+      data.boardId ?? assignment.boardId,
+      data.columnId ?? assignment.columnId,
+    )
+  }
+
+  return prisma.recurringTaskAssignment.update({ where: { id: assignmentId }, data })
+}
+
+export async function deleteAssignment(templateId: string, assignmentId: string, organizationId: string) {
+  await getAssignmentOrThrow(templateId, assignmentId, organizationId)
+  await prisma.recurringTaskAssignment.delete({ where: { id: assignmentId } })
   return { ok: true }
 }
