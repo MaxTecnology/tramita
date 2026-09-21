@@ -102,9 +102,10 @@ describe('createTask', () => {
     const board = await createTestBoard(org.id, client.id)
     const col = await createTestColumn(board.id, { position: 0 })
     await createTestTask(col.id, user.id, { position: 0 })
+    const department = await createTestDepartment(org.id)
 
     const task = await createTask(col.id, org.id, {
-      title: 'Nova tarefa', priority: 'HIGH', tags: [],
+      title: 'Nova tarefa', priority: 'HIGH', tags: [], departmentId: department.id,
     }, { id: user.id, type: 'user' })
 
     expect(task.position).toBe(1)
@@ -121,9 +122,15 @@ describe('createTask', () => {
     const client = await createTestClient(orgA.id)
     const board = await createTestBoard(orgA.id, client.id)
     const col = await createTestColumn(board.id, { position: 0 })
+    const department = await createTestDepartment(orgA.id)
 
     await expect(
-      createTask(col.id, orgB.id, { title: 'X', priority: 'MEDIUM', tags: [] }, { id: user.id, type: 'user' }),
+      createTask(
+        col.id,
+        orgB.id,
+        { title: 'X', priority: 'MEDIUM', tags: [], departmentId: department.id },
+        { id: user.id, type: 'user' },
+      ),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 

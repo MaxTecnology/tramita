@@ -285,10 +285,9 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
             {canEdit && (
               <select
                 value={task.departmentId ?? ''}
-                onChange={(e) => updateMutation.mutate({ departmentId: e.target.value || null })}
+                onChange={(e) => updateMutation.mutate({ departmentId: e.target.value })}
                 className="text-xs font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground cursor-pointer bg-surface"
               >
-                <option value="">Sem departamento</option>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}

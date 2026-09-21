@@ -3,7 +3,7 @@ import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
 import { publishOrgEvent } from '@/lib/sse'
 import { createBoard } from '@/modules/boards/boards.service'
-import { createTask } from '@/modules/tasks/tasks.service'
+import { createTask, defaultDepartmentForOrg } from '@/modules/tasks/tasks.service'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
 import type { CreateRequestBody, ApproveRequestBody, RejectRequestBody } from './requests.schema'
 import type { RequestStatus } from '@prisma/client'
@@ -132,6 +132,8 @@ export async function approveRequest(
     columnId = column.id
   }
 
+  const departmentId = request.departmentId ?? (await defaultDepartmentForOrg(organizationId))
+
   const task = await createTask(
     columnId,
     organizationId,
@@ -140,7 +142,7 @@ export async function approveRequest(
       description: request.description ?? undefined,
       priority: 'MEDIUM',
       tags: [],
-      departmentId: request.departmentId ?? undefined,
+      departmentId,
     },
     { id: reviewerId, type: 'user' },
   )

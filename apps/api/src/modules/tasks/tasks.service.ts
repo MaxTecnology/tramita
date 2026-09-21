@@ -21,11 +21,12 @@ async function resolveActorName(actorId: string, actorType: 'user' | 'client'): 
   return c?.name ?? 'Unknown'
 }
 
-// Task.departmentId is required at the DB level; callers that don't specify one
-// (e.g. requests approved without a department) fall back to the org's first
-// department, auto-creating a generic one if the org has none yet. See
-// docs/tech-debt.md for why this exists and when it should go away.
-async function defaultDepartmentForOrg(organizationId: string): Promise<string> {
+// Task.departmentId is required at the DB level. createTask itself always
+// receives a real departmentId now (Zod enforces it), so the only remaining
+// caller of this fallback is approveRequest, for a Request that was opened
+// without a department — it resolves to the org's first department, or
+// auto-creates a generic "Geral" one if the org has none yet.
+export async function defaultDepartmentForOrg(organizationId: string): Promise<string> {
   const existing = await prisma.department.findFirst({
     where: { organizationId },
     orderBy: { createdAt: 'asc' },
@@ -81,7 +82,7 @@ export async function createTask(
 ) {
   const column = await verifyColumnBelongsToOrg(columnId, organizationId)
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
-  const departmentId = data.departmentId ?? (await defaultDepartmentForOrg(organizationId))
+  const departmentId = data.departmentId
   const actorName = await resolveActorName(actor.id, actor.type)
 
   const task = await prisma.$transaction(async (tx) => {

@@ -63,26 +63,33 @@ export default function Board() {
   const hasFilters = search.trim() !== '' || filterPriority !== '' || filterCompetence !== ''
   const [addingToColumn, setAddingToColumn] = useState<string | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskDepartmentId, setNewTaskDepartmentId] = useState('')
+
+  const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['departments'],
+    queryFn: () => api.get('/departments').then((r) => r.data),
+  })
 
   // Computed values for board due date
   const boardDueDate = board?.dueDate ? new Date(board.dueDate) : null
   const boardDueDateOverdue = board?.dueDate ? isPastDateOnlyUTC(board.dueDate) : false
 
   const createTaskMutation = useMutation({
-    mutationFn: ({ columnId, title }: { columnId: string; title: string }) =>
-      api.post(`/columns/${columnId}/tasks`, { title }).then((r) => r.data),
+    mutationFn: ({ columnId, title, departmentId }: { columnId: string; title: string; departmentId: string }) =>
+      api.post(`/columns/${columnId}/tasks`, { title, departmentId }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Tarefa criada')
       qc.invalidateQueries({ queryKey: ['board', boardId] })
       setAddingToColumn(null)
       setNewTaskTitle('')
+      setNewTaskDepartmentId('')
     },
     onError: () => toast.error('Erro ao criar tarefa'),
   })
 
   function handleAddTask(columnId: string) {
-    if (!newTaskTitle.trim()) return
-    createTaskMutation.mutate({ columnId, title: newTaskTitle.trim() })
+    if (!newTaskTitle.trim() || !newTaskDepartmentId) return
+    createTaskMutation.mutate({ columnId, title: newTaskTitle.trim(), departmentId: newTaskDepartmentId })
   }
 
   const { data: searchResults } = useQuery<Task[]>({
@@ -253,16 +260,26 @@ export default function Board() {
                       placeholder="Nome da tarefa..."
                       className="w-full text-sm rounded-md border border-border bg-surface px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent"
                     />
+                    <select
+                      value={newTaskDepartmentId}
+                      onChange={(e) => setNewTaskDepartmentId(e.target.value)}
+                      className="w-full mt-1.5 text-xs rounded-md border border-border bg-surface px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent"
+                    >
+                      <option value="" disabled>Selecione um departamento</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
                     <div className="flex gap-2 mt-1.5">
                       <button
                         onClick={() => handleAddTask(column.id)}
-                        disabled={!newTaskTitle.trim() || createTaskMutation.isPending}
+                        disabled={!newTaskTitle.trim() || !newTaskDepartmentId || createTaskMutation.isPending}
                         className="text-xs bg-accent text-white px-3 py-1 rounded hover:bg-accent-hover disabled:opacity-50"
                       >
                         {createTaskMutation.isPending ? '...' : 'Adicionar'}
                       </button>
                       <button
-                        onClick={() => { setAddingToColumn(null); setNewTaskTitle('') }}
+                        onClick={() => { setAddingToColumn(null); setNewTaskTitle(''); setNewTaskDepartmentId('') }}
                         className="text-xs text-muted-foreground hover:text-foreground"
                       >
                         Cancelar
@@ -271,7 +288,7 @@ export default function Board() {
                   </div>
                 ) : (
                   <button
-                    onClick={() => { setAddingToColumn(column.id); setNewTaskTitle('') }}
+                    onClick={() => { setAddingToColumn(column.id); setNewTaskTitle(''); setNewTaskDepartmentId('') }}
                     className="mt-2 w-full text-left text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-neutral-bg flex items-center gap-1"
                   >
                     <Plus size={12} />
