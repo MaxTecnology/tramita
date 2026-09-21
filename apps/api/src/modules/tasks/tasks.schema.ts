@@ -14,6 +14,7 @@ export const updateTaskSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+  status: z.enum(['OPEN', 'DONE', 'DISREGARDED', 'BLOCKED']).optional(),
   assigneeId: z.string().cuid().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   tags: z.array(z.string()).optional(),

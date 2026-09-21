@@ -333,3 +333,38 @@ describe('getTaskHistory', () => {
     await expect(getTaskHistory(task.id, orgB.id)).rejects.toMatchObject({ statusCode: 404 })
   })
 })
+
+describe('updateTask (status)', () => {
+  it('atualiza status e registra TaskHistory status_changed', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+
+    const updated = await updateTask(task.id, org.id, { status: 'DISREGARDED' }, { id: user.id, type: 'user' })
+    expect(updated.status).toBe('DISREGARDED')
+
+    const history = await prisma.taskHistory.findMany({ where: { taskId: task.id, action: 'status_changed' } })
+    expect(history).toHaveLength(1)
+    expect(history[0].fromValue).toBe('OPEN')
+    expect(history[0].toValue).toBe('DISREGARDED')
+  })
+
+  it('não registra histórico quando status não muda', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+
+    await updateTask(task.id, org.id, { status: 'OPEN' }, { id: user.id, type: 'user' })
+
+    const history = await prisma.taskHistory.findMany({ where: { taskId: task.id, action: 'status_changed' } })
+    expect(history).toHaveLength(0)
+  })
+})

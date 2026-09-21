@@ -189,6 +189,13 @@ export async function updateTask(
       toValue: data.priority,
     })
   }
+  if (data.status !== undefined && data.status !== task.status) {
+    historyEntries.push({
+      action: 'status_changed',
+      fromValue: task.status,
+      toValue: data.status,
+    })
+  }
   if (data.assigneeId !== undefined && data.assigneeId !== task.assigneeId) {
     historyEntries.push({
       action: 'assigned_to',
@@ -204,6 +211,7 @@ export async function updateTask(
         title: data.title,
         description: data.description,
         priority: data.priority,
+        status: data.status,
         assigneeId: data.assigneeId,
         dueDate:
           data.dueDate === null ? null
