@@ -10,6 +10,7 @@ export async function getClientAccessScope(clientUserId: string): Promise<Client
   const accesses = await prisma.clientUserAccess.findMany({
     where: { clientUserId },
     select: { clientId: true, departmentId: true },
+    orderBy: { clientId: 'asc' },
   })
 
   const departmentIdsByClient = new Map<string, Set<string>>()

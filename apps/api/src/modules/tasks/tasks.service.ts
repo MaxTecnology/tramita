@@ -3,6 +3,7 @@ import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
 import { publishBoardEvent } from '@/lib/sse'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
+import { Prisma } from '@prisma/client'
 import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody } from './tasks.schema'
 
 export interface Actor {
@@ -22,15 +23,28 @@ async function resolveActorName(actorId: string, actorType: 'user' | 'client'): 
 
 // Task.departmentId is required at the DB level; callers that don't specify one
 // (e.g. requests approved without a department) fall back to the org's first
-// department, auto-creating a generic one if the org has none yet.
+// department, auto-creating a generic one if the org has none yet. See
+// docs/tech-debt.md for why this exists and when it should go away.
 async function defaultDepartmentForOrg(organizationId: string): Promise<string> {
   const existing = await prisma.department.findFirst({
     where: { organizationId },
     orderBy: { createdAt: 'asc' },
   })
   if (existing) return existing.id
-  const created = await prisma.department.create({ data: { organizationId, name: 'Geral' } })
-  return created.id
+
+  try {
+    const created = await prisma.department.create({ data: { organizationId, name: 'Geral' } })
+    return created.id
+  } catch (err) {
+    // Two concurrent calls can both see "no department yet" and race to create "Geral" —
+    // the loser hits the @@unique([organizationId, name]) constraint. Re-query instead of
+    // failing the whole task creation.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      const winner = await prisma.department.findFirst({ where: { organizationId, name: 'Geral' } })
+      if (winner) return winner.id
+    }
+    throw err
+  }
 }
 
 async function verifyColumnBelongsToOrg(columnId: string, organizationId: string) {

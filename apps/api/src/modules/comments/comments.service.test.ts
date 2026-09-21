@@ -61,7 +61,7 @@ describe('deleteComment - soft delete', () => {
     expect(found!.content).toBe('Texto importante')
   })
 
-  it('cliente só pode soft-deletar o próprio comentário', async () => {
+  it('cliente sem acesso à empresa recebe 404 (nunca revela que o comentário existe)', async () => {
     const plan = await createPlan()
     const org = await prisma.organization.create({
       data: { name: 'Org2', slug: 'org-test-2', email: 'o2@o.com', planId: plan.id },
@@ -86,11 +86,12 @@ describe('deleteComment - soft delete', () => {
       data: { content: 'Comentário do outro', taskId: task.id, authorType: 'CLIENT', clientId: client.id },
     })
 
-    // otherClientUser has no access grant to `client` — board isolation check fires first
+    // otherClientUser has no access grant to `client` — scope check fires first, and must
+    // 404 (not 403) so it never reveals the comment exists outside the caller's scope
     const { clientUser: otherClientUser } = await createTestClientUser(org.id)
     await expect(
       deleteComment(comment.id, { id: otherClientUser.id, role: 'CLIENT', organizationId: org.id })
-    ).rejects.toThrow('Acesso negado')
+    ).rejects.toMatchObject({ statusCode: 404 })
   })
 })
 

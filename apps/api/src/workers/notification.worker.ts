@@ -94,9 +94,6 @@ async function processClientNotification(
     const template = await getTemplate(organizationId, event as NotificationEvent, channel)
     const rendered = renderTemplate(template.body, vars)
 
-    let status: 'SENT' | 'FAILED' = 'SENT'
-    let error: string | undefined
-
     if (channel === 'EMAIL') {
       const recipients = await prisma.clientUser.findMany({
         where: { isActive: true, accesses: { some: { clientId } } },
@@ -104,6 +101,10 @@ async function processClientNotification(
         distinct: ['id'],
       })
       for (const recipient of recipients) {
+        // Declared per-recipient so one recipient's failure/error never leaks onto the
+        // next recipient's log entry.
+        let status: 'SENT' | 'FAILED' = 'SENT'
+        let error: string | undefined
         const subject = renderTemplate(template.subject ?? '', vars)
         try {
           await sendEmail(
@@ -127,6 +128,9 @@ async function processClientNotification(
       }
       continue // já logou por destinatário acima — pula o log único do fim do loop
     }
+
+    let status: 'SENT' | 'FAILED' = 'SENT'
+    let error: string | undefined
 
     try {
       await sendWhatsApp(config.maximizebotToken!, {

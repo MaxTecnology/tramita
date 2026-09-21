@@ -172,11 +172,13 @@ export async function deleteComment(id: string, actor: CommentActor) {
     throw new AppError(403, 'Acesso negado')
   }
 
-  // For CLIENT role, also validate that this ClientUser has access to the board's client
+  // For CLIENT role, also validate that this ClientUser has access to the board's client.
+  // 404, not 403: a ClientUser outside the scope must never learn this comment exists
+  // (same "never reveal" rule as listComments/createComment).
   if (actor.role === 'CLIENT') {
     const scope = await getClientAccessScope(actor.id)
     if (!scope.clientIds.includes(comment.task.column.board.clientId)) {
-      throw new AppError(403, 'Acesso negado')
+      throw new AppError(404, 'Comentário não encontrado')
     }
   }
 

@@ -50,3 +50,9 @@ Cobertura global final: 82.76% linhas / 78.09% branches / 81.25% funções (248 
 
 - Falta `@@index([departmentId])` em `Task` e `Request` no `schema.prisma` — sem problema no volume de dados atual; revisitar se queries filtradas por departamento aparecerem em logs de slow query.
 - `updateTask` em `tasks.service.ts` não grava uma entrada de `TaskHistory` quando `departmentId` muda (diferente de `priority`/`assigneeId`) — decisão explícita e revisada para esta fase (2a); estender quando o item 2c/2d do roadmap (motor de recorrência / modelo de status expandido) tocar essa função novamente.
+
+## `createTask` cai num departamento "Geral" auto-criado quando nenhum é informado (encontrado em 2026-09-21, feature de usuários de cliente por departamento)
+
+**Contexto:** a migration `20260921210100_task_department_required` tornou `Task.departmentId` obrigatório no schema. Hoje isso só é exercitado sem `departmentId` explícito por um caminho: `requests.service.ts`'s `approveRequest` cria a `Task` a partir de uma `Request` que pode ter sido aberta sem `departmentId` (esse campo continua opcional em `Request`). Para não quebrar esse fluxo nem inventar uma UX de seleção obrigatória de departamento no momento (fora do escopo da Task 1 do plano de usuários de cliente por departamento), `tasks.service.ts`'s `defaultDepartmentForOrg` busca o primeiro departamento da organização e, se não existir nenhum, cria um chamado "Geral" e usa esse.
+
+**Pendente:** a Task 6 do mesmo plano ("Task.departmentId required end-to-end") deve fechar isso corretamente fazendo `approveRequest` herdar o `departmentId` da própria `Request` de origem quando presente, caindo no fallback "Geral" auto-criado somente quando a request também não tiver departamento definido.
