@@ -64,7 +64,7 @@ export function TemplateEditor({ event, channel }: Props) {
 
       {/* Variáveis disponíveis */}
       <div>
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Variáveis disponíveis</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Variáveis disponíveis</p>
         <div className="flex flex-wrap gap-2">
           {TEMPLATE_VARS.map(({ key, label }) => (
             <button
@@ -80,16 +80,16 @@ export function TemplateEditor({ event, channel }: Props) {
         </div>
       </div>
 
-      <div className="border-t border-gray-100" />
+      <div className="border-t border-border" />
 
       {/* Textarea */}
       <div>
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Mensagem</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Mensagem</p>
         <Textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={8}
-          className="font-mono text-sm border-gray-200 focus:ring-2 focus:ring-[#185FA5] focus:border-transparent rounded-lg resize-none"
+          className="font-mono text-sm border-border focus:ring-2 focus:ring-[#185FA5] focus:border-transparent rounded-lg resize-none"
         />
       </div>
 

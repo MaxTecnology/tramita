@@ -133,12 +133,12 @@ export default function Users() {
     })
   }
 
-  if (isLoading) return <div className="p-8 text-gray-500">Carregando...</div>
+  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando...</div>
 
   return (
     <div className="p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-lg md:text-xl font-bold text-gray-900">Usuários</h1>
+        <h1 className="text-lg md:text-xl font-bold text-foreground">Usuários</h1>
         <Button
           onClick={() => { if (showCreate) setCreateForm(EMPTY_CREATE); setShowCreate(!showCreate) }}
           className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
@@ -149,8 +149,8 @@ export default function Users() {
 
       {/* Formulário de criação */}
       {showCreate && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6 space-y-3">
-          <h2 className="text-sm font-semibold text-gray-700">Novo usuário</h2>
+        <div className="bg-surface rounded-lg border border-border p-4 mb-6 space-y-3">
+          <h2 className="text-sm font-semibold text-foreground">Novo usuário</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1 sm:col-span-2">
               <Label htmlFor="c-name">Nome *</Label>
@@ -170,7 +170,7 @@ export default function Users() {
                 id="c-role"
                 value={createForm.role}
                 onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as EditableRole })}
-                className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <option value="ORG_MEMBER">Colaborador</option>
                 <option value="ORG_MANAGER">Gerente</option>
@@ -200,7 +200,7 @@ export default function Users() {
       {/* Barra de filtros */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="relative flex-1 min-w-[200px]">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
@@ -209,11 +209,11 @@ export default function Users() {
             placeholder="Buscar por nome ou e-mail..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-md bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
 
-        <div className="flex rounded-md border border-gray-300 overflow-hidden">
+        <div className="flex rounded-md border border-border overflow-hidden">
           {(['all', 'ORG_MANAGER', 'ORG_MEMBER'] as const satisfies readonly ('all' | EditableRole)[]).map((r) => (
             <button
               key={r}
@@ -221,7 +221,7 @@ export default function Users() {
               onClick={() => setRoleFilter(r)}
               className={cn(
                 'px-3 py-2 text-sm font-medium transition-colors',
-                roleFilter === r ? 'bg-[#185FA5] text-white' : 'bg-white text-gray-600 hover:bg-gray-50',
+                roleFilter === r ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
               )}
             >
               {r === 'all' ? 'Todos' : r === 'ORG_MANAGER' ? 'Gerente' : 'Colaborador'}
@@ -232,7 +232,7 @@ export default function Users() {
 
       {/* Contador */}
       {users.length > 0 && (
-        <p className="text-xs text-gray-400 mb-3">
+        <p className="text-xs text-muted-foreground mb-3">
           {filtered.length === users.length
             ? `${users.length} usuário${users.length !== 1 ? 's' : ''}`
             : `Exibindo ${filtered.length} de ${users.length}`}
@@ -242,26 +242,26 @@ export default function Users() {
       {/* Lista */}
       <div className="space-y-2">
         {filtered.length === 0 && (
-          <p className="text-center text-gray-400 py-12">
+          <p className="text-center text-muted-foreground py-12">
             {users.length === 0 ? 'Nenhum usuário cadastrado.' : 'Nenhum usuário encontrado para este filtro.'}
           </p>
         )}
         {filtered.map((user) => (
-          <div key={user.id} className="bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between gap-3">
+          <div key={user.id} className="bg-surface rounded-lg border border-border px-4 py-3 flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
+                <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
                 <span className={cn('text-xs px-1.5 py-0.5 rounded flex-shrink-0', ROLE_BADGE[user.role] ?? 'bg-gray-100 text-gray-500')}>
                   {ROLE_LABEL[user.role] ?? user.role}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 truncate">
+              <p className="text-xs text-muted-foreground truncate">
                 {user.email}{user.phone ? ` · ${user.phone}` : ''}
               </p>
             </div>
             {user.role !== 'ORG_ADMIN' && (
               <div className="flex items-center gap-1 flex-shrink-0">
-                <Button variant="ghost" size="sm" onClick={() => openEdit(user)} className="text-gray-600 hover:text-gray-900">
+                <Button variant="ghost" size="sm" onClick={() => openEdit(user)} className="text-muted-foreground hover:text-foreground">
                   Editar
                 </Button>
                 <Button
@@ -269,7 +269,7 @@ export default function Users() {
                   size="sm"
                   disabled={resetMutation.isPending}
                   onClick={() => resetMutation.mutate(user.id)}
-                  className="text-gray-600 hover:text-gray-900"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   Redefinir senha
                 </Button>
@@ -313,7 +313,7 @@ export default function Users() {
                 id="e-role"
                 value={editForm.role}
                 onChange={(e) => setEditForm({ ...editForm, role: e.target.value as EditableRole })}
-                className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <option value="ORG_MEMBER">Colaborador</option>
                 <option value="ORG_MANAGER">Gerente</option>
@@ -346,11 +346,11 @@ export default function Users() {
             <DialogTitle>Senha redefinida</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 mt-2">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Nova senha temporária — repasse para o usuário agora, ela não será mostrada novamente:
             </p>
             <div className="flex items-center gap-2">
-              <code className="flex-1 bg-gray-100 rounded px-3 py-2 text-sm font-mono">{resetPassword}</code>
+              <code className="flex-1 bg-neutral-bg text-foreground rounded px-3 py-2 text-sm font-mono">{resetPassword}</code>
               <Button
                 type="button"
                 variant="outline"

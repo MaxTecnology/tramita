@@ -64,7 +64,7 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       onClick={() => onChange(!checked)}
       className={cn(
         'relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors',
-        checked ? 'bg-[#185FA5]' : 'bg-gray-200',
+        checked ? 'bg-[#185FA5]' : 'bg-neutral-bg',
       )}
     >
       <span className={cn(
@@ -84,8 +84,8 @@ function SwitchRow({ label, description, checked, onChange }: {
   return (
     <div className="flex items-center justify-between gap-4">
       <div>
-        <p className="text-sm font-medium text-gray-800">{label}</p>
-        {description && <p className="text-xs text-gray-400 mt-0.5">{description}</p>}
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
       </div>
       <Switch checked={checked} onChange={onChange} />
     </div>
@@ -95,9 +95,9 @@ function SwitchRow({ label, description, checked, onChange }: {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{title}</p>
+    <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-3 border-b border-border bg-neutral-bg">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</p>
       </div>
       <div className="px-5 py-4 space-y-4">
         {children}
@@ -164,12 +164,12 @@ export default function Notifications() {
     <div className="p-4 md:p-6 max-w-3xl">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-lg md:text-xl font-bold text-gray-900">Notificações</h1>
-        <p className="text-sm text-gray-500 mt-1">Configure os canais e eventos de notificação do escritório.</p>
+        <h1 className="text-lg md:text-xl font-bold text-foreground">Notificações</h1>
+        <p className="text-sm text-muted-foreground mt-1">Configure os canais e eventos de notificação do escritório.</p>
       </div>
 
       {/* Abas */}
-      <div className="flex border-b border-gray-200 mb-6">
+      <div className="flex border-b border-border mb-6">
         {(['config', 'logs'] as const).map((t) => (
           <button
             key={t}
@@ -179,7 +179,7 @@ export default function Notifications() {
               'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
               tab === t
                 ? 'border-[#185FA5] text-[#185FA5]'
-                : 'border-transparent text-gray-500 hover:text-gray-700',
+                : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
             {t === 'config' ? 'Configurações' : 'Histórico de envios'}
@@ -234,8 +234,8 @@ export default function Notifications() {
                 className="font-mono text-sm"
               />
               {config?.maximizebotTokenPreview && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Salvo: <span className="font-mono text-gray-500">{config.maximizebotTokenPreview}</span>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Salvo: <span className="font-mono text-muted-foreground">{config.maximizebotTokenPreview}</span>
                 </p>
               )}
             </div>
@@ -247,7 +247,7 @@ export default function Notifications() {
               checked={form.emailEnabled ?? false}
               onChange={(v) => setForm({ ...form, emailEnabled: v })}
             />
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted-foreground">
               Os emails são enviados automaticamente pelo Tramita via <span className="font-medium">notificacoes@autohubs.com.br</span>.
             </p>
             <div className={cn('space-y-1 transition-opacity', !form.emailEnabled && 'opacity-40 pointer-events-none')}>
@@ -292,17 +292,17 @@ export default function Notifications() {
           {/* Filtros */}
           <div className="flex flex-wrap gap-2 items-center">
             <div className="relative flex-1 min-w-[200px]">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 aria-label="Buscar logs"
                 type="text"
                 placeholder="Buscar por evento ou destinatário..."
                 value={logSearch}
                 onChange={(e) => setLogSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
               />
             </div>
-            <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            <div className="flex rounded-lg border border-border overflow-hidden">
               {([
                 { value: '' as const,        label: 'Todos' },
                 { value: 'SENT' as const,    label: 'Enviado' },
@@ -315,7 +315,7 @@ export default function Notifications() {
                   onClick={() => setLogStatus(value)}
                   className={cn(
                     'px-3 py-2 text-sm font-medium transition-colors',
-                    logStatus === value ? 'bg-[#185FA5] text-white' : 'bg-white text-gray-600 hover:bg-gray-50',
+                    logStatus === value ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
                   )}
                 >
                   {label}
@@ -325,34 +325,34 @@ export default function Notifications() {
           </div>
 
           {/* Lista */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
             {filteredLogs.length === 0 ? (
               <div className="text-center py-16">
-                <FileSearch size={36} className="mx-auto mb-3 text-gray-300" />
-                <p className="text-sm font-medium text-gray-500">Nenhum registro encontrado</p>
-                <p className="text-xs text-gray-400 mt-1">
+                <FileSearch size={36} className="mx-auto mb-3 text-muted-foreground opacity-50" />
+                <p className="text-sm font-medium text-muted-foreground">Nenhum registro encontrado</p>
+                <p className="text-xs text-muted-foreground mt-1">
                   {logs.length === 0 ? 'Ainda não há envios registrados.' : 'Ajuste os filtros para ver mais resultados.'}
                 </p>
               </div>
             ) : (
               <>
-                <div className="hidden sm:flex items-center gap-3 px-5 py-2 bg-gray-50/80 border-b border-gray-100">
-                  <div className="flex-[2] text-xs font-semibold text-gray-400 uppercase tracking-wide">Evento</div>
-                  <div className="flex-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Canal</div>
-                  <div className="flex-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Destinatário</div>
-                  <div className="w-24 text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Status</div>
-                  <div className="w-32 text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Data</div>
+                <div className="hidden sm:flex items-center gap-3 px-5 py-2 bg-neutral-bg border-b border-border">
+                  <div className="flex-[2] text-xs font-semibold text-muted-foreground uppercase tracking-wide">Evento</div>
+                  <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Canal</div>
+                  <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Destinatário</div>
+                  <div className="w-24 text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right">Status</div>
+                  <div className="w-32 text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right">Data</div>
                 </div>
                 {filteredLogs.map((log) => (
-                  <div key={log.id} className="flex flex-wrap sm:flex-nowrap items-center gap-3 px-5 py-3 border-b border-gray-100 last:border-0 text-sm">
+                  <div key={log.id} className="flex flex-wrap sm:flex-nowrap items-center gap-3 px-5 py-3 border-b border-border last:border-0 text-sm">
                     <div className="flex-[2] min-w-0">
-                      <p className="text-gray-800 truncate">{EVENT_LABEL[log.event] ?? log.event}</p>
+                      <p className="text-foreground truncate">{EVENT_LABEL[log.event] ?? log.event}</p>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-gray-500 truncate">{CHANNEL_LABEL[log.channel] ?? log.channel}</p>
+                      <p className="text-muted-foreground truncate">{CHANNEL_LABEL[log.channel] ?? log.channel}</p>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-gray-500 truncate">{log.recipient}</p>
+                      <p className="text-muted-foreground truncate">{log.recipient}</p>
                     </div>
                     <div className="w-24 text-right">
                       <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', STATUS_BADGE[log.status] ?? 'bg-gray-100 text-gray-600')}>
@@ -360,7 +360,7 @@ export default function Notifications() {
                       </span>
                     </div>
                     <div className="w-32 text-right">
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-muted-foreground">
                         {new Date(log.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
@@ -371,7 +371,7 @@ export default function Notifications() {
           </div>
 
           {filteredLogs.length > 0 && (
-            <p className="text-xs text-gray-400 text-right">
+            <p className="text-xs text-muted-foreground text-right">
               {filteredLogs.length === logs.length
                 ? `${logs.length} registro${logs.length !== 1 ? 's' : ''}`
                 : `Exibindo ${filteredLogs.length} de ${logs.length}`}

@@ -37,12 +37,12 @@ export function TaskCard({ task, onClick }: Props) {
   return (
     <div
       className={cn(
-        'bg-white rounded-lg p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow select-none',
-        isOverdue ? 'border-red-400' : 'border-gray-200',
+        'bg-surface rounded-lg p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow select-none',
+        isOverdue ? 'border-red-400' : 'border-border',
       )}
       onClick={onClick}
     >
-      <p className="text-sm font-medium text-gray-800 mb-2 line-clamp-2">{task.title}</p>
+      <p className="text-sm font-medium text-foreground mb-2 line-clamp-2">{task.title}</p>
       <div className="flex items-center gap-2 flex-wrap">
         {task.sourceRequestId && (
           <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-600" title="Originado de uma solicitação do cliente">
@@ -62,7 +62,7 @@ export function TaskCard({ task, onClick }: Props) {
           <span className="text-xs text-red-500 font-medium">⚠ Prazo vencido</span>
         )}
       </div>
-      <p className="text-xs text-gray-400 mt-1.5">{daysOpen(task.createdAt)}</p>
+      <p className="text-xs text-muted-foreground mt-1.5">{daysOpen(task.createdAt)}</p>
     </div>
   )
 }

@@ -74,7 +74,7 @@ export function Comments({ taskId, currentUserId, role }: Props) {
                   {isClient && <span className="ml-1 text-blue-500 font-normal">(cliente)</span>}
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-muted-foreground">
                     {new Date(c.createdAt).toLocaleString('pt-BR')}
                   </span>
                   {canDelete(c) && (
@@ -91,20 +91,20 @@ export function Comments({ taskId, currentUserId, role }: Props) {
 
               {isDeleted ? (
                 <div>
-                  <p className="text-xs text-gray-400 italic">
+                  <p className="text-xs text-muted-foreground italic">
                     Comentário removido em {new Date(c.deletedAt!).toLocaleString('pt-BR')}
                   </p>
                   {CAN_SEE_DELETED.has(role) && c.deletedContent && (
                     <details className="mt-1">
-                      <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">
+                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
                         Ver conteúdo removido
                       </summary>
-                      <p className="text-sm text-gray-500 mt-1 line-through">{c.deletedContent}</p>
+                      <p className="text-sm text-muted-foreground mt-1 line-through">{c.deletedContent}</p>
                     </details>
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-gray-800">{c.content}</p>
+                <p className="text-sm text-foreground">{c.content}</p>
               )}
             </div>
           )
@@ -117,7 +117,7 @@ export function Comments({ taskId, currentUserId, role }: Props) {
           onChange={(e) => setContent(e.target.value)}
           placeholder="Adicionar comentário..."
           rows={2}
-          className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 resize-none"
+          className="flex-1 rounded-md border border-border bg-surface text-foreground px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-none"
         />
         <Button
           onClick={() => createMutation.mutate()}

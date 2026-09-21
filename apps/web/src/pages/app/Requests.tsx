@@ -96,15 +96,15 @@ export default function Requests() {
     onError: () => toast.error('Erro ao rejeitar solicitação'),
   })
 
-  if (isLoading) return <div className="p-8 text-gray-500">Carregando...</div>
+  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando...</div>
 
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg md:text-xl font-bold text-gray-900">Solicitações dos Clientes</h1>
+        <h1 className="text-lg md:text-xl font-bold text-foreground">Solicitações dos Clientes</h1>
       </div>
 
-      <div className="flex rounded-md border border-gray-300 overflow-hidden w-fit">
+      <div className="flex rounded-md border border-border overflow-hidden w-fit">
         {(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', ''] as const).map((s) => (
           <button
             key={s || 'all'}
@@ -112,7 +112,7 @@ export default function Requests() {
             onClick={() => setStatusFilter(s)}
             className={cn(
               'px-3 py-1.5 text-sm font-medium transition-colors',
-              statusFilter === s ? 'bg-[#185FA5] text-white' : 'bg-white text-gray-600 hover:bg-gray-50',
+              statusFilter === s ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
             )}
           >
             {s ? STATUS_LABEL[s] : 'Todas'}
@@ -122,34 +122,34 @@ export default function Requests() {
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[220px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por cliente ou título..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 border-gray-200 focus:ring-[#185FA5]"
+            className="pl-8 border-border focus:ring-accent"
           />
         </div>
 
         <div className="flex items-center gap-1.5">
-          <Label htmlFor="req-date-from" className="text-xs text-gray-500 whitespace-nowrap">De</Label>
+          <Label htmlFor="req-date-from" className="text-xs text-muted-foreground whitespace-nowrap">De</Label>
           <Input
             id="req-date-from"
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="w-36 border-gray-200"
+            className="w-36 border-border"
           />
         </div>
 
         <div className="flex items-center gap-1.5">
-          <Label htmlFor="req-date-to" className="text-xs text-gray-500 whitespace-nowrap">Até</Label>
+          <Label htmlFor="req-date-to" className="text-xs text-muted-foreground whitespace-nowrap">Até</Label>
           <Input
             id="req-date-to"
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="w-36 border-gray-200"
+            className="w-36 border-border"
           />
         </div>
 
@@ -157,7 +157,7 @@ export default function Requests() {
           <button
             type="button"
             onClick={() => { setSearch(''); setDateFrom(''); setDateTo('') }}
-            className="h-9 px-2 text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+            className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
           >
             <X size={13} />
             Limpar
@@ -166,7 +166,7 @@ export default function Requests() {
       </div>
 
       {requests.length > 0 && (
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-muted-foreground">
           {filtered.length === requests.length
             ? `${requests.length} solicitação${requests.length !== 1 ? 'ões' : ''}`
             : `Exibindo ${filtered.length} de ${requests.length}`}
@@ -174,7 +174,7 @@ export default function Requests() {
       )}
 
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center text-gray-400">
+        <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
           <Inbox size={48} className="mb-3 opacity-40" />
           <p className="text-sm font-medium">
             {requests.length === 0 ? 'Nenhuma solicitação encontrada' : 'Nenhuma solicitação encontrada para este filtro'}
@@ -183,12 +183,12 @@ export default function Requests() {
       ) : (
         <div className="space-y-2">
           {filtered.map((r) => (
-            <div key={r.id} className="bg-white rounded-lg border border-gray-200 px-4 py-3">
+            <div key={r.id} className="bg-surface rounded-lg border border-border px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{r.title}</p>
-                  <p className="text-xs text-gray-500">{r.client?.name}</p>
-                  {r.description && <p className="text-xs text-gray-500 mt-1">{r.description}</p>}
+                  <p className="text-sm font-medium text-foreground">{r.title}</p>
+                  <p className="text-xs text-muted-foreground">{r.client?.name}</p>
+                  {r.description && <p className="text-xs text-muted-foreground mt-1">{r.description}</p>}
                 </div>
                 <span className={cn('text-xs px-2 py-0.5 rounded-full flex-shrink-0', STATUS_STYLE[r.status])}>
                   {STATUS_LABEL[r.status]}
@@ -214,25 +214,25 @@ export default function Requests() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Aprovar solicitação</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
-            <div className="flex rounded-md border border-gray-300 overflow-hidden w-fit">
+            <div className="flex rounded-md border border-border overflow-hidden w-fit">
               <button
                 type="button"
                 onClick={() => setMode('NEW_BOARD')}
-                className={cn('px-3 py-1.5 text-sm font-medium', mode === 'NEW_BOARD' ? 'bg-[#185FA5] text-white' : 'bg-white text-gray-600')}
+                className={cn('px-3 py-1.5 text-sm font-medium', mode === 'NEW_BOARD' ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}
               >
                 Criar novo processo
               </button>
               <button
                 type="button"
                 onClick={() => setMode('EXISTING_BOARD')}
-                className={cn('px-3 py-1.5 text-sm font-medium', mode === 'EXISTING_BOARD' ? 'bg-[#185FA5] text-white' : 'bg-white text-gray-600')}
+                className={cn('px-3 py-1.5 text-sm font-medium', mode === 'EXISTING_BOARD' ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}
               >
                 Anexar a processo existente
               </button>
             </div>
 
             {mode === 'NEW_BOARD' && (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Será criado um novo processo "{approving?.title}" com 3 colunas padrão (Pendente → Em andamento → Concluído).
               </p>
             )}
@@ -244,7 +244,7 @@ export default function Requests() {
                   <select
                     value={boardId}
                     onChange={(e) => { setBoardId(e.target.value); setColumnId('') }}
-                    className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm"
+                    className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 text-sm"
                   >
                     <option value="">Selecione um processo</option>
                     {clientBoards.map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}
@@ -256,7 +256,7 @@ export default function Requests() {
                     <select
                       value={columnId}
                       onChange={(e) => setColumnId(e.target.value)}
-                      className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm"
+                      className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 text-sm"
                     >
                       <option value="">Selecione uma coluna</option>
                       {selectedBoard.columns.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
@@ -292,7 +292,7 @@ export default function Requests() {
                 rows={3}
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm resize-none"
+                className="flex w-full rounded-md border border-border bg-surface text-foreground px-3 py-2 text-sm resize-none"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">

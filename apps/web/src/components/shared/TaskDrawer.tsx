@@ -210,10 +210,10 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-      <aside className="fixed inset-y-0 right-0 z-50 flex flex-col bg-white shadow-2xl w-full max-w-[560px]">
+      <aside className="fixed inset-y-0 right-0 z-50 flex flex-col bg-surface shadow-2xl w-full max-w-[560px]">
 
         {/* Header fixo */}
-        <div className="px-5 pt-5 pb-4 border-b border-gray-200 flex-shrink-0">
+        <div className="px-5 pt-5 pb-4 border-b border-border flex-shrink-0">
           <div className="flex items-start justify-between mb-3">
             {canEdit && editingTitle ? (
               <input
@@ -230,20 +230,20 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                   if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
                   if (e.key === 'Escape') { setTitleValue(task.title); setEditingTitle(false) }
                 }}
-                className="flex-1 text-base font-semibold text-gray-900 border-b border-blue-500 focus:outline-none bg-transparent mr-4"
+                className="flex-1 text-base font-semibold text-foreground border-b border-accent focus:outline-none bg-transparent mr-4"
               />
             ) : (
               <h2
                 className={cn(
-                  'flex-1 text-base font-semibold text-gray-900 leading-tight mr-4',
-                  canEdit && 'cursor-pointer hover:text-blue-600',
+                  'flex-1 text-base font-semibold text-foreground leading-tight mr-4',
+                  canEdit && 'cursor-pointer hover:text-accent',
                 )}
                 onClick={() => canEdit && setEditingTitle(true)}
               >
                 {task.title}
               </h2>
             )}
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground flex-shrink-0">
               <X size={20} />
             </button>
           </div>
@@ -286,7 +286,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
               <select
                 value={task.departmentId ?? ''}
                 onChange={(e) => updateMutation.mutate({ departmentId: e.target.value || null })}
-                className="text-xs font-medium px-2 py-0.5 rounded-full border border-gray-200 text-gray-600 cursor-pointer bg-white"
+                className="text-xs font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground cursor-pointer bg-surface"
               >
                 <option value="">Sem departamento</option>
                 {departments.map((d) => (
@@ -311,7 +311,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                         : null,
                     })
                   }}
-                  className="text-xs border border-gray-300 rounded px-2 py-0.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="text-xs border border-border rounded px-2 py-0.5 text-foreground bg-surface focus:outline-none focus:ring-2 focus:ring-accent"
                 />
                 {/* Aviso quando prazo da tarefa ultrapassa prazo do processo */}
                 {task.dueDate && boardDueDate && new Date(task.dueDate) > new Date(boardDueDate) && (
@@ -322,7 +322,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
               </div>
             ) : (
               task.dueDate && (
-                <span className={cn('text-xs px-2 py-0.5 rounded-full bg-gray-100', isOverdue && 'bg-red-100 text-red-600 font-medium')}>
+                <span className={cn('text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700', isOverdue && 'bg-red-100 text-red-600 font-medium')}>
                   {isOverdue ? '⚠ ' : ''}Prazo: {formatDateOnlyUTC(task.dueDate)}
                 </span>
               )
@@ -344,23 +344,23 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                   })
                 }}
                 title="Meta interna"
-                className="text-xs border border-gray-300 rounded px-2 py-0.5 text-gray-700"
+                className="text-xs border border-border rounded px-2 py-0.5 text-foreground bg-surface"
               />
             ) : (
               task.targetDate && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" title="Meta interna">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700" title="Meta interna">
                   Meta: {formatDateOnlyUTC(task.targetDate)}
                 </span>
               )
             )}
             {task.competence && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" title="Competência">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700" title="Competência">
                 Competência: {new Date(task.competence).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })}
               </span>
             )}
 
             {canEdit && (
-              <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
                 <input
                   type="checkbox"
                   checked={task.visibleToClient}
@@ -383,17 +383,17 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
               }}
               placeholder="Adicionar descrição..."
               rows={2}
-              className="w-full text-sm text-gray-700 border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-400"
+              className="w-full text-sm text-foreground border border-border bg-surface rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent resize-none placeholder:text-muted-foreground"
             />
           ) : (
             task.description && (
-              <p className="text-sm text-gray-700">{task.description}</p>
+              <p className="text-sm text-foreground">{task.description}</p>
             )
           )}
         </div>
 
         {/* Abas */}
-        <div className="flex border-b border-gray-200 flex-shrink-0">
+        <div className="flex border-b border-border flex-shrink-0">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -401,8 +401,8 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
               className={cn(
                 'flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
                 tab === t.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700',
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
               {t.icon}
@@ -421,13 +421,13 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
           {tab === 'documents' && documents && (
             <div className="space-y-5">
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">A cobrar do cliente</p>
-                {documents.requirements.length === 0 && <p className="text-sm text-gray-400">Nenhum documento a cobrar.</p>}
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">A cobrar do cliente</p>
+                {documents.requirements.length === 0 && <p className="text-sm text-muted-foreground">Nenhum documento a cobrar.</p>}
                 <div className="space-y-2">
                   {documents.requirements.map((r) => (
-                    <div key={r.id} className="bg-gray-50 rounded-lg px-3 py-2.5">
+                    <div key={r.id} className="bg-neutral-bg rounded-lg px-3 py-2.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-700">{r.name}</span>
+                        <span className="text-sm text-foreground">{r.name}</span>
                         <span className={cn(
                           'text-xs font-medium px-2 py-0.5 rounded-full',
                           r.status === 'PENDING' && 'bg-gray-100 text-gray-500',
@@ -484,13 +484,13 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
               </div>
 
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">A entregar ao cliente</p>
-                {documents.deliverables.length === 0 && <p className="text-sm text-gray-400">Nenhum documento a entregar.</p>}
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">A entregar ao cliente</p>
+                {documents.deliverables.length === 0 && <p className="text-sm text-muted-foreground">Nenhum documento a entregar.</p>}
                 <div className="space-y-2">
                   {documents.deliverables.map((d) => (
-                    <div key={d.id} className="bg-gray-50 rounded-lg px-3 py-2.5">
+                    <div key={d.id} className="bg-neutral-bg rounded-lg px-3 py-2.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-700">{d.name}</span>
+                        <span className="text-sm text-foreground">{d.name}</span>
                         <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', d.deliveredAt ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500')}>
                           {d.deliveredAt ? 'Entregue' : 'Pendente'}
                         </span>
@@ -528,7 +528,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
           {tab === 'attachments' && (
             <div className="space-y-2">
               {attachments.length === 0 && (
-                <p className="text-sm text-gray-400">Nenhum anexo ainda.</p>
+                <p className="text-sm text-muted-foreground">Nenhum anexo ainda.</p>
               )}
               {attachments.map((a) => {
                 const isDeleted = !!a.deletedAt
@@ -537,13 +537,13 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                     key={a.id}
                     className={cn(
                       'flex items-start justify-between rounded-lg px-3 py-2.5 gap-2',
-                      isDeleted ? 'bg-red-50 border border-red-100' : 'bg-gray-50',
+                      isDeleted ? 'bg-red-50 border border-red-100' : 'bg-neutral-bg',
                     )}
                   >
                     <div className="flex items-start gap-2 min-w-0">
                       {isDeleted
                         ? <Trash2 size={14} className="text-red-300 flex-shrink-0 mt-0.5" />
-                        : <Paperclip size={14} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                        : <Paperclip size={14} className="text-muted-foreground flex-shrink-0 mt-0.5" />
                       }
                       <div className="min-w-0">
                         {isDeleted ? (
@@ -558,7 +558,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                             {a.filename}
                           </a>
                         )}
-                        <p className="text-xs text-gray-400 mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           {(a.size / 1024).toFixed(0)} KB
                           {' · '}
                           <span>Adicionado por {a.uploaderName}</span>
@@ -585,7 +585,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                 )
               })}
               {!attachments.some((a) => !a.deletedAt) && attachments.length > 0 && (
-                <p className="text-xs text-gray-400 pt-1">Todos os anexos foram removidos.</p>
+                <p className="text-xs text-muted-foreground pt-1">Todos os anexos foram removidos.</p>
               )}
               {isOrgRole(role) && (
                 <label className="flex items-center gap-2 cursor-pointer pt-1">
@@ -609,18 +609,18 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
           {tab === 'history' && (
             <div className="relative pl-4">
               {history.length === 0 && (
-                <p className="text-sm text-gray-400">Sem histórico ainda.</p>
+                <p className="text-sm text-muted-foreground">Sem histórico ainda.</p>
               )}
-              <div className="absolute left-1.5 top-0 bottom-0 w-px bg-gray-200" />
+              <div className="absolute left-1.5 top-0 bottom-0 w-px bg-border" />
               {history.map((h) => (
                 <div key={h.id} className="relative mb-4 last:mb-0">
                   <div className="absolute -left-[11px] top-1.5 w-2 h-2 rounded-full bg-blue-400" />
-                  <p className="text-xs text-gray-600">
-                    <span className="font-medium">{h.actorName}</span>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{h.actorName}</span>
                     {' — '}
                     {formatHistoryAction(h)}
                   </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {new Date(h.createdAt).toLocaleString('pt-BR')}
                   </p>
                 </div>

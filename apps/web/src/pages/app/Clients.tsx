@@ -54,25 +54,25 @@ function AssignmentsSection({ clientId }: { clientId: string }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1.5">
-        <UserCheck size={14} className="text-gray-400" />
-        <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Responsáveis por departamento</Label>
+        <UserCheck size={14} className="text-muted-foreground" />
+        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Responsáveis por departamento</Label>
       </div>
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-muted-foreground">
         Quando definido, só o responsável do departamento recebe notificações daquela área.
         Sem responsável, notifica todos os admins e gerentes.
       </p>
       {departments.length === 0 ? (
-        <p className="text-xs text-gray-400 text-center py-3">Nenhum departamento cadastrado.</p>
+        <p className="text-xs text-muted-foreground text-center py-3">Nenhum departamento cadastrado.</p>
       ) : (
         <div className="space-y-2">
           {departments.map((d) => (
             <div key={d.id} className="flex items-center gap-2">
-              <span className="text-sm text-gray-700 flex-1 min-w-0 truncate">{d.name}</span>
+              <span className="text-sm text-foreground flex-1 min-w-0 truncate">{d.name}</span>
               <select
                 value={responsibleFor(d.id)}
                 onChange={(e) => saveMutation.mutate({ departmentId: d.id, userId: e.target.value || null })}
                 disabled={saveMutation.isPending}
-                className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="h-8 rounded-md border border-border bg-surface text-foreground px-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="">Sem responsável</option>
                 {eligibleUsers.map((u) => (
@@ -106,7 +106,7 @@ const EMPTY_CREATE: CreateForm = {
 
 function TypeToggle({ value, onChange }: { value: ClientType; onChange: (v: ClientType) => void }) {
   return (
-    <div className="flex rounded-md border border-gray-300 overflow-hidden w-fit">
+    <div className="flex rounded-md border border-border overflow-hidden w-fit">
       {(['PJ', 'PF'] as ClientType[]).map((t) => (
         <button
           key={t}
@@ -114,7 +114,7 @@ function TypeToggle({ value, onChange }: { value: ClientType; onChange: (v: Clie
           onClick={() => onChange(t)}
           className={cn(
             'px-4 py-1.5 text-sm font-medium transition-colors',
-            value === t ? 'bg-[#185FA5] text-white' : 'bg-white text-gray-600 hover:bg-gray-50',
+            value === t ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
           )}
         >
           {t === 'PJ' ? 'Pessoa Jurídica' : 'Pessoa Física'}
@@ -170,7 +170,7 @@ function ClientFields<T extends { clientType: ClientType; cnpj: string; cpf: str
           onChange={(e) => onChange({ notes: e.target.value } as Partial<T>)}
           rows={2}
           placeholder="Notas visíveis apenas para o escritório..."
-          className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 resize-none"
+          className="flex w-full rounded-md border border-border bg-surface text-foreground px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-none"
         />
       </div>
     </>
@@ -281,12 +281,12 @@ export default function Clients() {
     })
   }
 
-  if (isLoading) return <div className="p-8 text-gray-500">Carregando...</div>
+  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando...</div>
 
   return (
     <div className="p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-lg md:text-xl font-bold text-gray-900">Clientes</h1>
+        <h1 className="text-lg md:text-xl font-bold text-foreground">Clientes</h1>
         <Button
           onClick={() => { if (showCreate) setCreateForm(EMPTY_CREATE); setShowCreate(!showCreate) }}
           className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
@@ -298,7 +298,7 @@ export default function Clients() {
       {/* Barra de filtros */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="relative flex-1 min-w-[200px]">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
@@ -307,11 +307,11 @@ export default function Clients() {
             placeholder="Buscar por nome, e-mail, CPF/CNPJ..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-md bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
 
-        <div className="flex rounded-md border border-gray-300 overflow-hidden">
+        <div className="flex rounded-md border border-border overflow-hidden">
           {(['all', 'PJ', 'PF'] as const).map((t) => (
             <button
               key={t}
@@ -319,7 +319,7 @@ export default function Clients() {
               onClick={() => setTypeFilter(t)}
               className={cn(
                 'px-3 py-2 text-sm font-medium transition-colors',
-                typeFilter === t ? 'bg-[#185FA5] text-white' : 'bg-white text-gray-600 hover:bg-gray-50',
+                typeFilter === t ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
               )}
             >
               {t === 'all' ? 'Todos' : t}
@@ -327,12 +327,12 @@ export default function Clients() {
           ))}
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
           <input
             type="checkbox"
             checked={includeInactive}
             onChange={(e) => setIncludeInactive(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600"
+            className="h-4 w-4 rounded border-border text-accent"
           />
           Incluir desativados
         </label>
@@ -340,7 +340,7 @@ export default function Clients() {
 
       {/* Contador */}
       {clients.length > 0 && (
-        <p className="text-xs text-gray-400 mb-3">
+        <p className="text-xs text-muted-foreground mb-3">
           {filtered.length === clients.length
             ? `${clients.length} cliente${clients.length !== 1 ? 's' : ''}`
             : `Exibindo ${filtered.length} de ${clients.length}`}
@@ -349,8 +349,8 @@ export default function Clients() {
 
       {/* Formulário de criação */}
       {showCreate && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6 space-y-3">
-          <h2 className="text-sm font-semibold text-gray-700">Novo cliente</h2>
+        <div className="bg-surface rounded-lg border border-border p-4 mb-6 space-y-3">
+          <h2 className="text-sm font-semibold text-foreground">Novo cliente</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1 sm:col-span-2">
               <Label htmlFor="c-name">Nome *</Label>
@@ -391,15 +391,15 @@ export default function Clients() {
       {/* Lista */}
       <div className="space-y-2">
         {filtered.length === 0 && (
-          <p className="text-center text-gray-400 py-12">
+          <p className="text-center text-muted-foreground py-12">
             {clients.length === 0 ? 'Nenhum cliente cadastrado.' : 'Nenhum cliente encontrado para este filtro.'}
           </p>
         )}
         {filtered.map((client) => (
-          <div key={client.id} className={cn('bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between gap-3', !client.isActive && 'opacity-60')}>
+          <div key={client.id} className={cn('bg-surface rounded-lg border border-border px-4 py-3 flex items-center justify-between gap-3', !client.isActive && 'opacity-60')}>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-gray-900 truncate">{client.name}</p>
+                <p className="text-sm font-medium text-foreground truncate">{client.name}</p>
                 <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0">
                   {client.clientType ?? 'PJ'}
                 </span>
@@ -409,9 +409,9 @@ export default function Clients() {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-500 truncate">{client.email}</p>
+              <p className="text-xs text-muted-foreground truncate">{client.email}</p>
               {(client.cnpj || client.cpf || client.whatsapp || client.phone) && (
-                <p className="text-xs text-gray-400 truncate mt-0.5">
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
                   {[client.cnpj, client.cpf, client.whatsapp, client.phone].filter(Boolean).join(' · ')}
                 </p>
               )}
@@ -420,7 +420,7 @@ export default function Clients() {
               )}
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
-              <Button variant="ghost" size="sm" onClick={() => openEdit(client)} className="text-gray-600 hover:text-gray-900">
+              <Button variant="ghost" size="sm" onClick={() => openEdit(client)} className="text-muted-foreground hover:text-foreground">
                 Editar
               </Button>
               <Button
@@ -461,7 +461,7 @@ export default function Clients() {
               onChange={(patch) => setEditForm((f) => ({ ...f, ...patch }))}
               idPrefix="e"
             />
-            <hr className="border-gray-100" />
+            <hr className="border-border" />
             {editingClient && <AssignmentsSection clientId={editingClient.id} />}
             {updateMutation.isError && (
               <p className="text-sm text-red-600">Erro ao salvar. Tente novamente.</p>
