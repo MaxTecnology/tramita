@@ -73,11 +73,11 @@ export default function MasterPlans() {
     })
   }
 
-  if (isLoading) return <div className="p-8 text-gray-500">Carregando planos...</div>
+  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando planos...</div>
 
   return (
     <div className="p-8">
-      <h1 className="text-xl font-bold text-gray-900 mb-6">Planos</h1>
+      <h1 className="text-xl font-bold text-foreground mb-6">Planos</h1>
 
       <Card className="mb-6">
         <CardHeader>
@@ -86,7 +86,7 @@ export default function MasterPlans() {
         <CardContent>
           <form onSubmit={handleCreate} className="flex gap-3 flex-wrap items-end">
             <div className="space-y-1">
-              <label className="text-xs text-gray-500">Nome</label>
+              <label className="text-xs text-muted-foreground">Nome</label>
               <Input
                 placeholder="Ex: Pro"
                 value={form.name}
@@ -96,7 +96,7 @@ export default function MasterPlans() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-gray-500">Max clientes</label>
+              <label className="text-xs text-muted-foreground">Max clientes</label>
               <Input
                 type="number"
                 placeholder="50"
@@ -109,7 +109,7 @@ export default function MasterPlans() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-gray-500">Preço/mês (R$)</label>
+              <label className="text-xs text-muted-foreground">Preço/mês (R$)</label>
               <Input
                 type="number"
                 placeholder="197"
@@ -136,16 +136,16 @@ export default function MasterPlans() {
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
+              <tr className="border-b border-border bg-neutral-bg">
                 {['Nome', 'Max clientes', 'Preço/mês', 'Status', 'Ações'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 font-medium text-muted-foreground">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {plans.map((plan) => (
-                <tr key={plan.id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-4 py-3 font-medium text-gray-900">
+                <tr key={plan.id} className="border-b border-border last:border-0">
+                  <td className="px-4 py-3 font-medium text-foreground">
                     {editId === plan.id ? (
                       <Input
                         value={editName}
@@ -156,8 +156,8 @@ export default function MasterPlans() {
                       plan.name
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{plan.maxClients}</td>
-                  <td className="px-4 py-3 text-gray-600">
+                  <td className="px-4 py-3 text-foreground">{plan.maxClients}</td>
+                  <td className="px-4 py-3 text-foreground">
                     R$ {Number(plan.priceMonthly).toFixed(2)}
                   </td>
                   <td className="px-4 py-3">

@@ -15,12 +15,12 @@ export default function MasterDashboard() {
     queryFn: () => api.get('/master/revenue').then((r) => r.data as Revenue),
   })
 
-  if (isLoading) return <div className="p-8 text-gray-500">Carregando...</div>
-  if (error) return <div className="p-8 text-red-500">Erro ao carregar dados.</div>
+  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando...</div>
+  if (error) return <div className="p-8 text-danger-text">Erro ao carregar dados.</div>
 
   return (
     <div className="p-8">
-      <h1 className="text-xl font-bold text-gray-900 mb-6">Dashboard</h1>
+      <h1 className="text-xl font-bold text-foreground mb-6">Dashboard</h1>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label="MRR"
@@ -60,10 +60,10 @@ function StatCard({
     <Card>
       <CardContent className="pt-6">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm text-gray-500">{label}</p>
+          <p className="text-sm text-muted-foreground">{label}</p>
           <span style={{ color: iconColor }}>{icon}</span>
         </div>
-        <p className="text-3xl font-bold text-gray-900">{value}</p>
+        <p className="text-3xl font-bold text-foreground">{value}</p>
       </CardContent>
     </Card>
   )

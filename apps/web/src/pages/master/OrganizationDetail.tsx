@@ -47,41 +47,41 @@ export default function MasterOrganizationDetail() {
     onError: () => toast.error('Erro ao redefinir senha'),
   })
 
-  if (isLoading || !org) return <div className="p-8 text-gray-500">Carregando...</div>
+  if (isLoading || !org) return <div className="p-8 text-muted-foreground">Carregando...</div>
 
   return (
     <div className="p-8">
-      <Link to="/master/organizations" className="text-sm text-blue-600 hover:underline">
+      <Link to="/master/organizations" className="text-sm text-accent hover:underline">
         ← Voltar
       </Link>
-      <h1 className="text-xl font-bold text-gray-900 mt-2 mb-1">{org.name}</h1>
-      <p className="text-sm text-gray-500 mb-6">{org.email} · {org.planName}</p>
+      <h1 className="text-xl font-bold text-foreground mt-2 mb-1">{org.name}</h1>
+      <p className="text-sm text-muted-foreground mb-6">{org.email} · {org.planName}</p>
 
       <Card className="mb-6">
         <CardContent className="p-4 flex gap-6 text-sm">
-          <div><span className="text-gray-400">Status:</span> <Badge>{org.subscriptionStatus}</Badge></div>
-          <div><span className="text-gray-400">Clientes:</span> {org.clientsCount}</div>
-          <div><span className="text-gray-400">Usuários:</span> {org.usersCount}</div>
+          <div><span className="text-muted-foreground">Status:</span> <Badge>{org.subscriptionStatus}</Badge></div>
+          <div><span className="text-muted-foreground">Clientes:</span> {org.clientsCount}</div>
+          <div><span className="text-muted-foreground">Usuários:</span> {org.usersCount}</div>
         </CardContent>
       </Card>
 
-      <h2 className="text-sm font-semibold text-gray-700 mb-3">Usuários</h2>
+      <h2 className="text-sm font-semibold text-foreground mb-3">Usuários</h2>
       <Card>
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
+              <tr className="border-b border-border bg-neutral-bg">
                 {['Nome', 'E-mail', 'Perfil', 'Ações'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 font-medium text-muted-foreground">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {org.users.map((u) => (
-                <tr key={u.id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-4 py-3 font-medium text-gray-900">{u.name}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{u.email}</td>
-                  <td className="px-4 py-3 text-gray-600">{ROLE_LABEL[u.role] ?? u.role}</td>
+                <tr key={u.id} className="border-b border-border last:border-0">
+                  <td className="px-4 py-3 font-medium text-foreground">{u.name}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">{u.email}</td>
+                  <td className="px-4 py-3 text-foreground">{ROLE_LABEL[u.role] ?? u.role}</td>
                   <td className="px-4 py-3">
                     <Button
                       size="sm"
@@ -105,11 +105,11 @@ export default function MasterOrganizationDetail() {
             <DialogTitle>Senha redefinida</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 mt-2">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Nova senha temporária — repasse para o usuário agora, ela não será mostrada novamente:
             </p>
             <div className="flex items-center gap-2">
-              <code className="flex-1 bg-gray-100 rounded px-3 py-2 text-sm font-mono">{resetPassword}</code>
+              <code className="flex-1 bg-neutral-bg rounded px-3 py-2 text-sm font-mono">{resetPassword}</code>
               <Button
                 type="button"
                 variant="outline"

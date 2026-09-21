@@ -109,14 +109,14 @@ export default function MasterOrganizations() {
     onError: () => toast.error('Erro ao atualizar escritório'),
   })
 
-  if (isLoading) return <div className="p-8 text-gray-500">Carregando escritórios...</div>
+  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando escritórios...</div>
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-gray-900">
+        <h1 className="text-xl font-bold text-foreground">
           Escritórios{' '}
-          <span className="text-base font-normal text-gray-400">({orgs.length})</span>
+          <span className="text-base font-normal text-muted-foreground">({orgs.length})</span>
         </h1>
         <Button onClick={() => setShowCreate(true)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
           + Criar organização
@@ -127,29 +127,29 @@ export default function MasterOrganizations() {
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
+              <tr className="border-b border-border bg-neutral-bg">
                 {['Nome', 'E-mail', 'Plano', 'Status', 'Clientes', 'Usuários', 'Ações'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 font-medium text-muted-foreground">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {orgs.map((org) => (
-                <tr key={org.id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-4 py-3 font-medium text-gray-900">
+                <tr key={org.id} className="border-b border-border last:border-0">
+                  <td className="px-4 py-3 font-medium text-foreground">
                     <Link to={`/master/organizations/${org.id}`} className="hover:underline">
                       {org.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{org.email}</td>
-                  <td className="px-4 py-3 text-gray-600">{org.planName}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">{org.email}</td>
+                  <td className="px-4 py-3 text-foreground">{org.planName}</td>
                   <td className="px-4 py-3">
                     <Badge className={STATUS_CLASS[org.subscriptionStatus] ?? 'bg-gray-100 text-gray-500'}>
                       {STATUS_LABEL[org.subscriptionStatus] ?? org.subscriptionStatus}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{org.clientsCount}</td>
-                  <td className="px-4 py-3 text-gray-600">{org.usersCount}</td>
+                  <td className="px-4 py-3 text-foreground">{org.clientsCount}</td>
+                  <td className="px-4 py-3 text-foreground">{org.usersCount}</td>
                   <td className="px-4 py-3">
                     {org.subscriptionStatus !== 'SUSPENDED' ? (
                       <Button
@@ -198,12 +198,12 @@ export default function MasterOrganizations() {
                 <DialogTitle>Organização criada</DialogTitle>
               </DialogHeader>
               <div className="space-y-3 mt-2">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   Senha temporária do administrador — repasse para o escritório agora,
                   ela não será mostrada novamente:
                 </p>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 bg-gray-100 rounded px-3 py-2 text-sm font-mono">
+                  <code className="flex-1 bg-neutral-bg rounded px-3 py-2 text-sm font-mono">
                     {createdPassword}
                   </code>
                   <Button
@@ -245,7 +245,7 @@ export default function MasterOrganizations() {
                     id="o-plan"
                     value={createForm.planId}
                     onChange={(e) => setCreateForm({ ...createForm, planId: e.target.value })}
-                    className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   >
                     <option value="">Selecione um plano</option>
                     {plans.map((p) => (
