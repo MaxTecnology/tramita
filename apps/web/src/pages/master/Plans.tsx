@@ -65,7 +65,7 @@ export default function MasterPlans() {
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.name || !form.maxClients || !form.priceMonthly) return
+    if (!form.name || form.maxClients === '' || form.priceMonthly === '') return
     createMutation.mutate({
       name: form.name,
       maxClients: Number(form.maxClients),
