@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Paperclip, MessageSquare, Clock, Trash2, FileCheck } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { Comments } from '@/components/shared/Comments'
 import type { Task, Attachment, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable } from '@/types'
 import { toast } from 'sonner'
@@ -197,7 +198,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
   const isOverdue =
     task.dueDate !== null &&
     task.status !== 'DONE' &&
-    new Date(task.dueDate) < new Date()
+    isPastDateOnlyUTC(task.dueDate)
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'comments', label: 'Comentários', icon: <MessageSquare size={14} /> },
@@ -302,7 +303,12 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                   onChange={(e) => {
                     const val = e.target.value
                     updateMutation.mutate({
-                      dueDate: val ? new Date(val + 'T00:00:00').toISOString() : null,
+                      dueDate: val
+                        ? (() => {
+                            const [y, m, d] = val.split('-').map(Number)
+                            return new Date(Date.UTC(y, m - 1, d)).toISOString()
+                          })()
+                        : null,
                     })
                   }}
                   className="text-xs border border-gray-300 rounded px-2 py-0.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -310,14 +316,14 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                 {/* Aviso quando prazo da tarefa ultrapassa prazo do processo */}
                 {task.dueDate && boardDueDate && new Date(task.dueDate) > new Date(boardDueDate) && (
                   <p className="text-xs text-amber-600">
-                    ⚠ Prazo além do processo ({new Date(boardDueDate).toLocaleDateString('pt-BR')})
+                    ⚠ Prazo além do processo ({formatDateOnlyUTC(boardDueDate)})
                   </p>
                 )}
               </div>
             ) : (
               task.dueDate && (
                 <span className={cn('text-xs px-2 py-0.5 rounded-full bg-gray-100', isOverdue && 'bg-red-100 text-red-600 font-medium')}>
-                  {isOverdue ? '⚠ ' : ''}Prazo: {new Date(task.dueDate).toLocaleDateString('pt-BR')}
+                  {isOverdue ? '⚠ ' : ''}Prazo: {formatDateOnlyUTC(task.dueDate)}
                 </span>
               )
             )}
@@ -328,7 +334,14 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                 defaultValue={task.targetDate ? task.targetDate.slice(0, 10) : ''}
                 onChange={(e) => {
                   const val = e.target.value
-                  updateMutation.mutate({ targetDate: val ? new Date(val + 'T00:00:00').toISOString() : null })
+                  updateMutation.mutate({
+                    targetDate: val
+                      ? (() => {
+                          const [y, m, d] = val.split('-').map(Number)
+                          return new Date(Date.UTC(y, m - 1, d)).toISOString()
+                        })()
+                      : null,
+                  })
                 }}
                 title="Meta interna"
                 className="text-xs border border-gray-300 rounded px-2 py-0.5 text-gray-700"
@@ -336,7 +349,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
             ) : (
               task.targetDate && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" title="Meta interna">
-                  Meta: {new Date(task.targetDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                  Meta: {formatDateOnlyUTC(task.targetDate)}
                 </span>
               )
             )}

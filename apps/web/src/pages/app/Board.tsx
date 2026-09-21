@@ -22,6 +22,7 @@ import { TaskCard } from '@/components/TaskCard'
 import { TaskDrawer } from '@/components/shared/TaskDrawer'
 import { useAuth } from '@/hooks/useAuth'
 import type { Task } from '@/types'
+import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { toast } from 'sonner'
 
 function DroppableColumn({ id, children }: { id: string; children: React.ReactNode }) {
@@ -65,7 +66,7 @@ export default function Board() {
 
   // Computed values for board due date
   const boardDueDate = board?.dueDate ? new Date(board.dueDate) : null
-  const boardDueDateOverdue = boardDueDate ? boardDueDate < new Date() : false
+  const boardDueDateOverdue = board?.dueDate ? isPastDateOnlyUTC(board.dueDate) : false
 
   const createTaskMutation = useMutation({
     mutationFn: ({ columnId, title }: { columnId: string; title: string }) =>
@@ -146,7 +147,7 @@ export default function Board() {
               ? 'bg-danger-bg text-danger-text'
               : 'bg-warning-bg text-warning-text'
           )}>
-            {boardDueDateOverdue ? '⚠ ' : ''}{boardDueDate.toLocaleDateString('pt-BR')}
+            {boardDueDateOverdue ? '⚠ ' : ''}{formatDateOnlyUTC(boardDueDate)}
           </span>
         )}
       </div>

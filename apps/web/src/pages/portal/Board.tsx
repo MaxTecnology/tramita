@@ -7,6 +7,7 @@ import { useBoardStream } from '@/hooks/useBoardStream'
 import { TaskDrawer } from '@/components/portal/TaskDrawer'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
+import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import type { Board, Task } from '@/types'
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -105,7 +106,7 @@ export default function PortalBoard() {
                   const isOverdue =
                     task.dueDate !== null &&
                     task.status !== 'DONE' &&
-                    new Date(task.dueDate) < new Date()
+                    isPastDateOnlyUTC(task.dueDate)
 
                   return (
                     <div
@@ -135,7 +136,7 @@ export default function PortalBoard() {
                         </span>
                         {task.dueDate && (
                           <span className={cn('text-xs', isOverdue ? 'text-red-500 font-medium' : 'text-gray-400')}>
-                            {isOverdue ? '⚠ ' : ''}{new Date(task.dueDate).toLocaleDateString('pt-BR')}
+                            {isOverdue ? '⚠ ' : ''}{formatDateOnlyUTC(task.dueDate)}
                           </span>
                         )}
                       </div>

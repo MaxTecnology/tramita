@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { diffDaysDateOnlyUTC, formatDateOnlyUTC } from '@/lib/dates'
 import { Plus, ChevronDown, ChevronRight, AlertTriangle, Clock, ClipboardList, CheckCircle2, Search, X, FileSearch } from 'lucide-react'
 import type { Board, Client } from '@/types'
 import { toast } from 'sonner'
@@ -50,11 +51,11 @@ function getCurrentStage(board: Board): string {
 
 function formatDueDate(date: Date | null, now: Date): { label: string; cls: string } {
   if (!date) return { label: '—', cls: 'text-muted-foreground' }
-  const diff = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const diff = diffDaysDateOnlyUTC(date, now)
   if (diff < 0) return { label: `Vencido há ${Math.abs(diff)}d`, cls: 'text-danger-text font-medium' }
   if (diff === 0) return { label: 'Vence hoje', cls: 'text-danger-text font-medium' }
   if (diff <= 7) return { label: `Em ${diff}d`, cls: 'text-warning-text font-medium' }
-  return { label: date.toLocaleDateString('pt-BR'), cls: 'text-muted-foreground' }
+  return { label: formatDateOnlyUTC(date), cls: 'text-muted-foreground' }
 }
 
 function getProgressCls(progress: number, isOverdue: boolean): string {
