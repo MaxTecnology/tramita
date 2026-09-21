@@ -15,6 +15,9 @@ export interface TemplateVars {
   portalUrl: string
   commentText?: string
   commentAuthorName?: string
+  documentName?: string      // novo — nome do documento rejeitado (DOCUMENT_REJECTED)
+  templateTitle?: string     // novo — título do template de recorrência (RECURRING_GENERATION_FAILED)
+  errorMessage?: string      // novo — mensagem de erro da geração (RECURRING_GENERATION_FAILED)
 }
 
 export const PREVIEW_VARS: TemplateVars = {
@@ -27,6 +30,9 @@ export const PREVIEW_VARS: TemplateVars = {
   portalUrl: 'https://tramita.autohubs.com.br/portal',
   commentText: 'Documento recebido, obrigado!',
   commentAuthorName: 'Dr. Carlos Mendes',
+  documentName: 'Extrato bancário',
+  templateTitle: 'Folha de pagamento',
+  errorMessage: 'Coluna do processo não encontrada',
 }
 
 export function renderTemplate(body: string, vars: TemplateVars): string {

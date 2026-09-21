@@ -18,10 +18,12 @@ const EVENT_FLAG_MAP: Record<string, keyof NotificationConfig> = {
   REQUEST_CREATED: 'requestCreated',
   REQUEST_APPROVED: 'requestApproved',
   REQUEST_REJECTED: 'requestRejected',
+  RECURRING_GENERATION_FAILED: 'recurringGenerationFailed',
+  DOCUMENT_REJECTED: 'documentRejected',
 }
 
 export async function processNotificationJob(job: { data: NotificationJob }): Promise<void> {
-  const { event, organizationId, recipientType = 'CLIENT', clientId, userId, taskId, requestId, metadata } =
+  const { event, organizationId, recipientType = 'CLIENT', clientId, userId, taskId, requestId, metadata, channels } =
     job.data
 
   const config = await prisma.notificationConfig.findUnique({ where: { organizationId } })
@@ -37,7 +39,7 @@ export async function processNotificationJob(job: { data: NotificationJob }): Pr
   }
 
   if (!clientId) return
-  await processClientNotification(config, { event, organizationId, clientId, taskId, requestId, metadata })
+  await processClientNotification(config, { event, organizationId, clientId, taskId, requestId, metadata, channels })
 }
 
 async function processClientNotification(
@@ -49,9 +51,10 @@ async function processClientNotification(
     taskId?: string
     requestId?: string
     metadata: Record<string, string | undefined>
+    channels?: MessageChannel[]
   },
 ): Promise<void> {
-  const { event, organizationId, clientId, taskId, requestId, metadata } = params
+  const { event, organizationId, clientId, taskId, requestId, metadata, channels: channelOverride } = params
 
   const [client, org, task] = await Promise.all([
     prisma.client.findUnique({ where: { id: clientId } }),
@@ -85,7 +88,9 @@ async function processClientNotification(
   if (config.whatsappEnabled && client.whatsapp && config.maximizebotToken) channels.push('WHATSAPP')
   if (config.emailEnabled) channels.push('EMAIL')
 
-  for (const channel of channels) {
+  const effectiveChannels = channelOverride ? channels.filter((c) => channelOverride.includes(c)) : channels
+
+  for (const channel of effectiveChannels) {
     const template = await getTemplate(organizationId, event as NotificationEvent, channel)
     const rendered = renderTemplate(template.body, vars)
 

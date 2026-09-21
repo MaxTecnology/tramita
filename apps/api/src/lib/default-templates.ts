@@ -37,4 +37,12 @@ export const DEFAULT_TEMPLATES: TemplateMap = {
     WHATSAPP: { body: 'Olá, {{clientName}}! Sua solicitação *{{requestTitle}}* não foi aprovada.\n\nMotivo: {{rejectionReason}}\n\nAcompanhe: {{portalUrl}}' },
     EMAIL: { subject: 'Solicitação não aprovada — {{requestTitle}}', body: 'Olá, {{clientName}}!\n\nSua solicitação *{{requestTitle}}* não foi aprovada.\n\nMotivo: {{rejectionReason}}\n\nAcompanhe em: {{portalUrl}}' },
   },
+  RECURRING_GENERATION_FAILED: {
+    WHATSAPP: { body: 'Falha ao gerar a tarefa recorrente *{{templateTitle}}*: {{errorMessage}}' },
+    EMAIL: { subject: 'Falha na geração de tarefa recorrente — {{templateTitle}}', body: 'A geração automática da tarefa recorrente *{{templateTitle}}* falhou.\n\nMotivo: {{errorMessage}}\n\nAcesse o painel pra reprocessar: {{portalUrl}}' },
+  },
+  DOCUMENT_REJECTED: {
+    WHATSAPP: { body: 'Olá, {{clientName}}! O documento *{{documentName}}* enviado em *{{taskTitle}}* foi rejeitado.\n\nMotivo: {{rejectionReason}}\n\nEnvie novamente: {{portalUrl}}' },
+    EMAIL: { subject: 'Documento rejeitado — {{documentName}}', body: 'Olá, {{clientName}}!\n\nO documento *{{documentName}}* enviado em *{{taskTitle}}* foi rejeitado.\n\nMotivo: {{rejectionReason}}\n\nEnvie novamente em: {{portalUrl}}' },
+  },
 }
