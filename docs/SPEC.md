@@ -213,6 +213,79 @@ Cadastro de novo escritório (público — sem autenticação).
 
 ---
 
+## Tarefas Recorrentes
+
+### GET `/recurring-templates` _(ORG_ADMIN | ORG_MANAGER)_ — lista templates da org, com listas de documento a pedir/entregar
+### GET `/recurring-templates/:id` _(ORG_ADMIN | ORG_MANAGER)_
+### POST `/recurring-templates` _(ORG_ADMIN)_
+```json
+{
+  "departmentId": "string",
+  "title": "string",
+  "description": "string?",
+  "periodicity": "WEEKLY|MONTHLY|QUARTERLY|ANNUAL",
+  "dueMonthOffset": 0,
+  "dueDayOfPeriod": 1,
+  "dueRollToBusinessDay": false,
+  "targetOffsetDays": 0,
+  "targetRollToBusinessDay": false,
+  "generationMonthOffset": 1,
+  "generationDayOfPeriod": 1,
+  "autoCompleteOnAllActivitiesDone": false,
+  "notifyViaWhatsapp": true,
+  "notifyViaEmail": false,
+  "visibleToClient": true,
+  "isActive": true,
+  "documentRequests": [{ "name": "string" }],
+  "documentDeliveries": [{ "name": "string" }]
+}
+```
+### PATCH `/recurring-templates/:id` _(ORG_ADMIN)_ — mesmo payload, todos os campos opcionais
+### DELETE `/recurring-templates/:id` _(ORG_ADMIN)_ — 409 se houver vínculo de cliente ativo
+
+### GET `/recurring-templates/:id/assignments` _(ORG_ADMIN | ORG_MANAGER)_ — lista vínculos de cliente do template
+### POST `/recurring-templates/:id/assignments` _(ORG_ADMIN)_
+```json
+{ "clientId": "string", "boardId": "string", "columnId": "string" }
+```
+→ 409 se o cliente já estiver vinculado a este template
+### PATCH `/recurring-templates/:id/assignments/:assignmentId` _(ORG_ADMIN)_ — `{ "boardId": "string?", "columnId": "string?", "isActive": "boolean?" }`
+### DELETE `/recurring-templates/:id/assignments/:assignmentId` _(ORG_ADMIN)_
+
+### POST `/recurring-templates/:id/assignments/:assignmentId/generate` _(ORG_ADMIN)_ — geração manual, fora do gatilho diário
+```json
+{ "competence": "ISO8601?" }
+```
+→ Sem `competence`, usa o início do período corrente; com `competence`, o valor é canonicalizado pro início do período (semana/mês/trimestre/ano) a que pertence, pra bater com a chave de idempotência do cron
+→ 409 se já existe geração `SUCCESS` pra essa competência+cliente
+
+### GET `/recurring-templates/:id/generation-log` _(ORG_ADMIN | ORG_MANAGER)_ — histórico de gerações (SUCCESS/FAILED) por competência
+
+---
+
+## Checklist de Documentos da Tarefa
+
+### GET `/tasks/:id/documents` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — lista `requirements` (a pedir) e `deliverables` (a entregar), cada um com `signedUrl` do anexo quando houver
+### POST `/tasks/:id/documents/requests` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — adiciona item ad-hoc à lista de documentos a pedir — `{ "name": "string" }` — recalcula o status da tarefa (BLOCKED enquanto houver item PENDING/REJECTED)
+### POST `/tasks/:id/documents/deliveries` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — adiciona item ad-hoc à lista de documentos a entregar — `{ "name": "string" }`
+### PATCH `/tasks/:id/documents/requests/:reqId` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — aprova/rejeita documento enviado
+```json
+{ "decision": "APPROVED|REJECTED", "rejectionReason": "string?" }
+```
+→ `rejectionReason` obrigatório quando `decision: REJECTED`
+→ Rejeição dispara `DOCUMENT_REJECTED`
+### POST `/tasks/:id/documents/requests/:reqId/upload` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — multipart, max 20MB — upload do lado do escritório pra um item a pedir
+### POST `/tasks/:id/documents/deliveries/:reqId/upload` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — multipart, max 20MB — entrega de documento gerado pelo escritório
+
+---
+
+## Portal do Cliente — Documentos da Tarefa
+
+### GET `/portal/tasks/:taskId/documents` _(CLIENT)_ — mesmo formato de `GET /tasks/:id/documents`; 404 se a tarefa não pertence ao cliente ou não é `visibleToClient`
+### POST `/portal/tasks/:taskId/documents/requests/:reqId/upload` _(CLIENT)_ — multipart, max 20MB — cliente envia o documento pedido pelo escritório
+
+---
+
 ## Templates de Mensagem
 
 ### GET `/notifications/templates` _(ORG_ADMIN)_
