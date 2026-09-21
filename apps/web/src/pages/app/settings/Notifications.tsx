@@ -34,6 +34,8 @@ const EVENT_LABEL: Record<string, string> = {
   TASK_COMPLETED: 'Tarefa concluída',
   TASK_COMMENT_ADDED: 'Comentário adicionado',
   TASK_DUE_DATE_APPROACHING: 'Prazo se aproximando',
+  RECURRING_GENERATION_FAILED: 'Falha na geração de tarefa recorrente',
+  DOCUMENT_REJECTED: 'Documento rejeitado',
 }
 
 const STATUS_LABEL: Record<string, string> = {
