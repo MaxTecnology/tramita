@@ -18,6 +18,7 @@ import Notifications from '@/pages/app/settings/Notifications'
 import AppSubscription from '@/pages/app/settings/Subscription'
 import Profile from '@/pages/app/settings/Profile'
 import Departments from '@/pages/app/settings/Departments'
+import RecurringTemplates from '@/pages/app/settings/RecurringTemplates'
 import DashboardMetrics from '@/pages/app/DashboardMetrics'
 import Processes from '@/pages/app/Processes'
 import Requests from '@/pages/app/Requests'
@@ -105,6 +106,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <Departments />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/recurring-templates',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <RecurringTemplates />
           </ProtectedRoute>
         ),
       },

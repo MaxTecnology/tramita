@@ -7,13 +7,17 @@ export interface Task {
   position: number
   columnId: string
   assigneeId: string | null
-  creatorId: string
+  creatorId: string | null
   dueDate: string | null
   tags: string[]
   createdAt: string
   updatedAt: string
   sourceRequestId: string | null
   departmentId: string | null
+  competence: string | null
+  targetDate: string | null
+  recurringTemplateId: string | null
+  visibleToClient: boolean
 }
 
 export interface Column {
@@ -127,4 +131,74 @@ export interface Department {
   name: string
   createdAt: string
   updatedAt: string
+}
+
+export interface RecurringTaskTemplateDocumentItem {
+  id: string
+  name: string
+  position: number
+}
+
+export interface RecurringTaskTemplate {
+  id: string
+  departmentId: string
+  department: { id: string; name: string }
+  title: string
+  description: string | null
+  periodicity: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL'
+  dueMonthOffset: number
+  dueDayOfPeriod: number
+  dueRollToBusinessDay: boolean
+  targetOffsetDays: number
+  targetRollToBusinessDay: boolean
+  generationMonthOffset: number
+  generationDayOfPeriod: number
+  autoCompleteOnAllActivitiesDone: boolean
+  notifyViaWhatsapp: boolean
+  notifyViaEmail: boolean
+  visibleToClient: boolean
+  isActive: boolean
+  documentRequests: RecurringTaskTemplateDocumentItem[]
+  documentDeliveries: RecurringTaskTemplateDocumentItem[]
+}
+
+export interface RecurringTaskAssignment {
+  id: string
+  templateId: string
+  clientId: string
+  client: { id: string; name: string }
+  boardId: string
+  board: { id: string; title: string }
+  columnId: string
+  isActive: boolean
+}
+
+export interface RecurringGenerationLog {
+  id: string
+  templateId: string
+  clientId: string
+  competence: string
+  status: 'SUCCESS' | 'FAILED'
+  taskId: string | null
+  errorMessage: string | null
+  createdAt: string
+}
+
+export interface TaskDocumentRequirement {
+  id: string
+  taskId: string
+  name: string
+  status: 'PENDING' | 'UPLOADED' | 'APPROVED' | 'REJECTED'
+  rejectionReason: string | null
+  signedUrl: string | null
+  position: number
+}
+
+export interface TaskDeliverable {
+  id: string
+  taskId: string
+  name: string
+  deliveredAt: string | null
+  signedUrl: string | null
+  position: number
 }

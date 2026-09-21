@@ -18,6 +18,10 @@ const baseTask: Task = {
   updatedAt: new Date().toISOString(),
   sourceRequestId: null,
   departmentId: null,
+  competence: null,
+  targetDate: null,
+  recurringTemplateId: null,
+  visibleToClient: true,
 }
 
 it('renders task title', () => {
