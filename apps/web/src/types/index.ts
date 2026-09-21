@@ -209,3 +209,21 @@ export interface TaskDeliverable {
   signedUrl: string | null
   position: number
 }
+
+export interface ClientUserAccessItem {
+  id: string
+  clientId: string
+  departmentId: string
+  client: { id: string; name: string }
+  department: { id: string; name: string }
+}
+
+export interface ClientUser {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  isActive: boolean
+  createdAt: string
+  accesses: ClientUserAccessItem[]
+}

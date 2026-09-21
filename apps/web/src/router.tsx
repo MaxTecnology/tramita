@@ -20,6 +20,8 @@ import Profile from '@/pages/app/settings/Profile'
 import Departments from '@/pages/app/settings/Departments'
 import RecurringTemplates from '@/pages/app/settings/RecurringTemplates'
 import RecurringTemplateForm from '@/pages/app/settings/RecurringTemplateForm'
+import ClientUsers from '@/pages/app/settings/ClientUsers'
+import ClientUserForm from '@/pages/app/settings/ClientUserForm'
 import DashboardMetrics from '@/pages/app/DashboardMetrics'
 import Processes from '@/pages/app/Processes'
 import Requests from '@/pages/app/Requests'
@@ -131,6 +133,30 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <RecurringTemplateForm />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/client-users',
+        element: (
+          <ProtectedRoute allowedRoles={MANAGER_ROLES}>
+            <ClientUsers />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/client-users/new',
+        element: (
+          <ProtectedRoute allowedRoles={MANAGER_ROLES}>
+            <ClientUserForm />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/client-users/:id/edit',
+        element: (
+          <ProtectedRoute allowedRoles={MANAGER_ROLES}>
+            <ClientUserForm />
           </ProtectedRoute>
         ),
       },
