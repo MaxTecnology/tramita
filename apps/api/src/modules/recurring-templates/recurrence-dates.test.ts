@@ -12,9 +12,9 @@ const monthlyRules: RecurrenceDateRules = {
   periodicity: 'MONTHLY',
   dueMonthOffset: 1,
   dueDayOfPeriod: 15,
-  dueRollToBusinessDay: false,
+  dueBusinessDayRoll: 'NONE',
   targetOffsetDays: -2,
-  targetRollToBusinessDay: false,
+  targetBusinessDayRoll: 'NONE',
   generationMonthOffset: 1,
   generationDayOfPeriod: 20,
 }
@@ -57,14 +57,22 @@ describe('computeDueDate', () => {
     expect(due.toISOString().slice(0, 10)).toBe('2026-02-06') // sexta da mesma semana
   })
 
-  it('ajusta pro próximo dia útil quando dueRollToBusinessDay=true e a data cai num sábado', () => {
+  it('ajusta pro próximo dia útil quando dueBusinessDayRoll=FORWARD e a data cai num sábado', () => {
     // competência fevereiro + dueMonthOffset=1 (herdado de monthlyRules) = base março; dia 14 de março de 2026 é um sábado
-    const rules: RecurrenceDateRules = { ...monthlyRules, dueDayOfPeriod: 14, dueRollToBusinessDay: true }
+    const rules: RecurrenceDateRules = { ...monthlyRules, dueDayOfPeriod: 14, dueBusinessDayRoll: 'FORWARD' }
     const competence = new Date(Date.UTC(2026, 1, 1))
     const due = computeDueDate(competence, rules)
     expect(due.getUTCDay()).not.toBe(0)
     expect(due.getUTCDay()).not.toBe(6)
     expect(due.toISOString().slice(0, 10)).toBe('2026-03-16') // segunda seguinte
+  })
+
+  it('antecipa pro dia útil anterior quando dueBusinessDayRoll=BACKWARD e a data cai num domingo', () => {
+    // dueDayOfPeriod=20 em setembro/2026 cai num domingo -> deve antecipar pra sexta (18)
+    const rules: RecurrenceDateRules = { ...monthlyRules, dueMonthOffset: 0, dueDayOfPeriod: 20, dueBusinessDayRoll: 'BACKWARD' }
+    const competence = new Date(Date.UTC(2026, 8, 1)) // setembro/2026
+    const due = computeDueDate(competence, rules)
+    expect(due.toISOString().slice(0, 10)).toBe('2026-09-18')
   })
 
   it('ajusta o dia pro último dia do mês quando dueDayOfPeriod excede os dias do mês de destino', () => {
@@ -84,7 +92,7 @@ describe('computeTargetDate', () => {
 
   it('ajusta a meta pro próximo dia útil independente do ajuste do vencimento', () => {
     // due=2026-03-16 (segunda) + targetOffsetDays=-1 = 2026-03-15 (domingo) — cai em fim de semana
-    const rules: RecurrenceDateRules = { ...monthlyRules, targetOffsetDays: -1, targetRollToBusinessDay: true }
+    const rules: RecurrenceDateRules = { ...monthlyRules, targetOffsetDays: -1, targetBusinessDayRoll: 'FORWARD' }
     const due = new Date(Date.UTC(2026, 2, 16)) // segunda 2026-03-16 -> meta cai em 2026-03-15 (domingo)
     const target = computeTargetDate(due, rules)
     expect(target.toISOString().slice(0, 10)).toBe('2026-03-16') // empurra pra segunda

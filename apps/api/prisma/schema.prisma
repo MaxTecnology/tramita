@@ -319,12 +319,12 @@ model RecurringTaskTemplate {
   description    String?
   periodicity    RecurrencePeriodicity
 
-  dueMonthOffset       Int     @default(0)
-  dueDayOfPeriod       Int
-  dueRollToBusinessDay Boolean @default(false)
+  dueMonthOffset     Int             @default(0)
+  dueDayOfPeriod     Int
+  dueBusinessDayRoll BusinessDayRoll @default(NONE)
 
-  targetOffsetDays        Int     @default(0)
-  targetRollToBusinessDay Boolean @default(false)
+  targetOffsetDays      Int             @default(0)
+  targetBusinessDayRoll BusinessDayRoll @default(NONE)
 
   generationMonthOffset Int @default(1)
   generationDayOfPeriod Int
@@ -356,6 +356,12 @@ enum RecurrencePeriodicity {
   MONTHLY
   QUARTERLY
   ANNUAL
+}
+
+enum BusinessDayRoll {
+  NONE
+  FORWARD
+  BACKWARD
 }
 
 model RecurringTaskTemplateDocument {

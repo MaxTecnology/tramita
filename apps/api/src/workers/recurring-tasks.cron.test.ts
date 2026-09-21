@@ -21,8 +21,8 @@ describe('runRecurringTasksGeneration', () => {
 
     const templateTriggersToday = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Dispara hoje', periodicity: 'MONTHLY',
-      dueMonthOffset: 0, dueDayOfPeriod: 10, dueRollToBusinessDay: false,
-      targetOffsetDays: 0, targetRollToBusinessDay: false,
+      dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
@@ -31,8 +31,8 @@ describe('runRecurringTasksGeneration', () => {
 
     const templateDoesNotTrigger = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Não dispara hoje', periodicity: 'MONTHLY',
-      dueMonthOffset: 0, dueDayOfPeriod: 10, dueRollToBusinessDay: false,
-      targetOffsetDays: 0, targetRollToBusinessDay: false,
+      dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 5,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
@@ -61,8 +61,8 @@ describe('runRecurringTasksGeneration', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Inativo', periodicity: 'MONTHLY',
-      dueMonthOffset: 0, dueDayOfPeriod: 10, dueRollToBusinessDay: false,
-      targetOffsetDays: 0, targetRollToBusinessDay: false,
+      dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: false, documentRequests: [], documentDeliveries: [],
@@ -88,8 +88,8 @@ describe('runRecurringTasksGeneration', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'X', periodicity: 'MONTHLY',
-      dueMonthOffset: 0, dueDayOfPeriod: 10, dueRollToBusinessDay: false,
-      targetOffsetDays: 0, targetRollToBusinessDay: false,
+      dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],

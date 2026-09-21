@@ -148,9 +148,9 @@ export interface RecurringTaskTemplate {
   periodicity: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL'
   dueMonthOffset: number
   dueDayOfPeriod: number
-  dueRollToBusinessDay: boolean
+  dueBusinessDayRoll: 'NONE' | 'FORWARD' | 'BACKWARD'
   targetOffsetDays: number
-  targetRollToBusinessDay: boolean
+  targetBusinessDayRoll: 'NONE' | 'FORWARD' | 'BACKWARD'
   generationMonthOffset: number
   generationDayOfPeriod: number
   autoCompleteOnAllActivitiesDone: boolean

@@ -1,12 +1,13 @@
 export type Periodicity = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL'
+export type BusinessDayRoll = 'NONE' | 'FORWARD' | 'BACKWARD'
 
 export interface RecurrenceDateRules {
   periodicity: Periodicity
   dueMonthOffset: number
   dueDayOfPeriod: number
-  dueRollToBusinessDay: boolean
+  dueBusinessDayRoll: BusinessDayRoll
   targetOffsetDays: number
-  targetRollToBusinessDay: boolean
+  targetBusinessDayRoll: BusinessDayRoll
   generationMonthOffset: number
   generationDayOfPeriod: number
 }
@@ -16,10 +17,12 @@ function isWeekend(date: Date): boolean {
   return day === 0 || day === 6
 }
 
-function rollToNextBusinessDay(date: Date): Date {
+function rollToBusinessDay(date: Date, direction: BusinessDayRoll): Date {
+  if (direction === 'NONE') return date
+  const step = direction === 'FORWARD' ? 1 : -1
   const result = new Date(date)
   while (isWeekend(result)) {
-    result.setUTCDate(result.getUTCDate() + 1)
+    result.setUTCDate(result.getUTCDate() + step)
   }
   return result
 }
@@ -63,12 +66,12 @@ export function computeDueDate(competence: Date, rules: RecurrenceDateRules): Da
     const day = clampDayOfMonth(year, month, rules.dueDayOfPeriod)
     due = new Date(Date.UTC(year, month, day))
   }
-  return rules.dueRollToBusinessDay ? rollToNextBusinessDay(due) : due
+  return rollToBusinessDay(due, rules.dueBusinessDayRoll)
 }
 
 export function computeTargetDate(dueDate: Date, rules: RecurrenceDateRules): Date {
   const target = addDaysUTC(dueDate, rules.targetOffsetDays)
-  return rules.targetRollToBusinessDay ? rollToNextBusinessDay(target) : target
+  return rollToBusinessDay(target, rules.targetBusinessDayRoll)
 }
 
 /**

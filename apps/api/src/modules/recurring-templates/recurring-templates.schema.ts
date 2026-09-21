@@ -12,10 +12,10 @@ export const createTemplateSchema = z.object({
 
   dueMonthOffset: z.number().int().min(-12).max(12).default(0),
   dueDayOfPeriod: z.number().int().min(1).max(31),
-  dueRollToBusinessDay: z.boolean().default(false),
+  dueBusinessDayRoll: z.enum(['NONE', 'FORWARD', 'BACKWARD']).default('NONE'),
 
   targetOffsetDays: z.number().int().default(0),
-  targetRollToBusinessDay: z.boolean().default(false),
+  targetBusinessDayRoll: z.enum(['NONE', 'FORWARD', 'BACKWARD']).default('NONE'),
 
   generationMonthOffset: z.number().int().min(0).default(1),
   generationDayOfPeriod: z.number().int().min(1).max(31),

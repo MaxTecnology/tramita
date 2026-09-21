@@ -20,6 +20,12 @@ const DUE_MONTH_OFFSET_OPTIONS = Array.from({ length: 25 }, (_, i) => i - 12) //
 const GENERATION_MONTH_OFFSET_OPTIONS = [0, 1, 2, 3]
 const WEEKDAY_LABEL: Record<number, string> = { 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado', 7: 'Domingo' }
 
+const BUSINESS_DAY_ROLL_LABEL: Record<RecurringTaskTemplate['dueBusinessDayRoll'], string> = {
+  NONE: 'Não ajustar',
+  FORWARD: 'Empurrar pro próximo dia útil',
+  BACKWARD: 'Antecipar pro dia útil anterior',
+}
+
 function dueMonthOffsetLabel(o: number): string {
   if (o === 0) return 'Mesma competência'
   if (o < 0) return `${Math.abs(o)} ${Math.abs(o) === 1 ? 'mês' : 'meses'} antes da competência`
@@ -33,9 +39,9 @@ interface FormState {
   periodicity: RecurringTaskTemplate['periodicity']
   dueMonthOffset: number
   dueDayOfPeriod: number
-  dueRollToBusinessDay: boolean
+  dueBusinessDayRoll: RecurringTaskTemplate['dueBusinessDayRoll']
   targetOffsetDays: number
-  targetRollToBusinessDay: boolean
+  targetBusinessDayRoll: RecurringTaskTemplate['targetBusinessDayRoll']
   generationMonthOffset: number
   generationDayOfPeriod: number
   autoCompleteOnAllActivitiesDone: boolean
@@ -49,8 +55,8 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   departmentId: '', title: '', description: '', periodicity: 'MONTHLY',
-  dueMonthOffset: 0, dueDayOfPeriod: 10, dueRollToBusinessDay: false,
-  targetOffsetDays: 0, targetRollToBusinessDay: false,
+  dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+  targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
   generationMonthOffset: 1, generationDayOfPeriod: 20,
   autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
   visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
@@ -117,8 +123,8 @@ export default function RecurringTemplateForm() {
     setForm({
       departmentId: template.departmentId, title: template.title, description: template.description ?? '',
       periodicity: template.periodicity, dueMonthOffset: template.dueMonthOffset, dueDayOfPeriod: template.dueDayOfPeriod,
-      dueRollToBusinessDay: template.dueRollToBusinessDay, targetOffsetDays: template.targetOffsetDays,
-      targetRollToBusinessDay: template.targetRollToBusinessDay, generationMonthOffset: template.generationMonthOffset,
+      dueBusinessDayRoll: template.dueBusinessDayRoll, targetOffsetDays: template.targetOffsetDays,
+      targetBusinessDayRoll: template.targetBusinessDayRoll, generationMonthOffset: template.generationMonthOffset,
       generationDayOfPeriod: template.generationDayOfPeriod, autoCompleteOnAllActivitiesDone: template.autoCompleteOnAllActivitiesDone,
       notifyViaWhatsapp: template.notifyViaWhatsapp, notifyViaEmail: template.notifyViaEmail, visibleToClient: template.visibleToClient,
       isActive: template.isActive,
@@ -215,10 +221,16 @@ export default function RecurringTemplateForm() {
             </select>
           </div>
         </div>
-        <label className="flex items-center gap-2 text-sm text-foreground">
-          <input type="checkbox" checked={form.dueRollToBusinessDay} onChange={(e) => setForm({ ...form, dueRollToBusinessDay: e.target.checked })} />
-          Empurrar vencimento pro próximo dia útil se cair em fim de semana
-        </label>
+        <div className="space-y-1.5">
+          <Label>Se o vencimento cair em fim de semana</Label>
+          <select
+            value={form.dueBusinessDayRoll}
+            onChange={(e) => setForm({ ...form, dueBusinessDayRoll: e.target.value as FormState['dueBusinessDayRoll'] })}
+            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
+          >
+            {(['NONE', 'FORWARD', 'BACKWARD'] as const).map((v) => <option key={v} value={v}>{BUSINESS_DAY_ROLL_LABEL[v]}</option>)}
+          </select>
+        </div>
 
         <div className="space-y-1.5">
           <Label>Meta interna — dias em relação ao vencimento (negativo = antes)</Label>
@@ -228,10 +240,16 @@ export default function RecurringTemplateForm() {
             onChange={(e) => setForm({ ...form, targetOffsetDays: Number(e.target.value) })}
           />
         </div>
-        <label className="flex items-center gap-2 text-sm text-foreground">
-          <input type="checkbox" checked={form.targetRollToBusinessDay} onChange={(e) => setForm({ ...form, targetRollToBusinessDay: e.target.checked })} />
-          Empurrar meta pro próximo dia útil se cair em fim de semana
-        </label>
+        <div className="space-y-1.5">
+          <Label>Se a meta cair em fim de semana</Label>
+          <select
+            value={form.targetBusinessDayRoll}
+            onChange={(e) => setForm({ ...form, targetBusinessDayRoll: e.target.value as FormState['targetBusinessDayRoll'] })}
+            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
+          >
+            {(['NONE', 'FORWARD', 'BACKWARD'] as const).map((v) => <option key={v} value={v}>{BUSINESS_DAY_ROLL_LABEL[v]}</option>)}
+          </select>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
