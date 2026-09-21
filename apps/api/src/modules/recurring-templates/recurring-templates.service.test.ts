@@ -416,6 +416,34 @@ describe('generateTaskForAssignment', () => {
 
     vi.restoreAllMocks()
   })
+
+  it('retry concorrente de uma competência FAILED não duplica a Task (perdedor vira ALREADY_EXISTS)', async () => {
+    const { template, assignment } = await setup()
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const competence = new Date(Date.UTC(2026, 1, 1))
+    await prisma.recurringGenerationLog.create({
+      data: { templateId: template.id, clientId: assignment.clientId, competence, status: 'FAILED', errorMessage: 'erro antigo' },
+    })
+
+    const [first, second] = await Promise.all([
+      generateTaskForAssignment(template.id, assignment.id, competence),
+      generateTaskForAssignment(template.id, assignment.id, competence),
+    ])
+
+    const statuses = [first.status, second.status].sort()
+    expect(statuses).toEqual(['ALREADY_EXISTS', 'SUCCESS'])
+
+    const count = await prisma.task.count({ where: { recurringTemplateId: template.id } })
+    expect(count).toBe(1)
+
+    const log = await prisma.recurringGenerationLog.findUnique({
+      where: { templateId_clientId_competence: { templateId: template.id, clientId: assignment.clientId, competence } },
+    })
+    expect(log?.status).toBe('SUCCESS')
+
+    vi.restoreAllMocks()
+  })
 })
 
 describe('generateManually', () => {
@@ -448,6 +476,21 @@ describe('generateManually', () => {
     await expect(
       generateManually(template.id, assignment.id, template.organizationId, competence),
     ).rejects.toMatchObject({ statusCode: 409 })
+
+    vi.restoreAllMocks()
+  })
+
+  it('canonicaliza um competenceOverride não-canônico pro início do período (MONTHLY)', async () => {
+    const { template, assignment } = await setupTemplate()
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    // instante arbitrário dentro de setembro/2026, não o dia 1 canônico
+    const nonCanonical = new Date(Date.UTC(2026, 8, 17, 13, 22, 0)).toISOString()
+
+    const { taskId } = await generateManually(template.id, assignment.id, template.organizationId, nonCanonical)
+
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } })
+    expect(task.competence?.toISOString().slice(0, 10)).toBe('2026-09-01')
 
     vi.restoreAllMocks()
   })

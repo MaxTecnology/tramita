@@ -8,6 +8,7 @@ import {
   computeDueDate,
   computeTargetDate,
   computeCurrentPeriodStart,
+  normalizeToPeriodStart,
   type RecurrenceDateRules,
 } from './recurrence-dates'
 import type {
@@ -193,6 +194,12 @@ function isDuplicateGenerationLogError(err: unknown): boolean {
   )
 }
 
+// Sinaliza que essa execução perdeu a corrida pra outra execução concorrente ao tentar
+// reclamar um log FAILED existente (ver comentário no branch `existingLog` abaixo). Deve
+// ser tratada exatamente como isDuplicateGenerationLogError — mapeada pra ALREADY_EXISTS,
+// nunca cai no branch de "falha genuína" (que reescreveria o log SUCCESS do vencedor pra FAILED).
+class ConcurrentGenerationLossError extends Error {}
+
 export async function generateTaskForAssignment(
   templateId: string,
   assignmentId: string,
@@ -272,10 +279,18 @@ export async function generateTaskForAssignment(
       // entre a checagem acima e aqui, o unique constraint derruba a transação inteira —
       // a Task recém-criada é revertida junto, nada fica duplicado no banco.
       if (existingLog) {
-        await tx.recurringGenerationLog.update({
-          where: logKey,
+        // Quando já existe um log (tipicamente FAILED), não há unique constraint pra colidir
+        // num `update` direto — duas transações concorrentes fariam o mesmo update com sucesso
+        // e ambas commitariam sua própria Task. Por isso usamos updateMany com o status FAILED
+        // ainda na cláusula WHERE: só uma das duas transações consegue affetar a linha (a outra
+        // já a encontra SUCCESS, count = 0) — quem perde a corrida trata como ALREADY_EXISTS.
+        const claimed = await tx.recurringGenerationLog.updateMany({
+          where: { templateId, clientId: assignment.clientId, competence, status: 'FAILED' },
           data: { status: 'SUCCESS', taskId: task.id, errorMessage: null },
         })
+        if (claimed.count !== 1) {
+          throw new ConcurrentGenerationLossError()
+        }
       } else {
         await tx.recurringGenerationLog.create({
           data: { templateId, clientId: assignment.clientId, competence, status: 'SUCCESS', taskId: task.id },
@@ -313,7 +328,7 @@ export async function generateTaskForAssignment(
 
     return { status: 'SUCCESS', taskId }
   } catch (err) {
-    if (isDuplicateGenerationLogError(err)) {
+    if (isDuplicateGenerationLogError(err) || err instanceof ConcurrentGenerationLossError) {
       // Perdeu a corrida pra outra execução concorrente que gerou essa competência primeiro
       // — não é uma falha real, é o próprio mecanismo de idempotência funcionando.
       return { status: 'ALREADY_EXISTS' }
@@ -356,8 +371,12 @@ export async function generateManually(
   const template = await getTemplateById(templateId, organizationId)
   const assignment = await getAssignmentOrThrow(templateId, assignmentId, organizationId)
 
+  // Canonicaliza o override pro início do período (semana/mês/trimestre/ano) a que ele
+  // pertence — sem isso, um instante não-canônico (ex.: 2026-09-17T13:22:00Z) viraria uma
+  // chave de idempotência que nunca colide com o valor canônico que o cron gera pro mesmo
+  // período real, criando uma Task efetivamente duplicada sem o sistema de idempotência notar.
   const competence = competenceOverride
-    ? new Date(competenceOverride)
+    ? normalizeToPeriodStart(new Date(competenceOverride), template.periodicity)
     : computeCurrentPeriodStart(new Date(), template.periodicity)
 
   const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
