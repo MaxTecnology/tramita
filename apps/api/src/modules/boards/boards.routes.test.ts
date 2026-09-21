@@ -5,6 +5,12 @@ import {
   createTestOrg,
   createTestUser,
   createTestClient,
+  createTestClientUser,
+  createTestDepartment,
+  grantClientAccess,
+  createTestBoard,
+  createTestColumn,
+  createTestTask,
   getAuthHeader,
 } from '@/test/helpers'
 
@@ -146,6 +152,66 @@ describe('GET /boards', () => {
     expect(res.statusCode).toBe(200)
     const boards = JSON.parse(res.body)
     expect(boards).toHaveLength(2)
+  })
+
+  it('CLIENT com acesso a duas empresas vê boards de ambas', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const clientA = await createTestClient(org.id, { name: 'Empresa A' })
+    const clientB = await createTestClient(org.id, { name: 'Empresa B' })
+    const departmentA = await createTestDepartment(org.id)
+    const departmentB = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, clientA.id, departmentA.id)
+    await grantClientAccess(clientUser.id, clientB.id, departmentB.id)
+
+    const boardA = await createTestBoard(org.id, clientA.id)
+    const boardB = await createTestBoard(org.id, clientB.id)
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/boards',
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const boards = JSON.parse(res.body)
+    const boardIds = boards.map((b: { id: string }) => b.id)
+    expect(boardIds).toContain(boardA.id)
+    expect(boardIds).toContain(boardB.id)
+    expect(boards).toHaveLength(2)
+  })
+})
+
+describe('GET /boards/:id', () => {
+  it('CLIENT com acesso a clientA/deptFiscal vê apenas a tarefa do departamento permitido', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const clientA = await createTestClient(org.id, { name: 'Empresa A' })
+    const deptFiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
+    const deptPessoal = await createTestDepartment(org.id, { name: 'Pessoal' })
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, clientA.id, deptFiscal.id)
+
+    const board = await createTestBoard(org.id, clientA.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const taskFiscal = await createTestTask(col.id, user.id, { departmentId: deptFiscal.id })
+    const taskPessoal = await createTestTask(col.id, user.id, { departmentId: deptPessoal.id })
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'GET',
+      url: `/boards/${board.id}`,
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = JSON.parse(res.body)
+    const taskIds = body.columns.flatMap((c: { tasks: { id: string }[] }) => c.tasks).map((t: { id: string }) => t.id)
+    expect(taskIds).toContain(taskFiscal.id)
+    expect(taskIds).not.toContain(taskPessoal.id)
   })
 })
 

@@ -5,6 +5,7 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createBoardSchema, updateBoardSchema, searchQuerySchema, listBoardsQuerySchema } from './boards.schema'
 import { listBoards, getBoardById, createBoard, updateBoard, searchTasks } from './boards.service'
+import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 
 export async function boardsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
@@ -17,9 +18,10 @@ export async function boardsRoutes(app: FastifyInstance) {
     const rawQuery = listBoardsQuerySchema.safeParse(request.query)
     const query = rawQuery.success ? rawQuery.data : {}
 
-    // CLIENT always sees only their own boards
+    // CLIENT sees boards from every client company they have access to
     if (role === 'CLIENT') {
-      return reply.send(await listBoards(organizationId!, { clientId: sub }))
+      const scope = await getClientAccessScope(sub)
+      return reply.send(await listBoards(organizationId!, { clientId: scope.clientIds }))
     }
 
     // ORG_MEMBER always sees only boards they are responsible for
@@ -35,9 +37,22 @@ export async function boardsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const isClient = request.user.role === 'CLIENT'
-    return reply.send(
-      await getBoardById(id, request.user.organizationId!, isClient, isClient ? request.user.sub : undefined),
-    )
+
+    if (!isClient) {
+      return reply.send(await getBoardById(id, request.user.organizationId!, false))
+    }
+
+    const scope = await getClientAccessScope(request.user.sub)
+    const board = await getBoardById(id, request.user.organizationId!, true, scope.clientIds)
+    const allowedDepartmentIds = scope.departmentIdsByClient.get(board.clientId) ?? new Set<string>()
+
+    return reply.send({
+      ...board,
+      columns: board.columns.map((column) => ({
+        ...column,
+        tasks: column.tasks.filter((task) => allowedDepartmentIds.has(task.departmentId)),
+      })),
+    })
   })
 
   app.get('/:id/tasks/search', {

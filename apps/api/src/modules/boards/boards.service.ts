@@ -11,7 +11,7 @@ const DEFAULT_COLUMNS = [
 export async function listBoards(
   organizationId: string,
   query: {
-    clientId?: string
+    clientId?: string | string[]
     responsibleUserId?: string
     columnTitle?: string
     overdue?: boolean
@@ -25,7 +25,9 @@ export async function listBoards(
     where: {
       organizationId,
       isActive: true,
-      ...(query.clientId ? { clientId: query.clientId } : {}),
+      ...(query.clientId
+        ? { clientId: Array.isArray(query.clientId) ? { in: query.clientId } : query.clientId }
+        : {}),
       ...(query.responsibleUserId ? { responsibleUserId: query.responsibleUserId } : {}),
       ...(query.columnTitle
         ? {
@@ -75,9 +77,19 @@ export async function listBoards(
   })
 }
 
-export async function getBoardById(id: string, organizationId: string, hideInvisibleTasks = false, clientId?: string) {
+export async function getBoardById(
+  id: string,
+  organizationId: string,
+  hideInvisibleTasks = false,
+  clientId?: string | string[],
+) {
   const board = await prisma.board.findFirst({
-    where: { id, organizationId, isActive: true, ...(clientId ? { clientId } : {}) },
+    where: {
+      id,
+      organizationId,
+      isActive: true,
+      ...(clientId ? { clientId: Array.isArray(clientId) ? { in: clientId } : clientId } : {}),
+    },
     include: {
       client: { select: { id: true, name: true } },
       responsibleUser: { select: { id: true, name: true } },
