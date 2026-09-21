@@ -75,7 +75,7 @@ export async function listBoards(
   })
 }
 
-export async function getBoardById(id: string, organizationId: string) {
+export async function getBoardById(id: string, organizationId: string, hideInvisibleTasks = false) {
   const board = await prisma.board.findFirst({
     where: { id, organizationId, isActive: true },
     include: {
@@ -83,7 +83,12 @@ export async function getBoardById(id: string, organizationId: string) {
       responsibleUser: { select: { id: true, name: true } },
       columns: {
         orderBy: { position: 'asc' },
-        include: { tasks: { orderBy: { position: 'asc' } } },
+        include: {
+          tasks: {
+            where: hideInvisibleTasks ? { visibleToClient: true } : undefined,
+            orderBy: { position: 'asc' },
+          },
+        },
       },
     },
   })

@@ -24,11 +24,11 @@ export async function updateClientProfile(clientId: string, data: UpdateProfileB
   })
 }
 
-export async function getTaskHistory(taskId: string, organizationId: string) {
+export async function getTaskHistory(taskId: string, organizationId: string, clientId: string) {
   const task = await prisma.task.findFirst({
-    where: { id: taskId, column: { board: { organizationId } } },
+    where: { id: taskId, column: { board: { organizationId, clientId } } },
   })
-  if (!task) throw new AppError(404, 'Tarefa não encontrada')
+  if (!task || !task.visibleToClient) throw new AppError(404, 'Tarefa não encontrada')
 
   return prisma.taskHistory.findMany({
     where: { taskId },

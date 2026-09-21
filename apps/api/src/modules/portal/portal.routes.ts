@@ -15,6 +15,7 @@ import {
   cancelRequest,
 } from '@/modules/requests/requests.service'
 import { createRequestAttachment } from '@/modules/requests/request-attachments.service'
+import { listTaskDocuments, uploadForRequirement } from '@/modules/task-documents/task-documents.service'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
 
@@ -36,7 +37,38 @@ export async function portalRoutes(app: FastifyInstance) {
 
   app.get('/tasks/:taskId/history', async (request, reply) => {
     const { taskId } = request.params as { taskId: string }
-    return reply.send(await getTaskHistory(taskId, request.user.organizationId!))
+    return reply.send(await getTaskHistory(taskId, request.user.organizationId!, request.user.sub))
+  })
+
+  app.get('/tasks/:taskId/documents', async (request, reply) => {
+    const { taskId } = request.params as { taskId: string }
+    return reply.send(await listTaskDocuments(taskId, request.user.organizationId!, request.user.sub))
+  })
+
+  app.post('/tasks/:taskId/documents/requests/:reqId/upload', async (request, reply) => {
+    const { taskId, reqId } = request.params as { taskId: string; reqId: string }
+
+    let file: Awaited<ReturnType<typeof request.file>>
+    try {
+      file = await request.file()
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number; code?: string }
+      if (e?.statusCode === 413 || e?.code === 'FST_FILES_LIMIT' || e?.code === 'FST_REQ_FILE_TOO_LARGE') {
+        throw new AppError(413, 'Arquivo excede o limite de 20MB')
+      }
+      throw err
+    }
+    if (!file) throw new AppError(400, 'Nenhum arquivo enviado')
+
+    const buffer = await file.toBuffer()
+    if (buffer.length > MAX_FILE_SIZE) throw new AppError(413, 'Arquivo excede o limite de 20MB')
+
+    return reply.status(201).send(
+      await uploadForRequirement(
+        taskId, reqId, request.user.organizationId!, { id: request.user.sub, type: 'client' }, request.user.sub,
+        { filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer },
+      ),
+    )
   })
 
   app.get('/departments', async (request, reply) => {

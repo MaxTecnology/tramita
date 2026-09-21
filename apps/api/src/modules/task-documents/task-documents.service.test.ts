@@ -4,7 +4,7 @@ import * as b2Module from '@/lib/b2'
 import { prisma } from '@/lib/prisma'
 import {
   addDocumentRequirement, uploadForRequirement, reviewDocumentRequirement,
-  addDeliverable, deliverDocument, recalculateTaskStatus,
+  addDeliverable, deliverDocument, recalculateTaskStatus, listTaskDocuments,
 } from './task-documents.service'
 import {
   createTemplate, createAssignment, generateTaskForAssignment,
@@ -120,5 +120,22 @@ describe('checklist de documento — impedimento automático', () => {
     expect(updated.status).toBe('DONE')
 
     vi.restoreAllMocks()
+  })
+})
+
+describe('verifyTaskAccess (visibilidade no portal)', () => {
+  it('lança 404 quando o cliente tenta acessar documentos de uma tarefa com visibleToClient=false', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { visibleToClient: false } })
+
+    await expect(listTaskDocuments(task.id, org.id, client.id)).rejects.toMatchObject({ statusCode: 404 })
+    // do lado do escritório (sem clientId), continua acessível
+    await expect(listTaskDocuments(task.id, org.id)).resolves.toBeDefined()
   })
 })
