@@ -40,7 +40,10 @@ export default function MasterPlans() {
       qc.invalidateQueries({ queryKey: ['master', 'plans'] })
       setForm({ name: '', maxClients: '', priceMonthly: '' })
     },
-    onError: () => toast.error('Erro ao criar plano'),
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(message ?? 'Erro ao criar plano')
+    },
   })
 
   const updateMutation = useMutation({
@@ -51,7 +54,10 @@ export default function MasterPlans() {
       qc.invalidateQueries({ queryKey: ['master', 'plans'] })
       setEditId(null)
     },
-    onError: () => toast.error('Erro ao atualizar plano'),
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(message ?? 'Erro ao atualizar plano')
+    },
   })
 
   const deleteMutation = useMutation({
@@ -60,7 +66,10 @@ export default function MasterPlans() {
       toast.success('Plano removido')
       qc.invalidateQueries({ queryKey: ['master', 'plans'] })
     },
-    onError: () => toast.error('Erro ao remover plano'),
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(message ?? 'Erro ao remover plano')
+    },
   })
 
   function handleCreate(e: React.FormEvent) {
