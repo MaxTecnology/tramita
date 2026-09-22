@@ -4,6 +4,7 @@ export const createBoardSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   clientId: z.string().cuid(),
+  osTemplateId: z.string().cuid().optional(),
   responsibleUserId: z.string().cuid().optional(),
   dueDate: z.string().datetime().optional(),
 })

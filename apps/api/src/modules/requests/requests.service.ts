@@ -26,6 +26,7 @@ export async function createRequest(
       title: data.title,
       description: data.description,
       departmentId: data.departmentId,
+      osTemplateId: data.osTemplateId,
     },
   })
 
@@ -117,9 +118,16 @@ export async function approveRequest(
   let columnId: string
 
   if (data.mode === 'NEW_BOARD') {
+    const client = await prisma.client.findFirst({ where: { id: request.clientId, organizationId } })
+    const titlePrefix = client?.codigo ? `${client.codigo} - ${client.name}` : client?.name
+    const osTemplate = request.osTemplateId
+      ? await prisma.oSTemplate.findFirst({ where: { id: request.osTemplateId, organizationId } })
+      : null
+
     const board = await createBoard(organizationId, reviewerId, reviewerRole, {
-      title: request.title,
+      title: osTemplate ? `${titlePrefix} — ${osTemplate.name}` : request.title,
       clientId: request.clientId,
+      osTemplateId: request.osTemplateId ?? undefined,
     })
     columnId = board.columns[0].id
   } else {
