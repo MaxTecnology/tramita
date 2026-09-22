@@ -132,6 +132,7 @@ Cadastro de novo escritório (público — sem autenticação).
 ```json
 {
   "name": "string", "clientType": "PF | PJ", "cnpj": "string?", "cpf": "string?",
+  "codigo": "string?",
   "whatsapp": "string?", "phone": "string?", "notes": "string?",
   "cep": "string?", "estado": "string?", "cidade": "string?", "bairro": "string?",
   "logradouro": "string?", "numero": "string?", "complemento": "string?",
@@ -141,6 +142,7 @@ Cadastro de novo escritório (público — sem autenticação).
   ]
 }
 ```
+→ `codigo` é um identificador curto opcional que o escritório escolhe pra localizar o cliente rapidamente (ex.: código do sistema de gestão interno); aparece na listagem/busca de clientes e é usado como prefixo do título do board quando uma Solicitação é aprovada com `NEW_BOARD` (`"<codigo> - <nome> — <template>"`)
 → Middleware `checkPlanLimit` valida `clientsCount < plan.maxClients` antes de criar
 → `email`/`password` não existem mais direto no `Client` — o login do portal é do `ClientUser`, não da empresa. `clientUsers` é obrigatório (mínimo 1 item), cada item vincula um `ClientUser` existente (`existingId`) ou cria um novo (`name`/`email`/`password`), sempre com `departmentIds` (mínimo 1) definindo o escopo de acesso daquele usuário àquele cliente
 
@@ -184,8 +186,10 @@ Cadastro de novo escritório (público — sem autenticação).
 ### GET `/boards/:id` — board com colunas e tarefas ordenadas por position
 ### POST `/boards` _(ORG_ADMIN | ORG_MANAGER)_
 ```json
-{ "title": "string", "description": "string?", "clientId": "string" }
+{ "title": "string", "description": "string?", "clientId": "string", "osTemplateId": "string?" }
 ```
+→ Sem `osTemplateId`: board nasce com as 3 colunas padrão (`Pendente`/`Em andamento`/`Concluído`)
+→ Com `osTemplateId`: colunas do board são copiadas das colunas do `OSTemplate` (título, ordem, `statusEffect`, `notifyClient` e checklist de documentos) — cópia acontece uma vez na criação, sem vínculo vivo com o template depois
 ### PATCH `/boards/:id`
 
 ---
@@ -194,11 +198,47 @@ Cadastro de novo escritório (público — sem autenticação).
 
 ### POST `/boards/:boardId/columns` _(ORG_ADMIN | ORG_MANAGER)_
 ```json
-{ "title": "string", "color": "#hex?", "position": 0, "isFinal": false }
+{
+  "title": "string", "color": "#hex?", "position": 0,
+  "statusEffect": "NONE|OPEN|STARTED|BLOCKED|DISREGARDED|DONE",
+  "notifyClient": false
+}
 ```
+→ `statusEffect` (padrão `NONE`): quando a tarefa entra nessa coluna, o `Task.status` é forçado pro valor configurado (exceto `NONE`, que não altera o status atual) — é assim que uma coluna "Fase" intermediária consegue marcar `STARTED` sem depender de `isFinal`, e uma coluna "Bloqueado" mantém `BLOCKED` mesmo movendo entre colunas do tipo Fase
+→ `statusEffect: DONE` também dispara `TASK_COMPLETED`, igual ao antigo `isFinal: true`
+→ `notifyClient` (padrão `false`): quando `true`, mover uma tarefa pra essa coluna dispara `TASK_MOVED` pro cliente mesmo que o toggle global "Tarefa movida" da organização esteja desligado — é uma notificação por coluna, não a notificação genérica de qualquer movimentação
+→ Documentos vinculados à coluna (via Template de OS) viram `TaskDocumentRequirement` automaticamente na tarefa ao entrar na coluna, sem duplicar se ela passar pela mesma coluna mais de uma vez
 ### PATCH `/columns/:id`
 ### PATCH `/columns/reorder` — `[{ "id": "string", "position": 0 }]`
 ### DELETE `/columns/:id` _(ORG_ADMIN)_
+
+---
+
+## Templates de OS
+
+`OSTemplate` define, de uma vez, o conjunto de colunas (com `statusEffect`/`notifyClient`/checklist de documentos) que um board `POST /boards` ou uma Solicitação aprovada com `NEW_BOARD` usa pra nascer já estruturado — sem precisar montar cada coluna manualmente depois. A cópia é feita uma vez na criação do board; editar o template depois não afeta boards já criados a partir dele.
+
+### GET `/os-templates` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — lista templates da org, com colunas e documentos
+### GET `/os-templates/:id` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_
+### POST `/os-templates` _(ORG_ADMIN)_
+```json
+{
+  "name": "string",
+  "description": "string?",
+  "isActive": true,
+  "columns": [
+    {
+      "title": "string",
+      "statusEffect": "NONE|OPEN|STARTED|BLOCKED|DISREGARDED|DONE",
+      "notifyClient": false,
+      "documents": [{ "name": "string" }]
+    }
+  ]
+}
+```
+→ `columns` obrigatório, mínimo 1 item — ordem do array vira `position`
+### PATCH `/os-templates/:id` _(ORG_ADMIN)_ — mesmo payload, todos os campos opcionais; `columns` quando enviado substitui a lista inteira (delete + recreate, não diff incremental)
+### DELETE `/os-templates/:id` _(ORG_ADMIN)_ — soft delete (`isActive: false`)
 
 ---
 
@@ -222,11 +262,20 @@ Cadastro de novo escritório (público — sem autenticação).
 ```json
 { "columnId": "string", "position": 0 }
 ```
-→ Dispara `TASK_MOVED`. Se coluna `isFinal: true` → dispara também `TASK_COMPLETED`
+→ Dispara `TASK_MOVED` (com canais `WHATSAPP`+`EMAIL` forçados se `Column.notifyClient: true`, independente do toggle global da org). Se `Column.statusEffect: DONE` → também aplica o status na tarefa e dispara `TASK_COMPLETED`
+→ Status possíveis (`TaskStatus`): `OPEN` (padrão) | `STARTED` (em andamento, atribuído por coluna com `statusEffect: STARTED`) | `BLOCKED` (impedimento, geralmente por checklist de documento pendente/rejeitado) | `DISREGARDED` (desconsiderada) | `DONE` (concluída)
 
 ### PATCH `/tasks/reorder` — `[{ "id": "string", "position": 0, "columnId": "string" }]`
 ### DELETE `/tasks/:id` _(ORG_ADMIN | ORG_MANAGER)_
 ### GET `/boards/:id/tasks/search?q=&priority=&assigneeId=&status=&dueBefore=&dueAfter=`
+
+### GET `/tasks` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — listagem flat de tarefas atravessando todos os boards da org, inclusive o board oculto `RECURRING_SYSTEM` onde moram as Tarefas Recorrentes
+**Query:** `?clientId=&assigneeId=&departmentId=&status=OPEN|STARTED|DONE|DISREGARDED|BLOCKED&recurringTemplateId=&dateFrom=&dateTo=&q=`
+→ `dateFrom`/`dateTo` filtram por `targetDate`
+→ `ORG_MEMBER` sempre vê só as próprias tarefas (`assigneeId` forçado ao próprio id, independente do que vier na query)
+→ Usado pela tela unificada Tarefas (Lista/Kanban) pra cruzar tarefas de clientes diferentes agrupadas por status
+
+**Response:** `Task[]`, cada item com `{ id, title, description, status, priority, position, columnId, assigneeId, creatorId, sourceRequestId, departmentId, tags, competence, targetDate, dueDate, recurringTemplateId, visibleToClient, createdAt, updatedAt, department: { id, name }, assignee: { id, name } | null, column: { board: { id, clientId, client: { id, name, codigo } } } }`, ordenado por `targetDate` ascendente
 
 ---
 
@@ -302,6 +351,31 @@ Cadastro de novo escritório (público — sem autenticação).
 
 ---
 
+## Solicitações — Escritório
+
+Contraparte, do lado do escritório, das Solicitações abertas pelo cliente no portal (ver `POST /portal/requests`).
+
+### GET `/requests` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — `?status=PENDING|APPROVED|REJECTED|CANCELLED`
+### GET `/requests/pending-count` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — `{ count: number }`
+### GET `/requests/:id` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_
+### GET `/requests/stream?token=<accessToken>` — SSE, evento `request:changed` (sem payload) a cada mutação de Solicitação da org
+### POST `/requests/:id/approve` _(ORG_ADMIN | ORG_MANAGER)_
+```json
+{ "mode": "EXISTING_BOARD", "boardId": "string", "columnId": "string" }
+```
+ou
+```json
+{ "mode": "NEW_BOARD" }
+```
+→ `EXISTING_BOARD`: cria a tarefa direto na coluna informada de um board já existente do cliente
+→ `NEW_BOARD`: cria um board novo pro cliente antes de criar a tarefa — se a `Request` tiver `osTemplateId` (escolhido pelo cliente em `POST /portal/requests`, ver `GET /portal/os-templates`), o board nasce com as colunas desse template (igual a `POST /boards` com `osTemplateId`) e o título do board vira `"<codigo do cliente> - <nome do cliente> — <nome do template>"`; sem `osTemplateId`, o board nasce com as 3 colunas padrão e o título é o próprio título da Solicitação
+### POST `/requests/:id/reject` _(ORG_ADMIN | ORG_MANAGER)_
+```json
+{ "reason": "string?" }
+```
+
+---
+
 ## Checklist de Documentos da Tarefa
 
 ### GET `/tasks/:id/documents` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — lista `requirements` (a pedir) e `deliverables` (a entregar), cada um com `signedUrl` do anexo quando houver
@@ -340,11 +414,17 @@ Cadastro de novo escritório (público — sem autenticação).
 
 ### GET `/portal/departments` _(CLIENT)_ — departamentos da organização, pra o formulário de nova solicitação
 
+### GET `/portal/os-templates` _(CLIENT)_ — `{ id, name }[]` — templates de OS ativos da organização, pra o cliente escolher o tipo de solicitação no formulário de nova Solicitação
+
 ### GET `/portal/requests` _(CLIENT)_ — `?clientId=` **obrigatório** — 400 se ausente, 404 se o `ClientUser` não tem acesso àquele `clientId`
 ### POST `/portal/requests` _(CLIENT)_
 ```json
-{ "clientId": "string", "title": "string", "description": "string?", "departmentId": "string?" }
+{
+  "clientId": "string", "title": "string", "description": "string?", "departmentId": "string?",
+  "osTemplateId": "string?"
+}
 ```
+→ `osTemplateId` (opcional) é o tipo de solicitação escolhido pelo cliente (ver `GET /portal/os-templates`) — fica salvo na `Request` e é usado por `POST /requests/:id/approve` quando o escritório aprova em modo `NEW_BOARD`
 → `clientId` **obrigatório** no body — 404 se o `ClientUser` não tem acesso àquele `clientId`
 
 ### GET `/portal/requests/:id` _(CLIENT)_
