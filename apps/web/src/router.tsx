@@ -22,6 +22,9 @@ import RecurringTemplates from '@/pages/app/settings/RecurringTemplates'
 import RecurringTemplateForm from '@/pages/app/settings/RecurringTemplateForm'
 import ClientUsers from '@/pages/app/settings/ClientUsers'
 import ClientUserForm from '@/pages/app/settings/ClientUserForm'
+import OSTemplates from '@/pages/app/settings/OSTemplates'
+import OSTemplateForm from '@/pages/app/settings/OSTemplateForm'
+import OSList from '@/pages/app/OSList'
 import DashboardMetrics from '@/pages/app/DashboardMetrics'
 import Processes from '@/pages/app/Processes'
 import Requests from '@/pages/app/Requests'
@@ -62,6 +65,14 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/app/dashboard" replace /> },
       { path: 'dashboard', element: <DashboardMetrics /> },
       { path: 'processes', element: <Processes /> },
+      {
+        path: 'os',
+        element: (
+          <ProtectedRoute allowedRoles={MANAGER_ROLES}>
+            <OSList />
+          </ProtectedRoute>
+        ),
+      },
       { path: 'requests', element: <Requests /> },
       { path: 'board/:boardId', element: <Board /> },
       {
@@ -133,6 +144,30 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <RecurringTemplateForm />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/os-templates',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <OSTemplates />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/os-templates/new',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <OSTemplateForm />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/os-templates/:id/edit',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <OSTemplateForm />
           </ProtectedRoute>
         ),
       },

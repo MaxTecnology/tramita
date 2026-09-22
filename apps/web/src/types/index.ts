@@ -40,6 +40,7 @@ export interface Board {
   responsibleUser: { id: string; name: string } | null
   isActive: boolean
   dueDate: string | null
+  osTemplateId?: string | null
   columns: Column[]
   client: { id: string; name: string }
 }
@@ -225,4 +226,16 @@ export interface ClientUser {
   isActive: boolean
   createdAt: string
   accesses: ClientUserAccessItem[]
+}
+
+export interface OSTemplateColumnDocumentItem { id: string; name: string; position: number }
+export interface OSTemplateColumn {
+  id: string; title: string; position: number
+  statusEffect: 'NONE' | 'OPEN' | 'STARTED' | 'BLOCKED' | 'DISREGARDED' | 'DONE'
+  notifyClient: boolean
+  documents: OSTemplateColumnDocumentItem[]
+}
+export interface OSTemplate {
+  id: string; name: string; description: string | null; isActive: boolean
+  columns: OSTemplateColumn[]
 }
