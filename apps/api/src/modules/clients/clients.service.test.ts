@@ -57,6 +57,23 @@ describe('createClient', () => {
     expect(access).not.toBeNull()
   })
 
+  it('creates a client with codigo', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const department = await createTestDepartment(org.id)
+
+    const result = await createClient(org.id, {
+      name: 'Cliente Com Código',
+      codigo: '0123',
+      clientType: 'PJ',
+      clientUsers: [{ name: 'Portal User', email: `portal-${Date.now()}@test.com`, password: 'Test@1234', departmentIds: [department.id] }],
+    })
+
+    expect(result.codigo).toBe('0123')
+    const stored = await prisma.client.findUnique({ where: { id: result.id } })
+    expect(stored?.codigo).toBe('0123')
+  })
+
   it('throws 404 when existingId belongs to a ClientUser from another organization', async () => {
     const plan = await createTestPlan()
     const orgA = await createTestOrg(plan.id)
@@ -83,6 +100,16 @@ describe('updateClient', () => {
     const result = await updateClient(client.id, org.id, { notes: 'Observação atualizada' })
 
     expect(result.notes).toBe('Observação atualizada')
+  })
+
+  it('updates codigo for a client in the same organization', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+
+    const result = await updateClient(client.id, org.id, { codigo: '0456' })
+
+    expect(result.codigo).toBe('0456')
   })
 
   it('throws 404 when client belongs to a different organization', async () => {

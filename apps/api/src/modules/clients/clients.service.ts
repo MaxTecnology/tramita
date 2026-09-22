@@ -7,7 +7,7 @@ import { hashPassword } from '@/modules/auth/auth.service'
 import type { CreateClientBody, UpdateClientBody } from './clients.schema'
 
 const SELECT = {
-  id: true, name: true, clientType: true, cnpj: true, cpf: true,
+  id: true, name: true, codigo: true, clientType: true, cnpj: true, cpf: true,
   whatsapp: true, phone: true, notes: true,
   cep: true, estado: true, cidade: true, bairro: true, logradouro: true, numero: true, complemento: true,
   isActive: true, createdAt: true,
@@ -73,6 +73,7 @@ export async function createClient(organizationId: string, data: CreateClientBod
     const client = await tx.client.create({
       data: {
         name: data.name,
+        codigo: data.codigo,
         clientType: data.clientType ?? 'PJ',
         cnpj: data.cnpj,
         cpf: data.cpf,

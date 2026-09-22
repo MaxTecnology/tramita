@@ -58,6 +58,7 @@ export interface User {
 export interface Client {
   id: string
   name: string
+  codigo: string | null
   clientType: 'PF' | 'PJ'
   cnpj: string | null
   cpf: string | null

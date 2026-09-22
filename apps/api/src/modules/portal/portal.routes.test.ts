@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { app } from '@/test/setup'
+import { createOSTemplate } from '@/modules/os-templates/os-templates.service'
 import {
   createTestPlan,
   createTestOrg,
@@ -265,5 +266,32 @@ describe('PATCH /portal/requests/:id/cancel', () => {
       headers: { authorization: authB },
     })
     expect(res.statusCode).toBe(404)
+  })
+})
+
+describe('GET /portal/os-templates', () => {
+  it('retorna apenas templates ativos da organização do cliente', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const otherOrg = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+
+    await createOSTemplate(org.id, { name: 'Ativo', isActive: true, columns: [] })
+    await createOSTemplate(org.id, { name: 'Inativo', isActive: false, columns: [] })
+    await createOSTemplate(otherOrg.id, { name: 'De Outra Org', isActive: true, columns: [] })
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/portal/os-templates',
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json<{ id: string; name: string }[]>()
+    expect(body.map((t) => t.name)).toEqual(['Ativo'])
   })
 })

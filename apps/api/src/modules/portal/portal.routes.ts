@@ -4,6 +4,7 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
+import { prisma } from '@/lib/prisma'
 import { getClientAccessScope } from '@/modules/client-users/client-access'
 import { getTaskHistory, listAccessibleClients } from './portal.service'
 import { listDepartments } from '@/modules/departments/departments.service'
@@ -76,6 +77,16 @@ export async function portalRoutes(app: FastifyInstance) {
 
   app.get('/departments', async (request, reply) => {
     return reply.send(await listDepartments(request.user.organizationId!))
+  })
+
+  app.get('/os-templates', async (request, reply) => {
+    return reply.send(
+      await prisma.oSTemplate.findMany({
+        where: { organizationId: request.user.organizationId!, isActive: true },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+    )
   })
 
   app.post('/requests', { preHandler: [checkSubscription] }, async (request, reply) => {
