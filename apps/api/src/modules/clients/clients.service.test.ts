@@ -57,6 +57,44 @@ describe('createClient', () => {
     expect(access).not.toBeNull()
   })
 
+  it('creates a client with codigo', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const department = await createTestDepartment(org.id)
+
+    const result = await createClient(org.id, {
+      name: 'Cliente Com Código',
+      codigo: '0123',
+      clientType: 'PJ',
+      clientUsers: [{ name: 'Portal User', email: `portal-${Date.now()}@test.com`, password: 'Test@1234', departmentIds: [department.id] }],
+    })
+
+    expect(result.codigo).toBe('0123')
+    const stored = await prisma.client.findUnique({ where: { id: result.id } })
+    expect(stored?.codigo).toBe('0123')
+  })
+
+  it('throws 409 when codigo is already used by another client in the same organization', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await createTestClient(org.id, { codigo: 'DUP1' })
+
+    await expect(
+      createClient(org.id, { name: 'Outro Cliente', clientType: 'PJ', codigo: 'DUP1', clientUsers: [] }),
+    ).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('allows the same codigo in two different organizations', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id)
+    await createTestClient(orgA.id, { codigo: 'SAME' })
+
+    const result = await createClient(orgB.id, { name: 'Cliente Org B', clientType: 'PJ', codigo: 'SAME', clientUsers: [] })
+
+    expect(result.codigo).toBe('SAME')
+  })
+
   it('throws 404 when existingId belongs to a ClientUser from another organization', async () => {
     const plan = await createTestPlan()
     const orgA = await createTestOrg(plan.id)
@@ -83,6 +121,25 @@ describe('updateClient', () => {
     const result = await updateClient(client.id, org.id, { notes: 'Observação atualizada' })
 
     expect(result.notes).toBe('Observação atualizada')
+  })
+
+  it('updates codigo for a client in the same organization', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+
+    const result = await updateClient(client.id, org.id, { codigo: '0456' })
+
+    expect(result.codigo).toBe('0456')
+  })
+
+  it('throws 409 when updating codigo to one already used by another client in the same organization', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await createTestClient(org.id, { codigo: 'DUP2' })
+    const clientB = await createTestClient(org.id, { codigo: 'DUP3' })
+
+    await expect(updateClient(clientB.id, org.id, { codigo: 'DUP2' })).rejects.toMatchObject({ statusCode: 409 })
   })
 
   it('throws 404 when client belongs to a different organization', async () => {

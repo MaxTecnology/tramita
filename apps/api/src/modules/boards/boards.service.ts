@@ -3,9 +3,9 @@ import { AppError } from '@/errors/AppError'
 import type { CreateBoardBody, UpdateBoardBody, SearchQuery } from './boards.schema'
 
 const DEFAULT_COLUMNS = [
-  { title: 'Pendente', position: 0, color: '#6B7280', isFinal: false },
-  { title: 'Em andamento', position: 1, color: '#3B82F6', isFinal: false },
-  { title: 'Concluído', position: 2, color: '#10B981', isFinal: true },
+  { title: 'Pendente', position: 0, color: '#6B7280', statusEffect: 'NONE' as const },
+  { title: 'Em andamento', position: 1, color: '#3B82F6', statusEffect: 'NONE' as const },
+  { title: 'Concluído', position: 2, color: '#10B981', statusEffect: 'DONE' as const },
 ]
 
 export async function listBoards(
@@ -25,6 +25,7 @@ export async function listBoards(
     where: {
       organizationId,
       isActive: true,
+      type: 'OS',
       ...(query.clientId
         ? { clientId: Array.isArray(query.clientId) ? { in: query.clientId } : query.clientId }
         : {}),
@@ -66,7 +67,7 @@ export async function listBoards(
         : {}),
     },
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, codigo: true } },
       responsibleUser: { select: { id: true, name: true } },
       columns: {
         orderBy: { position: 'asc' },
@@ -88,10 +89,11 @@ export async function getBoardById(
       id,
       organizationId,
       isActive: true,
+      type: 'OS',
       ...(clientId ? { clientId: Array.isArray(clientId) ? { in: clientId } : clientId } : {}),
     },
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, codigo: true } },
       responsibleUser: { select: { id: true, name: true } },
       columns: {
         orderBy: { position: 'asc' },
@@ -122,6 +124,10 @@ export async function createBoard(
   const responsibleUserId =
     userRole === 'ORG_MEMBER' ? userId : (data.responsibleUserId ?? null)
 
+  const columns = data.osTemplateId
+    ? await buildColumnsFromTemplate(data.osTemplateId, organizationId)
+    : DEFAULT_COLUMNS
+
   return prisma.board.create({
     data: {
       title: data.title,
@@ -130,17 +136,35 @@ export async function createBoard(
       organizationId,
       responsibleUserId,
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
-      columns: { create: DEFAULT_COLUMNS },
+      type: 'OS',
+      osTemplateId: data.osTemplateId,
+      columns: { create: columns },
     },
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, codigo: true } },
       columns: { orderBy: { position: 'asc' } },
     },
   })
 }
 
+async function buildColumnsFromTemplate(osTemplateId: string, organizationId: string) {
+  const template = await prisma.oSTemplate.findFirst({
+    where: { id: osTemplateId, organizationId, isActive: true },
+    include: { columns: { orderBy: { position: 'asc' }, include: { documents: { orderBy: { position: 'asc' } } } } },
+  })
+  if (!template) throw new AppError(404, 'Template de OS não encontrado')
+
+  return template.columns.map((col) => ({
+    title: col.title,
+    position: col.position,
+    statusEffect: col.statusEffect,
+    notifyClient: col.notifyClient,
+    documents: { create: col.documents.map((d) => ({ name: d.name, position: d.position })) },
+  }))
+}
+
 export async function updateBoard(id: string, organizationId: string, data: UpdateBoardBody) {
-  const board = await prisma.board.findFirst({ where: { id, organizationId, isActive: true } })
+  const board = await prisma.board.findFirst({ where: { id, organizationId, isActive: true, type: 'OS' } })
   if (!board) throw new AppError(404, 'Board não encontrado')
 
   return prisma.board.update({
@@ -153,13 +177,13 @@ export async function updateBoard(id: string, organizationId: string, data: Upda
         ? (data.dueDate ? new Date(data.dueDate) : null)
         : undefined,
     },
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, codigo: true } } },
   })
 }
 
 export async function searchTasks(boardId: string, organizationId: string, filters: SearchQuery) {
   const board = await prisma.board.findFirst({
-    where: { id: boardId, organizationId, isActive: true },
+    where: { id: boardId, organizationId, isActive: true, type: 'OS' },
   })
   if (!board) throw new AppError(404, 'Board não encontrado')
 

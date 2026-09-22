@@ -126,7 +126,7 @@ describe('checklist de documento — impedimento automático', () => {
       visibleToClient: true, isActive: true,
       documentRequests: [{ name: 'Ponto' }], documentDeliveries: [],
     })
-    const assignment = await createAssignment(template.id, org.id, { clientId: client.id, boardId: board.id, columnId: col.id })
+    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
     const outcome = await generateTaskForAssignment(template.id, assignment.id, new Date(Date.UTC(2026, 1, 1)))
     if (outcome.status !== 'SUCCESS') throw new Error('geração falhou no setup do teste')
 

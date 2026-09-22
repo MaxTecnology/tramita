@@ -3,7 +3,7 @@ export interface Task {
   title: string
   description: string | null
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
-  status: 'OPEN' | 'DONE' | 'DISREGARDED' | 'BLOCKED'
+  status: 'OPEN' | 'STARTED' | 'DONE' | 'DISREGARDED' | 'BLOCKED'
   position: number
   columnId: string
   assigneeId: string | null
@@ -25,7 +25,8 @@ export interface Column {
   title: string
   position: number
   color: string | null
-  isFinal: boolean
+  statusEffect: 'NONE' | 'OPEN' | 'STARTED' | 'BLOCKED' | 'DISREGARDED' | 'DONE'
+  notifyClient: boolean
   boardId: string
   tasks: Task[]
 }
@@ -40,8 +41,9 @@ export interface Board {
   responsibleUser: { id: string; name: string } | null
   isActive: boolean
   dueDate: string | null
+  osTemplateId?: string | null
   columns: Column[]
-  client: { id: string; name: string }
+  client: { id: string; name: string; codigo: string | null }
 }
 
 export interface User {
@@ -57,6 +59,7 @@ export interface User {
 export interface Client {
   id: string
   name: string
+  codigo: string | null
   clientType: 'PF' | 'PJ'
   cnpj: string | null
   cpf: string | null
@@ -225,4 +228,16 @@ export interface ClientUser {
   isActive: boolean
   createdAt: string
   accesses: ClientUserAccessItem[]
+}
+
+export interface OSTemplateColumnDocumentItem { id: string; name: string; position: number }
+export interface OSTemplateColumn {
+  id: string; title: string; position: number
+  statusEffect: 'NONE' | 'OPEN' | 'STARTED' | 'BLOCKED' | 'DISREGARDED' | 'DONE'
+  notifyClient: boolean
+  documents: OSTemplateColumnDocumentItem[]
+}
+export interface OSTemplate {
+  id: string; name: string; description: string | null; isActive: boolean
+  columns: OSTemplateColumn[]
 }

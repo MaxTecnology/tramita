@@ -2,6 +2,52 @@ import { describe, it, expect } from 'vitest'
 import { app } from '@/test/setup'
 import { createTestPlan, createTestOrg, createTestUser, getAuthHeader } from '@/test/helpers'
 
+describe('GET /users/me — Fastify addHook retroactivity regression', () => {
+  it('ORG_MEMBER can read own profile (GET /me) even though later routes require ORG_ADMIN', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const header = await getAuthHeader(member.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/users/me',
+      headers: { authorization: header },
+    })
+    expect(res.statusCode).toBe(200)
+  })
+})
+
+describe('GET /users — ORG_ADMIN only, but not accidentally over-restricted', () => {
+  it('returns 403 for ORG_MEMBER', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const header = await getAuthHeader(member.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/users',
+      headers: { authorization: header },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('returns 200 for ORG_ADMIN', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const header = await getAuthHeader(admin.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/users',
+      headers: { authorization: header },
+    })
+    expect(res.statusCode).toBe(200)
+  })
+})
+
 describe('POST /users/:id/reset-password', () => {
   it('returns 403 for ORG_MEMBER', async () => {
     const plan = await createTestPlan()

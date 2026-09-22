@@ -207,17 +207,17 @@ function ClientUsersSection({ links, onChange }: {
 }
 
 type CreateForm = AddressFields & {
-  name: string; clientType: ClientType; cnpj: string; cpf: string
+  name: string; codigo: string; clientType: ClientType; cnpj: string; cpf: string
   whatsapp: string; phone: string; notes: string; clientUsers: ClientUserLink[]
 }
 
 type EditForm = AddressFields & {
-  name: string; clientType: ClientType; cnpj: string; cpf: string
+  name: string; codigo: string; clientType: ClientType; cnpj: string; cpf: string
   whatsapp: string; phone: string; notes: string; clientUsers: ClientUserLink[]
 }
 
 const EMPTY_CREATE: CreateForm = {
-  name: '', clientType: 'PJ', cnpj: '', cpf: '',
+  name: '', codigo: '', clientType: 'PJ', cnpj: '', cpf: '',
   whatsapp: '', phone: '', notes: '', clientUsers: [], ...EMPTY_ADDRESS,
 }
 
@@ -384,7 +384,7 @@ export default function Clients() {
 
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [editForm, setEditForm] = useState<EditForm>({
-    name: '', clientType: 'PJ', cnpj: '', cpf: '', whatsapp: '', phone: '', notes: '', clientUsers: [], ...EMPTY_ADDRESS,
+    name: '', codigo: '', clientType: 'PJ', cnpj: '', cpf: '', whatsapp: '', phone: '', notes: '', clientUsers: [], ...EMPTY_ADDRESS,
   })
   const [loadingEditUsers, setLoadingEditUsers] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -416,6 +416,7 @@ export default function Clients() {
     mutationFn: () =>
       api.post('/clients', {
         name: createForm.name,
+        codigo: createForm.codigo || undefined,
         clientType: createForm.clientType,
         cnpj: createForm.cnpj || undefined,
         cpf: createForm.cpf || undefined,
@@ -446,6 +447,7 @@ export default function Clients() {
     mutationFn: (data: EditForm & { id: string }) =>
       api.patch(`/clients/${data.id}`, {
         name: data.name,
+        codigo: data.codigo || undefined,
         clientType: data.clientType,
         cnpj: data.cnpj || undefined,
         cpf: data.cpf || undefined,
@@ -484,6 +486,7 @@ export default function Clients() {
     setLoadingEditUsers(true)
     setEditForm({
       name: client.name,
+      codigo: client.codigo ?? '',
       clientType: client.clientType ?? 'PJ',
       cnpj: client.cnpj ?? '',
       cpf: client.cpf ?? '',
@@ -585,6 +588,10 @@ export default function Clients() {
               <Label htmlFor="c-name">Nome *</Label>
               <Input id="c-name" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
             </div>
+            <div className="space-y-1">
+              <Label htmlFor="c-codigo">Código</Label>
+              <Input id="c-codigo" value={createForm.codigo} onChange={(e) => setCreateForm({ ...createForm, codigo: e.target.value })} placeholder="Ex: 0123" />
+            </div>
           </div>
 
           <ClientFields
@@ -625,7 +632,9 @@ export default function Clients() {
           <div key={client.id} className={cn('bg-surface rounded-lg border border-border px-4 py-3 flex items-center justify-between gap-3', !client.isActive && 'opacity-60')}>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-foreground truncate">{client.name}</p>
+                <p className="text-sm font-medium text-foreground truncate">
+                  {client.codigo ? `${client.codigo} - ${client.name}` : client.name}
+                </p>
                 <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0">
                   {client.clientType ?? 'PJ'}
                 </span>
@@ -676,6 +685,10 @@ export default function Clients() {
             <div className="space-y-1">
               <Label htmlFor="e-name">Nome *</Label>
               <Input id="e-name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="e-codigo">Código</Label>
+              <Input id="e-codigo" value={editForm.codigo} onChange={(e) => setEditForm({ ...editForm, codigo: e.target.value })} placeholder="Ex: 0123" />
             </div>
             <ClientFields
               form={editForm}

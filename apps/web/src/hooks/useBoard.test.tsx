@@ -15,13 +15,14 @@ const mockBoard: Board = {
   responsibleUser: null,
   isActive: true,
   dueDate: null,
-  client: { id: 'c1', name: 'Empresa ABC' },
+  client: { id: 'c1', name: 'Empresa ABC', codigo: null },
   columns: [
     {
       id: 'col-1',
       title: 'Backlog',
       position: 0,
-      isFinal: false,
+      statusEffect: 'NONE',
+      notifyClient: false,
       color: null,
       boardId: 'board-1',
       tasks: [
@@ -52,7 +53,8 @@ const mockBoard: Board = {
       id: 'col-2',
       title: 'Concluído',
       position: 1,
-      isFinal: true,
+      statusEffect: 'DONE',
+      notifyClient: false,
       color: null,
       boardId: 'board-1',
       tasks: [],

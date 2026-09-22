@@ -23,14 +23,18 @@ const EVENT_FLAG_MAP: Record<string, keyof NotificationConfig> = {
 }
 
 export async function processNotificationJob(job: { data: NotificationJob }): Promise<void> {
-  const { event, organizationId, recipientType = 'CLIENT', clientId, userId, taskId, requestId, metadata, channels } =
+  const { event, organizationId, recipientType = 'CLIENT', clientId, userId, taskId, requestId, metadata, channels, forceChannels } =
     job.data
 
   const config = await prisma.notificationConfig.findUnique({ where: { organizationId } })
   if (!config) return
 
+  // forceChannels (Column.notifyClient via Template de OS) bypassa o toggle global do evento —
+  // é uma escolha explícita por coluna, não o aviso genérico de qualquer movimentação. Outras
+  // configurações da org (token do WhatsApp, master switches whatsappEnabled/emailEnabled) ainda
+  // se aplicam — só o gate por evento (config.taskMoved etc) é ignorado.
   const isEnabled = (config[EVENT_FLAG_MAP[event]] as boolean | undefined) ?? false
-  if (!isEnabled) return
+  if (!isEnabled && !forceChannels) return
 
   if (recipientType === 'USER') {
     if (!userId) return
@@ -39,7 +43,15 @@ export async function processNotificationJob(job: { data: NotificationJob }): Pr
   }
 
   if (!clientId) return
-  await processClientNotification(config, { event, organizationId, clientId, taskId, requestId, metadata, channels })
+  await processClientNotification(config, {
+    event,
+    organizationId,
+    clientId,
+    taskId,
+    requestId,
+    metadata,
+    channels: forceChannels ?? channels,
+  })
 }
 
 async function processClientNotification(

@@ -25,6 +25,7 @@ const clientUserLinkSchema = z.union([
 
 export const createClientSchema = z.object({
   name: z.string().min(2),
+  codigo: z.string().optional(),
   clientType: z.enum(['PF', 'PJ']).default('PJ'),
   cnpj: z.string().optional(),
   cpf: z.string().optional(),
@@ -37,6 +38,7 @@ export const createClientSchema = z.object({
 
 export const updateClientSchema = z.object({
   name: z.string().min(2).optional(),
+  codigo: z.string().optional(),
   clientType: z.enum(['PF', 'PJ']).optional(),
   cnpj: z.string().optional(),
   cpf: z.string().optional(),

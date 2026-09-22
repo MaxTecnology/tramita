@@ -22,15 +22,20 @@ import RecurringTemplates from '@/pages/app/settings/RecurringTemplates'
 import RecurringTemplateForm from '@/pages/app/settings/RecurringTemplateForm'
 import ClientUsers from '@/pages/app/settings/ClientUsers'
 import ClientUserForm from '@/pages/app/settings/ClientUserForm'
+import OSTemplates from '@/pages/app/settings/OSTemplates'
+import OSTemplateForm from '@/pages/app/settings/OSTemplateForm'
+import OSList from '@/pages/app/OSList'
 import DashboardMetrics from '@/pages/app/DashboardMetrics'
 import Processes from '@/pages/app/Processes'
 import Requests from '@/pages/app/Requests'
+import Tasks from '@/pages/app/Tasks'
 
 const PortalLayout = lazy(() => import('@/pages/portal/Layout'))
 const PortalBoards = lazy(() => import('@/pages/portal/Boards'))
 const PortalBoard = lazy(() => import('@/pages/portal/Board'))
 const PortalProfile = lazy(() => import('@/pages/portal/Profile'))
 const PortalRequests = lazy(() => import('@/pages/portal/Requests'))
+const PortalTasks = lazy(() => import('@/pages/portal/Tasks'))
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER']
 const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
@@ -62,6 +67,15 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/app/dashboard" replace /> },
       { path: 'dashboard', element: <DashboardMetrics /> },
       { path: 'processes', element: <Processes /> },
+      { path: 'tasks', element: <Tasks /> },
+      {
+        path: 'os',
+        element: (
+          <ProtectedRoute allowedRoles={MANAGER_ROLES}>
+            <OSList />
+          </ProtectedRoute>
+        ),
+      },
       { path: 'requests', element: <Requests /> },
       { path: 'board/:boardId', element: <Board /> },
       {
@@ -137,6 +151,30 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'settings/os-templates',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <OSTemplates />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/os-templates/new',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <OSTemplateForm />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/os-templates/:id/edit',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <OSTemplateForm />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: 'settings/client-users',
         element: (
           <ProtectedRoute allowedRoles={MANAGER_ROLES}>
@@ -176,6 +214,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/portal/board" replace /> },
       { path: 'board', element: <PortalBoards /> },
       { path: 'board/:boardId', element: <PortalBoard /> },
+      { path: 'tasks', element: <PortalTasks /> },
       { path: 'requests', element: <PortalRequests /> },
       { path: 'profile', element: <PortalProfile /> },
     ],

@@ -37,7 +37,7 @@ describe('POST /boards', () => {
     expect(body.columns).toHaveLength(3)
     expect(body.columns[0].title).toBe('Pendente')
     expect(body.columns[2].title).toBe('Concluído')
-    expect(body.columns[2].isFinal).toBe(true)
+    expect(body.columns[2].statusEffect).toBe('DONE')
   })
 
   it('ORG_MANAGER cria board sem responsável automático', async () => {

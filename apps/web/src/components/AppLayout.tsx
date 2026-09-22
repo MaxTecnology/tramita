@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { useRequestsBadgeStream } from '@/hooks/useRequestsBadgeStream'
 import { api } from '@/lib/api'
-import { LayoutDashboard, Users, UserCheck, Bell, CreditCard, Settings, LogOut, ClipboardList, Inbox, Menu, X, UserCircle, Building2, Repeat, UserCog } from 'lucide-react'
+import { LayoutDashboard, Users, UserCheck, Bell, CreditCard, Settings, LogOut, ClipboardList, ListChecks, Inbox, Menu, X, UserCircle, Building2, Repeat, UserCog, FileStack } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER']
@@ -86,6 +86,12 @@ export default function AppLayout() {
           {ORG_ROLES.includes(role) && (
             <SidebarLink to="/app/processes" icon={<ClipboardList size={16} />} label="Processos" onClick={handleNavClick} />
           )}
+          {MANAGER_ROLES.includes(role) && (
+            <SidebarLink to="/app/os" icon={<FileStack size={16} />} label="Ordens de Serviço" onClick={handleNavClick} />
+          )}
+          {ORG_ROLES.includes(role) && (
+            <SidebarLink to="/app/tasks" icon={<ListChecks size={16} />} label="Tarefas" onClick={handleNavClick} />
+          )}
           {ORG_ROLES.includes(role) && (
             <SidebarLink
               to="/app/requests"
@@ -122,6 +128,9 @@ export default function AppLayout() {
           )}
           {ADMIN_ROLES.includes(role) && (
             <SidebarLink to="/app/settings/recurring-templates" icon={<Repeat size={16} />} label="Tarefas Recorrentes" onClick={handleNavClick} />
+          )}
+          {ADMIN_ROLES.includes(role) && (
+            <SidebarLink to="/app/settings/os-templates" icon={<FileStack size={16} />} label="Templates de OS" onClick={handleNavClick} />
           )}
         </nav>
 

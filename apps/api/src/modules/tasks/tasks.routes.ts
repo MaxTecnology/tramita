@@ -3,8 +3,8 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
-import { createTaskSchema, updateTaskSchema, moveTaskSchema, reorderTasksSchema } from './tasks.schema'
-import { createTask, moveTask, updateTask, reorderTasks, deleteTask, getTaskHistory } from './tasks.service'
+import { createTaskSchema, updateTaskSchema, moveTaskSchema, reorderTasksSchema, listTasksQuerySchema } from './tasks.schema'
+import { createTask, moveTask, updateTask, reorderTasks, deleteTask, getTaskHistory, listTasks } from './tasks.service'
 
 export async function tasksRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
@@ -19,6 +19,17 @@ export async function tasksRoutes(app: FastifyInstance) {
     const actor = { id: request.user.sub, type: 'user' as const }
     return reply.status(201).send(
       await createTask(columnId, request.user.organizationId!, result.data, actor),
+    )
+  })
+
+  // /tasks (listagem flat) ANTES de qualquer /tasks/:id-shaped
+  app.get('/tasks', {
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+  }, async (request, reply) => {
+    const result = listTasksQuerySchema.safeParse(request.query)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(
+      await listTasks(request.user.organizationId!, { id: request.user.sub, role: request.user.role }, result.data),
     )
   })
 

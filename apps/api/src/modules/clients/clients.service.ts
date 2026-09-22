@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { lookupCnpj, type CnpjLookupResult } from '@/lib/cnpjws'
@@ -7,7 +7,7 @@ import { hashPassword } from '@/modules/auth/auth.service'
 import type { CreateClientBody, UpdateClientBody } from './clients.schema'
 
 const SELECT = {
-  id: true, name: true, clientType: true, cnpj: true, cpf: true,
+  id: true, name: true, codigo: true, clientType: true, cnpj: true, cpf: true,
   whatsapp: true, phone: true, notes: true,
   cep: true, estado: true, cidade: true, bairro: true, logradouro: true, numero: true, complemento: true,
   isActive: true, createdAt: true,
@@ -68,56 +68,83 @@ async function upsertClientUserLinks(
   return resolvedPairs
 }
 
+// Client.codigo é único por organização (constraint clients_codigo_organizationId_key). Duas
+// pessoas digitando o mesmo código, ou um typo, é uma colisão genuína e esperada — não pode
+// virar 500 genérico.
+function isDuplicateCodigoError(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    err.code === 'P2002' &&
+    Array.isArray(err.meta?.target) &&
+    (err.meta!.target as string[]).includes('codigo')
+  )
+}
+
 export async function createClient(organizationId: string, data: CreateClientBody) {
-  return prisma.$transaction(async (tx) => {
-    const client = await tx.client.create({
-      data: {
-        name: data.name,
-        clientType: data.clientType ?? 'PJ',
-        cnpj: data.cnpj,
-        cpf: data.cpf,
-        whatsapp: data.whatsapp,
-        phone: data.phone,
-        notes: data.notes,
-        cep: data.cep,
-        estado: data.estado,
-        cidade: data.cidade,
-        bairro: data.bairro,
-        logradouro: data.logradouro,
-        numero: data.numero,
-        complemento: data.complemento,
-        organizationId,
-      },
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const client = await tx.client.create({
+        data: {
+          name: data.name,
+          codigo: data.codigo,
+          clientType: data.clientType ?? 'PJ',
+          cnpj: data.cnpj,
+          cpf: data.cpf,
+          whatsapp: data.whatsapp,
+          phone: data.phone,
+          notes: data.notes,
+          cep: data.cep,
+          estado: data.estado,
+          cidade: data.cidade,
+          bairro: data.bairro,
+          logradouro: data.logradouro,
+          numero: data.numero,
+          complemento: data.complemento,
+          organizationId,
+        },
+      })
+
+      await upsertClientUserLinks(tx, client.id, organizationId, data.clientUsers)
+
+      return tx.client.findUniqueOrThrow({ where: { id: client.id }, select: SELECT })
     })
-
-    await upsertClientUserLinks(tx, client.id, organizationId, data.clientUsers)
-
-    return tx.client.findUniqueOrThrow({ where: { id: client.id }, select: SELECT })
-  })
+  } catch (err) {
+    if (isDuplicateCodigoError(err)) {
+      throw new AppError(409, 'Já existe um cliente com este código nesta organização')
+    }
+    throw err
+  }
 }
 
 export async function updateClient(id: string, organizationId: string, data: UpdateClientBody) {
-  return prisma.$transaction(async (tx) => {
-    const client = await tx.client.findFirst({ where: { id, organizationId, isActive: true } })
-    if (!client) throw new AppError(404, 'Cliente não encontrado')
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const client = await tx.client.findFirst({ where: { id, organizationId, isActive: true } })
+      if (!client) throw new AppError(404, 'Cliente não encontrado')
 
-    const { clientUsers, ...clientData } = data
-    const updated = await tx.client.update({ where: { id }, data: clientData, select: SELECT })
+      const { clientUsers, ...clientData } = data
+      const updated = await tx.client.update({ where: { id }, data: clientData, select: SELECT })
 
-    if (clientUsers) {
-      const resolvedPairs = await upsertClientUserLinks(tx, id, organizationId, clientUsers)
-      await tx.clientUserAccess.deleteMany({
-        where: {
-          clientId: id,
-          ...(resolvedPairs.length > 0
-            ? { NOT: { OR: resolvedPairs.map((p) => ({ clientUserId: p.clientUserId, departmentId: p.departmentId })) } }
-            : {}),
-        },
-      })
+      if (clientUsers) {
+        const resolvedPairs = await upsertClientUserLinks(tx, id, organizationId, clientUsers)
+        await tx.clientUserAccess.deleteMany({
+          where: {
+            clientId: id,
+            ...(resolvedPairs.length > 0
+              ? { NOT: { OR: resolvedPairs.map((p) => ({ clientUserId: p.clientUserId, departmentId: p.departmentId })) } }
+              : {}),
+          },
+        })
+      }
+
+      return updated
+    })
+  } catch (err) {
+    if (isDuplicateCodigoError(err)) {
+      throw new AppError(409, 'Já existe um cliente com este código nesta organização')
     }
-
-    return updated
-  })
+    throw err
+  }
 }
 
 export async function deleteClient(id: string, organizationId: string) {

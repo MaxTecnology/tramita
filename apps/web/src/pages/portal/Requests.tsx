@@ -29,7 +29,7 @@ export default function PortalRequests() {
   const qc = useQueryClient()
   const { clientId } = usePortalClient()
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ title: '', description: '', departmentId: '' })
+  const [form, setForm] = useState({ title: '', description: '', departmentId: '', osTemplateId: '' })
 
   const { data: requests = [], isLoading } = useQuery<ClientRequest[]>({
     queryKey: ['portal-requests', clientId],
@@ -42,18 +42,24 @@ export default function PortalRequests() {
     queryFn: () => api.get('/portal/departments').then((r) => r.data),
   })
 
+  const { data: osTemplates = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['portal-os-templates'],
+    queryFn: () => api.get('/portal/os-templates').then((r) => r.data),
+  })
+
   const createMutation = useMutation({
     mutationFn: () => api.post('/portal/requests', {
       clientId,
       title: form.title,
       description: form.description,
       departmentId: form.departmentId || undefined,
+      osTemplateId: form.osTemplateId || undefined,
     }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Solicitação enviada')
       qc.invalidateQueries({ queryKey: ['portal-requests'] })
       setOpen(false)
-      setForm({ title: '', description: '', departmentId: '' })
+      setForm({ title: '', description: '', departmentId: '', osTemplateId: '' })
     },
     onError: () => toast.error('Erro ao enviar solicitação'),
   })
@@ -123,6 +129,20 @@ export default function PortalRequests() {
             onSubmit={(e) => { e.preventDefault(); if (form.title.trim()) createMutation.mutate() }}
             className="space-y-4 mt-2"
           >
+            <div className="space-y-1.5">
+              <Label htmlFor="req-os-template">Tipo de solicitação</Label>
+              <select
+                id="req-os-template"
+                value={form.osTemplateId}
+                onChange={(e) => setForm({ ...form, osTemplateId: e.target.value })}
+                className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <option value="">Outro</option>
+                {osTemplates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="req-title">Título</Label>
               <Input

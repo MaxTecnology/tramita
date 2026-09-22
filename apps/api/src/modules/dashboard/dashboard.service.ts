@@ -13,12 +13,13 @@ export async function getDashboardMetrics(organizationId: string) {
     tasksByStatus,
     atRiskBoards,
   ] = await Promise.all([
-    prisma.board.count({ where: { organizationId, isActive: true } }),
+    prisma.board.count({ where: { organizationId, isActive: true, type: 'OS' } }),
 
     prisma.board.count({
       where: {
         organizationId,
         isActive: true,
+        type: 'OS',
         OR: [
           {
             columns: {
@@ -34,6 +35,10 @@ export async function getDashboardMetrics(organizationId: string) {
       },
     }),
 
+    // Agregados a nível de TAREFA — recorrentes moram no board de sistema RECURRING_SYSTEM mas
+    // são tarefas reais de trabalho da equipe, então NÃO filtramos type: 'OS' aqui (diferente
+    // das contagens/listagens a nível de BOARD acima e abaixo, onde o board de sistema nunca
+    // deve aparecer como "processo").
     prisma.task.count({
       where: {
         status: 'DONE',
@@ -60,6 +65,7 @@ export async function getDashboardMetrics(organizationId: string) {
       where: {
         organizationId,
         isActive: true,
+        type: 'OS',
         OR: [
           {
             columns: {
@@ -126,6 +132,7 @@ export async function getDashboardMetrics(organizationId: string) {
     },
     tasksByStatus: {
       OPEN: statusMap['OPEN'] ?? 0,
+      STARTED: statusMap['STARTED'] ?? 0,
       BLOCKED: statusMap['BLOCKED'] ?? 0,
       DONE: statusMap['DONE'] ?? 0,
       DISREGARDED: statusMap['DISREGARDED'] ?? 0,

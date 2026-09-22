@@ -22,7 +22,7 @@ describe('createColumn', () => {
     const board = await createTestBoard(org.id, client.id)
 
     const result = await createColumn(board.id, org.id, {
-      title: 'Nova Coluna', position: 0, isFinal: false,
+      title: 'Nova Coluna', position: 0, statusEffect: 'NONE', notifyClient: false,
     })
 
     expect(result.title).toBe('Nova Coluna')
@@ -37,23 +37,23 @@ describe('createColumn', () => {
     const board = await createTestBoard(orgA.id, client.id)
 
     await expect(
-      createColumn(board.id, orgB.id, { title: 'X', position: 0, isFinal: false }),
+      createColumn(board.id, orgB.id, { title: 'X', position: 0, statusEffect: 'NONE', notifyClient: false }),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 })
 
 describe('updateColumn', () => {
-  it('updates title and isFinal', async () => {
+  it('updates title and statusEffect', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
     const board = await createTestBoard(org.id, client.id)
     const col = await createTestColumn(board.id, { position: 0 })
 
-    const result = await updateColumn(col.id, org.id, { title: 'Renomeada', isFinal: true })
+    const result = await updateColumn(col.id, org.id, { title: 'Renomeada', statusEffect: 'DONE' })
 
     expect(result.title).toBe('Renomeada')
-    expect(result.isFinal).toBe(true)
+    expect(result.statusEffect).toBe('DONE')
   })
 
   it('throws 404 when column belongs to a different organization', async () => {

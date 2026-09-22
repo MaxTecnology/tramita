@@ -4,6 +4,7 @@ import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.
 import { Prisma, type MessageChannel } from '@prisma/client'
 import { enqueueNotification } from '@/lib/queue'
 import { logger } from '@/lib/logger'
+import { ensureRecurringSystemBoard } from '@/modules/tasks/tasks.service'
 import {
   computeDueDate,
   computeTargetDate,
@@ -108,41 +109,26 @@ export async function deleteTemplate(id: string, organizationId: string) {
   return { ok: true }
 }
 
-async function assertClientBoardColumnBelongToOrg(
-  organizationId: string,
-  clientId: string,
-  boardId: string,
-  columnId: string,
-) {
-  const client = await prisma.client.findFirst({ where: { id: clientId, organizationId } })
-  if (!client) throw new AppError(404, 'Cliente não encontrado')
-
-  const board = await prisma.board.findFirst({ where: { id: boardId, organizationId, clientId } })
-  if (!board) throw new AppError(404, 'Processo não encontrado para este cliente')
-
-  const column = await prisma.column.findFirst({ where: { id: columnId, boardId } })
-  if (!column) throw new AppError(404, 'Coluna não encontrada neste processo')
-}
-
 export async function listAssignments(templateId: string, organizationId: string) {
   await getTemplateById(templateId, organizationId)
   return prisma.recurringTaskAssignment.findMany({
     where: { templateId },
-    include: { client: { select: { id: true, name: true } }, board: { select: { id: true, title: true } } },
+    include: { client: { select: { id: true, name: true } } },
     orderBy: { createdAt: 'asc' },
   })
 }
 
 export async function createAssignment(templateId: string, organizationId: string, data: CreateAssignmentBody) {
   await getTemplateById(templateId, organizationId)
-  await assertClientBoardColumnBelongToOrg(organizationId, data.clientId, data.boardId, data.columnId)
+  const client = await prisma.client.findFirst({ where: { id: data.clientId, organizationId } })
+  if (!client) throw new AppError(404, 'Cliente não encontrado')
 
   const existing = await prisma.recurringTaskAssignment.findFirst({
     where: { templateId, clientId: data.clientId },
   })
   if (existing) throw new AppError(409, 'Este cliente já está vinculado a este template')
 
-  return prisma.recurringTaskAssignment.create({ data: { templateId, ...data } })
+  return prisma.recurringTaskAssignment.create({ data: { templateId, clientId: data.clientId } })
 }
 
 async function getAssignmentOrThrow(templateId: string, assignmentId: string, organizationId: string) {
@@ -160,16 +146,7 @@ export async function updateAssignment(
   organizationId: string,
   data: UpdateAssignmentBody,
 ) {
-  const assignment = await getAssignmentOrThrow(templateId, assignmentId, organizationId)
-
-  if (data.boardId || data.columnId) {
-    await assertClientBoardColumnBelongToOrg(
-      organizationId,
-      assignment.clientId,
-      data.boardId ?? assignment.boardId,
-      data.columnId ?? assignment.columnId,
-    )
-  }
+  await getAssignmentOrThrow(templateId, assignmentId, organizationId)
 
   return prisma.recurringTaskAssignment.update({ where: { id: assignmentId }, data })
 }
@@ -223,8 +200,8 @@ export async function generateTaskForAssignment(
   if (existingLog?.status === 'SUCCESS') return { status: 'ALREADY_EXISTS' }
 
   try {
-    const column = await prisma.column.findUnique({ where: { id: assignment.columnId } })
-    if (!column) throw new Error('Coluna do vínculo não existe mais')
+    const systemBoard = await ensureRecurringSystemBoard(assignment.clientId, template.organizationId)
+    const columnId = systemBoard.columns[0].id
 
     const rules: RecurrenceDateRules = template
     const dueDate = computeDueDate(competence, rules)
@@ -232,7 +209,7 @@ export async function generateTaskForAssignment(
     const initialStatus = template.documentRequests.length > 0 ? 'BLOCKED' : 'OPEN'
 
     const taskId = await prisma.$transaction(async (tx) => {
-      const position = await tx.task.count({ where: { columnId: assignment.columnId } })
+      const position = await tx.task.count({ where: { columnId } })
 
       const task = await tx.task.create({
         data: {
@@ -240,7 +217,7 @@ export async function generateTaskForAssignment(
           description: template.description,
           priority: 'MEDIUM',
           status: initialStatus,
-          columnId: assignment.columnId,
+          columnId,
           departmentId: template.departmentId,
           competence,
           dueDate,

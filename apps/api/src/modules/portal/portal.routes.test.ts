@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { app } from '@/test/setup'
+import { createOSTemplate } from '@/modules/os-templates/os-templates.service'
+import { ensureRecurringSystemBoard } from '@/modules/tasks/tasks.service'
+import { prisma } from '@/lib/prisma'
 import {
   createTestPlan,
   createTestOrg,
@@ -105,6 +108,85 @@ describe('GET /portal/tasks/:id/history', () => {
     })
     expect(res.statusCode).toBe(200)
     expect(Array.isArray(JSON.parse(res.body))).toBe(true)
+  })
+})
+
+describe('GET /portal/tasks', () => {
+  it('inclui tarefas recorrentes (board de sistema RECURRING_SYSTEM) quando visibleToClient', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+
+    const systemBoard = await ensureRecurringSystemBoard(client.id, org.id)
+    const recurringTask = await createTestTask(systemBoard.columns[0].id, user.id, {
+      title: 'Folha de Pagamento — Setembro',
+      departmentId: department.id,
+    })
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/portal/tasks',
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const list = JSON.parse(res.body) as Array<{ id: string }>
+    expect(list.some((t) => t.id === recurringTask.id)).toBe(true)
+  })
+
+  it('não retorna tarefa com visibleToClient false', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const hiddenTask = await createTestTask(col.id, user.id, { departmentId: department.id })
+    await prisma.task.update({ where: { id: hiddenTask.id }, data: { visibleToClient: false } })
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/portal/tasks',
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const list = JSON.parse(res.body) as Array<{ id: string }>
+    expect(list.some((t) => t.id === hiddenTask.id)).toBe(false)
+  })
+
+  it('não retorna tarefa de departamento ao qual o ClientUser não tem acesso', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id, { name: 'Fiscal' })
+    const otherDepartment = await createTestDepartment(org.id, { name: 'Folha' })
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const outOfScopeTask = await createTestTask(col.id, user.id, { departmentId: otherDepartment.id })
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/portal/tasks',
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const list = JSON.parse(res.body) as Array<{ id: string }>
+    expect(list.some((t) => t.id === outOfScopeTask.id)).toBe(false)
   })
 })
 
@@ -265,5 +347,32 @@ describe('PATCH /portal/requests/:id/cancel', () => {
       headers: { authorization: authB },
     })
     expect(res.statusCode).toBe(404)
+  })
+})
+
+describe('GET /portal/os-templates', () => {
+  it('retorna apenas templates ativos da organização do cliente', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const otherOrg = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+
+    await createOSTemplate(org.id, { name: 'Ativo', isActive: true, columns: [] })
+    await createOSTemplate(org.id, { name: 'Inativo', isActive: false, columns: [] })
+    await createOSTemplate(otherOrg.id, { name: 'De Outra Org', isActive: true, columns: [] })
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/portal/os-templates',
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json<{ id: string; name: string }[]>()
+    expect(body.map((t) => t.name)).toEqual(['Ativo'])
   })
 })

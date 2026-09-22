@@ -38,29 +38,31 @@ function formatHistoryAction(h: TaskHistory): string {
   return label
 }
 
-const PRIORITY_LABEL: Record<Task['priority'], string> = {
+export const PRIORITY_LABEL: Record<Task['priority'], string> = {
   LOW: 'Baixa',
   MEDIUM: 'Média',
   HIGH: 'Alta',
   URGENT: 'Urgente',
 }
 
-const PRIORITY_COLOR: Record<Task['priority'], string> = {
+export const PRIORITY_COLOR: Record<Task['priority'], string> = {
   LOW: 'bg-gray-100 text-gray-600',
   MEDIUM: 'bg-blue-100 text-blue-600',
   HIGH: 'bg-orange-100 text-orange-600',
   URGENT: 'bg-red-100 text-red-600',
 }
 
-const STATUS_LABEL: Record<Task['status'], string> = {
+export const STATUS_LABEL: Record<Task['status'], string> = {
   OPEN: 'Aberto',
+  STARTED: 'Iniciado',
   DONE: 'Concluído',
   DISREGARDED: 'Desconsiderado',
   BLOCKED: 'Com Impedimento',
 }
 
-const STATUS_COLOR: Record<Task['status'], string> = {
+export const STATUS_COLOR: Record<Task['status'], string> = {
   OPEN: 'bg-gray-100 text-gray-600',
+  STARTED: 'bg-blue-100 text-blue-600',
   DONE: 'bg-green-100 text-green-600',
   DISREGARDED: 'bg-gray-200 text-gray-500',
   BLOCKED: 'bg-red-100 text-red-600',
@@ -272,7 +274,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                 onChange={(e) => updateMutation.mutate({ status: e.target.value as Task['status'] })}
                 className={cn('text-xs font-medium px-2 py-0.5 rounded-full border-0 cursor-pointer', STATUS_COLOR[task.status])}
               >
-                {(['OPEN', 'DONE', 'DISREGARDED', 'BLOCKED'] as Task['status'][]).map((s) => (
+                {(['OPEN', 'STARTED', 'DONE', 'DISREGARDED', 'BLOCKED'] as Task['status'][]).map((s) => (
                   <option key={s} value={s}>{STATUS_LABEL[s]}</option>
                 ))}
               </select>

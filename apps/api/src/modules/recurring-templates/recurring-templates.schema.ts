@@ -39,13 +39,9 @@ export type UpdateTemplateBody = z.infer<typeof updateTemplateSchema>
 
 export const createAssignmentSchema = z.object({
   clientId: z.string().cuid(),
-  boardId: z.string().cuid(),
-  columnId: z.string().cuid(),
 })
 
 export const updateAssignmentSchema = z.object({
-  boardId: z.string().cuid().optional(),
-  columnId: z.string().cuid().optional(),
   isActive: z.boolean().optional(),
 })
 

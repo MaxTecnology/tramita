@@ -20,6 +20,7 @@ import {
   countPendingRequests,
 } from './requests.service'
 import { createBoard } from '@/modules/boards/boards.service'
+import { createOSTemplate } from '@/modules/os-templates/os-templates.service'
 
 beforeEach(() => {
   vi.spyOn(queue, 'enqueueNotification').mockResolvedValue(undefined)
@@ -152,6 +153,39 @@ describe('approveRequest', () => {
 
     const board = await prisma.board.findFirst({ where: { clientId: client.id } })
     expect(board?.title).toBe('Abertura de LTDA')
+  })
+
+  it('mode NEW_BOARD com osTemplateId cria board com as colunas do template e título com prefixo do código do cliente', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id, { name: 'Empresa X', codigo: 'CLI-001' })
+    const template = await createOSTemplate(org.id, {
+      name: 'Abertura de Empresa',
+      isActive: true,
+      columns: [
+        { title: 'Documentação', statusEffect: 'NONE', notifyClient: false, documents: [{ name: 'RG' }] },
+        { title: 'Concluído', statusEffect: 'DONE', notifyClient: true, documents: [] },
+      ],
+    })
+    const request = await createRequest(org.id, client.id, {
+      title: 'Abertura de LTDA',
+      osTemplateId: template.id,
+    })
+
+    const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
+
+    const board = await prisma.board.findFirst({
+      where: { clientId: client.id },
+      include: { columns: { orderBy: { position: 'asc' } } },
+    })
+    expect(board?.osTemplateId).toBe(template.id)
+    expect(board?.title).toBe('CLI-001 - Empresa X — Abertura de Empresa')
+    expect(board?.columns).toHaveLength(2)
+    expect(board?.columns.map((c) => c.title)).toEqual(['Documentação', 'Concluído'])
+
+    const task = await prisma.task.findUnique({ where: { id: approved.taskId! } })
+    expect(task?.columnId).toBe(board?.columns[0].id)
   })
 
   it('mode EXISTING_BOARD cria task na coluna informada de um board já existente do cliente', async () => {

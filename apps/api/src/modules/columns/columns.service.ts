@@ -3,7 +3,7 @@ import { AppError } from '@/errors/AppError'
 import type { CreateColumnBody, UpdateColumnBody, ReorderColumnsBody } from './columns.schema'
 
 export async function createColumn(boardId: string, organizationId: string, data: CreateColumnBody) {
-  const board = await prisma.board.findFirst({ where: { id: boardId, organizationId, isActive: true } })
+  const board = await prisma.board.findFirst({ where: { id: boardId, organizationId, isActive: true, type: 'OS' } })
   if (!board) throw new AppError(404, 'Board não encontrado')
 
   return prisma.column.create({ data: { ...data, boardId } })
@@ -11,7 +11,7 @@ export async function createColumn(boardId: string, organizationId: string, data
 
 export async function updateColumn(id: string, organizationId: string, data: UpdateColumnBody) {
   const column = await prisma.column.findFirst({
-    where: { id, board: { organizationId } },
+    where: { id, board: { organizationId, type: 'OS' } },
   })
   if (!column) throw new AppError(404, 'Coluna não encontrada')
 
@@ -20,7 +20,7 @@ export async function updateColumn(id: string, organizationId: string, data: Upd
 
 export async function reorderColumns(items: ReorderColumnsBody, organizationId: string) {
   const columns = await prisma.column.findMany({
-    where: { id: { in: items.map((i) => i.id) }, board: { organizationId } },
+    where: { id: { in: items.map((i) => i.id) }, board: { organizationId, type: 'OS' } },
   })
   if (columns.length !== items.length) throw new AppError(403, 'Acesso negado')
 
@@ -32,7 +32,7 @@ export async function reorderColumns(items: ReorderColumnsBody, organizationId: 
 
 export async function deleteColumn(id: string, organizationId: string) {
   const column = await prisma.column.findFirst({
-    where: { id, board: { organizationId } },
+    where: { id, board: { organizationId, type: 'OS' } },
   })
   if (!column) throw new AppError(404, 'Coluna não encontrada')
 
