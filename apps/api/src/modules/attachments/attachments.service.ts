@@ -161,7 +161,9 @@ export async function deleteAttachment(
       data: {
         deletedAt: new Date(),
         deletedBy: isClient ? undefined : actor.id,
-        deletedByClient: isClient ? actor.id : undefined,
+        // Same rule as uploadedByClient: authorship for a CLIENT actor is attributed to the
+        // company (Client.id), not the individual ClientUser.id.
+        deletedByClient: isClient ? task.column.board.clientId : undefined,
         deletedByName: actorName,
       },
     }),

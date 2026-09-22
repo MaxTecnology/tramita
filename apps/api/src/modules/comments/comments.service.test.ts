@@ -93,6 +93,30 @@ describe('deleteComment - soft delete', () => {
       deleteComment(comment.id, { id: otherClientUser.id, role: 'CLIENT', organizationId: org.id })
     ).rejects.toMatchObject({ statusCode: 404 })
   })
+
+  it('CLIENT que apaga comentário grava deletedBy como Client.id (empresa), não o ClientUser.id', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id, { position: 0 })
+    const task = await prisma.task.create({
+      data: { title: 'T', position: 0, columnId: column.id, creatorId: admin.id, departmentId: department.id },
+    })
+    const comment = await prisma.comment.create({
+      data: { content: 'Olá', taskId: task.id, authorType: 'CLIENT', clientId: client.id },
+    })
+
+    await deleteComment(comment.id, { id: clientUser.id, role: 'CLIENT', organizationId: org.id })
+
+    const stored = await prisma.comment.findUniqueOrThrow({ where: { id: comment.id } })
+    expect(stored.deletedBy).toBe(client.id)
+    expect(stored.deletedBy).not.toBe(clientUser.id)
+  })
 })
 
 describe('listComments - soft delete visibility', () => {

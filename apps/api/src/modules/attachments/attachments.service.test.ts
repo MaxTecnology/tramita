@@ -179,5 +179,11 @@ describe('attachments.service', () => {
     await expect(
       deleteAttachment(attachment.id, task.id, org.id, { id: otherClientUser.id, role: 'CLIENT' }),
     ).resolves.toEqual({ ok: true })
+
+    const stored = await prisma.attachment.findUniqueOrThrow({ where: { id: attachment.id } })
+    // deletedByClient must hold the Client.id (company), not otherClientUser.id (the ClientUser
+    // who performed the delete) — matches uploadedByClient's FK-to-clients semantics.
+    expect(stored.deletedByClient).toBe(client.id)
+    expect(stored.deletedByClient).not.toBe(otherClientUser.id)
   })
 })

@@ -200,7 +200,9 @@ export async function deleteComment(id: string, actor: CommentActor) {
     where: { id },
     data: {
       deletedAt: new Date(),
-      deletedBy: actor.id,
+      // Same rule as clientId on create: authorship for a CLIENT actor is attributed to the
+      // company (Client.id), not the individual ClientUser.id.
+      deletedBy: actor.role === 'CLIENT' ? comment.task.column.board.clientId : actor.id,
       deletedByType: actor.role === 'CLIENT' ? 'CLIENT' : 'USER',
     },
   })
