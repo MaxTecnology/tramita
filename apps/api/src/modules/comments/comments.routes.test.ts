@@ -91,4 +91,30 @@ describe('POST /tasks/:taskId/comments', () => {
 
     expect(res.statusCode).toBe(404)
   })
+
+  it('returns 404 when CLIENT has access to the company but not the task\'s department', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const deptFiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
+    const deptPessoal = await createTestDepartment(org.id, { name: 'Pessoal' })
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, deptFiscal.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id, { departmentId: deptPessoal.id })
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'POST',
+      url: `/tasks/${task.id}/comments`,
+      headers: { authorization: auth },
+      payload: { content: 'Tentativa fora do departamento' },
+    })
+
+    expect(res.statusCode).toBe(404)
+    const comment = await prisma.comment.findFirst({ where: { taskId: task.id } })
+    expect(comment).toBeNull()
+  })
 })
