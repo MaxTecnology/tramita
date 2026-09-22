@@ -448,7 +448,7 @@ variável nova) em vez de `assignment.columnId` no `tx.task.create({ data: { col
 abaixo — o resto da função (idempotência por `RecurringGenerationLog`, criação de
 `TaskDocumentRequirement`/`TaskDeliverable`, `taskHistory`) fica igual.
 
-- [ ] **Step 9: `test/helpers.ts` — `createTestColumn` ganha `statusEffect`, novo `createTestClient` com `codigo`**
+- [ ] **Step 9: `test/helpers.ts` — `createTestColumn` ganha `statusEffect`, `createTestClient` ganha `codigo`**
 
 ```ts
 export async function createTestColumn(
@@ -464,7 +464,24 @@ export async function createTestColumn(
     },
   })
 }
+
+export async function createTestClient(
+  organizationId: string,
+  overrides: Partial<{ isActive: boolean; name: string; codigo: string }> = {},
+) {
+  return prisma.client.create({
+    data: {
+      name: overrides.name ?? 'Test Client',
+      organizationId,
+      isActive: overrides.isActive ?? true,
+      codigo: overrides.codigo,
+    },
+  })
+}
 ```
+
+(`createTestClient` já existe em `test/helpers.ts` — esse snippet só adiciona `codigo` ao tipo de
+`overrides` e ao `data`, mantendo o resto da função igual.)
 
 Varrer o repositório (`grep -rn "isFinal" apps/api/src --include="*.test.ts"`) e trocar cada
 `isFinal: true`/`isFinal: false` pelo `statusEffect` equivalente (`DONE`/`NONE`) nos call sites de
@@ -1186,10 +1203,24 @@ git commit -m "feat(tasks): tela unificada de tarefas com modo lista e kanban di
 Adicionar `codigo: z.string().optional()` em `createClientSchema`/`updateClientSchema`, e
 `codigo: data.codigo` no `data` de `createClient`, mais `codigo: true` no `SELECT` do service.
 
-- [ ] **Step 2: `Clients.tsx`** — campo "Código" no formulário (create + edit), exibição
+- [ ] **Step 2: `types/index.ts` — `Client.codigo`**
+
+`apps/web/src/types/index.ts:57-75` define a interface `Client`. Adicionar o campo logo após `name`:
+
+```ts
+export interface Client {
+  id: string
+  name: string
+  codigo: string | null
+  clientType: 'PF' | 'PJ'
+  // ...resto dos campos inalterado
+}
+```
+
+- [ ] **Step 3: `Clients.tsx`** — campo "Código" no formulário (create + edit), exibição
   `"{codigo} - {name}"` na lista quando `codigo` existe (senão só `name`, como já faz hoje).
 
-- [ ] **Step 3: `portal.routes.ts` — `GET /portal/os-templates`**
+- [ ] **Step 4: `portal.routes.ts` — `GET /portal/os-templates`**
 
 ```ts
 app.get('/os-templates', async (request, reply) => {
@@ -1203,11 +1234,11 @@ app.get('/os-templates', async (request, reply) => {
 })
 ```
 
-- [ ] **Step 4: `portal/Requests.tsx`** — seletor "Tipo de solicitação" (lista `GET
+- [ ] **Step 5: `portal/Requests.tsx`** — seletor "Tipo de solicitação" (lista `GET
   /portal/os-templates`) + opção "Outro" que mantém o título livre como já funciona hoje. Mandar
   `osTemplateId` no `POST /portal/requests` quando um tipo específico for escolhido.
 
-- [ ] **Step 5: Typecheck, test, commit**
+- [ ] **Step 6: Typecheck, test, commit**
 
 ```bash
 pnpm --filter api exec tsc --noEmit && pnpm --filter api test
