@@ -59,39 +59,6 @@ describe('Portal — isolamento de tenant', () => {
   })
 })
 
-describe('PATCH /portal/profile', () => {
-  it('CLIENT atualiza próprio telefone — 200', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const { clientUser, password } = await createTestClientUser(org.id)
-
-    const auth = await getAuthHeader(clientUser.email, password)
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/portal/profile',
-      headers: { authorization: auth },
-      payload: { phone: '5582999999999' },
-    })
-    expect(res.statusCode).toBe(200)
-    expect(JSON.parse(res.body).phone).toBe('5582999999999')
-  })
-
-  it('ORG_MEMBER não acessa /portal/profile (403)', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const user = await createTestUser(org.id, { role: 'ORG_MEMBER' })
-
-    const auth = await getAuthHeader(user.email, 'Test@1234')
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/portal/profile',
-      headers: { authorization: auth },
-      payload: { phone: '5582999999999' },
-    })
-    expect(res.statusCode).toBe(403)
-  })
-})
-
 describe('GET /portal/clients', () => {
   it('retorna apenas as empresas às quais o ClientUser tem acesso', async () => {
     const plan = await createTestPlan()

@@ -5,8 +5,7 @@ import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { getClientAccessScope } from '@/modules/client-users/client-access'
-import { updateProfileSchema } from './portal.schema'
-import { getClientProfile, updateClientProfile, getTaskHistory, listAccessibleClients } from './portal.service'
+import { getTaskHistory, listAccessibleClients } from './portal.service'
 import { listDepartments } from '@/modules/departments/departments.service'
 import { createRequestSchema } from '@/modules/requests/requests.schema'
 import {
@@ -30,16 +29,6 @@ export async function portalRoutes(app: FastifyInstance) {
 
   app.addHook('preHandler', verifyJWT)
   app.addHook('preHandler', requireRole('CLIENT'))
-
-  app.get('/profile', async (request, reply) => {
-    return reply.send(await getClientProfile(request.user.sub))
-  })
-
-  app.patch('/profile', async (request, reply) => {
-    const result = updateProfileSchema.safeParse(request.body)
-    if (!result.success) throw new AppError(400, result.error.errors[0].message)
-    return reply.send(await updateClientProfile(request.user.sub, result.data))
-  })
 
   app.get('/clients', async (request, reply) => {
     return reply.send(await listAccessibleClients(request.user.sub))
