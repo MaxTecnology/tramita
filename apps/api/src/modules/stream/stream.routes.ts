@@ -22,7 +22,7 @@ export async function streamRoutes(app: FastifyInstance) {
 
     // Verify board exists and belongs to the user's org
     const board = await prisma.board.findFirst({
-      where: { id, organizationId: user.organizationId!, isActive: true },
+      where: { id, organizationId: user.organizationId!, isActive: true, type: 'OS' },
     })
     if (!board) throw new AppError(404, 'Board não encontrado')
 

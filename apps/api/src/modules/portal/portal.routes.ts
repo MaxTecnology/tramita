@@ -6,7 +6,7 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { prisma } from '@/lib/prisma'
 import { getClientAccessScope } from '@/modules/client-users/client-access'
-import { getTaskHistory, listAccessibleClients } from './portal.service'
+import { getTaskHistory, listAccessibleClients, listPortalTasks } from './portal.service'
 import { listDepartments } from '@/modules/departments/departments.service'
 import { createRequestSchema } from '@/modules/requests/requests.schema'
 import {
@@ -33,6 +33,13 @@ export async function portalRoutes(app: FastifyInstance) {
 
   app.get('/clients', async (request, reply) => {
     return reply.send(await listAccessibleClients(request.user.sub))
+  })
+
+  // Listagem flat de tarefas do cliente — inclui tarefas recorrentes (board de sistema
+  // RECURRING_SYSTEM, nunca listado por /boards) que sejam visibleToClient.
+  app.get('/tasks', async (request, reply) => {
+    const { clientId } = request.query as { clientId?: string }
+    return reply.send(await listPortalTasks(request.user.organizationId!, request.user.sub, { clientId }))
   })
 
   app.get('/tasks/:taskId/history', async (request, reply) => {

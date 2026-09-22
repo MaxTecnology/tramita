@@ -22,22 +22,29 @@ export async function departmentsRoutes(app: FastifyInstance) {
     return reply.send(await listDepartments(request.user.organizationId!))
   })
 
-  app.addHook('preHandler', requireRole('ORG_ADMIN'))
+  // Nota: `requireRole('ORG_ADMIN')` é passado explicitamente no preHandler de cada rota de
+  // mutação abaixo (em vez de um `app.addHook` global após a rota de leitura) porque hooks
+  // registrados via `addHook` no Fastify se aplicam a TODAS as rotas do mesmo contexto de
+  // encapsulamento, inclusive as declaradas antes do addHook — confirmado empiricamente. Um
+  // `addHook('preHandler', requireRole('ORG_ADMIN'))` aqui bloquearia também o GET acima para
+  // ORG_MANAGER/ORG_MEMBER, quebrando a leitura liberada pretendida. Ver mesmo padrão em
+  // os-templates.routes.ts.
+  const adminOnly = [requireRole('ORG_ADMIN')]
 
-  app.post('/', { preHandler: [checkSubscription] }, async (request, reply) => {
+  app.post('/', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {
     const result = createDepartmentSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     return reply.status(201).send(await createDepartment(request.user.organizationId!, result.data))
   })
 
-  app.patch('/:id', { preHandler: [checkSubscription] }, async (request, reply) => {
+  app.patch('/:id', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const result = updateDepartmentSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     return reply.send(await updateDepartment(id, request.user.organizationId!, result.data))
   })
 
-  app.delete('/:id', { preHandler: [checkSubscription] }, async (request, reply) => {
+  app.delete('/:id', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(await deleteDepartment(id, request.user.organizationId!))
   })

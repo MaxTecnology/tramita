@@ -144,6 +144,42 @@ describe('moveTask', () => {
 
     expect(result.status).toBe('DISREGARDED')
   })
+
+  it('creates TaskDocumentRequirements from ColumnDocument and recalculates status to BLOCKED, even overriding the column statusEffect', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col1 = await createTestColumn(board.id, { position: 0 })
+    const startedCol = await createTestColumn(board.id, { position: 1, statusEffect: 'STARTED' })
+    await prisma.columnDocument.createMany({
+      data: [
+        { columnId: startedCol.id, name: 'Contrato Social', position: 0 },
+        { columnId: startedCol.id, name: 'Procuração', position: 1 },
+      ],
+    })
+    const task = await createTestTask(col1.id, user.id)
+
+    const result = await moveTask(task.id, org.id, { columnId: startedCol.id, position: 0 }, {
+      id: user.id, type: 'user',
+    })
+
+    const requirements = await prisma.taskDocumentRequirement.findMany({ where: { taskId: task.id } })
+    expect(requirements).toHaveLength(2)
+    expect(requirements.map((r) => r.name).sort()).toEqual(['Contrato Social', 'Procuração'].sort())
+    // BLOCKED (from the freshly created pending requirements) must win over the column's own
+    // statusEffect (STARTED) — recalculateTaskStatus runs AFTER the statusEffect write.
+    expect(result.status).toBe('BLOCKED')
+
+    // Moving away and back to the same column must not duplicate the requirements.
+    const otherCol = await createTestColumn(board.id, { position: 2 })
+    await moveTask(task.id, org.id, { columnId: otherCol.id, position: 0 }, { id: user.id, type: 'user' })
+    await moveTask(task.id, org.id, { columnId: startedCol.id, position: 0 }, { id: user.id, type: 'user' })
+
+    const requirementsAfter = await prisma.taskDocumentRequirement.findMany({ where: { taskId: task.id } })
+    expect(requirementsAfter).toHaveLength(2)
+  })
 })
 
 describe('createTask', () => {

@@ -67,7 +67,7 @@ export async function listBoards(
         : {}),
     },
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, codigo: true } },
       responsibleUser: { select: { id: true, name: true } },
       columns: {
         orderBy: { position: 'asc' },
@@ -93,7 +93,7 @@ export async function getBoardById(
       ...(clientId ? { clientId: Array.isArray(clientId) ? { in: clientId } : clientId } : {}),
     },
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, codigo: true } },
       responsibleUser: { select: { id: true, name: true } },
       columns: {
         orderBy: { position: 'asc' },
@@ -141,7 +141,7 @@ export async function createBoard(
       columns: { create: columns },
     },
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, codigo: true } },
       columns: { orderBy: { position: 'asc' } },
     },
   })
@@ -149,7 +149,7 @@ export async function createBoard(
 
 async function buildColumnsFromTemplate(osTemplateId: string, organizationId: string) {
   const template = await prisma.oSTemplate.findFirst({
-    where: { id: osTemplateId, organizationId },
+    where: { id: osTemplateId, organizationId, isActive: true },
     include: { columns: { orderBy: { position: 'asc' }, include: { documents: { orderBy: { position: 'asc' } } } } },
   })
   if (!template) throw new AppError(404, 'Template de OS não encontrado')
@@ -177,7 +177,7 @@ export async function updateBoard(id: string, organizationId: string, data: Upda
         ? (data.dueDate ? new Date(data.dueDate) : null)
         : undefined,
     },
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, codigo: true } } },
   })
 }
 

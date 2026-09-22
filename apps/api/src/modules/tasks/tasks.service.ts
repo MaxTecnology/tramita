@@ -3,6 +3,7 @@ import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
 import { publishBoardEvent } from '@/lib/sse'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
+import { recalculateTaskStatus } from '@/modules/task-documents/task-documents.service'
 import { Prisma } from '@prisma/client'
 import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, ListTasksQuery } from './tasks.schema'
 
@@ -169,13 +170,14 @@ export async function moveTask(
 
   // Coluna configurada pra notificar (via Template de OS) manda mesmo se o toggle global
   // "Tarefa movida" da org estiver desligado — é uma escolha explícita por coluna, não o
-  // aviso genérico de qualquer movimentação.
+  // aviso genérico de qualquer movimentação. forceChannels bypassa o gate de evento no worker
+  // (channels sozinho só restringe, nunca força — ver notification.worker.ts).
   await enqueueNotification({
     event: 'TASK_MOVED',
     taskId,
     organizationId,
     clientId: toColumn.board.clientId,
-    channels: toColumn.notifyClient ? ['WHATSAPP', 'EMAIL'] : undefined,
+    forceChannels: toColumn.notifyClient ? ['WHATSAPP', 'EMAIL'] : undefined,
     metadata: { taskTitle: task.title, fromColumn: fromColumn.title, toColumn: toColumn.title },
   })
 
@@ -209,6 +211,10 @@ export async function moveTask(
       await prisma.taskDocumentRequirement.createMany({
         data: toCreate.map((d, i) => ({ taskId, name: d.name, position: basePosition + i })),
       })
+      // Recalcula DEPOIS do statusEffect da coluna já ter sido aplicado acima — um conjunto de
+      // documentos genuinamente bloqueante precisa vencer um status como STARTED, não o contrário.
+      await recalculateTaskStatus(taskId)
+      return prisma.task.findUniqueOrThrow({ where: { id: taskId } })
     }
   }
 

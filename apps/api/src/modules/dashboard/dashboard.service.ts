@@ -35,11 +35,15 @@ export async function getDashboardMetrics(organizationId: string) {
       },
     }),
 
+    // Agregados a nível de TAREFA — recorrentes moram no board de sistema RECURRING_SYSTEM mas
+    // são tarefas reais de trabalho da equipe, então NÃO filtramos type: 'OS' aqui (diferente
+    // das contagens/listagens a nível de BOARD acima e abaixo, onde o board de sistema nunca
+    // deve aparecer como "processo").
     prisma.task.count({
       where: {
         status: 'DONE',
         updatedAt: { gte: startOfMonth },
-        column: { board: { organizationId, isActive: true, type: 'OS' } },
+        column: { board: { organizationId, isActive: true } },
       },
     }),
 
@@ -47,13 +51,13 @@ export async function getDashboardMetrics(organizationId: string) {
       where: {
         priority: 'URGENT',
         status: { notIn: ['DONE', 'DISREGARDED'] },
-        column: { board: { organizationId, isActive: true, type: 'OS' } },
+        column: { board: { organizationId, isActive: true } },
       },
     }),
 
     prisma.task.groupBy({
       by: ['status'],
-      where: { column: { board: { organizationId, isActive: true, type: 'OS' } } },
+      where: { column: { board: { organizationId, isActive: true } } },
       _count: { status: true },
     }),
 

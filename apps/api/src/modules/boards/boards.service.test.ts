@@ -112,6 +112,27 @@ describe('createBoard', () => {
     expect(documents.map((d) => d.name)).toEqual(['RG', 'CPF'])
   })
 
+  it('lança 404 quando osTemplateId aponta pra um template soft-deleted (isActive: false)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const template = await createOSTemplate(org.id, {
+      name: 'Template descontinuado',
+      isActive: true,
+      columns: [{ title: 'Coluna', statusEffect: 'NONE', notifyClient: false, documents: [] }],
+    })
+    await prisma.oSTemplate.update({ where: { id: template.id }, data: { isActive: false } })
+
+    await expect(
+      createBoard(org.id, admin.id, 'ORG_ADMIN', {
+        title: 'Board a partir de template inativo',
+        clientId: client.id,
+        osTemplateId: template.id,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 })
+  })
+
   it('lança 404 quando osTemplateId não pertence à organização', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

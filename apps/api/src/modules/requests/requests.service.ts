@@ -132,7 +132,7 @@ export async function approveRequest(
     columnId = board.columns[0].id
   } else {
     const board = await prisma.board.findFirst({
-      where: { id: data.boardId, organizationId, clientId: request.clientId, isActive: true },
+      where: { id: data.boardId, organizationId, clientId: request.clientId, isActive: true, type: 'OS' },
     })
     if (!board) throw new AppError(404, 'Processo não encontrado para este cliente')
     const column = await prisma.column.findFirst({ where: { id: data.columnId, boardId: board.id } })

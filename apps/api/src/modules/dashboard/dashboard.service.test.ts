@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { getDashboardMetrics } from '@/modules/dashboard/dashboard.service'
+import { ensureRecurringSystemBoard } from '@/modules/tasks/tasks.service'
 import {
   createTestPlan,
   createTestOrg,
@@ -163,5 +164,27 @@ describe('getDashboardMetrics', () => {
     const result = await getDashboardMetrics(org.id)
 
     expect(result.atRisk.length).toBeLessThanOrEqual(8)
+  })
+
+  it('counts tasks living on the RECURRING_SYSTEM board in tasksByStatus and completedTasksThisMonth, but not in activeBoards/overdueBoards', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+
+    const systemBoard = await ensureRecurringSystemBoard(client.id, org.id)
+    await createTestTask(systemBoard.columns[0].id, user.id)
+    const doneTask = await createTestTask(systemBoard.columns[0].id, user.id)
+    await prisma.task.update({ where: { id: doneTask.id }, data: { status: 'DONE' } })
+
+    const result = await getDashboardMetrics(org.id)
+
+    // The system board itself must never count as a "processo" for the org.
+    expect(result.kpis.activeBoards).toBe(0)
+    expect(result.kpis.overdueBoards).toBe(0)
+    // But the tasks that live on it are real work and must show up in task-level aggregates.
+    expect(result.kpis.completedTasksThisMonth).toBe(1)
+    expect(result.tasksByStatus.OPEN).toBe(1)
+    expect(result.tasksByStatus.DONE).toBe(1)
   })
 })
