@@ -174,6 +174,8 @@ model ClientUserAccess {
   department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 
   @@unique([clientUserId, clientId, departmentId])
+  @@index([clientId])
+  @@index([departmentId])
   @@map("client_user_accesses")
 }
 
