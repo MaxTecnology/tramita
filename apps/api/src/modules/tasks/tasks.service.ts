@@ -4,7 +4,7 @@ import { enqueueNotification } from '@/lib/queue'
 import { publishBoardEvent } from '@/lib/sse'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
 import { Prisma } from '@prisma/client'
-import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody } from './tasks.schema'
+import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, ListTasksQuery } from './tasks.schema'
 
 export interface Actor {
   id: string
@@ -348,6 +348,56 @@ export async function deleteTask(id: string, organizationId: string) {
   await verifyTaskBelongsToOrg(id, organizationId)
   await prisma.task.delete({ where: { id } })
   return { ok: true }
+}
+
+// Lista tarefas de forma flat, atravessando todos os boards da org (inclusive o board de
+// sistema RECURRING_SYSTEM, que é onde moram as tarefas recorrentes) — ver nota em
+// tasks.schema.ts / brief da Task 4 sobre por que não filtramos Board.type aqui.
+export async function listTasks(
+  organizationId: string,
+  actor: { id: string; role: string },
+  query: ListTasksQuery,
+) {
+  const where: Prisma.TaskWhereInput = {
+    column: {
+      board: {
+        organizationId,
+        ...(query.clientId ? { clientId: query.clientId } : {}),
+      },
+    },
+    ...(query.assigneeId ? { assigneeId: query.assigneeId } : {}),
+    ...(query.departmentId ? { departmentId: query.departmentId } : {}),
+    ...(query.status ? { status: query.status } : {}),
+    ...(query.recurringTemplateId ? { recurringTemplateId: query.recurringTemplateId } : {}),
+    ...(query.dateFrom || query.dateTo
+      ? {
+          targetDate: {
+            ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+            ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+          },
+        }
+      : {}),
+    ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
+  }
+
+  if (actor.role === 'ORG_MEMBER') where.assigneeId = actor.id
+
+  return prisma.task.findMany({
+    where,
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      priority: true,
+      targetDate: true,
+      dueDate: true,
+      recurringTemplateId: true,
+      department: { select: { id: true, name: true } },
+      assignee: { select: { id: true, name: true } },
+      column: { select: { board: { select: { id: true, clientId: true, client: { select: { id: true, name: true, codigo: true } } } } } },
+    },
+    orderBy: { targetDate: 'asc' },
+  })
 }
 
 export async function getTaskHistory(taskId: string, organizationId: string) {

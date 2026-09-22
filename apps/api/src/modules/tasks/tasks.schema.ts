@@ -37,7 +37,19 @@ export const reorderTasksSchema = z.array(
   }),
 )
 
+export const listTasksQuerySchema = z.object({
+  clientId: z.string().cuid().optional(),
+  assigneeId: z.string().cuid().optional(),
+  departmentId: z.string().cuid().optional(),
+  status: z.enum(['OPEN', 'STARTED', 'DONE', 'DISREGARDED', 'BLOCKED']).optional(),
+  recurringTemplateId: z.string().cuid().optional(),
+  dateFrom: z.string().datetime().optional(),
+  dateTo: z.string().datetime().optional(),
+  q: z.string().optional(),
+})
+
 export type CreateTaskBody = z.infer<typeof createTaskSchema>
 export type UpdateTaskBody = z.infer<typeof updateTaskSchema>
 export type MoveTaskBody = z.infer<typeof moveTaskSchema>
 export type ReorderTasksBody = z.infer<typeof reorderTasksSchema>
+export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>
