@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, Pencil, Trash2, Repeat, Users, History } from 'lucide-react'
 import { toast } from 'sonner'
-import type { RecurringTaskTemplate, RecurringTaskAssignment, RecurringGenerationLog, Client, Board } from '@/types'
+import type { RecurringTaskTemplate, RecurringTaskAssignment, RecurringGenerationLog, Client } from '@/types'
 
 const PERIODICITY_LABEL: Record<RecurringTaskTemplate['periodicity'], string> = {
   WEEKLY: 'Semanal',
@@ -96,8 +96,6 @@ export default function RecurringTemplates() {
 function ManageTemplateDialog({ template, onClose }: { template: RecurringTaskTemplate; onClose: () => void }) {
   const qc = useQueryClient()
   const [clientId, setClientId] = useState('')
-  const [boardId, setBoardId] = useState('')
-  const [columnId, setColumnId] = useState('')
 
   const { data: assignments = [] } = useQuery<RecurringTaskAssignment[]>({
     queryKey: ['recurring-assignments', template.id],
@@ -114,20 +112,12 @@ function ManageTemplateDialog({ template, onClose }: { template: RecurringTaskTe
     queryFn: () => api.get('/clients').then((r) => r.data),
   })
 
-  const { data: boards = [] } = useQuery<Board[]>({
-    queryKey: ['boards', clientId],
-    queryFn: () => api.get('/boards', { params: { clientId } }).then((r) => r.data),
-    enabled: !!clientId,
-  })
-
-  const board = boards.find((b) => b.id === boardId)
-
   const addMutation = useMutation({
-    mutationFn: () => api.post(`/recurring-templates/${template.id}/assignments`, { clientId, boardId, columnId }),
+    mutationFn: () => api.post(`/recurring-templates/${template.id}/assignments`, { clientId }),
     onSuccess: () => {
       toast.success('Cliente vinculado')
       qc.invalidateQueries({ queryKey: ['recurring-assignments', template.id] })
-      setClientId(''); setBoardId(''); setColumnId('')
+      setClientId('')
     },
     onError: (err: unknown) => {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -184,21 +174,13 @@ function ManageTemplateDialog({ template, onClose }: { template: RecurringTaskTe
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <select value={clientId} onChange={(e) => { setClientId(e.target.value); setBoardId(''); setColumnId('') }} className="h-9 rounded-md border border-border bg-surface px-2 text-sm">
+          <div className="grid grid-cols-2 gap-2">
+            <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="h-9 rounded-md border border-border bg-surface text-foreground px-2 text-sm">
               <option value="">Cliente</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <select value={boardId} onChange={(e) => { setBoardId(e.target.value); setColumnId('') }} className="h-9 rounded-md border border-border bg-surface px-2 text-sm" disabled={!clientId}>
-              <option value="">Processo</option>
-              {boards.map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}
-            </select>
-            <select value={columnId} onChange={(e) => setColumnId(e.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-sm" disabled={!boardId}>
-              <option value="">Coluna</option>
-              {board?.columns.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-            </select>
           </div>
-          <Button type="button" size="sm" onClick={() => addMutation.mutate()} disabled={!clientId || !boardId || !columnId || addMutation.isPending}>
+          <Button type="button" size="sm" onClick={() => addMutation.mutate()} disabled={!clientId || addMutation.isPending}>
             Vincular cliente
           </Button>
 
