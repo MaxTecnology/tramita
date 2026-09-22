@@ -28,6 +28,7 @@ import OSList from '@/pages/app/OSList'
 import DashboardMetrics from '@/pages/app/DashboardMetrics'
 import Processes from '@/pages/app/Processes'
 import Requests from '@/pages/app/Requests'
+import Tasks from '@/pages/app/Tasks'
 
 const PortalLayout = lazy(() => import('@/pages/portal/Layout'))
 const PortalBoards = lazy(() => import('@/pages/portal/Boards'))
@@ -65,6 +66,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/app/dashboard" replace /> },
       { path: 'dashboard', element: <DashboardMetrics /> },
       { path: 'processes', element: <Processes /> },
+      { path: 'tasks', element: <Tasks /> },
       {
         path: 'os',
         element: (
