@@ -3,9 +3,9 @@ import { AppError } from '@/errors/AppError'
 import type { CreateBoardBody, UpdateBoardBody, SearchQuery } from './boards.schema'
 
 const DEFAULT_COLUMNS = [
-  { title: 'Pendente', position: 0, color: '#6B7280', isFinal: false },
-  { title: 'Em andamento', position: 1, color: '#3B82F6', isFinal: false },
-  { title: 'Concluído', position: 2, color: '#10B981', isFinal: true },
+  { title: 'Pendente', position: 0, color: '#6B7280', statusEffect: 'NONE' as const },
+  { title: 'Em andamento', position: 1, color: '#3B82F6', statusEffect: 'NONE' as const },
+  { title: 'Concluído', position: 2, color: '#10B981', statusEffect: 'DONE' as const },
 ]
 
 export async function listBoards(
@@ -25,6 +25,7 @@ export async function listBoards(
     where: {
       organizationId,
       isActive: true,
+      type: 'OS',
       ...(query.clientId
         ? { clientId: Array.isArray(query.clientId) ? { in: query.clientId } : query.clientId }
         : {}),
@@ -88,6 +89,7 @@ export async function getBoardById(
       id,
       organizationId,
       isActive: true,
+      type: 'OS',
       ...(clientId ? { clientId: Array.isArray(clientId) ? { in: clientId } : clientId } : {}),
     },
     include: {
@@ -140,7 +142,7 @@ export async function createBoard(
 }
 
 export async function updateBoard(id: string, organizationId: string, data: UpdateBoardBody) {
-  const board = await prisma.board.findFirst({ where: { id, organizationId, isActive: true } })
+  const board = await prisma.board.findFirst({ where: { id, organizationId, isActive: true, type: 'OS' } })
   if (!board) throw new AppError(404, 'Board não encontrado')
 
   return prisma.board.update({
@@ -159,7 +161,7 @@ export async function updateBoard(id: string, organizationId: string, data: Upda
 
 export async function searchTasks(boardId: string, organizationId: string, filters: SearchQuery) {
   const board = await prisma.board.findFirst({
-    where: { id: boardId, organizationId, isActive: true },
+    where: { id: boardId, organizationId, isActive: true, type: 'OS' },
   })
   if (!board) throw new AppError(404, 'Board não encontrado')
 

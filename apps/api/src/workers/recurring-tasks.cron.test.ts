@@ -27,7 +27,7 @@ describe('runRecurringTasksGeneration', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    await createAssignment(templateTriggersToday.id, org.id, { clientId: client.id, boardId: board.id, columnId: col.id })
+    await createAssignment(templateTriggersToday.id, org.id, { clientId: client.id })
 
     const templateDoesNotTrigger = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Não dispara hoje', periodicity: 'MONTHLY',
@@ -37,7 +37,7 @@ describe('runRecurringTasksGeneration', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    await createAssignment(templateDoesNotTrigger.id, org.id, { clientId: client.id, boardId: board.id, columnId: col.id })
+    await createAssignment(templateDoesNotTrigger.id, org.id, { clientId: client.id })
 
     const today = new Date(Date.UTC(2026, 0, 20)) // dia 20
     await runRecurringTasksGeneration(today)
@@ -67,7 +67,7 @@ describe('runRecurringTasksGeneration', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: false, documentRequests: [], documentDeliveries: [],
     })
-    await createAssignment(template.id, org.id, { clientId: client.id, boardId: board.id, columnId: col.id })
+    await createAssignment(template.id, org.id, { clientId: client.id })
 
     await runRecurringTasksGeneration(new Date(Date.UTC(2026, 0, 20)))
 
@@ -94,7 +94,7 @@ describe('runRecurringTasksGeneration', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    const assignment = await createAssignment(template.id, org.id, { clientId: client.id, boardId: board.id, columnId: col.id })
+    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
     await prisma.recurringTaskAssignment.update({ where: { id: assignment.id }, data: { isActive: false } })
 
     await runRecurringTasksGeneration(new Date(Date.UTC(2026, 0, 20)))

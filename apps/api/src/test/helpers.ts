@@ -52,13 +52,14 @@ export async function createTestUser(
 
 export async function createTestClient(
   organizationId: string,
-  overrides: Partial<{ isActive: boolean; name: string }> = {},
+  overrides: Partial<{ isActive: boolean; name: string; codigo: string }> = {},
 ) {
   return prisma.client.create({
     data: {
       name: overrides.name ?? 'Test Client',
       organizationId,
       isActive: overrides.isActive ?? true,
+      codigo: overrides.codigo,
     },
   })
 }
@@ -121,13 +122,13 @@ export async function createTestBoard(organizationId: string, clientId: string) 
 
 export async function createTestColumn(
   boardId: string,
-  overrides?: Partial<{ title: string; isFinal: boolean; position: number }>,
+  overrides?: Partial<{ title: string; statusEffect: 'NONE' | 'OPEN' | 'STARTED' | 'BLOCKED' | 'DISREGARDED' | 'DONE'; position: number }>,
 ) {
   return prisma.column.create({
     data: {
-      title: overrides?.title ?? (overrides?.isFinal ? 'Concluído' : 'Em Andamento'),
+      title: overrides?.title ?? (overrides?.statusEffect === 'DONE' ? 'Concluído' : 'Em Andamento'),
       position: overrides?.position ?? 0,
-      isFinal: overrides?.isFinal ?? false,
+      statusEffect: overrides?.statusEffect ?? 'NONE',
       boardId,
     },
   })

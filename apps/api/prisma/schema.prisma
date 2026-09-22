@@ -114,6 +114,7 @@ model Client {
   id         String  @id @default(cuid())
   name       String
   clientType String  @default("PJ")
+  codigo     String?
   cnpj       String?
   cpf        String?
   whatsapp   String?
@@ -221,14 +222,15 @@ model Board {
   responsibleUserId String?
   isActive          Boolean   @default(true)
   dueDate           DateTime?
+  type              BoardType @default(OS)
+  osTemplateId      String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  organization             Organization              @relation(fields: [organizationId], references: [id])
-  client                   Client                    @relation(fields: [clientId], references: [id])
-  responsibleUser          User?                     @relation("BoardResponsible", fields: [responsibleUserId], references: [id])
-  columns                  Column[]
-  recurringTaskAssignments RecurringTaskAssignment[]
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  client          Client       @relation(fields: [clientId], references: [id])
+  responsibleUser User?        @relation("BoardResponsible", fields: [responsibleUserId], references: [id])
+  columns         Column[]
 
   @@map("boards")
 }
@@ -282,20 +284,32 @@ model RequestAttachment {
 }
 
 model Column {
-  id        String   @id @default(cuid())
-  title     String
-  position  Int
-  color     String?
-  isFinal   Boolean  @default(false)
-  boardId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String             @id @default(cuid())
+  title        String
+  position     Int
+  color        String?
+  statusEffect ColumnStatusEffect @default(NONE)
+  notifyClient Boolean            @default(false)
+  boardId      String
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
-  board                    Board                     @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  tasks                    Task[]
-  recurringTaskAssignments RecurringTaskAssignment[]
+  board     Board            @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+  documents ColumnDocument[]
 
   @@map("columns")
+}
+
+model ColumnDocument {
+  id       String @id @default(cuid())
+  columnId String
+  name     String
+  position Int
+
+  column Column @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@map("column_documents")
 }
 
 model Task {
@@ -349,9 +363,24 @@ enum Priority {
 
 enum TaskStatus {
   OPEN
+  STARTED
   DONE
   DISREGARDED
   BLOCKED
+}
+
+enum ColumnStatusEffect {
+  NONE
+  OPEN
+  STARTED
+  BLOCKED
+  DISREGARDED
+  DONE
+}
+
+enum BoardType {
+  OS
+  RECURRING_SYSTEM
 }
 
 model RecurringTaskTemplate {
@@ -424,15 +453,11 @@ model RecurringTaskAssignment {
   id         String   @id @default(cuid())
   templateId String
   clientId   String
-  boardId    String
-  columnId   String
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
 
   template RecurringTaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   client   Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  board    Board                 @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  column   Column                @relation(fields: [columnId], references: [id], onDelete: Cascade)
 
   @@unique([templateId, clientId])
   @@map("recurring_task_assignments")

@@ -16,8 +16,6 @@ import {
   createTestPlan,
   createTestDepartment,
   createTestClient,
-  createTestBoard,
-  createTestColumn,
   createTestUser,
 } from '@/test/helpers'
 
@@ -141,13 +139,11 @@ describe('updateTemplate', () => {
 })
 
 describe('createAssignment', () => {
-  it('vincula cliente a template com board/coluna válidos', async () => {
+  it('vincula cliente a template', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const dept = await createTestDepartment(org.id)
     const client = await createTestClient(org.id)
-    const board = await createTestBoard(org.id, client.id)
-    const col = await createTestColumn(board.id, { position: 0 })
     const template = await createTemplate(org.id, {
       departmentId: dept.id,
       title: 'X',
@@ -168,11 +164,7 @@ describe('createAssignment', () => {
       documentDeliveries: [],
     })
 
-    const assignment = await createAssignment(template.id, org.id, {
-      clientId: client.id,
-      boardId: board.id,
-      columnId: col.id,
-    })
+    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
 
     expect(assignment.clientId).toBe(client.id)
   })
@@ -182,8 +174,6 @@ describe('createAssignment', () => {
     const org = await createTestOrg(plan.id)
     const dept = await createTestDepartment(org.id)
     const client = await createTestClient(org.id)
-    const board = await createTestBoard(org.id, client.id)
-    const col = await createTestColumn(board.id, { position: 0 })
     const template = await createTemplate(org.id, {
       departmentId: dept.id,
       title: 'X',
@@ -203,21 +193,19 @@ describe('createAssignment', () => {
       documentRequests: [],
       documentDeliveries: [],
     })
-    await createAssignment(template.id, org.id, { clientId: client.id, boardId: board.id, columnId: col.id })
+    await createAssignment(template.id, org.id, { clientId: client.id })
 
     await expect(
-      createAssignment(template.id, org.id, { clientId: client.id, boardId: board.id, columnId: col.id }),
+      createAssignment(template.id, org.id, { clientId: client.id }),
     ).rejects.toMatchObject({ statusCode: 409 })
   })
 
-  it('lança 404 se o board não pertence ao cliente informado', async () => {
+  it('lança 404 se o cliente não pertence à organização', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id)
     const dept = await createTestDepartment(org.id)
-    const clientA = await createTestClient(org.id)
-    const clientB = await createTestClient(org.id)
-    const boardOfB = await createTestBoard(org.id, clientB.id)
-    const col = await createTestColumn(boardOfB.id, { position: 0 })
+    const clientOfB = await createTestClient(orgB.id)
     const template = await createTemplate(org.id, {
       departmentId: dept.id,
       title: 'X',
@@ -239,7 +227,7 @@ describe('createAssignment', () => {
     })
 
     await expect(
-      createAssignment(template.id, org.id, { clientId: clientA.id, boardId: boardOfB.id, columnId: col.id }),
+      createAssignment(template.id, org.id, { clientId: clientOfB.id }),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 })
@@ -250,8 +238,6 @@ describe('deleteTemplate (com assignment vinculado)', () => {
     const org = await createTestOrg(plan.id)
     const dept = await createTestDepartment(org.id)
     const client = await createTestClient(org.id)
-    const board = await createTestBoard(org.id, client.id)
-    const col = await createTestColumn(board.id, { position: 0 })
     const template = await createTemplate(org.id, {
       departmentId: dept.id,
       title: 'X',
@@ -271,7 +257,7 @@ describe('deleteTemplate (com assignment vinculado)', () => {
       documentRequests: [],
       documentDeliveries: [],
     })
-    await createAssignment(template.id, org.id, { clientId: client.id, boardId: board.id, columnId: col.id })
+    await createAssignment(template.id, org.id, { clientId: client.id })
 
     await expect(deleteTemplate(template.id, org.id)).rejects.toMatchObject({ statusCode: 409 })
   })
@@ -283,8 +269,6 @@ describe('generateTaskForAssignment', () => {
     const org = await createTestOrg(plan.id)
     const dept = await createTestDepartment(org.id)
     const client = await createTestClient(org.id)
-    const board = await createTestBoard(org.id, client.id)
-    const col = await createTestColumn(board.id, { position: 0 })
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Folha de pagamento', periodicity: 'MONTHLY',
       dueMonthOffset: 1, dueDayOfPeriod: 15, dueBusinessDayRoll: 'NONE',
@@ -294,10 +278,8 @@ describe('generateTaskForAssignment', () => {
       visibleToClient: true, isActive: true,
       documentRequests: [{ name: 'Ponto' }], documentDeliveries: [{ name: 'Resumo' }],
     })
-    const assignment = await createAssignment(template.id, org.id, {
-      clientId: client.id, boardId: board.id, columnId: col.id,
-    })
-    return { org, dept, client, board, col, template, assignment }
+    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    return { org, dept, client, template, assignment }
   }
 
   it('gera a tarefa com checklist copiado do template, dueDate/targetDate calculados e status BLOCKED (tem documento a cobrar)', async () => {
@@ -369,21 +351,21 @@ describe('generateTaskForAssignment', () => {
     vi.restoreAllMocks()
   })
 
-  it('isolamento de falha: coluna do vínculo não existe mais, grava FAILED e notifica ORG_ADMIN', async () => {
+  it('isolamento de falha: erro inesperado na criação da Task grava FAILED e notifica ORG_ADMIN', async () => {
     const { org, template, assignment } = await setup()
     await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
-    // A coluna do vínculo tem onDelete: Cascade em RecurringTaskAssignment — apagar a coluna
-    // de verdade apagaria o próprio vínculo junto (o assignment sairia com ela), e a função
-    // retornaria cedo com "Vínculo não encontrado", nunca chegando no bloco try/catch que este
-    // teste quer exercitar. Simula o mesmo sintoma ("coluna sumiu entre o fetch do vínculo e o
-    // da coluna") sem violar a integridade referencial do banco. `vi.spyOn` não serve aqui:
-    // o client do Prisma usa proxies internamente e `mockRestore()` deixa o método `undefined`
-    // permanentemente pro resto do processo de teste (confirmado — quebrava os testes seguintes
-    // do arquivo); por isso a troca/restauração é feita com atribuição direta de propriedade.
-    const originalFindUnique = prisma.column.findUnique
-    ;(prisma.column as unknown as { findUnique: typeof prisma.column.findUnique }).findUnique = (async () =>
-      null) as unknown as typeof prisma.column.findUnique
+    // Simula uma falha inesperada durante a transação de criação da Task (ex.: erro de conexão
+    // com o banco no meio do processo). `vi.spyOn` não serve aqui: o client do Prisma usa
+    // proxies internamente e `mockRestore()` deixa o método `undefined` permanentemente pro
+    // resto do processo de teste (confirmado — quebrava os testes seguintes do arquivo); por
+    // isso a troca/restauração é feita com atribuição direta de propriedade. `$transaction` é
+    // interceptado (em vez de `tx.task.create`, que vive num client interno criado pra cada
+    // transação e não é o mesmo objeto que `prisma.task`).
+    const originalTransaction = prisma.$transaction
+    ;(prisma as unknown as { $transaction: typeof prisma.$transaction }).$transaction = (async () => {
+      throw new Error('simulated db failure')
+    }) as unknown as typeof prisma.$transaction
 
     try {
       const competence = new Date(Date.UTC(2026, 1, 1))
@@ -397,13 +379,13 @@ describe('generateTaskForAssignment', () => {
       expect(log?.status).toBe('FAILED')
       expect(spy).toHaveBeenCalledWith(expect.objectContaining({ event: 'RECURRING_GENERATION_FAILED' }))
     } finally {
-      ;(prisma.column as unknown as { findUnique: typeof prisma.column.findUnique }).findUnique = originalFindUnique
+      ;(prisma as unknown as { $transaction: typeof prisma.$transaction }).$transaction = originalTransaction
       spy.mockRestore()
     }
   })
 
   it('reprocessamento manual: gera com sucesso depois de um FAILED anterior pra mesma competência', async () => {
-    const { org, template, assignment, col } = await setup()
+    const { template, assignment } = await setup()
     vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
     const competence = new Date(Date.UTC(2026, 1, 1))
@@ -452,8 +434,6 @@ describe('generateManually', () => {
     const org = await createTestOrg(plan.id)
     const dept = await createTestDepartment(org.id)
     const client = await createTestClient(org.id)
-    const board = await createTestBoard(org.id, client.id)
-    const col = await createTestColumn(board.id, { position: 0 })
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'X', periodicity: 'MONTHLY',
       dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
@@ -462,7 +442,7 @@ describe('generateManually', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    const assignment = await createAssignment(template.id, org.id, { clientId: client.id, boardId: board.id, columnId: col.id })
+    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
     return { template, assignment }
   }
 

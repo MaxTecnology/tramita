@@ -58,14 +58,14 @@ describe('moveTask', () => {
     expect(history?.toValue).toBe('Em Revisão')
   })
 
-  it('sets status DONE when target column isFinal is true', async () => {
+  it('sets status DONE when target column statusEffect is DONE', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const user = await createTestUser(org.id)
     const client = await createTestClient(org.id)
     const board = await createTestBoard(org.id, client.id)
     const col1 = await createTestColumn(board.id, { position: 0 })
-    const finalCol = await createTestColumn(board.id, { position: 1, isFinal: true })
+    const finalCol = await createTestColumn(board.id, { position: 1, statusEffect: 'DONE' })
     const task = await createTestTask(col1.id, user.id)
 
     const result = await moveTask(task.id, org.id, { columnId: finalCol.id, position: 0 }, {
@@ -75,7 +75,7 @@ describe('moveTask', () => {
     expect(result.status).toBe('DONE')
   })
 
-  it('keeps status OPEN when target column isFinal is false', async () => {
+  it('keeps status OPEN when target column statusEffect is NONE', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const user = await createTestUser(org.id)
@@ -90,6 +90,59 @@ describe('moveTask', () => {
     })
 
     expect(result.status).toBe('OPEN')
+  })
+
+  it('sets status STARTED when target column statusEffect is STARTED', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col1 = await createTestColumn(board.id, { position: 0 })
+    const startedCol = await createTestColumn(board.id, { position: 1, statusEffect: 'STARTED' })
+    const task = await createTestTask(col1.id, user.id)
+
+    const result = await moveTask(task.id, org.id, { columnId: startedCol.id, position: 0 }, {
+      id: user.id, type: 'user',
+    })
+
+    expect(result.status).toBe('STARTED')
+  })
+
+  it('does not reset BLOCKED status when moved to a column with statusEffect NONE', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col1 = await createTestColumn(board.id, { position: 0 })
+    const col2 = await createTestColumn(board.id, { position: 1 })
+    const task = await createTestTask(col1.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { status: 'BLOCKED' } })
+
+    const result = await moveTask(task.id, org.id, { columnId: col2.id, position: 0 }, {
+      id: user.id, type: 'user',
+    })
+
+    expect(result.status).toBe('BLOCKED')
+  })
+
+  it('does not reset DISREGARDED status when moved to a column with statusEffect NONE', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col1 = await createTestColumn(board.id, { position: 0 })
+    const col2 = await createTestColumn(board.id, { position: 1 })
+    const task = await createTestTask(col1.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { status: 'DISREGARDED' } })
+
+    const result = await moveTask(task.id, org.id, { columnId: col2.id, position: 0 }, {
+      id: user.id, type: 'user',
+    })
+
+    expect(result.status).toBe('DISREGARDED')
   })
 })
 

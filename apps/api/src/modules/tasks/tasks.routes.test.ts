@@ -36,14 +36,14 @@ describe('PATCH /tasks/:id/move', () => {
     expect(body.status).toBe('OPEN')
   })
 
-  it('moves task to isFinal column — status becomes DONE', async () => {
+  it('moves task to a column with statusEffect DONE — status becomes DONE', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const user = await createTestUser(org.id)
     const client = await createTestClient(org.id)
     const board = await createTestBoard(org.id, client.id)
     const col1 = await createTestColumn(board.id, { position: 0 })
-    const finalCol = await createTestColumn(board.id, { position: 1, isFinal: true })
+    const finalCol = await createTestColumn(board.id, { position: 1, statusEffect: 'DONE' })
     const task = await createTestTask(col1.id, user.id)
 
     const auth = await getAuthHeader(user.email, 'Test@1234')

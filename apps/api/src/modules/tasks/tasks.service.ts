@@ -144,14 +144,12 @@ export async function moveTask(
   const toColumn = await verifyColumnBelongsToOrg(data.columnId, organizationId)
   const actorName = await resolveActorName(actor.id, actor.type)
 
+  const nextStatus = toColumn.statusEffect !== 'NONE' ? toColumn.statusEffect : task.status
+
   const updatedTask = await prisma.$transaction(async (tx) => {
     const updated = await tx.task.update({
       where: { id: taskId },
-      data: {
-        columnId: data.columnId,
-        position: data.position,
-        status: toColumn.isFinal ? 'DONE' : 'OPEN',
-      },
+      data: { columnId: data.columnId, position: data.position, status: nextStatus },
     })
 
     await tx.taskHistory.create({
@@ -169,19 +167,19 @@ export async function moveTask(
     return updated
   })
 
+  // Coluna configurada pra notificar (via Template de OS) manda mesmo se o toggle global
+  // "Tarefa movida" da org estiver desligado — é uma escolha explícita por coluna, não o
+  // aviso genérico de qualquer movimentação.
   await enqueueNotification({
     event: 'TASK_MOVED',
     taskId,
     organizationId,
     clientId: toColumn.board.clientId,
-    metadata: {
-      taskTitle: task.title,
-      fromColumn: fromColumn.title,
-      toColumn: toColumn.title,
-    },
+    channels: toColumn.notifyClient ? ['WHATSAPP', 'EMAIL'] : undefined,
+    metadata: { taskTitle: task.title, fromColumn: fromColumn.title, toColumn: toColumn.title },
   })
 
-  if (toColumn.isFinal) {
+  if (toColumn.statusEffect === 'DONE') {
     await enqueueNotification({
       event: 'TASK_COMPLETED',
       taskId,
@@ -196,7 +194,51 @@ export async function moveTask(
     data: { taskId, fromColumn: fromColumn.id, toColumn: data.columnId, position: data.position },
   })
 
+  // Documentos configurados na coluna de destino (via Template de OS) — cria os
+  // TaskDocumentRequirement que ainda não existem pra essa tarefa (evita duplicar se ela
+  // passar pela mesma coluna mais de uma vez).
+  const columnDocs = await prisma.columnDocument.findMany({ where: { columnId: data.columnId } })
+  if (columnDocs.length > 0) {
+    const existingNames = new Set(
+      (await prisma.taskDocumentRequirement.findMany({ where: { taskId }, select: { name: true } }))
+        .map((d) => d.name),
+    )
+    const toCreate = columnDocs.filter((d) => !existingNames.has(d.name))
+    if (toCreate.length > 0) {
+      const basePosition = await prisma.taskDocumentRequirement.count({ where: { taskId } })
+      await prisma.taskDocumentRequirement.createMany({
+        data: toCreate.map((d, i) => ({ taskId, name: d.name, position: basePosition + i })),
+      })
+    }
+  }
+
   return updatedTask
+}
+
+// Todo cliente com pelo menos uma Tarefa Recorrente vinculada precisa de uma "casa" pra essas
+// tarefas existirem no banco — não porque o usuário vê ou gerencia esse board (ele nunca aparece
+// em nenhuma tela), mas porque toda a lógica de escopo por departamento do portal do cliente
+// (comments/attachments/task-documents/notification worker) resolve a empresa de uma tarefa via
+// task.column.board.clientId. Criar essa cadeia uma vez por cliente é mais barato do que refatorar
+// essa cadeia inteira pra aceitar Task sem coluna.
+export async function ensureRecurringSystemBoard(clientId: string, organizationId: string) {
+  const existing = await prisma.board.findFirst({
+    where: { clientId, organizationId, type: 'RECURRING_SYSTEM' },
+    include: { columns: true },
+  })
+  if (existing && existing.columns[0]) return existing
+
+  return prisma.board.create({
+    data: {
+      title: 'Tarefas Recorrentes (sistema)',
+      organizationId,
+      clientId,
+      type: 'RECURRING_SYSTEM',
+      isActive: true,
+      columns: { create: [{ title: 'Recorrentes', position: 0, statusEffect: 'NONE' }] },
+    },
+    include: { columns: true },
+  })
 }
 
 export async function updateTask(

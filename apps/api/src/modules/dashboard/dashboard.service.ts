@@ -13,12 +13,13 @@ export async function getDashboardMetrics(organizationId: string) {
     tasksByStatus,
     atRiskBoards,
   ] = await Promise.all([
-    prisma.board.count({ where: { organizationId, isActive: true } }),
+    prisma.board.count({ where: { organizationId, isActive: true, type: 'OS' } }),
 
     prisma.board.count({
       where: {
         organizationId,
         isActive: true,
+        type: 'OS',
         OR: [
           {
             columns: {
@@ -38,7 +39,7 @@ export async function getDashboardMetrics(organizationId: string) {
       where: {
         status: 'DONE',
         updatedAt: { gte: startOfMonth },
-        column: { board: { organizationId, isActive: true } },
+        column: { board: { organizationId, isActive: true, type: 'OS' } },
       },
     }),
 
@@ -46,13 +47,13 @@ export async function getDashboardMetrics(organizationId: string) {
       where: {
         priority: 'URGENT',
         status: { notIn: ['DONE', 'DISREGARDED'] },
-        column: { board: { organizationId, isActive: true } },
+        column: { board: { organizationId, isActive: true, type: 'OS' } },
       },
     }),
 
     prisma.task.groupBy({
       by: ['status'],
-      where: { column: { board: { organizationId, isActive: true } } },
+      where: { column: { board: { organizationId, isActive: true, type: 'OS' } } },
       _count: { status: true },
     }),
 
@@ -60,6 +61,7 @@ export async function getDashboardMetrics(organizationId: string) {
       where: {
         organizationId,
         isActive: true,
+        type: 'OS',
         OR: [
           {
             columns: {
@@ -126,6 +128,7 @@ export async function getDashboardMetrics(organizationId: string) {
     },
     tasksByStatus: {
       OPEN: statusMap['OPEN'] ?? 0,
+      STARTED: statusMap['STARTED'] ?? 0,
       BLOCKED: statusMap['BLOCKED'] ?? 0,
       DONE: statusMap['DONE'] ?? 0,
       DISREGARDED: statusMap['DISREGARDED'] ?? 0,
