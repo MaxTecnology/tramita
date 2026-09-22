@@ -93,6 +93,47 @@ describe('updateClient', () => {
 
     await expect(updateClient(client.id, orgB.id, { notes: 'X' })).rejects.toMatchObject({ statusCode: 404 })
   })
+
+  it('removes ClientUserAccess for a portal user omitted from the submitted clientUsers list', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const department = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    const { clientUser: keptUser } = await createTestClientUser(org.id)
+    const { clientUser: removedUser } = await createTestClientUser(org.id)
+    await grantClientAccess(keptUser.id, client.id, department.id)
+    await grantClientAccess(removedUser.id, client.id, department.id)
+
+    await updateClient(client.id, org.id, {
+      clientUsers: [{ existingId: keptUser.id, departmentIds: [department.id] }],
+    })
+
+    const keptAccess = await prisma.clientUserAccess.findFirst({
+      where: { clientUserId: keptUser.id, clientId: client.id },
+    })
+    expect(keptAccess).not.toBeNull()
+
+    const removedAccess = await prisma.clientUserAccess.findFirst({
+      where: { clientUserId: removedUser.id, clientId: client.id },
+    })
+    expect(removedAccess).toBeNull()
+  })
+
+  it('does not touch existing ClientUserAccess when clientUsers is omitted from the update payload', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const department = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+
+    await updateClient(client.id, org.id, { notes: 'Sem alterar vínculos' })
+
+    const access = await prisma.clientUserAccess.findFirst({
+      where: { clientUserId: clientUser.id, clientId: client.id },
+    })
+    expect(access).not.toBeNull()
+  })
 })
 
 describe('deleteClient', () => {

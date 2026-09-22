@@ -29,7 +29,9 @@ async function upsertClientUserLinks(
   clientId: string,
   organizationId: string,
   links: NonNullable<CreateClientBody['clientUsers']>,
-) {
+): Promise<Set<string>> {
+  const resolvedClientUserIds = new Set<string>()
+
   for (const link of links) {
     let clientUserId: string
     if ('existingId' in link) {
@@ -45,6 +47,8 @@ async function upsertClientUserLinks(
       clientUserId = created.id
     }
 
+    resolvedClientUserIds.add(clientUserId)
+
     const departments = await tx.department.findMany({ where: { id: { in: link.departmentIds }, organizationId } })
     if (departments.length !== link.departmentIds.length) throw new AppError(404, 'Departamento não encontrado')
 
@@ -56,6 +60,8 @@ async function upsertClientUserLinks(
       })
     }
   }
+
+  return resolvedClientUserIds
 }
 
 export async function createClient(organizationId: string, data: CreateClientBody) {
@@ -94,7 +100,12 @@ export async function updateClient(id: string, organizationId: string, data: Upd
     const { clientUsers, ...clientData } = data
     const updated = await tx.client.update({ where: { id }, data: clientData, select: SELECT })
 
-    if (clientUsers) await upsertClientUserLinks(tx, id, organizationId, clientUsers)
+    if (clientUsers) {
+      const resolvedClientUserIds = await upsertClientUserLinks(tx, id, organizationId, clientUsers)
+      await tx.clientUserAccess.deleteMany({
+        where: { clientId: id, clientUserId: { notIn: [...resolvedClientUserIds] } },
+      })
+    }
 
     return updated
   })
