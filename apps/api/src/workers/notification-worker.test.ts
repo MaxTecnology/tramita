@@ -164,6 +164,80 @@ describe('processNotificationJob', () => {
     expect(logs.every((l) => l.status === 'SENT')).toBe(true)
   })
 
+  it('TASK_MOVED de tarefa do deptPessoal não envia email pra ClientUser escopado só ao deptFiscal', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id, { name: 'Cliente Departamentos' })
+    const deptFiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
+    const deptPessoal = await createTestDepartment(org.id, { name: 'Pessoal' })
+    const { clientUser: fiscalUser } = await createTestClientUser(org.id, { email: 'fiscal@test.com' })
+    const { clientUser: pessoalUser } = await createTestClientUser(org.id, { email: 'pessoal@test.com' })
+    await grantClientAccess(fiscalUser.id, client.id, deptFiscal.id)
+    await grantClientAccess(pessoalUser.id, client.id, deptPessoal.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id, { departmentId: deptPessoal.id })
+
+    await prisma.notificationConfig.create({
+      data: { organizationId: org.id, taskMoved: true, emailEnabled: true },
+    })
+
+    const job: JobInput = {
+      data: {
+        event: 'TASK_MOVED',
+        taskId: task.id,
+        organizationId: org.id,
+        clientId: client.id,
+        metadata: { taskTitle: task.title, fromColumn: 'A', toColumn: 'B' },
+      },
+    }
+
+    await processNotificationJob(job)
+
+    expect(mailer.sendEmail).toHaveBeenCalledTimes(1)
+    expect(mailer.sendEmail).toHaveBeenCalledWith(
+      pessoalUser.email,
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    )
+  })
+
+  it('não envia email quando a tarefa tem visibleToClient=false', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id, { name: 'Cliente Tarefa Oculta' })
+    const department = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id, { departmentId: department.id })
+    await prisma.task.update({ where: { id: task.id }, data: { visibleToClient: false } })
+
+    await prisma.notificationConfig.create({
+      data: { organizationId: org.id, taskMoved: true, emailEnabled: true },
+    })
+
+    const job: JobInput = {
+      data: {
+        event: 'TASK_MOVED',
+        taskId: task.id,
+        organizationId: org.id,
+        clientId: client.id,
+        metadata: { taskTitle: task.title, fromColumn: 'A', toColumn: 'B' },
+      },
+    }
+
+    await processNotificationJob(job)
+
+    expect(mailer.sendEmail).not.toHaveBeenCalled()
+    const logs = await prisma.notificationLog.findMany({ where: { taskId: task.id } })
+    expect(logs).toHaveLength(0)
+  })
+
   it('REQUEST_CREATED envia email para destinatário USER e grava log sem clientId', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

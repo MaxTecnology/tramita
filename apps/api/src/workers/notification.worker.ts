@@ -95,8 +95,14 @@ async function processClientNotification(
     const rendered = renderTemplate(template.body, vars)
 
     if (channel === 'EMAIL') {
+      // A task-scoped notification for a task hidden from clients must never be emailed.
+      if (task && !task.visibleToClient) continue
+
       const recipients = await prisma.clientUser.findMany({
-        where: { isActive: true, accesses: { some: { clientId } } },
+        where: {
+          isActive: true,
+          accesses: { some: task ? { clientId, departmentId: task.departmentId } : { clientId } },
+        },
         select: { id: true, name: true, email: true },
         distinct: ['id'],
       })
