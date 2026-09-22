@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { app } from '@/test/setup'
+import { prisma } from '@/lib/prisma'
 import {
   createTestPlan,
   createTestOrg,
@@ -181,6 +182,69 @@ describe('GET /boards', () => {
     expect(boardIds).toContain(boardA.id)
     expect(boardIds).toContain(boardB.id)
     expect(boards).toHaveLength(2)
+  })
+
+  it('CLIENT com acesso a clientA/deptFiscal vê apenas tarefas do departamento permitido no board de clientA', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const clientA = await createTestClient(org.id, { name: 'Empresa A' })
+    const deptFiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
+    const deptPessoal = await createTestDepartment(org.id, { name: 'Pessoal' })
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, clientA.id, deptFiscal.id)
+
+    const board = await createTestBoard(org.id, clientA.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const taskFiscal = await createTestTask(col.id, user.id, { departmentId: deptFiscal.id })
+    const taskPessoal = await createTestTask(col.id, user.id, { departmentId: deptPessoal.id })
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/boards',
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const boards = JSON.parse(res.body)
+    const returnedBoard = boards.find((b: { id: string }) => b.id === board.id)
+    expect(returnedBoard).toBeDefined()
+    const taskIds = returnedBoard.columns
+      .flatMap((c: { tasks: { id: string }[] }) => c.tasks)
+      .map((t: { id: string }) => t.id)
+    expect(taskIds).toContain(taskFiscal.id)
+    expect(taskIds).not.toContain(taskPessoal.id)
+  })
+
+  it('CLIENT nunca vê tarefa com visibleToClient=false', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const clientA = await createTestClient(org.id, { name: 'Empresa A' })
+    const deptFiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, clientA.id, deptFiscal.id)
+
+    const board = await createTestBoard(org.id, clientA.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const hiddenTask = await createTestTask(col.id, user.id, { departmentId: deptFiscal.id })
+    await prisma.task.update({ where: { id: hiddenTask.id }, data: { visibleToClient: false } })
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/boards',
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const boards = JSON.parse(res.body)
+    const returnedBoard = boards.find((b: { id: string }) => b.id === board.id)
+    const taskIds = returnedBoard.columns
+      .flatMap((c: { tasks: { id: string }[] }) => c.tasks)
+      .map((t: { id: string }) => t.id)
+    expect(taskIds).not.toContain(hiddenTask.id)
   })
 })
 
