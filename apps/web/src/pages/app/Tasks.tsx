@@ -15,7 +15,7 @@ import { List, LayoutGrid, Inbox } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
-import { TaskDrawer, STATUS_LABEL, STATUS_COLOR } from '@/components/shared/TaskDrawer'
+import { TaskDrawer, STATUS_LABEL, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR } from '@/components/shared/TaskDrawer'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import type { Task, User, Department, RecurringTaskTemplate } from '@/types'
 
@@ -44,20 +44,6 @@ interface ClientOption {
 type ViewMode = 'list' | 'kanban'
 
 const STATUS_ORDER: Task['status'][] = ['OPEN', 'STARTED', 'BLOCKED', 'DISREGARDED', 'DONE']
-
-const PRIORITY_LABEL: Record<Task['priority'], string> = {
-  LOW: 'Baixa',
-  MEDIUM: 'Média',
-  HIGH: 'Alta',
-  URGENT: 'Urgente',
-}
-
-const PRIORITY_COLOR: Record<Task['priority'], string> = {
-  LOW: 'bg-neutral-bg text-muted-foreground',
-  MEDIUM: 'bg-blue-100 text-blue-600',
-  HIGH: 'bg-orange-100 text-orange-600',
-  URGENT: 'bg-red-100 text-red-600',
-}
 
 function FilterSelect({
   value,
@@ -331,7 +317,7 @@ export default function Tasks() {
         />
         <FilterSelect value={clientId} onChange={setClientId} placeholder="Cliente">
           {clients.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+            <option key={c.id} value={c.id}>{c.codigo ? `${c.codigo} - ${c.name}` : c.name}</option>
           ))}
         </FilterSelect>
         <FilterSelect value={assigneeId} onChange={setAssigneeId} placeholder="Colaborador">

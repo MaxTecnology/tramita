@@ -38,14 +38,14 @@ function formatHistoryAction(h: TaskHistory): string {
   return label
 }
 
-const PRIORITY_LABEL: Record<Task['priority'], string> = {
+export const PRIORITY_LABEL: Record<Task['priority'], string> = {
   LOW: 'Baixa',
   MEDIUM: 'Média',
   HIGH: 'Alta',
   URGENT: 'Urgente',
 }
 
-const PRIORITY_COLOR: Record<Task['priority'], string> = {
+export const PRIORITY_COLOR: Record<Task['priority'], string> = {
   LOW: 'bg-gray-100 text-gray-600',
   MEDIUM: 'bg-blue-100 text-blue-600',
   HIGH: 'bg-orange-100 text-orange-600',

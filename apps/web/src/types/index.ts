@@ -25,7 +25,8 @@ export interface Column {
   title: string
   position: number
   color: string | null
-  isFinal: boolean
+  statusEffect: 'NONE' | 'OPEN' | 'STARTED' | 'BLOCKED' | 'DISREGARDED' | 'DONE'
+  notifyClient: boolean
   boardId: string
   tasks: Task[]
 }
@@ -42,7 +43,7 @@ export interface Board {
   dueDate: string | null
   osTemplateId?: string | null
   columns: Column[]
-  client: { id: string; name: string }
+  client: { id: string; name: string; codigo: string | null }
 }
 
 export interface User {

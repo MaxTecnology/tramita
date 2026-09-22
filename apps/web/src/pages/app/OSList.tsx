@@ -87,7 +87,9 @@ export default function OSList() {
             className="h-9 rounded-lg border border-border bg-surface px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="">Cliente</option>
-            {uniqueClients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {uniqueClients.map((c) => (
+              <option key={c.id} value={c.id}>{c.codigo ? `${c.codigo} - ${c.name}` : c.name}</option>
+            ))}
           </select>
 
           {MANAGER_ROLES.includes(user?.role ?? '') && (

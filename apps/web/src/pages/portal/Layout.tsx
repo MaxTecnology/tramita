@@ -4,11 +4,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { LayoutGrid, User, LogOut, Inbox } from 'lucide-react'
+import { LayoutGrid, User, LogOut, Inbox, ClipboardList } from 'lucide-react'
 import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 
 const tabs = [
   { to: '/portal/board', icon: LayoutGrid, label: 'Processos' },
+  { to: '/portal/tasks', icon: ClipboardList, label: 'Tarefas' },
   { to: '/portal/requests', icon: Inbox, label: 'Solicitações' },
   { to: '/portal/profile', icon: User, label: 'Perfil' },
 ] as const

@@ -177,7 +177,7 @@ function ManageTemplateDialog({ template, onClose }: { template: RecurringTaskTe
           <div className="grid grid-cols-2 gap-2">
             <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="h-9 rounded-md border border-border bg-surface text-foreground px-2 text-sm">
               <option value="">Cliente</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.codigo ? `${c.codigo} - ${c.name}` : c.name}</option>)}
             </select>
           </div>
           <Button type="button" size="sm" onClick={() => addMutation.mutate()} disabled={!clientId || addMutation.isPending}>
