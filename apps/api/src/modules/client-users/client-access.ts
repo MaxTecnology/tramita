@@ -8,7 +8,7 @@ export interface ClientAccessScope {
 
 export async function getClientAccessScope(clientUserId: string): Promise<ClientAccessScope> {
   const accesses = await prisma.clientUserAccess.findMany({
-    where: { clientUserId },
+    where: { clientUserId, clientUser: { isActive: true } },
     select: { clientId: true, departmentId: true },
     orderBy: { clientId: 'asc' },
   })

@@ -36,6 +36,22 @@ describe('getClientAccessScope', () => {
 
     expect(scope.clientIds).toEqual([])
   })
+
+  it('returns empty scope for a deactivated ClientUser even though ClientUserAccess rows exist', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const clientA = await createTestClient(org.id)
+    const dept = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, clientA.id, dept.id)
+
+    await prisma.clientUser.update({ where: { id: clientUser.id }, data: { isActive: false } })
+
+    const scope = await getClientAccessScope(clientUser.id)
+
+    expect(scope.clientIds).toEqual([])
+    expect(scope.departmentIdsByClient.size).toBe(0)
+  })
 })
 
 describe('canSeeTask', () => {

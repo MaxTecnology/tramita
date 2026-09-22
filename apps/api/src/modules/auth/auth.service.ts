@@ -37,19 +37,24 @@ export async function login(email: string, password: string): Promise<LoginRespo
     return buildSession(user.id, user.name, user.role as Role, user.organizationId, user.organization?.name ?? null)
   }
 
-  // Fall back to ClientUser table (portal login)
-  const clientUser = await prisma.clientUser.findFirst({
+  // Fall back to ClientUser table (portal login). ClientUser email uniqueness is scoped to
+  // (email, organizationId) — not global — so the same email can belong to more than one
+  // organization (e.g. a bookkeeper working with multiple accounting offices). Try every
+  // candidate and return the session for the first whose password matches.
+  const clientUserCandidates = await prisma.clientUser.findMany({
     where: { email, isActive: true },
     include: { organization: { select: { name: true } } },
   })
-  if (clientUser && (await verifyPassword(password, clientUser.passwordHash))) {
-    return buildSession(
-      clientUser.id,
-      clientUser.name,
-      'CLIENT',
-      clientUser.organizationId,
-      clientUser.organization?.name ?? null,
-    )
+  for (const clientUser of clientUserCandidates) {
+    if (await verifyPassword(password, clientUser.passwordHash)) {
+      return buildSession(
+        clientUser.id,
+        clientUser.name,
+        'CLIENT',
+        clientUser.organizationId,
+        clientUser.organization?.name ?? null,
+      )
+    }
   }
 
   throw new AppError(401, 'Credenciais inválidas')
@@ -84,6 +89,21 @@ export async function refreshSession(refreshToken: string): Promise<{ accessToke
     role: Role
     organizationId: string | null
   }
+
+  // A deactivated ClientUser must not be able to keep refreshing access tokens — the
+  // access-scope check alone (getClientAccessScope) only closes this gap once the current
+  // access token naturally expires, up to 15 minutes later; this closes it immediately for
+  // the refresh path, which could otherwise be abused for up to the full 7-day refresh TTL.
+  if (payload.role === 'CLIENT') {
+    const clientUser = await prisma.clientUser.findUnique({
+      where: { id: payload.sub },
+      select: { isActive: true },
+    })
+    if (!clientUser || !clientUser.isActive) {
+      throw new AppError(401, 'Refresh token inválido ou expirado')
+    }
+  }
+
   const accessToken = generateAccessToken(payload)
   return { accessToken }
 }

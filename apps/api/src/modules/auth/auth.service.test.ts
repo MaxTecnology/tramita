@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import bcrypt from 'bcryptjs'
+import { prisma } from '@/lib/prisma'
 import { redis } from '@/lib/redis'
 import { generateAccessToken, verifyAccessToken } from '@/lib/jwt'
 import {
@@ -94,6 +95,24 @@ describe('login', () => {
   it('throws 401 for nonexistent email', async () => {
     await expect(login('nobody@test.com', 'any')).rejects.toMatchObject({ statusCode: 401 })
   })
+
+  it('logs into the correct organization when the same ClientUser email exists in two orgs', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id)
+    const sharedEmail = `shared-${Date.now()}@test.com`
+
+    const { clientUser: clientUserA } = await createTestClientUser(orgA.id, { email: sharedEmail, password: 'PassA@123' })
+    const { clientUser: clientUserB } = await createTestClientUser(orgB.id, { email: sharedEmail, password: 'PassB@123' })
+
+    const resultA = await login(sharedEmail, 'PassA@123')
+    expect(resultA.user.organizationId).toBe(orgA.id)
+    expect(resultA.user.id).toBe(clientUserA.id)
+
+    const resultB = await login(sharedEmail, 'PassB@123')
+    expect(resultB.user.organizationId).toBe(orgB.id)
+    expect(resultB.user.id).toBe(clientUserB.id)
+  })
 })
 
 describe('refreshSession', () => {
@@ -123,6 +142,19 @@ describe('refreshSession', () => {
 
     const { refreshToken } = await login(email, 'Pass@123')
     await logout(refreshToken)
+
+    await expect(refreshSession(refreshToken)).rejects.toMatchObject({ statusCode: 401 })
+  })
+
+  it('throws 401 for a deactivated ClientUser even with a valid refresh token', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const email = `client-${Date.now()}@test.com`
+    const { clientUser } = await createTestClientUser(org.id, { email, password: 'Client@123' })
+
+    const { refreshToken } = await login(email, 'Client@123')
+
+    await prisma.clientUser.update({ where: { id: clientUser.id }, data: { isActive: false } })
 
     await expect(refreshSession(refreshToken)).rejects.toMatchObject({ statusCode: 401 })
   })
