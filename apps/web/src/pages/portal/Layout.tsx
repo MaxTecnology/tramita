@@ -114,6 +114,20 @@ export default function PortalLayout() {
 
         {/* Main content — pb-16 evita conteúdo atrás da tab bar no mobile */}
         <main className="flex-1 overflow-auto pb-16 md:pb-0">
+          {/* Company selector — mobile only (desktop has it in the sidebar) */}
+          {accessibleClients.length > 1 && (
+            <div className="md:hidden sticky top-0 z-40 bg-surface border-b border-border px-4 py-2">
+              <select
+                value={selectedClientId}
+                onChange={(e) => setSelectedClientId(e.target.value)}
+                className="w-full rounded-md border border-border bg-surface text-foreground text-sm px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                {accessibleClients.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <Outlet />
         </main>
 
