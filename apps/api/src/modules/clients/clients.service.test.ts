@@ -119,6 +119,31 @@ describe('updateClient', () => {
     expect(removedAccess).toBeNull()
   })
 
+  it('removes a single department from a user who keeps access to another department on the same client', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const deptFiscal = await createTestDepartment(org.id, { name: `Fiscal ${Date.now()}` })
+    const deptPessoal = await createTestDepartment(org.id, { name: `Pessoal ${Date.now()}` })
+    const client = await createTestClient(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, deptFiscal.id)
+    await grantClientAccess(clientUser.id, client.id, deptPessoal.id)
+
+    await updateClient(client.id, org.id, {
+      clientUsers: [{ existingId: clientUser.id, departmentIds: [deptFiscal.id] }],
+    })
+
+    const fiscalAccess = await prisma.clientUserAccess.findFirst({
+      where: { clientUserId: clientUser.id, clientId: client.id, departmentId: deptFiscal.id },
+    })
+    expect(fiscalAccess).not.toBeNull()
+
+    const pessoalAccess = await prisma.clientUserAccess.findFirst({
+      where: { clientUserId: clientUser.id, clientId: client.id, departmentId: deptPessoal.id },
+    })
+    expect(pessoalAccess).toBeNull()
+  })
+
   it('does not touch existing ClientUserAccess when clientUsers is omitted from the update payload', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

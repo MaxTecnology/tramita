@@ -24,13 +24,18 @@ export async function listClients(organizationId: string, includeInactive = fals
   })
 }
 
+interface ClientUserAccessPair {
+  clientUserId: string
+  departmentId: string
+}
+
 async function upsertClientUserLinks(
   tx: Prisma.TransactionClient,
   clientId: string,
   organizationId: string,
   links: NonNullable<CreateClientBody['clientUsers']>,
-): Promise<Set<string>> {
-  const resolvedClientUserIds = new Set<string>()
+): Promise<ClientUserAccessPair[]> {
+  const resolvedPairs: ClientUserAccessPair[] = []
 
   for (const link of links) {
     let clientUserId: string
@@ -47,8 +52,6 @@ async function upsertClientUserLinks(
       clientUserId = created.id
     }
 
-    resolvedClientUserIds.add(clientUserId)
-
     const departments = await tx.department.findMany({ where: { id: { in: link.departmentIds }, organizationId } })
     if (departments.length !== link.departmentIds.length) throw new AppError(404, 'Departamento não encontrado')
 
@@ -58,10 +61,11 @@ async function upsertClientUserLinks(
         update: {},
         create: { clientUserId, clientId, departmentId },
       })
+      resolvedPairs.push({ clientUserId, departmentId })
     }
   }
 
-  return resolvedClientUserIds
+  return resolvedPairs
 }
 
 export async function createClient(organizationId: string, data: CreateClientBody) {
@@ -101,9 +105,14 @@ export async function updateClient(id: string, organizationId: string, data: Upd
     const updated = await tx.client.update({ where: { id }, data: clientData, select: SELECT })
 
     if (clientUsers) {
-      const resolvedClientUserIds = await upsertClientUserLinks(tx, id, organizationId, clientUsers)
+      const resolvedPairs = await upsertClientUserLinks(tx, id, organizationId, clientUsers)
       await tx.clientUserAccess.deleteMany({
-        where: { clientId: id, clientUserId: { notIn: [...resolvedClientUserIds] } },
+        where: {
+          clientId: id,
+          ...(resolvedPairs.length > 0
+            ? { NOT: { OR: resolvedPairs.map((p) => ({ clientUserId: p.clientUserId, departmentId: p.departmentId })) } }
+            : {}),
+        },
       })
     }
 
