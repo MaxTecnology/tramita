@@ -127,23 +127,54 @@ Cadastro de novo escritório (público — sem autenticação).
 
 ## Clientes Finais
 
-### GET `/clients` _(ORG_ADMIN | ORG_MANAGER)_
+### GET `/clients` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_
 ### POST `/clients` _(ORG_ADMIN | ORG_MANAGER)_
 ```json
 {
-  "name": "string", "cnpj": "string?", "email": "string", "password": "string", "whatsapp": "string?",
+  "name": "string", "clientType": "PF | PJ", "cnpj": "string?", "cpf": "string?",
+  "whatsapp": "string?", "phone": "string?", "notes": "string?",
   "cep": "string?", "estado": "string?", "cidade": "string?", "bairro": "string?",
-  "logradouro": "string?", "numero": "string?", "complemento": "string?"
+  "logradouro": "string?", "numero": "string?", "complemento": "string?",
+  "clientUsers": [
+    { "existingId": "string", "departmentIds": ["string"] },
+    { "name": "string", "email": "string", "password": "string", "departmentIds": ["string"] }
+  ]
 }
 ```
 → Middleware `checkPlanLimit` valida `clientsCount < plan.maxClients` antes de criar
+→ `email`/`password` não existem mais direto no `Client` — o login do portal é do `ClientUser`, não da empresa. `clientUsers` é obrigatório (mínimo 1 item), cada item vincula um `ClientUser` existente (`existingId`) ou cria um novo (`name`/`email`/`password`), sempre com `departmentIds` (mínimo 1) definindo o escopo de acesso daquele usuário àquele cliente
 
-### PATCH `/clients/:id`
+### PATCH `/clients/:id` — mesmo payload, todos os campos opcionais; `clientUsers` quando enviado substitui os vínculos existentes
 ### DELETE `/clients/:id` — soft delete (não conta no limite ao desativar)
 
 ### GET `/clients/lookup-cnpj/:cnpj` _(ORG_ADMIN | ORG_MANAGER)_ — consulta a API pública do CNPJ.ws e retorna razão social + endereço pra preencher o formulário de cadastro
 → Sem autenticação própria, proxied pelo backend (`src/lib/cnpjws.ts`) pra evitar CORS e centralizar o tratamento de erro
 → Limite de 3 requisições/minuto por IP no plano gratuito da API pública — mapeado pra 429 com mensagem amigável
+
+### GET `/clients/search-users` _(ORG_ADMIN | ORG_MANAGER)_ — `?q=` busca `ClientUser` da org por nome/email, pra reaproveitar um usuário já cadastrado ao vincular a um novo cliente
+### GET `/clients/:id/users` _(ORG_ADMIN | ORG_MANAGER)_ — lista os `ClientUser` vinculados àquele cliente, com os departamentos de acesso de cada um
+
+---
+
+## Usuários de Cliente
+
+`ClientUser` é a identidade de login do portal — uma pessoa, não uma empresa. Cada `ClientUser` pode ter acesso a mais de um `Client` (empresa), e o acesso a cada empresa é por departamento (`ClientUserAccess`: `clientUserId` + `clientId` + `departmentId`).
+
+### GET `/client-users` _(ORG_ADMIN | ORG_MANAGER)_ — lista os `ClientUser` da org, com os clientes/departamentos que cada um acessa
+### GET `/client-users/:id` _(ORG_ADMIN | ORG_MANAGER)_
+### POST `/client-users` _(ORG_ADMIN | ORG_MANAGER)_
+```json
+{
+  "name": "string", "email": "string", "password": "string", "phone": "string?", "isActive": true,
+  "accesses": [{ "clientId": "string", "departmentId": "string" }]
+}
+```
+→ `accesses` obrigatório (mínimo 1) — cada entrada é um par cliente+departamento que esse usuário pode ver no portal
+
+### PATCH `/client-users/:id` _(ORG_ADMIN | ORG_MANAGER)_ — mesmo payload, todos os campos opcionais; `accesses` quando enviado substitui os vínculos existentes
+### DELETE `/client-users/:id` _(ORG_ADMIN | ORG_MANAGER)_ — soft delete
+
+### GET `/portal/clients` _(CLIENT)_ — `{ id, name }[]` — lista as empresas que o `ClientUser` logado pode acessar; usado pelo portal pra montar o seletor de empresa quando há mais de uma
 
 ---
 
@@ -291,6 +322,34 @@ Cadastro de novo escritório (público — sem autenticação).
 
 ### GET `/portal/tasks/:taskId/documents` _(CLIENT)_ — mesmo formato de `GET /tasks/:id/documents`; 404 se a tarefa não pertence ao cliente ou não é `visibleToClient`
 ### POST `/portal/tasks/:taskId/documents/requests/:reqId/upload` _(CLIENT)_ — multipart, max 20MB — cliente envia o documento pedido pelo escritório
+
+---
+
+## Portal do Cliente — Perfil e Solicitações
+
+`request.user.sub` nas rotas de portal é o id do `ClientUser` (a pessoa logada), não de um `Client`. Rotas que tocam dado de empresa (`requests`, `tasks`, `documents`) exigem `clientId` explícito (body ou query) e validam contra o escopo de acesso do `ClientUser` (`getClientAccessScope`) — 404 se o `ClientUser` não tiver acesso àquele `clientId`.
+
+### GET `/portal/profile` _(CLIENT)_ — dados do `ClientUser` logado
+### PATCH `/portal/profile` _(CLIENT)_
+```json
+{ "password": "string?", "phone": "string?" }
+```
+→ `phone` (não mais `whatsapp`) — regex `\d{10,15}`
+
+### GET `/portal/clients` _(CLIENT)_ — `{ id, name }[]` — empresas acessíveis pelo `ClientUser` logado
+
+### GET `/portal/departments` _(CLIENT)_ — departamentos da organização, pra o formulário de nova solicitação
+
+### GET `/portal/requests` _(CLIENT)_ — `?clientId=` **obrigatório** — 400 se ausente, 404 se o `ClientUser` não tem acesso àquele `clientId`
+### POST `/portal/requests` _(CLIENT)_
+```json
+{ "clientId": "string", "title": "string", "description": "string?", "departmentId": "string?" }
+```
+→ `clientId` **obrigatório** no body — 404 se o `ClientUser` não tem acesso àquele `clientId`
+
+### GET `/portal/requests/:id` _(CLIENT)_
+### PATCH `/portal/requests/:id/cancel` _(CLIENT)_
+### POST `/portal/requests/:id/attachments` _(CLIENT)_ — multipart, max 20MB
 
 ---
 

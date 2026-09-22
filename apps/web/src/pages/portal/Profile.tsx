@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Lock, Mail } from 'lucide-react'
 
 interface Profile {
-  id: string; name: string; email: string; phone: string | null; whatsapp: string | null
+  id: string; name: string; email: string; phone: string | null
 }
 
 function getInitials(name: string): string {
@@ -112,14 +112,6 @@ export default function PortalProfile() {
             <Label htmlFor="p-phone">Telefone</Label>
             <Input id="p-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(82) 99999-9999" />
           </div>
-
-          {profile?.whatsapp && (
-            <div className="space-y-1">
-              <Label>WhatsApp</Label>
-              <p className="text-sm text-foreground bg-neutral-bg border border-border rounded-md px-3 py-2">{profile.whatsapp}</p>
-              <p className="text-xs text-muted-foreground">O WhatsApp é gerenciado pelo escritório.</p>
-            </div>
-          )}
 
           <div className="flex justify-end pt-1">
             <Button

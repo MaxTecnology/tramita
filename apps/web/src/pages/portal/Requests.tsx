@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { Plus, Inbox } from 'lucide-react'
 import type { ClientRequest } from '@/types'
 import { toast } from 'sonner'
+import { usePortalClient } from './Layout'
 
 const STATUS_LABEL: Record<ClientRequest['status'], string> = {
   PENDING: 'Em análise',
@@ -26,12 +27,14 @@ const STATUS_STYLE: Record<ClientRequest['status'], string> = {
 
 export default function PortalRequests() {
   const qc = useQueryClient()
+  const { clientId } = usePortalClient()
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', departmentId: '' })
 
   const { data: requests = [], isLoading } = useQuery<ClientRequest[]>({
-    queryKey: ['portal-requests'],
-    queryFn: () => api.get('/portal/requests').then((r) => r.data),
+    queryKey: ['portal-requests', clientId],
+    queryFn: () => api.get('/portal/requests', { params: { clientId } }).then((r) => r.data),
+    enabled: !!clientId,
   })
 
   const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
@@ -41,6 +44,7 @@ export default function PortalRequests() {
 
   const createMutation = useMutation({
     mutationFn: () => api.post('/portal/requests', {
+      clientId,
       title: form.title,
       description: form.description,
       departmentId: form.departmentId || undefined,

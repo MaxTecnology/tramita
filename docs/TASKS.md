@@ -147,7 +147,7 @@
   - [x] Timeline de histórico de movimentações visível
 - [x] Barra de progresso: % concluído no board
 - [x] Seção de relatórios: download de PDFs mensais
-- [x] Tela de perfil: alterar senha, número WhatsApp
+- [x] Tela de perfil: alterar senha, telefone
 
 ## Fase 8 — Recursos Avançados ✅
 ### Testes da Fase 8
@@ -231,5 +231,6 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
 5. [ ] Evolução de Solicitações → Ordem de Serviço
 6. [ ] Automação de documentos (robô que lê/classifica documentos do cliente, inspirado no Nibo) — maior risco técnico, decidir fonte de dados (upload manual vs. leitura de pasta) antes de especificar
 7. [ ] Protocolo digital com validade jurídica + IP — estende o sistema de notificação/tracking já existente
+8. [x] **Usuários de cliente com acesso por departamento** (concluído em 2026-09-21) — `ClientUser`/`ClientUserAccess`, login do portal desacoplado de `Client`, `Task.departmentId` obrigatório. Um `ClientUser` (pessoa) pode acessar mais de uma empresa (`Client`), com escopo de departamento por empresa; rotas de portal (`requests`, `tasks`, `documents`) agora exigem `clientId` explícito e validam contra o escopo de acesso do usuário. Tela dedicada de Usuários de Cliente (CRUD + reaproveitamento de usuário existente ao cadastrar empresa), seletor de empresa no portal quando há mais de uma. Ver `docs/superpowers/sdd/2026-09-21-client-users/`.
 
 Próximo passo: usuário escolhe entre seguir com 2b (motor de recorrência, dado que 2a já está pronto) ou outro item do roadmap (3-7) pra entrar em brainstorming a seguir.
