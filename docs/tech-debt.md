@@ -56,3 +56,27 @@ Cobertura global final: 82.76% linhas / 78.09% branches / 81.25% funções (248 
 **Contexto:** a migration `20260921210100_task_department_required` tornou `Task.departmentId` obrigatório no schema, e a Task 6 do plano de usuários de cliente por departamento removeu o `.optional()` de `createTaskSchema.departmentId` — todo chamador de `createTask` agora precisa fornecer um `departmentId` real. `Request.departmentId` continua opcional (o cliente final pode abrir uma solicitação sem escolher departamento), então `requests.service.ts`'s `approveRequest` é o único lugar que ainda precisa de um fallback: ele herda o `departmentId` da própria `Request` quando presente e, quando não, resolve explicitamente via `defaultDepartmentForOrg` (agora exportado de `tasks.service.ts`) *antes* de chamar `createTask`, passando sempre uma string real.
 
 **Este não é mais um débito interino:** o fallback "Geral" auto-criado é o design definitivo para o caso de borda "Request aprovada sem departamento definido" — não uma gambiarra temporária. `defaultDepartmentForOrg` deixou de ser chamado de dentro de `createTask` (onde era código morto, já que todo chamador agora fornece um valor real por construção) e passou a ser responsabilidade exclusiva de `approveRequest`, o único caller que legitimamente pode receber um `departmentId` ausente.
+
+## `GET /tasks` sem paginação (encontrado em 2026-09-22, revisão final do redesenho de Kanban)
+
+**Contexto:** o endpoint `listTasks`/`GET /tasks` (`apps/api/src/modules/tasks/tasks.service.ts`), que alimenta a tela "Tarefas" (lista + kanban dinâmico), retorna toda tarefa da organização de uma vez quando nenhum filtro é aplicado — sem `take`/cursor, sem limite de página. Não é um problema com o volume de dados atual, mas com ~50 clientes × 12 meses de tarefas recorrentes acumuladas, essa é a tela padrão que abre ao clicar em "Tarefas" no menu principal.
+
+**Pendente:** adicionar paginação (cursor ou `take`/`skip`) ao `listTasks` e ao frontend (`apps/web/src/pages/app/Tasks.tsx`), ou pelo menos um filtro de data padrão (ex.: só mostrar `targetDate` dos últimos 3 meses) pra evitar que a query cresça sem limite. Revisitar quando o volume de tarefas por organização começar a aparecer em queries lentas.
+
+## `GET /portal/tasks` não filtra `board.isActive` (encontrado em 2026-09-22, revisão final do redesenho de Kanban)
+
+**Contexto:** o novo `listPortalTasks` (`apps/api/src/modules/portal/portal.service.ts`), que alimenta a tela de tarefas do cliente final no portal, não filtra tarefas cujo board pai está com `isActive: false` (soft-deletado) — diferente de outras queries scoped por board neste mesmo arquivo, que também têm essa mesma lacuna (ex.: `getTaskHistory`). Não é uma regressão desta feature, é um padrão pré-existente que só ficou mais visível com a nova tela.
+
+**Pendente:** adicionar `board: { isActive: true }` ao `where` de `listPortalTasks` (e revisar as outras queries do mesmo arquivo com a mesma lacuna) pra garantir que um board arquivado nunca volte a aparecer pro cliente final.
+
+## Rótulo do status `BLOCKED` inconsistente na UI (encontrado em 2026-09-22, revisão final do redesenho de Kanban)
+
+**Contexto:** o mesmo valor de enum `BLOCKED` aparece como "Bloqueado" em `apps/web/src/pages/app/settings/OSTemplateForm.tsx` (seletor de tipo de coluna) e como "Com Impedimento" em `TaskDrawer`/`Tasks.tsx` (label oficial do status, já usado em produção antes desta feature). Puramente cosmético, baixa prioridade.
+
+**Pendente:** padronizar para "Com Impedimento" (o rótulo já estabelecido) em `OSTemplateForm.tsx`.
+
+## Não é possível limpar campo opcional de volta pra vazio em formulários de edição (padrão pré-existente, revisitado em 2026-09-22)
+
+**Contexto:** vários formulários de edição (cliente `notes`/`phone`/`codigo`, template de OS `description`, etc.) enviam `campo: form.campo || undefined` no payload — quando o usuário apaga o conteúdo de um campo opcional, `undefined` é omitido do JSON e o Prisma trata isso como "não mexer no valor", então o campo nunca é limpo de volta pra `null` no banco. Não é uma regressão de nenhuma feature específica, é um padrão que se repete em vários formulários deste projeto.
+
+**Pendente:** decidir um padrão único (ex.: sempre enviar `campo: form.campo || null` quando o campo é limpável, e o schema Zod aceitar `.nullable()`) e aplicar de uma vez em todos os formulários afetados, em vez de corrigir arquivo por arquivo conforme aparece.
