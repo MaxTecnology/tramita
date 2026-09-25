@@ -30,6 +30,8 @@ export async function createTestOrg(planId: string, overrides?: Partial<{ slug: 
   })
 }
 
+let testUserCounter = 0
+
 export async function createTestUser(
   organizationId: string,
   overrides?: Partial<{
@@ -42,7 +44,7 @@ export async function createTestUser(
   return prisma.user.create({
     data: {
       name: 'Test User',
-      email: overrides?.email ?? `user-${Date.now()}@test.com`,
+      email: overrides?.email ?? `user-${Date.now()}-${++testUserCounter}@test.com`,
       passwordHash: await bcrypt.hash(password, 10),
       role: overrides?.role ?? 'ORG_ADMIN',
       organizationId,
@@ -64,6 +66,8 @@ export async function createTestClient(
   })
 }
 
+let testClientUserCounter = 0
+
 export async function createTestClientUser(
   organizationId: string,
   overrides?: Partial<{ name: string; email: string; password: string; isActive: boolean }>,
@@ -72,7 +76,7 @@ export async function createTestClientUser(
   const clientUser = await prisma.clientUser.create({
     data: {
       name: overrides?.name ?? 'Test Client User',
-      email: overrides?.email ?? `client-user-${Date.now()}@test.com`,
+      email: overrides?.email ?? `client-user-${Date.now()}-${++testClientUserCounter}@test.com`,
       passwordHash: await bcrypt.hash(password, 10),
       isActive: overrides?.isActive ?? true,
       organizationId,
@@ -164,13 +168,18 @@ async function defaultDepartmentForColumn(columnId: string): Promise<string> {
   return created.id
 }
 
+let testDepartmentCounter = 0
+
 export async function createTestDepartment(
   organizationId: string,
   overrides?: Partial<{ name: string }>,
 ) {
   return prisma.department.create({
     data: {
-      name: overrides?.name ?? `Test Department ${Date.now()}`,
+      // Date.now() sozinho colide quando dois departamentos são criados na mesma organização no
+      // mesmo milissegundo (comum sob cobertura de testes no CI) — mesmo padrão de
+      // Date.now()+contador já usado em createTestOrg acima.
+      name: overrides?.name ?? `Test Department ${Date.now()}-${++testDepartmentCounter}`,
       organizationId,
     },
   })
