@@ -109,6 +109,28 @@ describe('GET /portal/tasks/:id/history', () => {
     expect(res.statusCode).toBe(200)
     expect(Array.isArray(JSON.parse(res.body))).toBe(true)
   })
+
+  it('retorna 404 pra tarefa de board arquivado (isActive: false)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id, { departmentId: department.id })
+    await prisma.board.update({ where: { id: board.id }, data: { isActive: false } })
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'GET',
+      url: `/portal/tasks/${task.id}/history`,
+      headers: { authorization: auth },
+    })
+    expect(res.statusCode).toBe(404)
+  })
 })
 
 describe('GET /portal/tasks', () => {
@@ -187,6 +209,31 @@ describe('GET /portal/tasks', () => {
     expect(res.statusCode).toBe(200)
     const list = JSON.parse(res.body) as Array<{ id: string }>
     expect(list.some((t) => t.id === outOfScopeTask.id)).toBe(false)
+  })
+
+  it('não retorna tarefa de board arquivado (isActive: false)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const archivedTask = await createTestTask(col.id, user.id, { departmentId: department.id })
+    await prisma.board.update({ where: { id: board.id }, data: { isActive: false } })
+
+    const auth = await getAuthHeader(clientUser.email, password)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/portal/tasks',
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const list = JSON.parse(res.body) as Array<{ id: string }>
+    expect(list.some((t) => t.id === archivedTask.id)).toBe(false)
   })
 })
 

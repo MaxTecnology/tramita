@@ -5,7 +5,7 @@ import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-
 export async function getTaskHistory(taskId: string, organizationId: string, clientUserId: string) {
   const scope = await getClientAccessScope(clientUserId)
   const task = await prisma.task.findFirst({
-    where: { id: taskId, column: { board: { organizationId, clientId: { in: scope.clientIds } } } },
+    where: { id: taskId, column: { board: { organizationId, isActive: true, clientId: { in: scope.clientIds } } } },
     include: { column: { include: { board: { select: { clientId: true } } } } },
   })
   if (!task || !task.visibleToClient || !canSeeTask(scope, task.column.board.clientId, task.departmentId)) {
@@ -47,7 +47,7 @@ export async function listPortalTasks(
   const orConditions = clientIds.flatMap((clientId) => {
     const departmentIds = scope.departmentIdsByClient.get(clientId)
     if (!departmentIds || departmentIds.size === 0) return []
-    return [{ column: { board: { clientId } }, departmentId: { in: [...departmentIds] } }]
+    return [{ column: { board: { clientId, isActive: true } }, departmentId: { in: [...departmentIds] } }]
   })
   if (orConditions.length === 0) return []
 

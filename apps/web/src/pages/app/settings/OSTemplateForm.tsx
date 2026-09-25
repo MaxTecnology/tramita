@@ -15,7 +15,7 @@ const STATUS_EFFECT_LABEL: Record<StatusEffect, string> = {
   NONE: 'Fase (sem efeito no status)',
   OPEN: 'Aberto',
   STARTED: 'Iniciado',
-  BLOCKED: 'Bloqueado',
+  BLOCKED: 'Com Impedimento',
   DISREGARDED: 'Desconsiderado',
   DONE: 'Concluído',
 }

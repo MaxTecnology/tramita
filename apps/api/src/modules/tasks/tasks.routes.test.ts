@@ -228,4 +228,33 @@ describe('GET /tasks', () => {
     const body = JSON.parse(res.body) as Array<{ id: string }>
     expect(body.map((t) => t.id)).toEqual([match.id])
   })
+
+  it('respeita o parâmetro limit e nunca excede o teto máximo', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    for (let i = 0; i < 5; i++) {
+      await createTestTask(col.id, user.id, { title: `Tarefa ${i}` })
+    }
+
+    const auth = await getAuthHeader(user.email, 'Test@1234')
+
+    const limited = await app.inject({
+      method: 'GET',
+      url: '/tasks?limit=2',
+      headers: { authorization: auth },
+    })
+    expect(limited.statusCode).toBe(200)
+    expect((JSON.parse(limited.body) as unknown[]).length).toBe(2)
+
+    const overCap = await app.inject({
+      method: 'GET',
+      url: '/tasks?limit=9999',
+      headers: { authorization: auth },
+    })
+    expect(overCap.statusCode).toBe(400)
+  })
 })

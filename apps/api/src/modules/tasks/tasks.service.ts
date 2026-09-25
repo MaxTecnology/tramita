@@ -12,6 +12,9 @@ export interface Actor {
   type: 'user' | 'client'
 }
 
+const DEFAULT_LIST_TASKS_LIMIT = 200
+const MAX_LIST_TASKS_LIMIT = 500
+
 // Called BEFORE $transaction to avoid incompatible tx type
 async function resolveActorName(actorId: string, actorType: 'user' | 'client'): Promise<string> {
   if (actorType === 'user') {
@@ -415,6 +418,9 @@ export async function listTasks(
       column: { select: { board: { select: { id: true, clientId: true, client: { select: { id: true, name: true, codigo: true } } } } } },
     },
     orderBy: { targetDate: 'asc' },
+    // Sem filtro, essa query varreria toda tarefa da org — DEFAULT_LIMIT protege contra isso até
+    // que paginação de verdade (cursor) seja implementada; ver docs/tech-debt.md.
+    take: Math.min(query.limit ?? DEFAULT_LIST_TASKS_LIMIT, MAX_LIST_TASKS_LIMIT),
   })
 }
 
