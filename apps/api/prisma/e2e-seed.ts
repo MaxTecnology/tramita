@@ -42,6 +42,12 @@ async function main() {
     },
   })
 
+  const department = await prisma.department.upsert({
+    where: { organizationId_name: { organizationId: org.id, name: 'Geral' } },
+    update: {},
+    create: { name: 'Geral', organizationId: org.id },
+  })
+
   // Remove stale E2E data to guarantee a clean slate
   const staleBoards = await prisma.board.findMany({
     where: { organizationId: org.id, title: 'Processo E2E' },
@@ -51,17 +57,37 @@ async function main() {
     await prisma.board.delete({ where: { id: b.id } })
   }
   await prisma.client.deleteMany({
-    where: { email: 'cliente@g2a.com.br', organizationId: org.id },
+    where: { name: 'Cliente E2E', organizationId: org.id },
   })
 
-  // Create E2E client (portal user)
+  // Login do cliente final acontece via ClientUser (não mais via Client.email/passwordHash,
+  // removidos pela migration 20260921210000_client_users) — o portal autentica contra
+  // ClientUser e escopa o acesso via ClientUserAccess (cliente + departamento).
   const client = await prisma.client.create({
-    data: {
+    data: { name: 'Cliente E2E', organizationId: org.id },
+  })
+
+  const clientUser = await prisma.clientUser.upsert({
+    where: { email_organizationId: { email: 'cliente@g2a.com.br', organizationId: org.id } },
+    update: {},
+    create: {
       name: 'Cliente E2E',
       email: 'cliente@g2a.com.br',
       passwordHash: await bcrypt.hash('Cliente@2025', 10),
       organizationId: org.id,
     },
+  })
+
+  await prisma.clientUserAccess.upsert({
+    where: {
+      clientUserId_clientId_departmentId: {
+        clientUserId: clientUser.id,
+        clientId: client.id,
+        departmentId: department.id,
+      },
+    },
+    update: {},
+    create: { clientUserId: clientUser.id, clientId: client.id, departmentId: department.id },
   })
 
   // Create board with 3 columns and 2 tasks in the first column
@@ -75,7 +101,7 @@ async function main() {
           {
             title: 'Pendente',
             position: 0,
-            isFinal: false,
+            statusEffect: 'NONE',
             color: '#6B7280',
             tasks: {
               create: [
@@ -86,6 +112,7 @@ async function main() {
                   status: 'OPEN',
                   tags: [],
                   creatorId: admin.id,
+                  departmentId: department.id,
                 },
                 {
                   title: 'Inscrição estadual',
@@ -94,18 +121,19 @@ async function main() {
                   status: 'OPEN',
                   tags: [],
                   creatorId: admin.id,
+                  departmentId: department.id,
                 },
               ],
             },
           },
-          { title: 'Em andamento', position: 1, isFinal: false, color: '#3B82F6' },
-          { title: 'Concluído', position: 2, isFinal: true, color: '#10B981' },
+          { title: 'Em andamento', position: 1, statusEffect: 'NONE', color: '#3B82F6' },
+          { title: 'Concluído', position: 2, statusEffect: 'DONE', color: '#10B981' },
         ],
       },
     },
   })
 
-  console.log('E2E seed concluído: org G2A + admin@g2a.com.br + cliente@g2a.com.br + board "Processo E2E"')
+  console.log('E2E seed concluído: org G2A + admin@g2a.com.br + cliente@g2a.com.br (ClientUser) + board "Processo E2E"')
 }
 
 main()
