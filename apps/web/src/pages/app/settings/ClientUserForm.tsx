@@ -59,13 +59,16 @@ export default function ClientUserForm() {
   const saveMutation = useMutation({
     mutationFn: () => {
       const payload = {
-        name: form.name, email: form.email, phone: form.phone || undefined, isActive: form.isActive,
+        name: form.name, email: form.email, isActive: form.isActive,
         accesses: form.accesses,
         ...(form.password ? { password: form.password } : {}),
       }
+      // No PATCH (edição), campo vazio precisa virar `null` pra realmente limpar o telefone no
+      // banco — `undefined` faz o Prisma ignorar o campo, mantendo o valor antigo. No POST
+      // (criação) não há nada a limpar, então `undefined` (omitir do payload) é o correto.
       return isEditing
-        ? api.patch(`/client-users/${id}`, payload).then((r) => r.data)
-        : api.post('/client-users', { ...payload, password: form.password }).then((r) => r.data)
+        ? api.patch(`/client-users/${id}`, { ...payload, phone: form.phone || null }).then((r) => r.data)
+        : api.post('/client-users', { ...payload, phone: form.phone || undefined, password: form.password }).then((r) => r.data)
     },
     onSuccess: () => {
       toast.success(isEditing ? 'Usuário atualizado' : 'Usuário criado')

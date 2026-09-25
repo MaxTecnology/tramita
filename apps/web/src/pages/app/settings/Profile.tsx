@@ -46,7 +46,7 @@ export default function Profile() {
   const profileMutation = useMutation({
     mutationFn: () => api.patch('/auth/me', {
       name: form.name || undefined,
-      phone: form.phone || undefined,
+      phone: form.phone || null,
     }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Perfil atualizado')

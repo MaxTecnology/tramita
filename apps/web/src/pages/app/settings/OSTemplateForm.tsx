@@ -157,10 +157,12 @@ export default function OSTemplateForm() {
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      const payload = { name: form.name, description: form.description || undefined, isActive: form.isActive, columns: form.columns }
+      const base = { name: form.name, isActive: form.isActive, columns: form.columns }
+      // No PATCH (edição), descrição vazia precisa virar `null` pra realmente limpar no banco —
+      // `undefined` faz o Prisma ignorar o campo. No POST (criação) não há nada a limpar.
       return isEditing
-        ? api.patch(`/os-templates/${id}`, payload).then((r) => r.data)
-        : api.post('/os-templates', payload).then((r) => r.data)
+        ? api.patch(`/os-templates/${id}`, { ...base, description: form.description || null }).then((r) => r.data)
+        : api.post('/os-templates', { ...base, description: form.description || undefined }).then((r) => r.data)
     },
     onSuccess: () => {
       toast.success(isEditing ? 'Template atualizado' : 'Template criado')

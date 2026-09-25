@@ -17,6 +17,7 @@ export const createOSTemplateSchema = z.object({
 })
 
 export const updateOSTemplateSchema = createOSTemplateSchema.partial().extend({
+  description: z.string().nullable().optional(),
   columns: z.array(columnSchema).min(1).optional(),
 })
 

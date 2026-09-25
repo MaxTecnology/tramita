@@ -151,6 +151,18 @@ describe('updateClient', () => {
     await expect(updateClient(client.id, orgB.id, { notes: 'X' })).rejects.toMatchObject({ statusCode: 404 })
   })
 
+  it('clears codigo/notes back to null when sent explicitly as null (not just omitted)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id, { codigo: '0789' })
+    await updateClient(client.id, org.id, { notes: 'algo' })
+
+    const result = await updateClient(client.id, org.id, { codigo: null, notes: null })
+
+    expect(result.codigo).toBeNull()
+    expect(result.notes).toBeNull()
+  })
+
   it('removes ClientUserAccess for a portal user omitted from the submitted clientUsers list', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

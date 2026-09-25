@@ -38,14 +38,20 @@ export const createClientSchema = z.object({
 
 export const updateClientSchema = z.object({
   name: z.string().min(2).optional(),
-  codigo: z.string().optional(),
+  codigo: z.string().nullable().optional(),
   clientType: z.enum(['PF', 'PJ']).optional(),
-  cnpj: z.string().optional(),
-  cpf: z.string().optional(),
-  whatsapp: z.string().optional(),
-  phone: z.string().optional(),
-  notes: z.string().optional(),
-  ...addressFields,
+  cnpj: z.string().nullable().optional(),
+  cpf: z.string().nullable().optional(),
+  whatsapp: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  cep: z.string().nullable().optional(),
+  estado: z.string().nullable().optional(),
+  cidade: z.string().nullable().optional(),
+  bairro: z.string().nullable().optional(),
+  logradouro: z.string().nullable().optional(),
+  numero: z.string().nullable().optional(),
+  complemento: z.string().nullable().optional(),
   clientUsers: z.array(clientUserLinkSchema).min(1, 'Adicione pelo menos um usuário').optional(),
 })
 

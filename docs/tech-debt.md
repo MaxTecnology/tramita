@@ -75,8 +75,14 @@ Cobertura global final: 82.76% linhas / 78.09% branches / 81.25% funções (248 
 
 **Pendente:** padronizar para "Com Impedimento" (o rótulo já estabelecido) em `OSTemplateForm.tsx`.
 
-## Não é possível limpar campo opcional de volta pra vazio em formulários de edição (padrão pré-existente, revisitado em 2026-09-22)
+## Não é possível limpar campo opcional de volta pra vazio em formulários de edição ✅ (resolvido em 2026-09-24)
 
-**Contexto:** vários formulários de edição (cliente `notes`/`phone`/`codigo`, template de OS `description`, etc.) enviam `campo: form.campo || undefined` no payload — quando o usuário apaga o conteúdo de um campo opcional, `undefined` é omitido do JSON e o Prisma trata isso como "não mexer no valor", então o campo nunca é limpo de volta pra `null` no banco. Não é uma regressão de nenhuma feature específica, é um padrão que se repete em vários formulários deste projeto.
+**Contexto original:** vários formulários de edição (cliente `notes`/`phone`/`codigo`/endereço, usuário `phone`, usuário de cliente `phone`, template de OS `description`) enviavam `campo: form.campo || undefined` no payload de PATCH — quando o usuário apagava o conteúdo de um campo opcional, `undefined` era omitido do JSON e o Prisma tratava isso como "não mexer no valor", então o campo nunca era limpo de volta pra `null` no banco.
 
-**Pendente:** decidir um padrão único (ex.: sempre enviar `campo: form.campo || null` quando o campo é limpável, e o schema Zod aceitar `.nullable()`) e aplicar de uma vez em todos os formulários afetados, em vez de corrigir arquivo por arquivo conforme aparece.
+**Resolvido:** padrão único aplicado em todos os pontos afetados — schemas Zod de **update** (não de create, que não precisa limpar nada) passaram a aceitar `.nullable().optional()` nos campos opcionais, e os payloads de edição do frontend passaram a enviar `campo: form.campo || null` em vez de `|| undefined`:
+- `clients.schema.ts` (`updateClientSchema`) + `Clients.tsx` — `codigo`, `cnpj`, `cpf`, `whatsapp`, `phone`, `notes`, todos os campos de endereço
+- `users.schema.ts` (`updateUserSchema`, `updateMyProfileSchema`) + `Users.tsx`/`Profile.tsx` — `phone`
+- `client-users.schema.ts` (`updateClientUserSchema`) + `ClientUserForm.tsx` — `phone` (payload de create/edit foi separado, já que o schema de create continua exigindo `undefined`, não `null`)
+- `os-templates.schema.ts` (`updateOSTemplateSchema`) + `OSTemplateForm.tsx` — `description` (mesma separação create/edit)
+
+Todos os `services` correspondentes já espalhavam o body do Zod direto no `data` do `prisma.update`, então nenhuma mudança de lógica de service foi necessária — só o tipo do schema e o valor enviado pelo frontend. Teste adicionado em `clients.service.test.ts` confirmando que `codigo`/`notes` voltam a `null` quando enviados explicitamente como `null`. Suítes completas (API 421 testes, web 11 testes) passando.

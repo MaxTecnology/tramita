@@ -18,7 +18,7 @@ export const updateClientUserSchema = z.object({
   name: z.string().min(2).optional(),
   email: z.string().email().optional(),
   password: z.string().min(8).optional(),
-  phone: z.string().optional(),
+  phone: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   accesses: z.array(accessSchema).min(1, 'Selecione pelo menos um cliente e departamento').optional(),
 })

@@ -94,7 +94,7 @@ export default function Users() {
         name: data.name,
         email: data.email,
         role: data.role,
-        phone: data.phone || undefined,
+        phone: data.phone || null,
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Usuário atualizado')
