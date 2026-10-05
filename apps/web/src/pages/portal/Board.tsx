@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { ArrowLeft, Search } from 'lucide-react'
 import { useBoardStream } from '@/hooks/useBoardStream'
 import { TaskDrawer } from '@/components/portal/TaskDrawer'
+import { STATUS_LABEL, STATUS_COLOR } from '@/components/shared/TaskDrawer'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
@@ -123,6 +124,11 @@ export default function PortalBoard() {
                     >
                       <p className="text-sm font-medium text-foreground line-clamp-2">{task.title}</p>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {task.status !== 'OPEN' && (
+                          <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', STATUS_COLOR[task.status])}>
+                            {STATUS_LABEL[task.status]}
+                          </span>
+                        )}
                         <span className={cn(
                           'text-xs font-medium px-2 py-0.5 rounded-full',
                           ({
