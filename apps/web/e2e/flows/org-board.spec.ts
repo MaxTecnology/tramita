@@ -69,10 +69,10 @@ test.describe('Fluxo do Escritório', () => {
     await expect(titleInput).toHaveValue('Abertura de empresa E2E')
     await titleInput.press('Enter')
 
-    // Assert on the kanban card, not the drawer's own heading: the mutation
-    // does persist (board query refetches and the card updates), but the
-    // open drawer keeps showing the pre-edit title until it's closed and
-    // reopened — a real, separate staleness quirk in TaskDrawer, not a test bug
+    // Drawer's own heading now reflects the edit live — Board.tsx derives the selected task from
+    // the refetched board query by id instead of holding a stale snapshot taken at click time
+    // (fixed 2026-10-05, see docs/tech-debt.md). Assert both surfaces update.
+    await expect(drawer.getByRole('heading', { name: 'Abertura de empresa E2E', level: 2 })).toBeVisible({ timeout: 5_000 })
     await expect(page.getByRole('button', { name: /Abertura de empresa E2E/ })).toBeVisible({ timeout: 5_000 })
   })
 })

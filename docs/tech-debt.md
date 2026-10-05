@@ -32,11 +32,15 @@ Nenhum arquivo de teste em `apps/api/src` usa mais `vi.mock(module, factory)` pa
 
 Cobertura global final: 82.76% linhas / 78.09% branches / 81.25% funções (248 testes, 35 arquivos). `pnpm --filter api test:coverage` passa com exit 0. `.github/workflows/ci.yml` voltou a rodar `test:coverage` (enforcement reativado).
 
-## `TaskDrawer` não atualiza o próprio título após salvar edição inline (encontrado em 2026-09-20)
+## `TaskDrawer` não atualiza o próprio título após salvar edição inline ✅ (resolvido em 2026-10-05)
 
-**Contexto:** ao editar o título de uma tarefa pelo `TaskDrawer` (`apps/web/src/components/shared/TaskDrawer.tsx`) — clicar no `<h2>`, editar o `<input>` inline, `Enter`/blur dispara `updateMutation.mutate({ title })` — a mutação persiste corretamente e o card da tarefa na coluna do Kanban atualiza (a query do board é invalidada e refaz o fetch), mas o próprio `<h2>` dentro do drawer continua mostrando o título antigo até o drawer ser fechado e reaberto. Encontrado depurando `apps/web/e2e/flows/org-board.spec.ts` — o teste de edição de título precisou verificar o card no Kanban em vez do heading do drawer por causa disso (ver comentário no teste).
+**Contexto original:** ao editar o título de uma tarefa pelo `TaskDrawer` — clicar no `<h2>`, editar o `<input>` inline, `Enter`/blur dispara `updateMutation.mutate({ title })` — a mutação persistia corretamente e o card na coluna do Kanban atualizava, mas o próprio `<h2>` dentro do drawer continuava mostrando o título antigo até fechar/reabrir. Encontrado depurando `apps/web/e2e/flows/org-board.spec.ts`.
 
-**Pendente:** investigar se o `task` exibido no `TaskDrawer` vem de uma referência memorizada no componente pai (ex.: `useState` setado só no clique de abrir, nunca ressincronizado com o resultado da query do board) em vez de derivado ao vivo da query por id — se for isso, o fix é passar/derivar o `task` atualizado do cache do react-query em vez de um snapshot fixo.
+**Resolvido:** a suspeita original era exatamente a causa — `Board.tsx` guardava o objeto `Task` inteiro num `useState` setado só no clique (`selectedTask`), nunca ressincronizado com o resultado da query do board depois de uma mutação. Trocado por `selectedTaskId: string | null` + derivação ao vivo (`board?.columns.flatMap(c => c.tasks).find(t => t.id === selectedTaskId)`) a cada render, assim o objeto passado pro `TaskDrawer` sempre reflete os dados mais recentes da query.
+
+`apps/web/src/pages/app/Tasks.tsx` (tela nova de Kanban dinâmico, Task 7 do redesenho de Kanban) tinha o mesmo padrão com a mesma causa — corrigido do mesmo jeito, derivando de `tasks.find(...)` em vez de guardar o objeto. Achado um segundo bug relacionado nesse processo: `TaskDrawer`'s `updateMutation.onSuccess` só invalidava `queryKey: ['board']`, nunca `['tasks']` — então editar uma tarefa pela tela nova não atualizava a lista/kanban daquela tela de forma alguma (não só o drawer), até um refresh manual. Corrigido invalidando os dois query keys sempre, já que o componente agora é usado nos dois contextos.
+
+Teste E2E (`org-board.spec.ts`) atualizado pra afirmar diretamente no heading do drawer em vez de só no card do Kanban, já que agora os dois refletem a edição. 8/8 specs Playwright passando.
 
 ## Migration `20260920160000_add_departments` assume `client_assignments` vazia (encontrado em 2026-09-20)
 

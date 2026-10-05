@@ -102,7 +102,11 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
       api.patch(`/tasks/${task.id}`, data).then((r) => r.data),
     onSuccess: () => {
       toast.success('Tarefa atualizada')
+      // TaskDrawer é usado tanto no Kanban por board (Board.tsx, query ['board', boardId]) quanto
+      // na tela flat de Tarefas (Tasks.tsx, query ['tasks', filters]) — precisa invalidar os dois,
+      // senão a edição fica invisível em um dos dois lugares até um refresh manual.
       queryClient.invalidateQueries({ queryKey: ['board'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
     },
     onError: () => toast.error('Erro ao salvar tarefa'),
   })

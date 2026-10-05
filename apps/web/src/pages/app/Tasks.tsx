@@ -162,7 +162,9 @@ export default function Tasks() {
   const { user } = useAuth()
   const qc = useQueryClient()
   const [view, setView] = useState<ViewMode>('list')
-  const [selectedTask, setSelectedTask] = useState<TaskListItem | null>(null)
+  // Guarda só o id — o objeto é derivado ao vivo de `tasks` (abaixo, depois da query), pra que o
+  // TaskDrawer sempre reflita a tarefa atual depois de uma edição, não um snapshot do clique.
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [activeTask, setActiveTask] = useState<TaskListItem | null>(null)
 
   const [clientId, setClientId] = useState('')
@@ -211,6 +213,8 @@ export default function Tasks() {
       return api.get('/tasks', { params }).then((r) => r.data)
     },
   })
+
+  const selectedTask = selectedTaskId ? tasks.find((t) => t.id === selectedTaskId) ?? null : null
 
   const hasFilters =
     !!clientId || !!assigneeId || !!departmentId || !!recurringTemplateId || !!status || !!dateFrom || !!dateTo || !!search.trim()
@@ -381,7 +385,7 @@ export default function Tasks() {
               </thead>
               <tbody>
                 {tasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onClick={() => setSelectedTask(task)} />
+                  <TaskRow key={task.id} task={task} onClick={() => setSelectedTaskId(task.id)} />
                 ))}
               </tbody>
             </table>
@@ -401,7 +405,7 @@ export default function Tasks() {
                     </div>
                     <DroppableStatusColumn id={s}>
                       {columnTasks.map((task) => (
-                        <DraggableTaskCard key={task.id} task={task} onClick={() => setSelectedTask(task)} />
+                        <DraggableTaskCard key={task.id} task={task} onClick={() => setSelectedTaskId(task.id)} />
                       ))}
                     </DroppableStatusColumn>
                   </div>
@@ -421,7 +425,7 @@ export default function Tasks() {
           task={selectedTask}
           currentUserId={user.id}
           role={user.role as 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'}
-          onClose={() => setSelectedTask(null)}
+          onClose={() => setSelectedTaskId(null)}
         />
       )}
     </div>

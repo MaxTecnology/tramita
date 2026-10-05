@@ -55,7 +55,13 @@ export default function Board() {
   useBoardStream(boardId)
   const qc = useQueryClient()
   const { user } = useAuth()
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  // Guarda só o id, não o objeto Task — o objeto é derivado ao vivo de `board` a cada render
+  // (abaixo), pra que o TaskDrawer sempre reflita o estado atual da tarefa depois de uma edição
+  // (ex.: título), em vez de um snapshot tirado no momento do clique que nunca se atualiza.
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const selectedTask = selectedTaskId
+    ? (board?.columns.flatMap((c) => c.tasks).find((t) => t.id === selectedTaskId) ?? null)
+    : null
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [search, setSearch] = useState('')
   const [filterPriority, setFilterPriority] = useState('')
@@ -209,7 +215,7 @@ export default function Board() {
             {searchResults.map((task) => (
               <div
                 key={task.id}
-                onClick={() => setSelectedTask(task)}
+                onClick={() => setSelectedTaskId(task.id)}
                 className="bg-surface rounded-lg p-2.5 border border-border cursor-pointer hover:shadow-sm text-sm flex items-center justify-between"
               >
                 <span className="font-medium text-foreground">{task.title}</span>
@@ -241,7 +247,7 @@ export default function Board() {
                       <SortableTaskCard
                         key={task.id}
                         task={task}
-                        onClick={() => setSelectedTask(task)}
+                        onClick={() => setSelectedTaskId(task.id)}
                       />
                     ))}
                   </DroppableColumn>
@@ -311,7 +317,7 @@ export default function Board() {
           currentUserId={user.id}
           role={user.role as 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'}
           boardDueDate={board.dueDate}
-          onClose={() => setSelectedTask(null)}
+          onClose={() => setSelectedTaskId(null)}
         />
       )}
     </div>
