@@ -56,6 +56,16 @@ sem nenhuma das duas datas não aparece no calendário (consistente com o crité
 Lista já usa). Tarefas com `status: DISREGARDED` são excluídas (mesmo filtro implícito que o board do
 portal já aplica pra tarefas desconsideradas).
 
+**Agrupamento por dia precisa seguir a convenção "date-only UTC" que `apps/web/src/lib/dates.ts` já
+estabelece** (usada por `formatDateOnlyUTC`/`isPastDateOnlyUTC`, ver `TaskRow`/cards existentes) — as
+datas do banco são "dia puro" armazenado como UTC-midnight, e agrupar usando o dia no fuso LOCAL do
+navegador (ex.: `new Date(task.targetDate).getDate()`) desloca a tarefa pro dia errado pra qualquer
+usuário num fuso atrás de UTC (o caso comum no Brasil, UTC-3) — exatamente o tipo de bug que esse
+arquivo já existe pra evitar. `buildCalendarGrid` usa a mesma lógica de "dia UTC" que
+`utcDayFromUTCDate`/`utcDayFromLocalDate` (hoje privadas em `dates.ts`) já implementam — exportar um
+helper dedicado de `dates.ts` (ex.: `utcDateKey(date): string` retornando uma chave `'YYYY-MM-DD'`
+estável) em vez de duplicar a lógica dentro de `Tasks.tsx`.
+
 ### Densidade por dia
 
 Até 2 tarefas renderizadas diretamente na célula (card compacto: título truncado + selo de status,
@@ -150,11 +160,59 @@ de `task.column.board`). Passa a incluir `column: { select: { board: { select: {
 organizationId: true } } } }` no mesmo `include`, pra ter o que `notifyIfBlocked` precisa sem uma
 query extra.
 
+**Confirmado por varredura (`grep -rn "task.update(" apps/api/src/modules`), não é uma suposição:**
+existem exatamente três pontos no código inteiro que escrevem `Task.status` — `moveTask`,
+`updateTask`, e o próprio `prisma.task.update` dentro de `recalculateTaskStatus`
+(`task-documents.service.ts:221`). `reorderTasks` e o `prisma.task.update` de
+`requests.service.ts` (que só grava `sourceRequestId`) nunca tocam `status`. Os três pontos cobertos
+pelo design acima são realmente todos os pontos de escrita — não uma simplificação otimista.
+
 ### 2.3 Configurações de Notificações
 
-`apps/web/src/pages/app/settings/Notifications.tsx` ganha mais uma linha de toggle ("Tarefa com
-impedimento"), seguindo exatamente o padrão visual/de estado já usado por `taskMoved`/`dueDateAlert`
-(mesmo componente de toggle, mesmo texto de ajuda ao lado).
+**Achado crítico durante a revisão da spec — sem isso o toggle da UI não tem efeito nenhum:**
+`apps/api/src/modules/notifications/notifications.schema.ts`'s `updateConfigSchema` é uma lista
+manual de `z.boolean().optional()` — **não deriva automaticamente do model Prisma**. Um `z.object()`
+comum descarta silenciosamente qualquer campo que o payload mande mas o schema não declare (sem
+erro, sem aviso). Confirmado grepando o próprio arquivo: `recurringGenerationFailed` e
+`documentRejected` já existem no `NotificationConfig` do schema, têm default `true`, e o worker já os
+usa via `EVENT_FLAG_MAP` — mas **nenhum dos dois está em `updateConfigSchema`**, então mesmo que
+existissem na UI, salvar não gravaria nada. `taskBlocked` **precisa** de uma linha própria em
+`updateConfigSchema` (`taskBlocked: z.boolean().optional()`) — adicionar só o toggle na tela sem essa
+linha reproduziria exatamente esse bug silencioso pro recurso que o usuário pediu.
+
+**Checklist completo de onde `TASK_BLOCKED`/`taskBlocked` precisa aparecer** (rastreado seguindo o
+padrão ponta a ponta de um evento já existente, `TASK_DUE_DATE_APPROACHING`/`dueDateAlert`):
+1. `apps/api/src/modules/notifications/notifications.schema.ts`'s `updateConfigSchema` — campo novo
+   (crítico, ver acima).
+2. `apps/web/src/pages/app/settings/Notifications.tsx` — `Config` interface ganha `taskBlocked?:
+   boolean`; nova linha de toggle ("Tarefa com impedimento"), mesmo padrão visual de
+   `taskMoved`/`dueDateAlert`; `EVENT_LABEL` ganha `TASK_BLOCKED: 'Tarefa com impedimento'` (usado na
+   tabela de histórico de envios da mesma tela).
+3. `apps/web/src/pages/app/settings/Templates.tsx` — a tela de edição de mensagem customizada por
+   evento tem seu próprio array `EVENTS` (hoje só 5 dos 10 valores de `NotificationEvent` — nem todo
+   evento existente tem editor de template hoje, gap pré-existente, fora de escopo). `TASK_BLOCKED`
+   entra nesse array + seu próprio `EVENT_LABEL` nessa tela, pra que o escritório possa customizar a
+   mensagem de WhatsApp/E-mail, não só ligar/desligar — consistente com o pedido de controle do
+   usuário.
+4. `apps/api/src/workers/notification.worker.ts`'s `EVENT_FLAG_MAP` (já coberto na seção anterior) —
+   tipado `Record<string, keyof NotificationConfig>`, não é `Record<NotificationEvent, ...>`, então o
+   TypeScript não obriga a entrada — esquecer aqui silenciosamente faz `isEnabled` cair em `false`
+   pra sempre (`?? false` no fallback), a notificação nunca dispara apesar do toggle ligado.
+5. `apps/api/src/lib/default-templates.ts`'s `DEFAULT_TEMPLATES` (já coberto na seção anterior) —
+   usado como fallback enquanto a org não customizar via (3). Este é o único dos cinco pontos que o
+   **compilador obriga**: `DEFAULT_TEMPLATES` é tipado `Record<NotificationEvent, ...>`, então
+   esquecer `TASK_BLOCKED` aqui quebra o build assim que o enum ganhar o valor novo — os outros
+   quatro pontos (1, 2, 3, 4) são todos objetos/arrays soltos sem checagem contra o enum, e é
+   exatamente aí que um esquecimento passaria despercebido até alguém testar manualmente.
+
+**Fora de escopo, registrar como débito técnico separado (não é desta feature, achado faz parte da
+revisão):** `recurringGenerationFailed` e `documentRejected` não têm toggle nenhum na UI de
+Configurações (nem em `Notifications.tsx`, nem como entrada em `updateConfigSchema`) — ficam travados
+no default `true` do banco pra sempre, sem o escritório poder desligar. `Templates.tsx`'s `EVENTS`
+também não cobre `REQUEST_CREATED`/`REQUEST_APPROVED`/`REQUEST_REJECTED`/
+`RECURRING_GENERATION_FAILED`/`DOCUMENT_REJECTED` — cinco eventos sem editor de mensagem customizada,
+só o template padrão do sistema. Vale uma tarefa própria pra nivelar todos os eventos ao mesmo nível
+de controle (toggle + mensagem customizável), já que o usuário valoriza esse controle explicitamente.
 
 ---
 
@@ -173,7 +231,12 @@ impedimento"), seguindo exatamente o padrão visual/de estado já usado por `tas
   confirmando que a transição PARA `BLOCKED` por aquele caminho específico dispara a notificação.
 - `buildCalendarGrid`: tarefa sem `targetDate` nem `dueDate` não aparece; tarefa com só `dueDate`
   cai no dia certo; grade cobre semanas completas incluindo dias do mês vizinho; mais de 2 tarefas
-  no mesmo dia produz o "+N mais" corretamente.
+  no mesmo dia produz o "+N mais" corretamente; uma tarefa com `targetDate` em UTC-midnight cai no
+  dia certo independente do fuso horário do ambiente de teste (regressão específica pro bug de
+  fuso-horário descrito acima).
+- `PATCH /notifications/config` com `{ taskBlocked: false }` realmente persiste `false` (não só
+  passa na validação — confirmar lendo de volta via `GET /notifications/config` depois do PATCH),
+  prova direta de que `updateConfigSchema` inclui o campo novo.
 - E2E: opcionalmente, um teste cobrindo a troca pro modo Calendário na tela Tarefas (navegação básica
   + clique numa tarefa abre o drawer) — avaliar custo/benefício na hora de escrever o plano, já que
   os specs Playwright existentes são poucos e focados em fluxos críticos (login, board, portal).
