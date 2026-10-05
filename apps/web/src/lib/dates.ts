@@ -32,3 +32,13 @@ export function diffDaysDateOnlyUTC(date: string | Date, now: Date = new Date())
   const today = utcDayFromLocalDate(now)
   return Math.round((due - today) / (1000 * 60 * 60 * 24))
 }
+
+/** Chave 'YYYY-MM-DD' estável pro dia UTC de uma data "date-only" — usada pra agrupar tarefas por
+ * dia (calendário) sem deslocar pelo fuso local do navegador. */
+export function utcDateKey(date: string | Date): string {
+  const d = new Date(date)
+  const year = d.getUTCFullYear()
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
