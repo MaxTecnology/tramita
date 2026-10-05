@@ -57,23 +57,23 @@ Cobertura global final: 82.76% linhas / 78.09% branches / 81.25% funções (248 
 
 **Este não é mais um débito interino:** o fallback "Geral" auto-criado é o design definitivo para o caso de borda "Request aprovada sem departamento definido" — não uma gambiarra temporária. `defaultDepartmentForOrg` deixou de ser chamado de dentro de `createTask` (onde era código morto, já que todo chamador agora fornece um valor real por construção) e passou a ser responsabilidade exclusiva de `approveRequest`, o único caller que legitimamente pode receber um `departmentId` ausente.
 
-## `GET /tasks` sem paginação (encontrado em 2026-09-22, revisão final do redesenho de Kanban)
+## `GET /tasks` sem paginação ⚠️ (mitigado em 2026-09-24, cursor completo ainda pendente)
 
-**Contexto:** o endpoint `listTasks`/`GET /tasks` (`apps/api/src/modules/tasks/tasks.service.ts`), que alimenta a tela "Tarefas" (lista + kanban dinâmico), retorna toda tarefa da organização de uma vez quando nenhum filtro é aplicado — sem `take`/cursor, sem limite de página. Não é um problema com o volume de dados atual, mas com ~50 clientes × 12 meses de tarefas recorrentes acumuladas, essa é a tela padrão que abre ao clicar em "Tarefas" no menu principal.
+**Contexto original:** o endpoint `listTasks`/`GET /tasks` (`apps/api/src/modules/tasks/tasks.service.ts`), que alimenta a tela "Tarefas" (lista + kanban dinâmico), retornava toda tarefa da organização de uma vez quando nenhum filtro era aplicado — sem `take`/cursor, sem limite de página.
 
-**Pendente:** adicionar paginação (cursor ou `take`/`skip`) ao `listTasks` e ao frontend (`apps/web/src/pages/app/Tasks.tsx`), ou pelo menos um filtro de data padrão (ex.: só mostrar `targetDate` dos últimos 3 meses) pra evitar que a query cresça sem limite. Revisitar quando o volume de tarefas por organização começar a aparecer em queries lentas.
+**Mitigado, não resolvido por completo:** adicionado um `limit` configurável na query (`?limit=`, padrão 200, teto 500) — a query nunca mais roda sem limite nenhum, mas ainda não há paginação de cursor real (sem `nextCursor`, sem "carregar mais" no frontend). Revisitar com paginação de cursor completa quando o volume de tarefas por organização começar a aparecer em queries lentas de verdade.
 
-## `GET /portal/tasks` não filtra `board.isActive` (encontrado em 2026-09-22, revisão final do redesenho de Kanban)
+## `GET /portal/tasks` não filtra `board.isActive` ✅ (resolvido em 2026-09-24)
 
-**Contexto:** o novo `listPortalTasks` (`apps/api/src/modules/portal/portal.service.ts`), que alimenta a tela de tarefas do cliente final no portal, não filtra tarefas cujo board pai está com `isActive: false` (soft-deletado) — diferente de outras queries scoped por board neste mesmo arquivo, que também têm essa mesma lacuna (ex.: `getTaskHistory`). Não é uma regressão desta feature, é um padrão pré-existente que só ficou mais visível com a nova tela.
+**Contexto original:** o novo `listPortalTasks` (`apps/api/src/modules/portal/portal.service.ts`) não filtrava tarefas cujo board pai está com `isActive: false` (soft-deletado) — mesma lacuna existia em `getTaskHistory`, no mesmo arquivo.
 
-**Pendente:** adicionar `board: { isActive: true }` ao `where` de `listPortalTasks` (e revisar as outras queries do mesmo arquivo com a mesma lacuna) pra garantir que um board arquivado nunca volte a aparecer pro cliente final.
+**Resolvido:** `board: { isActive: true }` adicionado ao `where` de ambas as funções (`listPortalTasks` e `getTaskHistory`). Testes adicionados em `portal.routes.test.ts` confirmando 404/exclusão pra tarefa de board arquivado.
 
-## Rótulo do status `BLOCKED` inconsistente na UI (encontrado em 2026-09-22, revisão final do redesenho de Kanban)
+## Rótulo do status `BLOCKED` inconsistente na UI ✅ (resolvido em 2026-09-24)
 
-**Contexto:** o mesmo valor de enum `BLOCKED` aparece como "Bloqueado" em `apps/web/src/pages/app/settings/OSTemplateForm.tsx` (seletor de tipo de coluna) e como "Com Impedimento" em `TaskDrawer`/`Tasks.tsx` (label oficial do status, já usado em produção antes desta feature). Puramente cosmético, baixa prioridade.
+**Contexto original:** o mesmo valor de enum `BLOCKED` aparecia como "Bloqueado" em `OSTemplateForm.tsx` e como "Com Impedimento" no resto da UI (`TaskDrawer`/`Tasks.tsx`).
 
-**Pendente:** padronizar para "Com Impedimento" (o rótulo já estabelecido) em `OSTemplateForm.tsx`.
+**Resolvido:** padronizado para "Com Impedimento" em `OSTemplateForm.tsx`.
 
 ## Não é possível limpar campo opcional de volta pra vazio em formulários de edição ✅ (resolvido em 2026-09-24)
 
@@ -85,4 +85,17 @@ Cobertura global final: 82.76% linhas / 78.09% branches / 81.25% funções (248 
 - `client-users.schema.ts` (`updateClientUserSchema`) + `ClientUserForm.tsx` — `phone` (payload de create/edit foi separado, já que o schema de create continua exigindo `undefined`, não `null`)
 - `os-templates.schema.ts` (`updateOSTemplateSchema`) + `OSTemplateForm.tsx` — `description` (mesma separação create/edit)
 
+## Helpers de teste geravam nome/e-mail único só com `Date.now()` ✅ (resolvido em 2026-09-25)
+
+**Contexto original:** `createTestDepartment`, `createTestUser` e `createTestClientUser` (`apps/api/src/test/helpers.ts`) usavam só `Date.now()` (granularidade de milissegundo) pra gerar nome/e-mail único — duas chamadas na mesma organização no mesmo milissegundo colidiam com `@@unique([organizationId, name])` (Department) ou e-mail único, muito mais provável sob o runner do CI (cobertura de código, timing diferente) do que localmente. Isso derrubava o job `test` do CI de forma intermitente.
+
+**Resolvido:** aplicado o mesmo padrão `Date.now()-contador` que `createTestOrg` já usava nos três helpers. Confirmado verde no CI depois (`gh run watch`).
+
+**Residual, baixo risco:** `createTestOrg`'s org "autohubs"/usuário "master" (linhas 98-108 do mesmo arquivo) ainda usam `Date.now()` puro, sem contador — mas são seeds chamados no máximo uma vez por arquivo de teste hoje, então o risco de colisão é baixo. Revisitar se algum teste futuro passar a chamá-los mais de uma vez na mesma execução.
+
+## `e2e-seed.ts` desatualizado em relação a duas migrations ✅ (resolvido em 2026-09-25)
+
+**Contexto original:** o seed usado pelos testes Playwright E2E (`apps/api/prisma/e2e-seed.ts`) ainda criava `Client` com `email`/`passwordHash` (removidos pela migration `20260921210000_client_users`, que introduziu `ClientUser` como entidade de login do portal) e colunas de board com `isFinal` (removido pela migration `20260922100000_kanban_os_foundation`, substituído por `statusEffect`). O job `e2e` do CI falhava direto no seed, antes de qualquer teste rodar.
+
+**Resolvido:** seed reescrito pra criar um `Department` "Geral", um `ClientUser` com as credenciais que os specs Playwright já esperavam, e um `ClientUserAccess` ligando cliente+departamento — replicando o fluxo real de login do portal. Testado localmente (seed roda 2x seguidas sem erro, 8/8 specs Playwright passam) e confirmado verde no CI.
 Todos os `services` correspondentes já espalhavam o body do Zod direto no `data` do `prisma.update`, então nenhuma mudança de lógica de service foi necessária — só o tipo do schema e o valor enviado pelo frontend. Teste adicionado em `clients.service.test.ts` confirmando que `codigo`/`notes` voltam a `null` quando enviados explicitamente como `null`. Suítes completas (API 421 testes, web 11 testes) passando.
