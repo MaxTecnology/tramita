@@ -26,8 +26,8 @@ export const DEFAULT_TEMPLATES: TemplateMap = {
     EMAIL: { subject: 'Prazo se aproximando — {{taskTitle}}', body: 'Olá, {{clientName}}!\n\nO processo *{{taskTitle}}* vence em {{dueDate}}.\n\nAcompanhe em: {{portalUrl}}' },
   },
   TASK_BLOCKED: {
-    WHATSAPP: { body: 'Olá, {{clientName}}! Seu processo *{{taskTitle}}* está impedido no momento.\n\nAcompanhe: {{portalUrl}}' },
-    EMAIL: { subject: 'Processo impedido — {{taskTitle}}', body: 'Olá, {{clientName}}!\n\nSeu processo *{{taskTitle}}* está impedido no momento.\n\nAcompanhe em: {{portalUrl}}' },
+    WHATSAPP: { body: 'Olá, {{clientName}}! A tarefa *{{taskTitle}}* está com impedimento e precisa da sua atenção.\n\nAcesse: {{portalUrl}}' },
+    EMAIL: { subject: 'Tarefa com impedimento — {{taskTitle}}', body: 'Olá, {{clientName}}!\n\nA tarefa *{{taskTitle}}* está com impedimento e precisa da sua atenção.\n\nAcesse: {{portalUrl}}' },
   },
   REQUEST_CREATED: {
     WHATSAPP: { body: 'Nova solicitação de {{clientName}}: *{{requestTitle}}*.' },

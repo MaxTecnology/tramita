@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import * as queue from '@/lib/queue'
 import { prisma } from '@/lib/prisma'
 import {
   moveTask,
@@ -488,5 +489,59 @@ describe('updateTask (status)', () => {
 
     const history = await prisma.taskHistory.findMany({ where: { taskId: task.id, action: 'status_changed' } })
     expect(history).toHaveLength(0)
+  })
+})
+
+describe('notifyIfBlocked (via moveTask e updateTask)', () => {
+  it('moveTask: notifica exatamente uma vez quando a coluna de destino é BLOCKED e tem documentos configurados', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const colA = await createTestColumn(board.id, { position: 0 })
+    const colB = await createTestColumn(board.id, { position: 1, statusEffect: 'BLOCKED' })
+    await prisma.columnDocument.create({ data: { columnId: colB.id, name: 'Contrato', position: 0 } })
+    const task = await createTestTask(colA.id, user.id)
+
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+    await moveTask(task.id, org.id, { columnId: colB.id, position: 0 }, { id: user.id, type: 'user' })
+
+    const blockedCalls = spy.mock.calls.filter((c) => (c[0] as { event: string }).event === 'TASK_BLOCKED')
+    expect(blockedCalls).toHaveLength(1)
+    spy.mockRestore()
+  })
+
+  it('updateTask: notifica quando o status é editado manualmente para BLOCKED', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+    await updateTask(task.id, org.id, { status: 'BLOCKED' }, { id: user.id, type: 'user' })
+
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ event: 'TASK_BLOCKED', taskId: task.id }))
+    spy.mockRestore()
+  })
+
+  it('updateTask: não notifica quando o status muda entre valores que não são BLOCKED', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+    await updateTask(task.id, org.id, { status: 'STARTED' }, { id: user.id, type: 'user' })
+
+    const blockedCalls = spy.mock.calls.filter((c) => (c[0] as { event: string }).event === 'TASK_BLOCKED')
+    expect(blockedCalls).toHaveLength(0)
+    spy.mockRestore()
   })
 })

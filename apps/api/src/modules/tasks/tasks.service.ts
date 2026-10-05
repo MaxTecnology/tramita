@@ -3,7 +3,7 @@ import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
 import { publishBoardEvent } from '@/lib/sse'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
-import { recalculateTaskStatus } from '@/modules/task-documents/task-documents.service'
+import { recalculateTaskStatus, notifyIfBlocked } from '@/modules/task-documents/task-documents.service'
 import { Prisma } from '@prisma/client'
 import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, ListTasksQuery } from './tasks.schema'
 
@@ -194,6 +194,8 @@ export async function moveTask(
     })
   }
 
+  await notifyIfBlocked(taskId, task.status, nextStatus, toColumn.board.clientId, organizationId)
+
   await publishBoardEvent(toColumn.board.id, {
     event: 'task:moved',
     data: { taskId, fromColumn: fromColumn.id, toColumn: data.columnId, position: data.position },
@@ -334,6 +336,10 @@ export async function updateTask(
 
     return result
   })
+
+  if (data.status !== undefined) {
+    await notifyIfBlocked(id, task.status, data.status, task.column.board.clientId, organizationId)
+  }
 
   await publishBoardEvent(task.column.board.id, {
     event: 'task:updated',

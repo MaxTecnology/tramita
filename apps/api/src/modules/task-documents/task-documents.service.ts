@@ -188,6 +188,28 @@ export async function deliverDocument(
   return updated
 }
 
+// Ponto único de disparo da notificação TASK_BLOCKED — chamado por recalculateTaskStatus (abaixo,
+// quando um documento pendente/rejeitado bloqueia a tarefa) e por tasks.service.ts's moveTask/
+// updateTask (os outros dois — e únicos outros, confirmado por varredura do código inteiro — pontos
+// que escrevem Task.status). Só dispara na transição DE ENTRADA em BLOCKED, nunca em edições
+// subsequentes enquanto já está bloqueada, nunca ao sair de BLOCKED.
+export async function notifyIfBlocked(
+  taskId: string,
+  previousStatus: TaskStatus,
+  newStatus: TaskStatus,
+  clientId: string,
+  organizationId: string,
+): Promise<void> {
+  if (newStatus !== 'BLOCKED' || previousStatus === 'BLOCKED') return
+  await enqueueNotification({
+    event: 'TASK_BLOCKED',
+    organizationId,
+    clientId,
+    taskId,
+    metadata: {},
+  })
+}
+
 export async function recalculateTaskStatus(taskId: string) {
   const task = await prisma.task.findUniqueOrThrow({
     where: { id: taskId },
@@ -195,6 +217,7 @@ export async function recalculateTaskStatus(taskId: string) {
       documentRequirements: true,
       deliverables: true,
       recurringTemplate: { select: { autoCompleteOnAllActivitiesDone: true } },
+      column: { select: { board: { select: { clientId: true, organizationId: true } } } },
     },
   })
 
@@ -231,5 +254,7 @@ export async function recalculateTaskStatus(taskId: string) {
         },
       }),
     ])
+
+    await notifyIfBlocked(taskId, task.status, nextStatus, task.column.board.clientId, task.column.board.organizationId)
   }
 }

@@ -15,6 +15,7 @@ const EVENT_FLAG_MAP: Record<string, keyof NotificationConfig> = {
   TASK_COMPLETED: 'taskCompleted',
   TASK_COMMENT_ADDED: 'commentAdded',
   TASK_DUE_DATE_APPROACHING: 'dueDateAlert',
+  TASK_BLOCKED: 'taskBlocked',
   REQUEST_CREATED: 'requestCreated',
   REQUEST_APPROVED: 'requestApproved',
   REQUEST_REJECTED: 'requestRejected',

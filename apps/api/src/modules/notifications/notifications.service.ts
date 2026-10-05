@@ -26,6 +26,7 @@ export async function getConfig(organizationId: string) {
       requestCreated: true,
       requestApproved: true,
       requestRejected: true,
+      taskBlocked: true,
       saveOnTicket: true,
       startChatbot: true,
       createdAt: true,

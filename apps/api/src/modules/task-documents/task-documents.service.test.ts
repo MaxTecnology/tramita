@@ -187,3 +187,59 @@ describe('verifyTaskAccess (visibilidade no portal)', () => {
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 })
+
+describe('notifyIfBlocked (via recalculateTaskStatus)', () => {
+  it('enfileira TASK_BLOCKED quando um documento pendente bloqueia a tarefa', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.taskDocumentRequirement.create({ data: { taskId: task.id, name: 'Contrato', position: 0 } })
+
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+    await recalculateTaskStatus(task.id)
+
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ event: 'TASK_BLOCKED', taskId: task.id }))
+    spy.mockRestore()
+  })
+
+  it('não notifica de novo se a tarefa já estava BLOCKED', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { status: 'BLOCKED' } })
+    await prisma.taskDocumentRequirement.create({ data: { taskId: task.id, name: 'Contrato', position: 0 } })
+
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+    await recalculateTaskStatus(task.id)
+
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it('não notifica ao resolver o impedimento (BLOCKED -> OPEN)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { status: 'BLOCKED' } })
+    const req = await prisma.taskDocumentRequirement.create({ data: { taskId: task.id, name: 'Contrato', position: 0 } })
+    await prisma.taskDocumentRequirement.update({ where: { id: req.id }, data: { status: 'APPROVED' } })
+
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+    await recalculateTaskStatus(task.id)
+
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+})

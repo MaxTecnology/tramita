@@ -104,3 +104,56 @@ describe('processNotificationJob — Column.notifyClient forceChannels', () => {
     expect(maximizebot.sendWhatsApp).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('processNotificationJob — TASK_BLOCKED respeita config.taskBlocked', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  async function setupTaskBlocked(taskBlocked: boolean) {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    await prisma.client.update({ where: { id: client.id }, data: { whatsapp: '5511999999999' } })
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, user.id)
+
+    await prisma.notificationConfig.create({
+      data: {
+        organizationId: org.id,
+        whatsappEnabled: true,
+        emailEnabled: true,
+        taskBlocked,
+        maximizebotToken: 'Bearer fake-token',
+      },
+    })
+
+    return { org, client, task }
+  }
+
+  it('envia TASK_BLOCKED quando config.taskBlocked está ligado', async () => {
+    const { org, client, task } = await setupTaskBlocked(true)
+
+    await processNotificationJob({
+      data: { event: 'TASK_BLOCKED', organizationId: org.id, clientId: client.id, taskId: task.id, metadata: {} },
+    })
+
+    expect(maximizebot.sendWhatsApp).toHaveBeenCalledTimes(1)
+    const logs = await prisma.notificationLog.findMany({ where: { taskId: task.id, event: 'TASK_BLOCKED' } })
+    expect(logs.some((l) => l.channel === 'WHATSAPP' && l.status === 'SENT')).toBe(true)
+  })
+
+  it('não envia nada quando config.taskBlocked está desligado — nunca usa forceChannels pra contornar', async () => {
+    const { org, client, task } = await setupTaskBlocked(false)
+
+    await processNotificationJob({
+      data: { event: 'TASK_BLOCKED', organizationId: org.id, clientId: client.id, taskId: task.id, metadata: {} },
+    })
+
+    expect(maximizebot.sendWhatsApp).not.toHaveBeenCalled()
+    const logs = await prisma.notificationLog.findMany({ where: { taskId: task.id, event: 'TASK_BLOCKED' } })
+    expect(logs).toHaveLength(0)
+  })
+})

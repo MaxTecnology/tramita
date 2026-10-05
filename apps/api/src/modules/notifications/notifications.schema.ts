@@ -13,6 +13,7 @@ export const updateConfigSchema = z.object({
   requestCreated: z.boolean().optional(),
   requestApproved: z.boolean().optional(),
   requestRejected: z.boolean().optional(),
+  taskBlocked: z.boolean().optional(),
   maximizebotToken: z.string().optional(),
   saveOnTicket: z.boolean().optional(),
   startChatbot: z.boolean().optional(),
