@@ -398,7 +398,13 @@ export async function listTasks(
 
   if (actor.role === 'ORG_MEMBER') where.assigneeId = actor.id
 
-  return prisma.task.findMany({
+  const limit = Math.min(query.limit ?? DEFAULT_LIST_TASKS_LIMIT, MAX_LIST_TASKS_LIMIT)
+
+  // targetDate não é único — duas tarefas podem compartilhar a mesma data (ou ambas serem null).
+  // orderBy só por targetDate tornaria o cursor ambíguo entre linhas empatadas (poderia pular ou
+  // repetir uma tarefa ao virar a página); id como critério secundário garante uma ordem total
+  // estável, que é o que o cursor em si (um id único) exige pra funcionar corretamente.
+  const rows = await prisma.task.findMany({
     where,
     select: {
       id: true,
@@ -424,11 +430,16 @@ export async function listTasks(
       assignee: { select: { id: true, name: true } },
       column: { select: { board: { select: { id: true, clientId: true, client: { select: { id: true, name: true, codigo: true } } } } } },
     },
-    orderBy: { targetDate: 'asc' },
-    // Sem filtro, essa query varreria toda tarefa da org — DEFAULT_LIMIT protege contra isso até
-    // que paginação de verdade (cursor) seja implementada; ver docs/tech-debt.md.
-    take: Math.min(query.limit ?? DEFAULT_LIST_TASKS_LIMIT, MAX_LIST_TASKS_LIMIT),
+    orderBy: [{ targetDate: 'asc' }, { id: 'asc' }],
+    take: limit + 1,
+    ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
   })
+
+  const hasMore = rows.length > limit
+  const items = hasMore ? rows.slice(0, limit) : rows
+  const nextCursor = hasMore ? items[items.length - 1].id : null
+
+  return { items, nextCursor }
 }
 
 export async function getTaskHistory(taskId: string, organizationId: string) {

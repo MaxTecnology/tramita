@@ -128,8 +128,9 @@ describe('GET /tasks', () => {
     })
 
     expect(res.statusCode).toBe(200)
-    const body = JSON.parse(res.body) as Array<{ id: string }>
-    expect(body.map((t) => t.id)).toEqual([taskA.id])
+    const body = JSON.parse(res.body) as { items: Array<{ id: string }>; nextCursor: string | null }
+    expect(body.items.map((t) => t.id)).toEqual([taskA.id])
+    expect(body.nextCursor).toBeNull()
   })
 
   it('filtra por recurringTemplateId — retorna tarefas recorrentes (board de sistema) de clientes diferentes', async () => {
@@ -167,9 +168,12 @@ describe('GET /tasks', () => {
     })
 
     expect(res.statusCode).toBe(200)
-    const body = JSON.parse(res.body) as Array<{ id: string; column: { board: { clientId: string } } }>
-    expect(body).toHaveLength(2)
-    const clientIds = body.map((t) => t.column.board.clientId).sort()
+    const body = JSON.parse(res.body) as {
+      items: Array<{ id: string; column: { board: { clientId: string } } }>
+      nextCursor: string | null
+    }
+    expect(body.items).toHaveLength(2)
+    const clientIds = body.items.map((t) => t.column.board.clientId).sort()
     expect(clientIds).toEqual([clientA.id, clientB.id].sort())
   })
 
@@ -194,8 +198,8 @@ describe('GET /tasks', () => {
     })
 
     expect(res.statusCode).toBe(200)
-    const body = JSON.parse(res.body) as Array<{ id: string }>
-    expect(body.map((t) => t.id)).toEqual([ownTask.id])
+    const body = JSON.parse(res.body) as { items: Array<{ id: string }>; nextCursor: string | null }
+    expect(body.items.map((t) => t.id)).toEqual([ownTask.id])
   })
 
   it('combina filtros status + departmentId', async () => {
@@ -225,8 +229,8 @@ describe('GET /tasks', () => {
     })
 
     expect(res.statusCode).toBe(200)
-    const body = JSON.parse(res.body) as Array<{ id: string }>
-    expect(body.map((t) => t.id)).toEqual([match.id])
+    const body = JSON.parse(res.body) as { items: Array<{ id: string }>; nextCursor: string | null }
+    expect(body.items.map((t) => t.id)).toEqual([match.id])
   })
 
   it('respeita o parâmetro limit e nunca excede o teto máximo', async () => {
@@ -248,7 +252,9 @@ describe('GET /tasks', () => {
       headers: { authorization: auth },
     })
     expect(limited.statusCode).toBe(200)
-    expect((JSON.parse(limited.body) as unknown[]).length).toBe(2)
+    const limitedBody = JSON.parse(limited.body) as { items: unknown[]; nextCursor: string | null }
+    expect(limitedBody.items.length).toBe(2)
+    expect(limitedBody.nextCursor).not.toBeNull()
 
     const overCap = await app.inject({
       method: 'GET',
@@ -256,5 +262,35 @@ describe('GET /tasks', () => {
       headers: { authorization: auth },
     })
     expect(overCap.statusCode).toBe(400)
+  })
+
+  it('pagina com cursor — percorre todas as tarefas sem pular ou repetir nenhuma', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const created = []
+    for (let i = 0; i < 5; i++) {
+      created.push(await createTestTask(col.id, user.id, { title: `Tarefa ${i}` }))
+    }
+
+    const auth = await getAuthHeader(user.email, 'Test@1234')
+    const seenIds: string[] = []
+    let cursor: string | null = null
+
+    for (let page = 0; page < 10; page++) {
+      const url = cursor ? `/tasks?limit=2&cursor=${cursor}` : '/tasks?limit=2'
+      const res = await app.inject({ method: 'GET', url, headers: { authorization: auth } })
+      expect(res.statusCode).toBe(200)
+      const body = JSON.parse(res.body) as { items: Array<{ id: string }>; nextCursor: string | null }
+      seenIds.push(...body.items.map((t) => t.id))
+      cursor = body.nextCursor
+      if (!cursor) break
+    }
+
+    expect(seenIds.sort()).toEqual(created.map((t) => t.id).sort())
+    expect(new Set(seenIds).size).toBe(created.length)
   })
 })

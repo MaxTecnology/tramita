@@ -62,11 +62,15 @@ Teste E2E (`org-board.spec.ts`) atualizado pra afirmar diretamente no heading do
 
 **Este não é mais um débito interino:** o fallback "Geral" auto-criado é o design definitivo para o caso de borda "Request aprovada sem departamento definido" — não uma gambiarra temporária. `defaultDepartmentForOrg` deixou de ser chamado de dentro de `createTask` (onde era código morto, já que todo chamador agora fornece um valor real por construção) e passou a ser responsabilidade exclusiva de `approveRequest`, o único caller que legitimamente pode receber um `departmentId` ausente.
 
-## `GET /tasks` sem paginação ⚠️ (mitigado em 2026-09-24, cursor completo ainda pendente)
+## `GET /tasks` sem paginação ✅ (resolvido com cursor completo em 2026-10-05)
 
-**Contexto original:** o endpoint `listTasks`/`GET /tasks` (`apps/api/src/modules/tasks/tasks.service.ts`), que alimenta a tela "Tarefas" (lista + kanban dinâmico), retornava toda tarefa da organização de uma vez quando nenhum filtro era aplicado — sem `take`/cursor, sem limite de página.
+**Contexto original:** o endpoint `listTasks`/`GET /tasks` (`apps/api/src/modules/tasks/tasks.service.ts`), que alimenta a tela "Tarefas" (lista + kanban dinâmico), retornava toda tarefa da organização de uma vez quando nenhum filtro era aplicado — sem `take`/cursor, sem limite de página. Mitigado em 2026-09-24 com um `limit` fixo (sem cursor real).
 
-**Mitigado, não resolvido por completo:** adicionado um `limit` configurável na query (`?limit=`, padrão 200, teto 500) — a query nunca mais roda sem limite nenhum, mas ainda não há paginação de cursor real (sem `nextCursor`, sem "carregar mais" no frontend). Revisitar com paginação de cursor completa quando o volume de tarefas por organização começar a aparecer em queries lentas de verdade.
+**Resolvido por completo:** `listTasks` agora pagina por cursor de verdade — `orderBy: [{ targetDate: 'asc' }, { id: 'asc' }]` (`id` como critério secundário pra garantir ordem total estável, já que `targetDate` não é único/pode ser null), busca `limit + 1` linhas pra saber se há próxima página sem uma segunda query, e retorna `{ items, nextCursor }` em vez de um array solto — **mudança de contrato da resposta**, não só um parâmetro novo. Schema ganhou `cursor: z.string().cuid().optional()`.
+
+Frontend (`Tasks.tsx`) migrado de `useQuery` pra `useInfiniteQuery` (`@tanstack/react-query` v5), com botão "Carregar mais" que chama `fetchNextPage()` — visível em ambos os modos (Lista e Kanban), já que os dois derivam do mesmo array acumulado de páginas.
+
+Testes atualizados pra ler `.items`/`.nextCursor` em vez do array direto, mais um teste novo que percorre todas as páginas com `limit=2` e confirma que nenhuma tarefa é pulada ou repetida. Suíte completa (423 testes API / 11 web / 8 E2E) verde depois da mudança de contrato.
 
 ## `GET /portal/tasks` não filtra `board.isActive` ✅ (resolvido em 2026-09-24)
 

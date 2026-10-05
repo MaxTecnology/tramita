@@ -47,6 +47,7 @@ export const listTasksQuerySchema = z.object({
   dateTo: z.string().datetime().optional(),
   q: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
+  cursor: z.string().cuid().optional(),
 })
 
 export type CreateTaskBody = z.infer<typeof createTaskSchema>

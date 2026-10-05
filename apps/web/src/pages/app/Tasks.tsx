@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
   DragEndEvent,
@@ -198,9 +198,16 @@ export default function Tasks() {
 
   const filters = { clientId, assigneeId, departmentId, recurringTemplateId, status, dateFrom, dateTo, search }
 
-  const { data: tasks = [], isLoading } = useQuery<TaskListItem[]>({
+  const {
+    data: tasksPages,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<{ items: TaskListItem[]; nextCursor: string | null }>({
     queryKey: ['tasks', filters],
-    queryFn: () => {
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => {
       const params: Record<string, string> = {}
       if (clientId) params.clientId = clientId
       if (assigneeId) params.assigneeId = assigneeId
@@ -210,9 +217,13 @@ export default function Tasks() {
       if (search.trim()) params.q = search.trim()
       if (dateFrom) params.dateFrom = new Date(`${dateFrom}T00:00:00Z`).toISOString()
       if (dateTo) params.dateTo = new Date(`${dateTo}T23:59:59Z`).toISOString()
+      if (pageParam) params.cursor = pageParam as string
       return api.get('/tasks', { params }).then((r) => r.data)
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   })
+
+  const tasks = useMemo(() => tasksPages?.pages.flatMap((p) => p.items) ?? [], [tasksPages])
 
   const selectedTask = selectedTaskId ? tasks.find((t) => t.id === selectedTaskId) ?? null : null
 
@@ -417,6 +428,19 @@ export default function Tasks() {
               {activeTask ? <DraggableTaskCard task={activeTask} onClick={() => {}} /> : null}
             </DragOverlay>
           </DndContext>
+        )}
+
+        {!isLoading && hasNextPage && (
+          <div className="flex justify-center mt-4">
+            <button
+              type="button"
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg px-4 py-2 bg-surface disabled:opacity-50"
+            >
+              {isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
+            </button>
+          </div>
         )}
       </div>
 
