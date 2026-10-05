@@ -15,6 +15,7 @@ interface Config {
   taskCompleted?: boolean
   commentAdded?: boolean
   dueDateAlert?: boolean
+  taskBlocked?: boolean
   maximizebotToken?: string        // write-only: sent on save, never returned by API
   maximizebotTokenPreview?: string | null  // read-only: masked preview returned by API
 }
@@ -34,6 +35,7 @@ const EVENT_LABEL: Record<string, string> = {
   TASK_COMPLETED: 'Tarefa concluída',
   TASK_COMMENT_ADDED: 'Comentário adicionado',
   TASK_DUE_DATE_APPROACHING: 'Prazo se aproximando',
+  TASK_BLOCKED: 'Tarefa com impedimento',
   RECURRING_GENERATION_FAILED: 'Falha na geração de tarefa recorrente',
   DOCUMENT_REJECTED: 'Documento rejeitado',
 }
@@ -214,6 +216,12 @@ export default function Notifications() {
               description="Notifica 24h antes do vencimento"
               checked={form.dueDateAlert ?? false}
               onChange={(v) => setForm({ ...form, dueDateAlert: v })}
+            />
+            <SwitchRow
+              label="Tarefa com impedimento"
+              description="Notifica o cliente quando uma tarefa dele fica com impedimento"
+              checked={form.taskBlocked ?? false}
+              onChange={(v) => setForm({ ...form, taskBlocked: v })}
             />
           </Section>
 
