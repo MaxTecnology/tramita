@@ -8,11 +8,11 @@ export interface CalendarTaskLike {
   status: Task['status']
 }
 
-export interface CalendarDay {
+export interface CalendarDay<T extends CalendarTaskLike = CalendarTaskLike> {
   dateKey: string
   dayOfMonth: number
   isCurrentMonth: boolean
-  tasks: CalendarTaskLike[]
+  tasks: T[]
 }
 
 function gridLeadingDays(month: Date): { year: number; monthIndex: number; firstWeekday: number; daysInMonth: number } {
@@ -37,7 +37,7 @@ export function getCalendarGridRange(month: Date): { from: string; to: string } 
 /** Agrupa `tasks` por dia (via targetDate, com fallback pra dueDate) numa grade de semanas
  * completas cobrindo `month`. Tarefa sem nenhuma das duas datas, ou com status DISREGARDED, não
  * aparece em dia nenhum. */
-export function buildCalendarGrid<T extends CalendarTaskLike>(tasks: T[], month: Date): CalendarDay[] {
+export function buildCalendarGrid<T extends CalendarTaskLike>(tasks: T[], month: Date): CalendarDay<T>[] {
   const { year, monthIndex, firstWeekday, daysInMonth } = gridLeadingDays(month)
   const totalCells = Math.ceil((firstWeekday + daysInMonth) / 7) * 7
 
@@ -52,7 +52,7 @@ export function buildCalendarGrid<T extends CalendarTaskLike>(tasks: T[], month:
     byDateKey.set(key, list)
   }
 
-  const days: CalendarDay[] = []
+  const days: CalendarDay<T>[] = []
   for (let i = 0; i < totalCells; i++) {
     const current = new Date(Date.UTC(year, monthIndex, 1 - firstWeekday + i))
     const key = utcDateKey(current)

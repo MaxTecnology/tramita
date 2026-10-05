@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
@@ -11,12 +11,13 @@ import {
   useDroppable,
   useDraggable,
 } from '@dnd-kit/core'
-import { List, LayoutGrid, Inbox } from 'lucide-react'
+import { List, LayoutGrid, Inbox, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { TaskDrawer, STATUS_LABEL, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR } from '@/components/shared/TaskDrawer'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
+import { buildCalendarGrid, getCalendarGridRange } from './tasksCalendar'
 import type { Task, User, Department, RecurringTaskTemplate } from '@/types'
 
 // GET /tasks retorna uma listagem flat de tarefas cruzando todos os boards da org (inclusive o
@@ -41,7 +42,7 @@ interface ClientOption {
   codigo?: string
 }
 
-type ViewMode = 'list' | 'kanban'
+type ViewMode = 'list' | 'kanban' | 'calendar'
 
 const STATUS_ORDER: Task['status'][] = ['OPEN', 'STARTED', 'BLOCKED', 'DISREGARDED', 'DONE']
 
@@ -158,6 +159,124 @@ function DraggableTaskCard({ task, onClick }: { task: TaskListItem; onClick: () 
   )
 }
 
+const MONTH_LABEL = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const MAX_VISIBLE_PER_DAY = 2
+
+function CalendarView({
+  tasks,
+  month,
+  onPrevMonth,
+  onNextMonth,
+  onToday,
+  onTaskClick,
+}: {
+  tasks: TaskListItem[]
+  month: Date
+  onPrevMonth: () => void
+  onNextMonth: () => void
+  onToday: () => void
+  onTaskClick: (taskId: string) => void
+}) {
+  const [expandedDay, setExpandedDay] = useState<string | null>(null)
+  const grid = useMemo(() => buildCalendarGrid<TaskListItem>(tasks, month), [tasks, month])
+  const tasksByDateKey = useMemo(() => {
+    const map = new Map<string, TaskListItem[]>()
+    for (const day of grid) map.set(day.dateKey, day.tasks)
+    return map
+  }, [grid])
+
+  return (
+    <div className="bg-surface border border-border rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-neutral-bg">
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={onPrevMonth} className="p-1 rounded hover:bg-surface text-muted-foreground hover:text-foreground">
+            <ChevronLeft size={16} />
+          </button>
+          <button type="button" onClick={onNextMonth} className="p-1 rounded hover:bg-surface text-muted-foreground hover:text-foreground">
+            <ChevronRight size={16} />
+          </button>
+          <button type="button" onClick={onToday} className="ml-1 text-xs text-muted-foreground hover:text-foreground underline">
+            Hoje
+          </button>
+        </div>
+        <span className="text-sm font-semibold text-foreground capitalize">{MONTH_LABEL.format(month)}</span>
+        <div className="w-16" />
+      </div>
+
+      <div className="grid grid-cols-7">
+        {WEEKDAY_LABELS.map((w) => (
+          <div key={w} className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-center py-1.5 border-b border-border">
+            {w}
+          </div>
+        ))}
+        {grid.map((day) => {
+          const dayTasks = tasksByDateKey.get(day.dateKey) ?? []
+          const visible = dayTasks.slice(0, MAX_VISIBLE_PER_DAY)
+          const extra = dayTasks.length - visible.length
+          return (
+            <div
+              key={day.dateKey}
+              className={cn(
+                'min-h-[90px] border-b border-r border-border p-1.5 relative',
+                !day.isCurrentMonth && 'bg-neutral-bg/40',
+              )}
+            >
+              <span className={cn('text-xs', day.isCurrentMonth ? 'text-foreground' : 'text-muted-foreground')}>
+                {day.dayOfMonth}
+              </span>
+              <div className="flex flex-col gap-1 mt-1">
+                {visible.map((task) => (
+                  <button
+                    key={task.id}
+                    type="button"
+                    onClick={() => onTaskClick(task.id)}
+                    className="text-left text-[11px] leading-tight px-1.5 py-1 rounded bg-neutral-bg hover:bg-border truncate"
+                  >
+                    <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1', STATUS_COLOR[task.status])} />
+                    {task.title}
+                  </button>
+                ))}
+                {extra > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedDay(day.dateKey)}
+                    className="text-left text-[11px] text-muted-foreground hover:text-foreground px-1.5"
+                  >
+                    +{extra} mais
+                  </button>
+                )}
+              </div>
+
+              {expandedDay === day.dateKey && (
+                <div className="absolute z-10 top-full left-0 mt-1 w-56 bg-surface border border-border rounded-lg shadow-lg p-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-foreground">{day.dayOfMonth} — todas as tarefas</span>
+                    <button type="button" onClick={() => setExpandedDay(null)} className="text-muted-foreground hover:text-foreground text-xs">✕</button>
+                  </div>
+                  <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+                    {dayTasks.map((task) => (
+                      <button
+                        key={task.id}
+                        type="button"
+                        onClick={() => { onTaskClick(task.id); setExpandedDay(null) }}
+                        className="text-left text-xs px-1.5 py-1 rounded hover:bg-neutral-bg truncate"
+                      >
+                        <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1', STATUS_COLOR[task.status])} />
+                        {task.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function Tasks() {
   const { user } = useAuth()
   const qc = useQueryClient()
@@ -166,6 +285,7 @@ export default function Tasks() {
   // TaskDrawer sempre reflita a tarefa atual depois de uma edição, não um snapshot do clique.
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [activeTask, setActiveTask] = useState<TaskListItem | null>(null)
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date())
 
   const [clientId, setClientId] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
@@ -175,6 +295,16 @@ export default function Tasks() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [search, setSearch] = useState('')
+
+  // No modo Calendário, a navegação de mês É o filtro de data — substitui dateFrom/dateTo pela
+  // janela da grade inteira (inclui dias do mês vizinho visíveis). Voltar pra Lista/Kanban depois
+  // mantém esse intervalo (comportamento aceitável: os três modos compartilham o mesmo filtro).
+  useEffect(() => {
+    if (view !== 'calendar') return
+    const { from, to } = getCalendarGridRange(calendarMonth)
+    setDateFrom(from)
+    setDateTo(to)
+  }, [view, calendarMonth])
 
   const { data: clients = [] } = useQuery<ClientOption[]>({
     queryKey: ['clients'],
@@ -318,6 +448,17 @@ export default function Tasks() {
             <LayoutGrid size={14} />
             Kanban
           </button>
+          <button
+            type="button"
+            onClick={() => setView('calendar')}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors',
+              view === 'calendar' ? 'bg-surface text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <CalendarIcon size={14} />
+            Calendário
+          </button>
         </div>
       </div>
 
@@ -355,20 +496,24 @@ export default function Tasks() {
             <option key={s} value={s}>{STATUS_LABEL[s]}</option>
           ))}
         </FilterSelect>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          title="Meta de"
-          className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-        />
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          title="Meta até"
-          className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-        />
+        {view !== 'calendar' && (
+          <>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              title="Meta de"
+              className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            />
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              title="Meta até"
+              className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            />
+          </>
+        )}
         {hasFilters && (
           <button type="button" onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground underline">
             Limpar
@@ -379,6 +524,15 @@ export default function Tasks() {
       <div className="flex-1 overflow-auto p-4 md:p-6">
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando tarefas...</p>
+        ) : view === 'calendar' ? (
+          <CalendarView
+            tasks={tasks}
+            month={calendarMonth}
+            onPrevMonth={() => setCalendarMonth((m) => new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() - 1, 1)))}
+            onNextMonth={() => setCalendarMonth((m) => new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1)))}
+            onToday={() => setCalendarMonth(new Date())}
+            onTaskClick={(taskId) => setSelectedTaskId(taskId)}
+          />
         ) : tasks.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhuma tarefa encontrada.</p>
         ) : view === 'list' ? (
