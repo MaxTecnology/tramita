@@ -48,12 +48,13 @@ Teste E2E (`org-board.spec.ts`) atualizado pra afirmar diretamente no heading do
 
 **Pendente:** se este repositório for implantado em um ambiente com dados reais em `client_assignments` antes de uma reescrita, a migration falhará. Nesse caso, ela precisa ser reescrita com um passo de backfill de `departmentId` antes de adicionar a constraint `NOT NULL`.
 
-## Departamentos — itens parqueados na revisão de 2026-09-20
+## Departamentos — itens parqueados na revisão de 2026-09-20 ✅ (resolvidos em 2026-10-05)
 
-**Contexto:** revisão de branch completa do feature de Departamentos (responsabilidade por departamento) encontrou dois itens Medium considerados de baixo risco no volume atual de dados, parqueados deliberadamente em vez de corrigidos junto com os Important:
+**Contexto original:** revisão de branch completa do feature de Departamentos encontrou dois itens Medium considerados de baixo risco no volume atual de dados, parqueados deliberadamente em vez de corrigidos junto com os Important.
 
-- Falta `@@index([departmentId])` em `Task` e `Request` no `schema.prisma` — sem problema no volume de dados atual; revisitar se queries filtradas por departamento aparecerem em logs de slow query.
-- `updateTask` em `tasks.service.ts` não grava uma entrada de `TaskHistory` quando `departmentId` muda (diferente de `priority`/`assigneeId`) — decisão explícita e revisada para esta fase (2a); estender quando o item 2c/2d do roadmap (motor de recorrência / modelo de status expandido) tocar essa função novamente.
+**Resolvidos:**
+- `@@index([departmentId])` adicionado em `Task` e `Request` (`schema.prisma` + migration `20261005200000_task_request_department_indexes`), aplicada em dev e teste.
+- `updateTask` em `tasks.service.ts` agora grava `TaskHistory` (action `department_changed`, `fromValue`/`toValue` = ids dos departamentos) quando `departmentId` muda, só quando o valor muda de verdade — mesmo padrão já usado por `priority_changed`/`assigned_to`. Label `department_changed` adicionado em `TaskDrawer.tsx`'s `ACTION_LABELS`. Teste adicionado confirmando o registro único (não duplica em updates repetidos com o mesmo valor).
 
 ## `approveRequest` cai num departamento "Geral" auto-criado quando a Request de origem não tem departamento ✅ (design final, fechado em 2026-09-21)
 

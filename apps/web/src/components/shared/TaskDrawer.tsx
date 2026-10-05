@@ -28,6 +28,7 @@ const ACTION_LABELS: Record<string, string> = {
   status_changed: 'alterou status para',
   priority_changed: 'alterou prioridade para',
   assigned_to: 'alterou responsável para',
+  department_changed: 'alterou departamento para',
 }
 
 function formatHistoryAction(h: TaskHistory): string {

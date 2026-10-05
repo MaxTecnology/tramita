@@ -280,6 +280,32 @@ describe('updateTask', () => {
     expect(history).toBeNull()
   })
 
+  it('records department_changed history only when departmentId actually changes', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const deptA = await createTestDepartment(org.id)
+    const deptB = await createTestDepartment(org.id)
+    const task = await createTestTask(col.id, user.id, { departmentId: deptA.id })
+
+    await updateTask(task.id, org.id, { departmentId: deptB.id }, { id: user.id, type: 'user' })
+
+    const history = await prisma.taskHistory.findFirst({
+      where: { taskId: task.id, action: 'department_changed' },
+    })
+    expect(history?.fromValue).toBe(deptA.id)
+    expect(history?.toValue).toBe(deptB.id)
+
+    await updateTask(task.id, org.id, { departmentId: deptB.id }, { id: user.id, type: 'user' })
+    const historyCount = await prisma.taskHistory.count({
+      where: { taskId: task.id, action: 'department_changed' },
+    })
+    expect(historyCount).toBe(1)
+  })
+
   it('clears dueDate when explicitly set to null', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

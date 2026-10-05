@@ -283,6 +283,13 @@ export async function updateTask(
       toValue: data.assigneeId ?? undefined,
     })
   }
+  if (data.departmentId !== undefined && data.departmentId !== task.departmentId) {
+    historyEntries.push({
+      action: 'department_changed',
+      fromValue: task.departmentId,
+      toValue: data.departmentId,
+    })
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.task.update({

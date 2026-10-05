@@ -263,6 +263,7 @@ model Request {
   attachments  RequestAttachment[]
 
   @@index([organizationId, status])
+  @@index([departmentId])
   @@map("requests")
 }
 
@@ -356,6 +357,7 @@ model Task {
   @@index([title])
   @@index([competence])
   @@index([targetDate])
+  @@index([departmentId])
   @@map("tasks")
 }
 
