@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { TemplateEditor } from '@/components/TemplateEditor'
 
-const EVENTS = ['TASK_CREATED', 'TASK_MOVED', 'TASK_COMPLETED', 'TASK_COMMENT_ADDED', 'TASK_DUE_DATE_APPROACHING'] as const
+const EVENTS = ['TASK_CREATED', 'TASK_MOVED', 'TASK_COMPLETED', 'TASK_COMMENT_ADDED', 'TASK_DUE_DATE_APPROACHING', 'TASK_BLOCKED'] as const
 const CHANNELS = ['WHATSAPP', 'EMAIL'] as const
 
 const EVENT_LABEL: Record<string, string> = {
@@ -10,6 +10,7 @@ const EVENT_LABEL: Record<string, string> = {
   TASK_COMPLETED: 'Tarefa concluída',
   TASK_COMMENT_ADDED: 'Comentário adicionado',
   TASK_DUE_DATE_APPROACHING: 'Prazo se aproximando',
+  TASK_BLOCKED: 'Tarefa com impedimento',
 }
 
 export default function Templates() {
