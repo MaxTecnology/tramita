@@ -121,3 +121,22 @@ customizada, só o template padrão do sistema.
 **Pendente:** nivelar todos os eventos de `NotificationEvent` ao mesmo padrão de controle (toggle em
 `Notifications.tsx` + entrada em `updateConfigSchema` + editor em `Templates.tsx`) que
 `taskMoved`/`taskCompleted`/`commentAdded`/`dueDateAlert`/`taskBlocked` já têm.
+
+## `notification.worker.ts` não filtra o envio de WhatsApp por `task.visibleToClient` (encontrado em 2026-10-05, revisão da spec de calendário/impedimento)
+
+**Contexto:** o branch de envio de email do worker (`apps/api/src/workers/notification.worker.ts`) já
+pula o envio quando `task.visibleToClient === false` (tarefa marcada como controle interno, nunca
+visível no portal), mas o branch de WhatsApp não tem essa checagem — manda a mensagem pro cliente
+mesmo quando a tarefa referenciada não existe pra ele no portal. Isso é pré-existente a este feature
+(afeta `TASK_CREATED`, `TASK_MOVED`, `TASK_COMPLETED`, `DOCUMENT_REJECTED`, etc. — qualquer evento com
+`taskId`), não foi introduzido por ele.
+
+`notifyIfBlocked` (`apps/api/src/modules/task-documents/task-documents.service.ts`), ponto único de
+disparo do evento `TASK_BLOCKED` deste feature, recebeu a correção **só pro próprio evento**: checa
+`visibleToClient` antes de enfileirar, já que `TASK_BLOCKED` vem ligado por padrão e sua mensagem
+manda o cliente checar o portal por uma tarefa que ele pode não conseguir ver lá.
+
+**Pendente:** aplicar a mesma checagem de `visibleToClient` no branch de WhatsApp de
+`notification.worker.ts`, nivelando com o branch de email, pra cobrir os demais eventos — deliberadamente
+fora do escopo desta wave de correção (ruling do controller: corrigir só `notifyIfBlocked`, não o
+worker inteiro).

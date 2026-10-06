@@ -483,6 +483,7 @@ Renderiza prévia do template com dados fictícios.
   "taskCompleted": true,
   "commentAdded": true,
   "dueDateAlert": true,
+  "taskBlocked": true,
   "maximizebotToken": "Bearer <token>",
   "saveOnTicket": true,
   "startChatbot": false,

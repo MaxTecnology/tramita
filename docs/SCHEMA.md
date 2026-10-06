@@ -300,6 +300,7 @@ model NotificationConfig {
   taskCompleted        Boolean  @default(true)
   commentAdded         Boolean  @default(true)
   dueDateAlert         Boolean  @default(true)
+  taskBlocked          Boolean  @default(true)
   // MaximizeBot
   maximizebotToken     String?  // Bearer token da org no MaximizeBot
   saveOnTicket         Boolean  @default(true)
@@ -347,6 +348,7 @@ enum NotificationEvent {
   TASK_COMPLETED
   TASK_COMMENT_ADDED
   TASK_DUE_DATE_APPROACHING
+  TASK_BLOCKED
 }
 
 enum MessageChannel {
