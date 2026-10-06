@@ -270,10 +270,11 @@ Cadastro de novo escritório (público — sem autenticação).
 ### GET `/boards/:id/tasks/search?q=&priority=&assigneeId=&status=&dueBefore=&dueAfter=`
 
 ### GET `/tasks` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — listagem flat de tarefas atravessando todos os boards da org, inclusive o board oculto `RECURRING_SYSTEM` onde moram as Tarefas Recorrentes
-**Query:** `?clientId=&assigneeId=&departmentId=&status=OPEN|STARTED|DONE|DISREGARDED|BLOCKED&recurringTemplateId=&dateFrom=&dateTo=&q=`
-→ `dateFrom`/`dateTo` filtram por `targetDate`
+**Query:** `?clientId=&assigneeId=&departmentId=&status=OPEN|STARTED|DONE|DISREGARDED|BLOCKED&recurringTemplateId=&dateFrom=&dateTo=&dateField=target|effective&q=`
+→ `dateFrom`/`dateTo` filtram por `targetDate` quando `dateField` é omitido ou `target` (padrão, usado por Lista/Kanban)
+→ `dateField=effective` filtra por `targetDate` OU, quando `targetDate` é `null`, por `dueDate` — usado pelo modo Calendário pra incluir tarefas de processo comuns (que não têm `targetDate`) na janela do mês visível
 → `ORG_MEMBER` sempre vê só as próprias tarefas (`assigneeId` forçado ao próprio id, independente do que vier na query)
-→ Usado pela tela unificada Tarefas (Lista/Kanban) pra cruzar tarefas de clientes diferentes agrupadas por status
+→ Usado pela tela unificada Tarefas (Lista/Kanban/Calendário) pra cruzar tarefas de clientes diferentes agrupadas por status
 
 **Response:** `Task[]`, cada item com `{ id, title, description, status, priority, position, columnId, assigneeId, creatorId, sourceRequestId, departmentId, tags, competence, targetDate, dueDate, recurringTemplateId, visibleToClient, createdAt, updatedAt, department: { id, name }, assignee: { id, name } | null, column: { board: { id, clientId, client: { id, name, codigo } } } }`, ordenado por `targetDate` ascendente
 
