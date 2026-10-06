@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
@@ -159,9 +159,21 @@ function DraggableTaskCard({ task, onClick }: { task: TaskListItem; onClick: () 
   )
 }
 
+// buildCalendarGrid/getCalendarGridRange leem o mês via getUTCFullYear/getUTCMonth — por isso o
+// "mês atual" precisa ser representado como meia-noite UTC do dia 1 do mês LOCAL do viewer, nunca
+// um `new Date()` cru (cujos getters UTC refletem o dia em Greenwich, não o dia local). Entre
+// ~21h e 23h59 num fuso atrás de UTC (todo o Brasil), um `new Date()` cru já é o dia seguinte em
+// UTC — ver convenção documentada em `@/lib/dates`.
+function startOfCurrentMonthUTC(): Date {
+  const now = new Date()
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1))
+}
+
 const MONTH_LABEL = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 const MAX_VISIBLE_PER_DAY = 2
+
+const GRID_COLUMNS = 7
 
 function CalendarView({
   tasks,
@@ -185,6 +197,7 @@ function CalendarView({
     for (const day of grid) map.set(day.dateKey, day.tasks)
     return map
   }, [grid])
+  const rowCount = grid.length / GRID_COLUMNS
 
   return (
     <div className="bg-surface border border-border rounded-lg overflow-hidden">
@@ -210,10 +223,17 @@ function CalendarView({
             {w}
           </div>
         ))}
-        {grid.map((day) => {
+        {grid.map((day, i) => {
           const dayTasks = tasksByDateKey.get(day.dateKey) ?? []
           const visible = dayTasks.slice(0, MAX_VISIBLE_PER_DAY)
           const extra = dayTasks.length - visible.length
+          const col = i % GRID_COLUMNS
+          const row = Math.floor(i / GRID_COLUMNS)
+          // Popover de 224px (w-56) não cabe se abrir pra fora da grade — nas duas últimas colunas
+          // (Sex/Sáb) ele abre pra esquerda em vez de pra direita, e nas duas últimas linhas ele
+          // abre pra cima em vez de pra baixo, pra nunca ficar clipado pelas bordas da página.
+          const openLeft = col >= GRID_COLUMNS - 2
+          const openUp = row >= rowCount - 2
           return (
             <div
               key={day.dateKey}
@@ -249,7 +269,13 @@ function CalendarView({
               </div>
 
               {expandedDay === day.dateKey && (
-                <div className="absolute z-10 top-full left-0 mt-1 w-56 bg-surface border border-border rounded-lg shadow-lg p-2">
+                <div
+                  className={cn(
+                    'absolute z-10 w-56 bg-surface border border-border rounded-lg shadow-lg p-2',
+                    openUp ? 'bottom-full mb-1' : 'top-full mt-1',
+                    openLeft ? 'right-0' : 'left-0',
+                  )}
+                >
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-xs font-semibold text-foreground">{day.dayOfMonth} — todas as tarefas</span>
                     <button type="button" onClick={() => setExpandedDay(null)} className="text-muted-foreground hover:text-foreground text-xs">✕</button>
@@ -285,7 +311,7 @@ export default function Tasks() {
   // TaskDrawer sempre reflita a tarefa atual depois de uma edição, não um snapshot do clique.
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [activeTask, setActiveTask] = useState<TaskListItem | null>(null)
-  const [calendarMonth, setCalendarMonth] = useState(() => new Date())
+  const [calendarMonth, setCalendarMonth] = useState(() => startOfCurrentMonthUTC())
 
   const [clientId, setClientId] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
@@ -296,15 +322,17 @@ export default function Tasks() {
   const [dateTo, setDateTo] = useState('')
   const [search, setSearch] = useState('')
 
-  // No modo Calendário, a navegação de mês É o filtro de data — substitui dateFrom/dateTo pela
-  // janela da grade inteira (inclui dias do mês vizinho visíveis). Voltar pra Lista/Kanban depois
-  // mantém esse intervalo (comportamento aceitável: os três modos compartilham o mesmo filtro).
-  useEffect(() => {
-    if (view !== 'calendar') return
-    const { from, to } = getCalendarGridRange(calendarMonth)
-    setDateFrom(from)
-    setDateTo(to)
-  }, [view, calendarMonth])
+  // No modo Calendário, a navegação de mês É o filtro de data — mas calculada aqui, no momento de
+  // montar a query, em vez de escrita no estado dateFrom/dateTo compartilhado com os inputs manuais
+  // de Lista/Kanban. Isso evita: (a) "Limpar" zerar as datas sem a grade reagir (nenhuma dependência
+  // do efeito mudaria); (b) voltar pra Lista/Kanban herdar silenciosamente a janela do calendário;
+  // (c) um round-trip de query extra a cada troca de mês (efeito corre depois do render, não durante).
+  // Também pede `dateField=effective` à API — ver tasks.schema.ts — pra não excluir tarefas sem
+  // targetDate (toda tarefa que não é recorrente) da janela do mês via fallback pra dueDate.
+  const calendarRange = useMemo(
+    () => (view === 'calendar' ? getCalendarGridRange(calendarMonth) : null),
+    [view, calendarMonth],
+  )
 
   const { data: clients = [] } = useQuery<ClientOption[]>({
     queryKey: ['clients'],
@@ -326,7 +354,18 @@ export default function Tasks() {
     queryFn: () => api.get('/recurring-templates').then((r) => r.data),
   })
 
-  const filters = { clientId, assigneeId, departmentId, recurringTemplateId, status, dateFrom, dateTo, search }
+  // Em modo Calendário, a janela efetiva de data vem de calendarRange (grade do mês), nunca do
+  // estado dateFrom/dateTo — que permanece sob controle exclusivo dos inputs manuais de Lista/
+  // Kanban (ocultos em modo Calendário). Isso também garante que `hasFilters`/"Limpar", abaixo,
+  // nunca contem a janela interna do calendário como filtro escolhido pelo usuário.
+  const effectiveDateFrom = calendarRange ? calendarRange.from : dateFrom
+  const effectiveDateTo = calendarRange ? calendarRange.to : dateTo
+  const dateField = calendarRange ? 'effective' : undefined
+
+  const filters = {
+    clientId, assigneeId, departmentId, recurringTemplateId, status, search,
+    dateFrom: effectiveDateFrom, dateTo: effectiveDateTo, dateField,
+  }
 
   const {
     data: tasksPages,
@@ -345,8 +384,9 @@ export default function Tasks() {
       if (recurringTemplateId) params.recurringTemplateId = recurringTemplateId
       if (status) params.status = status
       if (search.trim()) params.q = search.trim()
-      if (dateFrom) params.dateFrom = new Date(`${dateFrom}T00:00:00Z`).toISOString()
-      if (dateTo) params.dateTo = new Date(`${dateTo}T23:59:59Z`).toISOString()
+      if (effectiveDateFrom) params.dateFrom = new Date(`${effectiveDateFrom}T00:00:00Z`).toISOString()
+      if (effectiveDateTo) params.dateTo = new Date(`${effectiveDateTo}T23:59:59Z`).toISOString()
+      if (dateField) params.dateField = dateField
       if (pageParam) params.cursor = pageParam as string
       return api.get('/tasks', { params }).then((r) => r.data)
     },
@@ -530,7 +570,7 @@ export default function Tasks() {
             month={calendarMonth}
             onPrevMonth={() => setCalendarMonth((m) => new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() - 1, 1)))}
             onNextMonth={() => setCalendarMonth((m) => new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1)))}
-            onToday={() => setCalendarMonth(new Date())}
+            onToday={() => setCalendarMonth(startOfCurrentMonthUTC())}
             onTaskClick={(taskId) => setSelectedTaskId(taskId)}
           />
         ) : tasks.length === 0 ? (
