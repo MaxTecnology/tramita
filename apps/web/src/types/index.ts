@@ -155,6 +155,7 @@ export interface RecurringTaskTemplate {
   title: string
   description: string | null
   periodicity: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL'
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
   dueMonthOffset: number
   dueDayOfPeriod: number
   dueBusinessDayRoll: 'NONE' | 'FORWARD' | 'BACKWARD'

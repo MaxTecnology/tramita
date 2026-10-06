@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { ArrowLeft, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { RecurringTaskTemplate, Department } from '@/types'
+import { PRIORITY_LABEL } from '@/components/shared/TaskDrawer'
 
 const PERIODICITY_LABEL: Record<RecurringTaskTemplate['periodicity'], string> = {
   WEEKLY: 'Semanal',
@@ -37,6 +38,7 @@ interface FormState {
   title: string
   description: string
   periodicity: RecurringTaskTemplate['periodicity']
+  priority: RecurringTaskTemplate['priority']
   dueMonthOffset: number
   dueDayOfPeriod: number
   dueBusinessDayRoll: RecurringTaskTemplate['dueBusinessDayRoll']
@@ -54,7 +56,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
-  departmentId: '', title: '', description: '', periodicity: 'MONTHLY',
+  departmentId: '', title: '', description: '', periodicity: 'MONTHLY', priority: 'MEDIUM',
   dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
   targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
   generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -122,7 +124,7 @@ export default function RecurringTemplateForm() {
     if (!template) return
     setForm({
       departmentId: template.departmentId, title: template.title, description: template.description ?? '',
-      periodicity: template.periodicity, dueMonthOffset: template.dueMonthOffset, dueDayOfPeriod: template.dueDayOfPeriod,
+      periodicity: template.periodicity, priority: template.priority, dueMonthOffset: template.dueMonthOffset, dueDayOfPeriod: template.dueDayOfPeriod,
       dueBusinessDayRoll: template.dueBusinessDayRoll, targetOffsetDays: template.targetOffsetDays,
       targetBusinessDayRoll: template.targetBusinessDayRoll, generationMonthOffset: template.generationMonthOffset,
       generationDayOfPeriod: template.generationDayOfPeriod, autoCompleteOnAllActivitiesDone: template.autoCompleteOnAllActivitiesDone,
@@ -195,6 +197,17 @@ export default function RecurringTemplateForm() {
             className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
           >
             {Object.entries(PERIODICITY_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Prioridade</Label>
+          <select
+            value={form.priority}
+            onChange={(e) => setForm({ ...form, priority: e.target.value as FormState['priority'] })}
+            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
+          >
+            {Object.entries(PRIORITY_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>
 

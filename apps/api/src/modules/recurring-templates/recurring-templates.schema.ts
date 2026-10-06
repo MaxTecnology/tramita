@@ -9,6 +9,7 @@ export const createTemplateSchema = z.object({
   title: z.string().trim().min(1, 'Título obrigatório'),
   description: z.string().optional(),
   periodicity: z.enum(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUAL']),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
 
   dueMonthOffset: z.number().int().min(-12).max(12).default(0),
   dueDayOfPeriod: z.number().int().min(1).max(31),

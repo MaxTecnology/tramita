@@ -439,6 +439,7 @@ model RecurringTaskTemplate {
   title          String
   description    String?
   periodicity    RecurrencePeriodicity
+  priority       Priority              @default(MEDIUM)
 
   dueMonthOffset     Int             @default(0)
   dueDayOfPeriod     Int

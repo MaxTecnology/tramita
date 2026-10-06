@@ -28,7 +28,7 @@ describe('createTemplate', () => {
     const template = await createTemplate(org.id, {
       departmentId: dept.id,
       title: 'Folha de pagamento',
-      periodicity: 'MONTHLY',
+      periodicity: 'MONTHLY', priority: 'MEDIUM',
       dueMonthOffset: 1,
       dueDayOfPeriod: 15,
       dueBusinessDayRoll: 'NONE',
@@ -59,7 +59,7 @@ describe('createTemplate', () => {
       createTemplate(orgA.id, {
         departmentId: deptOfB.id,
         title: 'X',
-        periodicity: 'MONTHLY',
+        periodicity: 'MONTHLY', priority: 'MEDIUM',
         dueMonthOffset: 0,
         dueDayOfPeriod: 10,
         dueBusinessDayRoll: 'NONE',
@@ -87,7 +87,7 @@ describe('createTemplate', () => {
       createTemplate(org.id, {
         departmentId: dept.id,
         title: 'X',
-        periodicity: 'WEEKLY',
+        periodicity: 'WEEKLY', priority: 'MEDIUM',
         dueMonthOffset: 0,
         dueDayOfPeriod: 10,
         dueBusinessDayRoll: 'NONE',
@@ -115,7 +115,7 @@ describe('updateTemplate', () => {
     const template = await createTemplate(org.id, {
       departmentId: dept.id,
       title: 'X',
-      periodicity: 'MONTHLY',
+      periodicity: 'MONTHLY', priority: 'MEDIUM',
       dueMonthOffset: 0,
       dueDayOfPeriod: 10,
       dueBusinessDayRoll: 'NONE',
@@ -147,7 +147,7 @@ describe('createAssignment', () => {
     const template = await createTemplate(org.id, {
       departmentId: dept.id,
       title: 'X',
-      periodicity: 'MONTHLY',
+      periodicity: 'MONTHLY', priority: 'MEDIUM',
       dueMonthOffset: 0,
       dueDayOfPeriod: 10,
       dueBusinessDayRoll: 'NONE',
@@ -177,7 +177,7 @@ describe('createAssignment', () => {
     const template = await createTemplate(org.id, {
       departmentId: dept.id,
       title: 'X',
-      periodicity: 'MONTHLY',
+      periodicity: 'MONTHLY', priority: 'MEDIUM',
       dueMonthOffset: 0,
       dueDayOfPeriod: 10,
       dueBusinessDayRoll: 'NONE',
@@ -209,7 +209,7 @@ describe('createAssignment', () => {
     const template = await createTemplate(org.id, {
       departmentId: dept.id,
       title: 'X',
-      periodicity: 'MONTHLY',
+      periodicity: 'MONTHLY', priority: 'MEDIUM',
       dueMonthOffset: 0,
       dueDayOfPeriod: 10,
       dueBusinessDayRoll: 'NONE',
@@ -241,7 +241,7 @@ describe('deleteTemplate (com assignment vinculado)', () => {
     const template = await createTemplate(org.id, {
       departmentId: dept.id,
       title: 'X',
-      periodicity: 'MONTHLY',
+      periodicity: 'MONTHLY', priority: 'MEDIUM',
       dueMonthOffset: 0,
       dueDayOfPeriod: 10,
       dueBusinessDayRoll: 'NONE',
@@ -264,13 +264,13 @@ describe('deleteTemplate (com assignment vinculado)', () => {
 })
 
 describe('generateTaskForAssignment', () => {
-  async function setup() {
+  async function setup(priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' = 'MEDIUM') {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const dept = await createTestDepartment(org.id)
     const client = await createTestClient(org.id)
     const template = await createTemplate(org.id, {
-      departmentId: dept.id, title: 'Folha de pagamento', periodicity: 'MONTHLY',
+      departmentId: dept.id, title: 'Folha de pagamento', periodicity: 'MONTHLY', priority,
       dueMonthOffset: 1, dueDayOfPeriod: 15, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: -2, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -305,6 +305,20 @@ describe('generateTaskForAssignment', () => {
     spy.mockRestore()
   })
 
+  it('gera a tarefa com a prioridade configurada no template, não com MEDIUM fixo', async () => {
+    const { template, assignment } = await setup('URGENT')
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, new Date(Date.UTC(2026, 1, 1)))
+    expect(outcome.status).toBe('SUCCESS')
+    if (outcome.status !== 'SUCCESS') throw new Error('unreachable')
+
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: outcome.taskId } })
+    expect(task.priority).toBe('URGENT')
+
+    spy.mockRestore()
+  })
+
   it('gera com TASK_BLOCKED (exatamente uma vez) quando o template tem documento exigido', async () => {
     const { template, assignment } = await setup()
     const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
@@ -324,7 +338,7 @@ describe('generateTaskForAssignment', () => {
     const dept = await createTestDepartment(org.id)
     const client = await createTestClient(org.id)
     const template = await createTemplate(org.id, {
-      departmentId: dept.id, title: 'Folha de pagamento', periodicity: 'MONTHLY',
+      departmentId: dept.id, title: 'Folha de pagamento', periodicity: 'MONTHLY', priority: 'MEDIUM',
       dueMonthOffset: 1, dueDayOfPeriod: 15, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: -2, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -478,7 +492,7 @@ describe('generateManually', () => {
     const dept = await createTestDepartment(org.id)
     const client = await createTestClient(org.id)
     const template = await createTemplate(org.id, {
-      departmentId: dept.id, title: 'X', periodicity: 'MONTHLY',
+      departmentId: dept.id, title: 'X', periodicity: 'MONTHLY', priority: 'MEDIUM',
       dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 5,

@@ -20,7 +20,7 @@ describe('runRecurringTasksGeneration', () => {
     vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
     const templateTriggersToday = await createTemplate(org.id, {
-      departmentId: dept.id, title: 'Dispara hoje', periodicity: 'MONTHLY',
+      departmentId: dept.id, title: 'Dispara hoje', periodicity: 'MONTHLY', priority: 'MEDIUM',
       dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -30,7 +30,7 @@ describe('runRecurringTasksGeneration', () => {
     await createAssignment(templateTriggersToday.id, org.id, { clientId: client.id })
 
     const templateDoesNotTrigger = await createTemplate(org.id, {
-      departmentId: dept.id, title: 'Não dispara hoje', periodicity: 'MONTHLY',
+      departmentId: dept.id, title: 'Não dispara hoje', periodicity: 'MONTHLY', priority: 'MEDIUM',
       dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 5,
@@ -60,7 +60,7 @@ describe('runRecurringTasksGeneration', () => {
     vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
     const template = await createTemplate(org.id, {
-      departmentId: dept.id, title: 'Inativo', periodicity: 'MONTHLY',
+      departmentId: dept.id, title: 'Inativo', periodicity: 'MONTHLY', priority: 'MEDIUM',
       dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -87,7 +87,7 @@ describe('runRecurringTasksGeneration', () => {
     vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
     const template = await createTemplate(org.id, {
-      departmentId: dept.id, title: 'X', periodicity: 'MONTHLY',
+      departmentId: dept.id, title: 'X', periodicity: 'MONTHLY', priority: 'MEDIUM',
       dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,

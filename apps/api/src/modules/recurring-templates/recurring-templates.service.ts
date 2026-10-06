@@ -216,7 +216,7 @@ export async function generateTaskForAssignment(
         data: {
           title: template.title,
           description: template.description,
-          priority: 'MEDIUM',
+          priority: template.priority,
           status: initialStatus,
           columnId,
           departmentId: template.departmentId,
