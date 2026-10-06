@@ -156,9 +156,9 @@ export interface RecurringTaskTemplate {
   description: string | null
   periodicity: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL'
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
-  dueMonthOffset: number
   dueDayOfPeriod: number
   dueBusinessDayRoll: 'NONE' | 'FORWARD' | 'BACKWARD'
+  competenceMonthOffset: number
   targetOffsetDays: number
   targetBusinessDayRoll: 'NONE' | 'FORWARD' | 'BACKWARD'
   generationMonthOffset: number
@@ -188,6 +188,28 @@ export interface RecurringGenerationLog {
   status: 'SUCCESS' | 'FAILED'
   taskId: string | null
   errorMessage: string | null
+  createdAt: string
+}
+
+export interface BulkGenerationResult {
+  generated: number
+  alreadyExists: number
+  failed: { clientName: string; errorMessage: string }[]
+}
+
+export interface BulkGenerationSummary {
+  templateId: string
+  templateTitle: string
+  result: BulkGenerationResult
+}
+
+export interface FailedGeneration {
+  templateId: string
+  templateTitle: string
+  clientId: string
+  clientName: string
+  competence: string
+  errorMessage: string
   createdAt: string
 }
 

@@ -17,8 +17,8 @@ const PERIODICITY_LABEL: Record<RecurringTaskTemplate['periodicity'], string> = 
   ANNUAL: 'Anual',
 }
 
-const DUE_MONTH_OFFSET_OPTIONS = Array.from({ length: 25 }, (_, i) => i - 12) // -12..12
 const GENERATION_MONTH_OFFSET_OPTIONS = [0, 1, 2, 3]
+const COMPETENCE_MONTH_OFFSET_OPTIONS = [0, 1, 2, 3]
 const WEEKDAY_LABEL: Record<number, string> = { 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado', 7: 'Domingo' }
 
 const BUSINESS_DAY_ROLL_LABEL: Record<RecurringTaskTemplate['dueBusinessDayRoll'], string> = {
@@ -27,21 +27,15 @@ const BUSINESS_DAY_ROLL_LABEL: Record<RecurringTaskTemplate['dueBusinessDayRoll'
   BACKWARD: 'Antecipar pro dia útil anterior',
 }
 
-function dueMonthOffsetLabel(o: number): string {
-  if (o === 0) return 'Mesma competência'
-  if (o < 0) return `${Math.abs(o)} ${Math.abs(o) === 1 ? 'mês' : 'meses'} antes da competência`
-  return `${o} ${o === 1 ? 'mês' : 'meses'} depois da competência`
-}
-
 interface FormState {
   departmentId: string
   title: string
   description: string
   periodicity: RecurringTaskTemplate['periodicity']
   priority: RecurringTaskTemplate['priority']
-  dueMonthOffset: number
   dueDayOfPeriod: number
   dueBusinessDayRoll: RecurringTaskTemplate['dueBusinessDayRoll']
+  competenceMonthOffset: number
   targetOffsetDays: number
   targetBusinessDayRoll: RecurringTaskTemplate['targetBusinessDayRoll']
   generationMonthOffset: number
@@ -57,7 +51,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   departmentId: '', title: '', description: '', periodicity: 'MONTHLY', priority: 'MEDIUM',
-  dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+  dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE', competenceMonthOffset: 1,
   targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
   generationMonthOffset: 1, generationDayOfPeriod: 20,
   autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -124,8 +118,8 @@ export default function RecurringTemplateForm() {
     if (!template) return
     setForm({
       departmentId: template.departmentId, title: template.title, description: template.description ?? '',
-      periodicity: template.periodicity, priority: template.priority, dueMonthOffset: template.dueMonthOffset, dueDayOfPeriod: template.dueDayOfPeriod,
-      dueBusinessDayRoll: template.dueBusinessDayRoll, targetOffsetDays: template.targetOffsetDays,
+      periodicity: template.periodicity, priority: template.priority, dueDayOfPeriod: template.dueDayOfPeriod,
+      dueBusinessDayRoll: template.dueBusinessDayRoll, competenceMonthOffset: template.competenceMonthOffset, targetOffsetDays: template.targetOffsetDays,
       targetBusinessDayRoll: template.targetBusinessDayRoll, generationMonthOffset: template.generationMonthOffset,
       generationDayOfPeriod: template.generationDayOfPeriod, autoCompleteOnAllActivitiesDone: template.autoCompleteOnAllActivitiesDone,
       notifyViaWhatsapp: template.notifyViaWhatsapp, notifyViaEmail: template.notifyViaEmail, visibleToClient: template.visibleToClient,
@@ -211,28 +205,15 @@ export default function RecurringTemplateForm() {
           </select>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label>Competência do vencimento</Label>
-            <select
-              value={form.dueMonthOffset}
-              onChange={(e) => setForm({ ...form, dueMonthOffset: Number(e.target.value) })}
-              className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-              disabled={isWeekly}
-            >
-              {DUE_MONTH_OFFSET_OPTIONS.map((o) => <option key={o} value={o}>{o} — {dueMonthOffsetLabel(o)}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>{isWeekly ? 'Dia da semana do vencimento' : 'Dia do vencimento'}</Label>
-            <select
-              value={form.dueDayOfPeriod}
-              onChange={(e) => setForm({ ...form, dueDayOfPeriod: Number(e.target.value) })}
-              className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-            >
-              {dayOptions.map((d) => <option key={d} value={d}>{isWeekly ? WEEKDAY_LABEL[d] : d}</option>)}
-            </select>
-          </div>
+        <div className="space-y-1.5">
+          <Label>{isWeekly ? 'Dia da semana do vencimento' : 'Dia do vencimento'}</Label>
+          <select
+            value={form.dueDayOfPeriod}
+            onChange={(e) => setForm({ ...form, dueDayOfPeriod: Number(e.target.value) })}
+            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
+          >
+            {dayOptions.map((d) => <option key={d} value={d}>{isWeekly ? WEEKDAY_LABEL[d] : d}</option>)}
+          </select>
         </div>
         <div className="space-y-1.5">
           <Label>Se o vencimento cair em fim de semana</Label>
@@ -242,6 +223,18 @@ export default function RecurringTemplateForm() {
             className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
           >
             {(['NONE', 'FORWARD', 'BACKWARD'] as const).map((v) => <option key={v} value={v}>{BUSINESS_DAY_ROLL_LABEL[v]}</option>)}
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Competência — meses antes do vencimento</Label>
+          <select
+            value={form.competenceMonthOffset}
+            onChange={(e) => setForm({ ...form, competenceMonthOffset: Number(e.target.value) })}
+            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
+            disabled={isWeekly}
+          >
+            {COMPETENCE_MONTH_OFFSET_OPTIONS.map((o) => <option key={o} value={o}>{o === 0 ? 'Mesmo mês do vencimento' : `${o} ${o === 1 ? 'mês' : 'meses'} antes do vencimento`}</option>)}
           </select>
         </div>
 
@@ -266,7 +259,7 @@ export default function RecurringTemplateForm() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label>Geração — meses antes da competência</Label>
+            <Label>Geração — meses antes do vencimento</Label>
             <select
               value={form.generationMonthOffset}
               onChange={(e) => setForm({ ...form, generationMonthOffset: Number(e.target.value) })}
@@ -274,6 +267,11 @@ export default function RecurringTemplateForm() {
             >
               {GENERATION_MONTH_OFFSET_OPTIONS.map((o) => <option key={o} value={o}>{o === 0 ? 'Mesmo mês' : `${o} ${o === 1 ? 'mês' : 'meses'} antes`}</option>)}
             </select>
+            {form.generationMonthOffset === 0 && (
+              <p className="text-xs text-danger-text mt-1">
+                ⚠ Com 0 mês de antecedência, a tarefa é gerada no mesmo mês do vencimento — se o dia do vencimento já tiver passado quando o cron disparar, ela nasce vencida.
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Dia da geração</Label>
