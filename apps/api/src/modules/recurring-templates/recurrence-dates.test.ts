@@ -132,6 +132,29 @@ describe('computeCompetencesToGenerate', () => {
     const mondaysOfFebruary2026 = computeCompetencesToGenerate(trigger, rules).map((d) => d.toISOString().slice(0, 10))
     expect(mondaysOfFebruary2026).toEqual(['2026-02-02', '2026-02-09', '2026-02-16', '2026-02-23'])
   })
+
+  it('mensal: generationMonthOffset=0 gera competência no próprio mês do gatilho (ex: DAS — gera em setembro a competência de setembro)', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, generationMonthOffset: 0 }
+    const trigger = new Date(Date.UTC(2026, 8, 20)) // 20 de setembro
+    expect(computeCompetencesToGenerate(trigger, rules).map((d) => d.toISOString().slice(0, 10)))
+      .toEqual(['2026-09-01'])
+  })
+
+  it('mensal: generationMonthOffset=2 gera a competência com dois meses de antecedência', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, generationMonthOffset: 2 }
+    const trigger = new Date(Date.UTC(2026, 8, 20)) // 20 de setembro
+    expect(computeCompetencesToGenerate(trigger, rules).map((d) => d.toISOString().slice(0, 10)))
+      .toEqual(['2026-11-01'])
+  })
+
+  it('trimestral: generationMonthOffset=0 só gera quando o próprio mês do gatilho inicia um trimestre', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'QUARTERLY', generationMonthOffset: 0 }
+    const triggersQuarter = new Date(Date.UTC(2026, 0, 20)) // janeiro -> início do Q1
+    const doesNotTrigger = new Date(Date.UTC(2026, 1, 20)) // fevereiro -> não é início de trimestre
+    expect(computeCompetencesToGenerate(triggersQuarter, rules).map((d) => d.toISOString().slice(0, 10)))
+      .toEqual(['2026-01-01'])
+    expect(computeCompetencesToGenerate(doesNotTrigger, rules)).toEqual([])
+  })
 })
 
 describe('computeCurrentPeriodStart', () => {

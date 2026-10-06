@@ -84,24 +84,28 @@ export function computeCompetencesToGenerate(today: Date, rules: RecurrenceDateR
   const triggerDay = clampDayOfMonth(year, month, rules.generationDayOfPeriod)
   if (today.getUTCDate() !== triggerDay) return []
 
-  const nextMonthStart = addMonthsUTC(startOfMonthUTC(today), 1)
+  // Mês da competência gerada hoje: generationMonthOffset conta a partir do mês do gatilho,
+  // não sempre "mês seguinte" — offset=0 gera no próprio mês do gatilho, offset=2 gera com
+  // dois meses de antecedência, etc. (default do schema é 1, que preserva o comportamento
+  // histórico de quem nunca configurou esse campo).
+  const competenceMonthStart = addMonthsUTC(startOfMonthUTC(today), rules.generationMonthOffset)
 
   switch (rules.periodicity) {
     case 'MONTHLY':
-      return [nextMonthStart]
+      return [competenceMonthStart]
 
     case 'QUARTERLY':
-      return nextMonthStart.getUTCMonth() % 3 === 0 ? [nextMonthStart] : []
+      return competenceMonthStart.getUTCMonth() % 3 === 0 ? [competenceMonthStart] : []
 
     case 'ANNUAL':
-      return nextMonthStart.getUTCMonth() === 0 ? [nextMonthStart] : []
+      return competenceMonthStart.getUTCMonth() === 0 ? [competenceMonthStart] : []
 
     case 'WEEKLY': {
-      const nextMonthEnd = addMonthsUTC(nextMonthStart, 1)
+      const competenceMonthEnd = addMonthsUTC(competenceMonthStart, 1)
       const competences: Date[] = []
-      let cursor = mondayOfWeek(nextMonthStart)
-      if (cursor < nextMonthStart) cursor = addDaysUTC(cursor, 7)
-      while (cursor < nextMonthEnd) {
+      let cursor = mondayOfWeek(competenceMonthStart)
+      if (cursor < competenceMonthStart) cursor = addDaysUTC(cursor, 7)
+      while (cursor < competenceMonthEnd) {
         competences.push(cursor)
         cursor = addDaysUTC(cursor, 7)
       }
