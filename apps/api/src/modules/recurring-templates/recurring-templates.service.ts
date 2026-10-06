@@ -8,8 +8,10 @@ import { ensureRecurringSystemBoard } from '@/modules/tasks/tasks.service'
 import { notifyIfBlocked } from '@/modules/task-documents/task-documents.service'
 import {
   computeDueDate,
+  computeDueDateFromMonth,
+  computeCompetenceFromDueMonth,
   computeTargetDate,
-  computeCurrentPeriodStart,
+  computeNextDueMonth,
   normalizeToPeriodStart,
   type RecurrenceDateRules,
 } from './recurrence-dates'
@@ -110,10 +112,13 @@ export async function deleteTemplate(id: string, organizationId: string) {
   return { ok: true }
 }
 
-export async function listAssignments(templateId: string, organizationId: string) {
+export async function listAssignments(templateId: string, organizationId: string, search?: string) {
   await getTemplateById(templateId, organizationId)
   return prisma.recurringTaskAssignment.findMany({
-    where: { templateId },
+    where: {
+      templateId,
+      ...(search ? { client: { name: { contains: search, mode: 'insensitive' } } } : {}),
+    },
     include: { client: { select: { id: true, name: true, codigo: true } } },
     orderBy: { createdAt: 'asc' },
   })
@@ -181,7 +186,7 @@ class ConcurrentGenerationLossError extends Error {}
 export async function generateTaskForAssignment(
   templateId: string,
   assignmentId: string,
-  competence: Date,
+  dueMonth: Date,
 ): Promise<GenerationOutcome> {
   const template = await prisma.recurringTaskTemplate.findUnique({
     where: { id: templateId },
@@ -194,6 +199,12 @@ export async function generateTaskForAssignment(
     return { status: 'FAILED', errorMessage: 'Vínculo não encontrado' }
   }
 
+  const rules: RecurrenceDateRules = template
+  // WEEKLY: dueMonth É a competência (contrato herdado, sem mudança de semântica — ver Task 1).
+  // Demais periodicidades: dueMonth é o 1º dia do mês de vencimento; competência é derivada
+  // dele (vencimento é a âncora, não mais o contrário).
+  const competence = rules.periodicity === 'WEEKLY' ? dueMonth : computeCompetenceFromDueMonth(dueMonth, rules)
+
   const logKey = {
     templateId_clientId_competence: { templateId, clientId: assignment.clientId, competence },
   }
@@ -204,8 +215,7 @@ export async function generateTaskForAssignment(
     const systemBoard = await ensureRecurringSystemBoard(assignment.clientId, template.organizationId)
     const columnId = systemBoard.columns[0].id
 
-    const rules: RecurrenceDateRules = template
-    const dueDate = computeDueDate(competence, rules)
+    const dueDate = rules.periodicity === 'WEEKLY' ? computeDueDate(dueMonth, rules) : computeDueDateFromMonth(dueMonth, rules)
     const targetDate = computeTargetDate(dueDate, rules)
     const initialStatus = template.documentRequests.length > 0 ? 'BLOCKED' : 'OPEN'
 
@@ -359,20 +369,20 @@ export async function generateManually(
   templateId: string,
   assignmentId: string,
   organizationId: string,
-  competenceOverride?: string,
+  dueMonthOverride?: string,
 ) {
   const template = await getTemplateById(templateId, organizationId)
   const assignment = await getAssignmentOrThrow(templateId, assignmentId, organizationId)
 
-  // Canonicaliza o override pro início do período (semana/mês/trimestre/ano) a que ele
-  // pertence — sem isso, um instante não-canônico (ex.: 2026-09-17T13:22:00Z) viraria uma
-  // chave de idempotência que nunca colide com o valor canônico que o cron gera pro mesmo
-  // período real, criando uma Task efetivamente duplicada sem o sistema de idempotência notar.
-  const competence = competenceOverride
-    ? normalizeToPeriodStart(new Date(competenceOverride), template.periodicity)
-    : computeCurrentPeriodStart(new Date(), template.periodicity)
+  const rules: RecurrenceDateRules = template
+  // Canonicaliza o override pro início do período a que ele pertence — mesmo raciocínio de
+  // idempotência de antes (ver comentário original). Sem override: usa o próximo ciclo normal
+  // do template (o que o cron geraria no próximo disparo), não mais "o mês/semana atual cru".
+  const dueMonth = dueMonthOverride
+    ? normalizeToPeriodStart(new Date(dueMonthOverride), template.periodicity)
+    : computeNextDueMonth(new Date(), rules)
 
-  const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+  const outcome = await generateTaskForAssignment(template.id, assignment.id, dueMonth)
 
   if (outcome.status === 'ALREADY_EXISTS') {
     throw new AppError(409, 'Já existe tarefa gerada pra essa competência e esse cliente')
@@ -390,4 +400,105 @@ export async function listGenerationLog(templateId: string, organizationId: stri
     include: { template: { select: { title: true } } },
     orderBy: { createdAt: 'desc' },
   })
+}
+
+export interface BulkGenerationResult {
+  generated: number
+  alreadyExists: number
+  failed: { clientName: string; errorMessage: string }[]
+}
+
+export async function generateBulkForTemplate(
+  templateId: string,
+  organizationId: string,
+  dueMonthRaw: string,
+  assignmentIds: string[],
+): Promise<BulkGenerationResult> {
+  const template = await getTemplateById(templateId, organizationId)
+  const dueMonth = normalizeToPeriodStart(new Date(dueMonthRaw), template.periodicity)
+
+  const assignments = await prisma.recurringTaskAssignment.findMany({
+    where: { id: { in: assignmentIds }, templateId },
+    include: { client: { select: { name: true } } },
+  })
+  const foundIds = new Set(assignments.map((a) => a.id))
+
+  const result: BulkGenerationResult = { generated: 0, alreadyExists: 0, failed: [] }
+
+  // IDs que não pertencem a este template/org (removidos entre a seleção na tela e o clique
+  // no botão, ou um request forjado) entram em failed[] com motivo explícito — nunca somem
+  // silenciosamente, ver spec "Falhas persistentes".
+  for (const requestedId of assignmentIds) {
+    if (!foundIds.has(requestedId)) {
+      result.failed.push({ clientName: '(cliente não encontrado)', errorMessage: 'Cliente não encontrado ou não vinculado a este template' })
+    }
+  }
+
+  for (const assignment of assignments) {
+    const outcome = await generateTaskForAssignment(templateId, assignment.id, dueMonth)
+    if (outcome.status === 'SUCCESS') result.generated++
+    else if (outcome.status === 'ALREADY_EXISTS') result.alreadyExists++
+    else result.failed.push({ clientName: assignment.client.name, errorMessage: outcome.errorMessage })
+  }
+
+  return result
+}
+
+export interface BulkGenerationSummary {
+  templateId: string
+  templateTitle: string
+  result: BulkGenerationResult
+}
+
+export async function generateBulkForAllTemplates(
+  organizationId: string,
+  dueMonthRaw: string,
+): Promise<BulkGenerationSummary[]> {
+  const templates = await prisma.recurringTaskTemplate.findMany({
+    where: { organizationId, isActive: true },
+    include: { assignments: { where: { isActive: true } } },
+  })
+
+  const summaries: BulkGenerationSummary[] = []
+  for (const template of templates) {
+    const assignmentIds = template.assignments.map((a) => a.id)
+    const result = assignmentIds.length > 0
+      ? await generateBulkForTemplate(template.id, organizationId, dueMonthRaw, assignmentIds)
+      : { generated: 0, alreadyExists: 0, failed: [] }
+    summaries.push({ templateId: template.id, templateTitle: template.title, result })
+  }
+  return summaries
+}
+
+export interface FailedGeneration {
+  templateId: string
+  templateTitle: string
+  clientId: string
+  clientName: string
+  competence: string
+  errorMessage: string
+  createdAt: string
+}
+
+export async function getFailedGenerations(organizationId: string): Promise<FailedGeneration[]> {
+  const logs = await prisma.recurringGenerationLog.findMany({
+    where: { status: 'FAILED', template: { organizationId } },
+    include: { template: { select: { id: true, title: true } } },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (logs.length === 0) return []
+
+  const clientIds = [...new Set(logs.map((l) => l.clientId))]
+  const clients = await prisma.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, name: true } })
+  const clientNameById = new Map(clients.map((c) => [c.id, c.name]))
+
+  return logs.map((log) => ({
+    templateId: log.template.id,
+    templateTitle: log.template.title,
+    clientId: log.clientId,
+    clientName: clientNameById.get(log.clientId) ?? '(cliente removido)',
+    competence: log.competence.toISOString(),
+    errorMessage: log.errorMessage ?? '',
+    createdAt: log.createdAt.toISOString(),
+  }))
 }

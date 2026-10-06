@@ -10,6 +10,9 @@ import {
   deleteAssignment,
   generateTaskForAssignment,
   generateManually,
+  generateBulkForTemplate,
+  generateBulkForAllTemplates,
+  getFailedGenerations,
 } from './recurring-templates.service'
 import {
   createTestOrg,
@@ -29,7 +32,7 @@ describe('createTemplate', () => {
       departmentId: dept.id,
       title: 'Folha de pagamento',
       periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 1,
+      competenceMonthOffset: 1,
       dueDayOfPeriod: 15,
       dueBusinessDayRoll: 'NONE',
       targetOffsetDays: -2,
@@ -60,7 +63,7 @@ describe('createTemplate', () => {
         departmentId: deptOfB.id,
         title: 'X',
         periodicity: 'MONTHLY', priority: 'MEDIUM',
-        dueMonthOffset: 0,
+        competenceMonthOffset: 0,
         dueDayOfPeriod: 10,
         dueBusinessDayRoll: 'NONE',
         targetOffsetDays: 0,
@@ -88,7 +91,7 @@ describe('createTemplate', () => {
         departmentId: dept.id,
         title: 'X',
         periodicity: 'WEEKLY', priority: 'MEDIUM',
-        dueMonthOffset: 0,
+        competenceMonthOffset: 0,
         dueDayOfPeriod: 10,
         dueBusinessDayRoll: 'NONE',
         targetOffsetDays: 0,
@@ -116,7 +119,7 @@ describe('updateTemplate', () => {
       departmentId: dept.id,
       title: 'X',
       periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 0,
+      competenceMonthOffset: 0,
       dueDayOfPeriod: 10,
       dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0,
@@ -148,7 +151,7 @@ describe('createAssignment', () => {
       departmentId: dept.id,
       title: 'X',
       periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 0,
+      competenceMonthOffset: 0,
       dueDayOfPeriod: 10,
       dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0,
@@ -178,7 +181,7 @@ describe('createAssignment', () => {
       departmentId: dept.id,
       title: 'X',
       periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 0,
+      competenceMonthOffset: 0,
       dueDayOfPeriod: 10,
       dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0,
@@ -210,7 +213,7 @@ describe('createAssignment', () => {
       departmentId: dept.id,
       title: 'X',
       periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 0,
+      competenceMonthOffset: 0,
       dueDayOfPeriod: 10,
       dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0,
@@ -242,7 +245,7 @@ describe('deleteTemplate (com assignment vinculado)', () => {
       departmentId: dept.id,
       title: 'X',
       periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 0,
+      competenceMonthOffset: 0,
       dueDayOfPeriod: 10,
       dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0,
@@ -271,7 +274,7 @@ describe('generateTaskForAssignment', () => {
     const client = await createTestClient(org.id)
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Folha de pagamento', periodicity: 'MONTHLY', priority,
-      dueMonthOffset: 1, dueDayOfPeriod: 15, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 15, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: -2, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -286,8 +289,10 @@ describe('generateTaskForAssignment', () => {
     const { template, assignment } = await setup()
     const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
-    const competence = new Date(Date.UTC(2026, 1, 1)) // fevereiro
-    const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+    // dueMonth é o mês de vencimento (âncora): dueDayOfPeriod=15 → vence 15/março.
+    // competenceMonthOffset=1 → competência derivada é fevereiro.
+    const dueMonth = new Date(Date.UTC(2026, 2, 1)) // março
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, dueMonth)
 
     expect(outcome.status).toBe('SUCCESS')
     if (outcome.status !== 'SUCCESS') throw new Error('unreachable')
@@ -298,6 +303,7 @@ describe('generateTaskForAssignment', () => {
     })
     expect(task.status).toBe('BLOCKED')
     expect(task.dueDate?.toISOString().slice(0, 10)).toBe('2026-03-15')
+    expect(task.competence?.toISOString().slice(0, 10)).toBe('2026-02-01')
     expect(task.documentRequirements).toHaveLength(1)
     expect(task.deliverables).toHaveLength(1)
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ event: 'TASK_CREATED', channels: ['WHATSAPP'] }))
@@ -309,7 +315,7 @@ describe('generateTaskForAssignment', () => {
     const { template, assignment } = await setup('URGENT')
     const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
-    const outcome = await generateTaskForAssignment(template.id, assignment.id, new Date(Date.UTC(2026, 1, 1)))
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, new Date(Date.UTC(2026, 2, 1)))
     expect(outcome.status).toBe('SUCCESS')
     if (outcome.status !== 'SUCCESS') throw new Error('unreachable')
 
@@ -319,12 +325,35 @@ describe('generateTaskForAssignment', () => {
     spy.mockRestore()
   })
 
+  it('DAS: dueMonth=outubro, dueDayOfPeriod=10, competenceMonthOffset=1 → vence 10/outubro, competência setembro', async () => {
+    const { org, dept, client } = await setup()
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'DAS', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    const dasAssignment = await createAssignment(template.id, org.id, { clientId: client.id })
+
+    const dueMonth = new Date(Date.UTC(2026, 9, 1)) // outubro
+    const outcome = await generateTaskForAssignment(template.id, dasAssignment.id, dueMonth)
+    expect(outcome.status).toBe('SUCCESS')
+    if (outcome.status !== 'SUCCESS') throw new Error('unreachable')
+
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: outcome.taskId } })
+    expect(task.dueDate?.toISOString().slice(0, 10)).toBe('2026-10-10')
+    expect(task.competence?.toISOString().slice(0, 10)).toBe('2026-09-01')
+  })
+
   it('gera com TASK_BLOCKED (exatamente uma vez) quando o template tem documento exigido', async () => {
     const { template, assignment } = await setup()
     const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
-    const competence = new Date(Date.UTC(2026, 1, 1))
-    const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+    const dueMonth = new Date(Date.UTC(2026, 2, 1))
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, dueMonth)
     expect(outcome.status).toBe('SUCCESS')
 
     const blockedCalls = spy.mock.calls.filter((c) => (c[0] as { event: string }).event === 'TASK_BLOCKED')
@@ -339,7 +368,7 @@ describe('generateTaskForAssignment', () => {
     const client = await createTestClient(org.id)
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Folha de pagamento', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 1, dueDayOfPeriod: 15, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 15, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: -2, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
@@ -349,8 +378,8 @@ describe('generateTaskForAssignment', () => {
     const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
     const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
-    const competence = new Date(Date.UTC(2026, 1, 1))
-    const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+    const dueMonth = new Date(Date.UTC(2026, 2, 1))
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, dueMonth)
     expect(outcome.status).toBe('SUCCESS')
     if (outcome.status !== 'SUCCESS') throw new Error('unreachable')
 
@@ -366,14 +395,18 @@ describe('generateTaskForAssignment', () => {
     const { template, assignment } = await setup()
     const spy = vi.spyOn(queue, 'enqueueNotification').mockRejectedValueOnce(new Error('ECONNREFUSED'))
 
-    const competence = new Date(Date.UTC(2026, 1, 1))
-    const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+    const dueMonth = new Date(Date.UTC(2026, 2, 1))
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, dueMonth)
 
     // (a) a função continua retornando SUCCESS mesmo com a notificação falhando
     expect(outcome.status).toBe('SUCCESS')
     if (outcome.status !== 'SUCCESS') throw new Error('unreachable')
 
-    // (b) o log de geração continua SUCCESS — não foi sobrescrito pra FAILED pelo catch genérico
+    // (b) o log de geração continua SUCCESS — não foi sobrescrito pra FAILED pelo catch genérico.
+    // Busca a competência real gravada na Task (derivada de dueMonth), não um valor recalculado
+    // à mão no teste — assim a asserção verifica o comportamento real do serviço.
+    const createdTask = await prisma.task.findUniqueOrThrow({ where: { id: outcome.taskId } })
+    const competence = createdTask.competence!
     const log = await prisma.recurringGenerationLog.findUnique({
       where: { templateId_clientId_competence: { templateId: template.id, clientId: assignment.clientId, competence } },
     })
@@ -382,7 +415,7 @@ describe('generateTaskForAssignment', () => {
 
     // (c) a chave de idempotência não foi reaberta — uma segunda tentativa continua bloqueada
     spy.mockResolvedValue()
-    const second = await generateTaskForAssignment(template.id, assignment.id, competence)
+    const second = await generateTaskForAssignment(template.id, assignment.id, dueMonth)
     expect(second.status).toBe('ALREADY_EXISTS')
 
     const count = await prisma.task.count({ where: { recurringTemplateId: template.id } })
@@ -395,9 +428,9 @@ describe('generateTaskForAssignment', () => {
     const { template, assignment } = await setup()
     vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
-    const competence = new Date(Date.UTC(2026, 1, 1))
-    const first = await generateTaskForAssignment(template.id, assignment.id, competence)
-    const second = await generateTaskForAssignment(template.id, assignment.id, competence)
+    const dueMonth = new Date(Date.UTC(2026, 2, 1))
+    const first = await generateTaskForAssignment(template.id, assignment.id, dueMonth)
+    const second = await generateTaskForAssignment(template.id, assignment.id, dueMonth)
 
     expect(first.status).toBe('SUCCESS')
     expect(second.status).toBe('ALREADY_EXISTS')
@@ -425,13 +458,16 @@ describe('generateTaskForAssignment', () => {
     }) as unknown as typeof prisma.$transaction
 
     try {
-      const competence = new Date(Date.UTC(2026, 1, 1))
-      const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+      const dueMonth = new Date(Date.UTC(2026, 2, 1))
+      const outcome = await generateTaskForAssignment(template.id, assignment.id, dueMonth)
 
       expect(outcome.status).toBe('FAILED')
 
-      const log = await prisma.recurringGenerationLog.findUnique({
-        where: { templateId_clientId_competence: { templateId: template.id, clientId: assignment.clientId, competence } },
+      // Nenhuma Task foi criada (falha simulada), então não há como ler a competência real de
+      // volta — busca pelo único log desse template/cliente em vez de recalcular a competência
+      // derivada à mão no teste.
+      const log = await prisma.recurringGenerationLog.findFirst({
+        where: { templateId: template.id, clientId: assignment.clientId },
       })
       expect(log?.status).toBe('FAILED')
       expect(spy).toHaveBeenCalledWith(expect.objectContaining({ event: 'RECURRING_GENERATION_FAILED' }))
@@ -445,12 +481,17 @@ describe('generateTaskForAssignment', () => {
     const { template, assignment } = await setup()
     vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
-    const competence = new Date(Date.UTC(2026, 1, 1))
+    // competence é o valor já gravado no log (como o cron/uma tentativa anterior teria salvo).
+    // dueMonth é o mês de vencimento equivalente que generateTaskForAssignment recebe agora —
+    // com competenceMonthOffset=1, dueMonth = competence + 1 mês, pra derivar a mesma competência
+    // e colidir com o log FAILED existente.
+    const competence = new Date(Date.UTC(2026, 1, 1)) // fevereiro
+    const dueMonth = new Date(Date.UTC(2026, 2, 1)) // março
     await prisma.recurringGenerationLog.create({
       data: { templateId: template.id, clientId: assignment.clientId, competence, status: 'FAILED', errorMessage: 'erro antigo' },
     })
 
-    const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, dueMonth)
     expect(outcome.status).toBe('SUCCESS')
 
     vi.restoreAllMocks()
@@ -460,14 +501,15 @@ describe('generateTaskForAssignment', () => {
     const { template, assignment } = await setup()
     vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
-    const competence = new Date(Date.UTC(2026, 1, 1))
+    const competence = new Date(Date.UTC(2026, 1, 1)) // fevereiro
+    const dueMonth = new Date(Date.UTC(2026, 2, 1)) // março (competenceMonthOffset=1)
     await prisma.recurringGenerationLog.create({
       data: { templateId: template.id, clientId: assignment.clientId, competence, status: 'FAILED', errorMessage: 'erro antigo' },
     })
 
     const [first, second] = await Promise.all([
-      generateTaskForAssignment(template.id, assignment.id, competence),
-      generateTaskForAssignment(template.id, assignment.id, competence),
+      generateTaskForAssignment(template.id, assignment.id, dueMonth),
+      generateTaskForAssignment(template.id, assignment.id, dueMonth),
     ])
 
     const statuses = [first.status, second.status].sort()
@@ -493,7 +535,7 @@ describe('generateManually', () => {
     const client = await createTestClient(org.id)
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'X', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 5,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -507,17 +549,17 @@ describe('generateManually', () => {
     const { template, assignment } = await setupTemplate()
     vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
-    const competence = new Date().toISOString()
-    await generateManually(template.id, assignment.id, template.organizationId, competence)
+    const dueMonthOverride = new Date().toISOString()
+    await generateManually(template.id, assignment.id, template.organizationId, dueMonthOverride)
 
     await expect(
-      generateManually(template.id, assignment.id, template.organizationId, competence),
+      generateManually(template.id, assignment.id, template.organizationId, dueMonthOverride),
     ).rejects.toMatchObject({ statusCode: 409 })
 
     vi.restoreAllMocks()
   })
 
-  it('canonicaliza um competenceOverride não-canônico pro início do período (MONTHLY)', async () => {
+  it('canonicaliza um dueMonthOverride não-canônico pro início do período (MONTHLY)', async () => {
     const { template, assignment } = await setupTemplate()
     vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
@@ -526,8 +568,139 @@ describe('generateManually', () => {
 
     const { taskId } = await generateManually(template.id, assignment.id, template.organizationId, nonCanonical)
 
+    // competenceMonthOffset=0 nesse template → competência derivada coincide com o mês de
+    // vencimento canonicalizado (setembro); dueDayOfPeriod=10 → vence 10/setembro.
     const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } })
     expect(task.competence?.toISOString().slice(0, 10)).toBe('2026-09-01')
+    expect(task.dueDate?.toISOString().slice(0, 10)).toBe('2026-09-10')
+
+    vi.restoreAllMocks()
+  })
+})
+
+describe('generateBulkForTemplate', () => {
+  it('gera parcial: sucesso + já existe + falha de ID inválido no mesmo lote, sem derrubar os outros', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const clientA = await createTestClient(org.id)
+    const clientB = await createTestClient(org.id)
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'Lote', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    const assignmentA = await createAssignment(template.id, org.id, { clientId: clientA.id })
+    const assignmentB = await createAssignment(template.id, org.id, { clientId: clientB.id })
+
+    const dueMonth = new Date(Date.UTC(2026, 9, 1)).toISOString()
+
+    // Gera uma vez só pra clientB, pra forçar ALREADY_EXISTS no lote
+    await generateTaskForAssignment(template.id, assignmentB.id, new Date(Date.UTC(2026, 9, 1)))
+
+    const result = await generateBulkForTemplate(template.id, org.id, dueMonth, [
+      assignmentA.id,
+      assignmentB.id,
+      'cmxxxxxxxxxxxxxxxxxxxxxxx0', // id válido no formato cuid mas inexistente
+    ])
+
+    expect(result.generated).toBe(1)
+    expect(result.alreadyExists).toBe(1)
+    expect(result.failed).toHaveLength(1)
+    expect(result.failed[0].errorMessage).toContain('não encontrado')
+
+    vi.restoreAllMocks()
+  })
+})
+
+describe('generateBulkForAllTemplates', () => {
+  it('roda todos os templates ativos da org, inclusive os sem vínculo (0 geradas)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const withAssignment = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'Com vínculo', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    await createAssignment(withAssignment.id, org.id, { clientId: client.id })
+
+    await createTemplate(org.id, {
+      departmentId: dept.id, title: 'Sem vínculo', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+
+    const dueMonth = new Date(Date.UTC(2026, 9, 1)).toISOString()
+    const summaries = await generateBulkForAllTemplates(org.id, dueMonth)
+
+    expect(summaries).toHaveLength(2)
+    const withAssignmentSummary = summaries.find((s) => s.templateTitle === 'Com vínculo')
+    const withoutAssignmentSummary = summaries.find((s) => s.templateTitle === 'Sem vínculo')
+    expect(withAssignmentSummary?.result.generated).toBe(1)
+    expect(withoutAssignmentSummary?.result.generated).toBe(0)
+
+    vi.restoreAllMocks()
+  })
+})
+
+describe('getFailedGenerations', () => {
+  it('retorna falhas com nome do cliente, e trata clientId órfão sem quebrar', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'Falhável', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+
+    await prisma.recurringGenerationLog.create({
+      data: {
+        templateId: template.id, clientId: client.id,
+        competence: new Date(Date.UTC(2026, 8, 1)),
+        status: 'FAILED', errorMessage: 'Erro de teste',
+      },
+    })
+    // clientId que não existe mais (simula cliente excluído depois da falha)
+    await prisma.recurringGenerationLog.create({
+      data: {
+        templateId: template.id, clientId: 'cmxxxxxxxxxxxxxxxxxxxxxxx1',
+        competence: new Date(Date.UTC(2026, 8, 1)),
+        status: 'FAILED', errorMessage: 'Erro órfão',
+      },
+    })
+
+    const failures = await getFailedGenerations(org.id)
+    expect(failures).toHaveLength(2)
+    const withClient = failures.find((f) => f.clientId === client.id)
+    const orphan = failures.find((f) => f.clientId === 'cmxxxxxxxxxxxxxxxxxxxxxxx1')
+    expect(withClient?.clientName).toBe(client.name)
+    expect(orphan?.clientName).toBe('(cliente removido)')
 
     vi.restoreAllMocks()
   })
