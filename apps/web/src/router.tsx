@@ -21,6 +21,7 @@ import Departments from '@/pages/app/settings/Departments'
 import RecurringTemplates from '@/pages/app/settings/RecurringTemplates'
 import RecurringTemplateForm from '@/pages/app/settings/RecurringTemplateForm'
 import RecurringTemplateManage from '@/pages/app/settings/RecurringTemplateManage'
+import RecurringGenerationConsole from '@/pages/app/settings/RecurringGenerationConsole'
 import ClientUsers from '@/pages/app/settings/ClientUsers'
 import ClientUserForm from '@/pages/app/settings/ClientUserForm'
 import OSTemplates from '@/pages/app/settings/OSTemplates'
@@ -156,6 +157,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <RecurringTemplateManage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/recurring-generation',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <RecurringGenerationConsole />
           </ProtectedRoute>
         ),
       },
