@@ -18,6 +18,7 @@ const monthlyRules: RecurrenceDateRules = {
   periodicity: 'MONTHLY',
   competenceMonthOffset: 1,
   dueDayOfPeriod: 15,
+  dueMonthAnchor: 1,
   dueBusinessDayRoll: 'NONE',
   targetOffsetDays: -2,
   targetBusinessDayRoll: 'NONE',
@@ -161,6 +162,31 @@ describe('computeDueMonthsToGenerate', () => {
   it('lança erro se chamada com periodicidade WEEKLY', () => {
     const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'WEEKLY' }
     expect(() => computeDueMonthsToGenerate(new Date(Date.UTC(2026, 0, 20)), rules)).toThrow()
+  })
+
+  it('trimestral: dueMonthAnchor=2 gera no grupo Fev/Mai/Ago/Nov, não no grupo padrão Jan/Abr/Jul/Out', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'QUARTERLY', dueMonthAnchor: 2, generationMonthOffset: 1 }
+    const triggersFebGroup = new Date(Date.UTC(2026, 0, 20)) // janeiro -> +1 mês = fevereiro (grupo 2)
+    const doesNotTrigger = new Date(Date.UTC(2026, 1, 20)) // fevereiro -> +1 mês = março (grupo 3, não o 2)
+    expect(computeDueMonthsToGenerate(triggersFebGroup, rules).map((d) => d.toISOString().slice(0, 10)))
+      .toEqual(['2026-02-01'])
+    expect(computeDueMonthsToGenerate(doesNotTrigger, rules)).toEqual([])
+  })
+
+  it('trimestral: dueMonthAnchor=3 gera no grupo Mar/Jun/Set/Dez', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'QUARTERLY', dueMonthAnchor: 3, generationMonthOffset: 1 }
+    const triggersMarGroup = new Date(Date.UTC(2026, 1, 20)) // fevereiro -> +1 mês = março (grupo 3)
+    expect(computeDueMonthsToGenerate(triggersMarGroup, rules).map((d) => d.toISOString().slice(0, 10)))
+      .toEqual(['2026-03-01'])
+  })
+
+  it('anual: dueMonthAnchor=3 (DEFIS em março) gera só quando o mês de vencimento calculado é março', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'ANNUAL', dueMonthAnchor: 3, generationMonthOffset: 1 }
+    const triggersMarch = new Date(Date.UTC(2026, 1, 20)) // fevereiro -> +1 mês = março
+    const doesNotTrigger = new Date(Date.UTC(2026, 0, 20)) // janeiro -> +1 mês = fevereiro
+    expect(computeDueMonthsToGenerate(triggersMarch, rules).map((d) => d.toISOString().slice(0, 10)))
+      .toEqual(['2026-03-01'])
+    expect(computeDueMonthsToGenerate(doesNotTrigger, rules)).toEqual([])
   })
 
   it('regressão do bug original: DAS com generationDayOfPeriod=20, generationMonthOffset=1, dueDayOfPeriod=10, competenceMonthOffset=1 — dispara 20/set, vence 10/out, competência setembro', () => {

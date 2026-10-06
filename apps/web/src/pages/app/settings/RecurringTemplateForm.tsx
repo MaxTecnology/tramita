@@ -21,6 +21,13 @@ const GENERATION_MONTH_OFFSET_OPTIONS = [0, 1, 2, 3]
 const COMPETENCE_MONTH_OFFSET_OPTIONS = [0, 1, 2, 3]
 const WEEKDAY_LABEL: Record<number, string> = { 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado', 7: 'Domingo' }
 
+const QUARTERLY_ANCHOR_OPTIONS = [
+  { value: 1, label: 'Jan, Abr, Jul, Out' },
+  { value: 2, label: 'Fev, Mai, Ago, Nov' },
+  { value: 3, label: 'Mar, Jun, Set, Dez' },
+]
+const MONTH_LABEL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+
 const BUSINESS_DAY_ROLL_LABEL: Record<RecurringTaskTemplate['dueBusinessDayRoll'], string> = {
   NONE: 'Não ajustar',
   FORWARD: 'Empurrar pro próximo dia útil',
@@ -35,6 +42,7 @@ interface FormState {
   priority: RecurringTaskTemplate['priority']
   dueDayOfPeriod: number
   dueBusinessDayRoll: RecurringTaskTemplate['dueBusinessDayRoll']
+  dueMonthAnchor: number
   competenceMonthOffset: number
   targetOffsetDays: number
   targetBusinessDayRoll: RecurringTaskTemplate['targetBusinessDayRoll']
@@ -51,7 +59,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   departmentId: '', title: '', description: '', periodicity: 'MONTHLY', priority: 'MEDIUM',
-  dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE', competenceMonthOffset: 1,
+  dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE', dueMonthAnchor: 1, competenceMonthOffset: 1,
   targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
   generationMonthOffset: 1, generationDayOfPeriod: 20,
   autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -119,7 +127,7 @@ export default function RecurringTemplateForm() {
     setForm({
       departmentId: template.departmentId, title: template.title, description: template.description ?? '',
       periodicity: template.periodicity, priority: template.priority, dueDayOfPeriod: template.dueDayOfPeriod,
-      dueBusinessDayRoll: template.dueBusinessDayRoll, competenceMonthOffset: template.competenceMonthOffset, targetOffsetDays: template.targetOffsetDays,
+      dueBusinessDayRoll: template.dueBusinessDayRoll, dueMonthAnchor: template.dueMonthAnchor, competenceMonthOffset: template.competenceMonthOffset, targetOffsetDays: template.targetOffsetDays,
       targetBusinessDayRoll: template.targetBusinessDayRoll, generationMonthOffset: template.generationMonthOffset,
       generationDayOfPeriod: template.generationDayOfPeriod, autoCompleteOnAllActivitiesDone: template.autoCompleteOnAllActivitiesDone,
       notifyViaWhatsapp: template.notifyViaWhatsapp, notifyViaEmail: template.notifyViaEmail, visibleToClient: template.visibleToClient,
@@ -146,6 +154,7 @@ export default function RecurringTemplateForm() {
   })
 
   const isWeekly = form.periodicity === 'WEEKLY'
+  const isQuarterlyOrAnnual = form.periodicity === 'QUARTERLY' || form.periodicity === 'ANNUAL'
   const dayOptions = isWeekly ? [1, 2, 3, 4, 5, 6, 7] : Array.from({ length: 31 }, (_, i) => i + 1)
 
   if (isEditing && isLoading) return <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
@@ -205,15 +214,41 @@ export default function RecurringTemplateForm() {
           </select>
         </div>
 
-        <div className="space-y-1.5">
-          <Label>{isWeekly ? 'Dia da semana do vencimento' : 'Dia do vencimento'}</Label>
-          <select
-            value={form.dueDayOfPeriod}
-            onChange={(e) => setForm({ ...form, dueDayOfPeriod: Number(e.target.value) })}
-            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-          >
-            {dayOptions.map((d) => <option key={d} value={d}>{isWeekly ? WEEKDAY_LABEL[d] : d}</option>)}
-          </select>
+        <div className={isQuarterlyOrAnnual ? 'grid grid-cols-2 gap-3' : 'space-y-1.5'}>
+          <div className="space-y-1.5">
+            <Label>{isWeekly ? 'Dia da semana do vencimento' : 'Dia do vencimento'}</Label>
+            <select
+              value={form.dueDayOfPeriod}
+              onChange={(e) => setForm({ ...form, dueDayOfPeriod: Number(e.target.value) })}
+              className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
+            >
+              {dayOptions.map((d) => <option key={d} value={d}>{isWeekly ? WEEKDAY_LABEL[d] : d}</option>)}
+            </select>
+          </div>
+          {form.periodicity === 'QUARTERLY' && (
+            <div className="space-y-1.5">
+              <Label>Mês</Label>
+              <select
+                value={form.dueMonthAnchor}
+                onChange={(e) => setForm({ ...form, dueMonthAnchor: Number(e.target.value) })}
+                className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
+              >
+                {QUARTERLY_ANCHOR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          )}
+          {form.periodicity === 'ANNUAL' && (
+            <div className="space-y-1.5">
+              <Label>Mês</Label>
+              <select
+                value={form.dueMonthAnchor}
+                onChange={(e) => setForm({ ...form, dueMonthAnchor: Number(e.target.value) })}
+                className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
+              >
+                {MONTH_LABEL.map((label, i) => <option key={i} value={i + 1}>{label}</option>)}
+              </select>
+            </div>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label>Se o vencimento cair em fim de semana</Label>

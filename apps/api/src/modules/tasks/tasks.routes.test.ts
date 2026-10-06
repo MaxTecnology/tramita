@@ -144,7 +144,7 @@ describe('GET /tasks', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Folha mensal', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,

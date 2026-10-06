@@ -444,6 +444,11 @@ model RecurringTaskTemplate {
   dueDayOfPeriod     Int
   dueBusinessDayRoll BusinessDayRoll @default(NONE)
 
+  // Mês-âncora de vencimento — só relevante pra QUARTERLY (valor 1-3, define qual dos 3 grupos
+  // de meses: 1="Jan,Abr,Jul,Out", 2="Fev,Mai,Ago,Nov", 3="Mar,Jun,Set,Dez", via mês % 3) e
+  // ANNUAL (valor 1-12, mês literal do vencimento). Ignorado por MONTHLY/WEEKLY.
+  dueMonthAnchor Int @default(1)
+
   competenceMonthOffset Int @default(1)
 
   targetOffsetDays      Int             @default(0)

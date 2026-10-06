@@ -5,6 +5,7 @@ export interface RecurrenceDateRules {
   periodicity: Periodicity
   dueDayOfPeriod: number
   dueBusinessDayRoll: BusinessDayRoll
+  dueMonthAnchor: number
   competenceMonthOffset: number
   targetOffsetDays: number
   targetBusinessDayRoll: BusinessDayRoll
@@ -128,9 +129,11 @@ export function computeDueMonthsToGenerate(today: Date, rules: RecurrenceDateRul
     case 'MONTHLY':
       return [dueMonthStart]
     case 'QUARTERLY':
-      return dueMonthStart.getUTCMonth() % 3 === 0 ? [dueMonthStart] : []
+      // dueMonthAnchor 1-3 define o grupo (1="Jan,Abr,Jul,Out", 2="Fev,Mai,Ago,Nov",
+      // 3="Mar,Jun,Set,Dez") — meses do mesmo grupo têm o mesmo resto na divisão por 3.
+      return dueMonthStart.getUTCMonth() % 3 === (rules.dueMonthAnchor - 1) % 3 ? [dueMonthStart] : []
     case 'ANNUAL':
-      return dueMonthStart.getUTCMonth() === 0 ? [dueMonthStart] : []
+      return dueMonthStart.getUTCMonth() === rules.dueMonthAnchor - 1 ? [dueMonthStart] : []
   }
 }
 

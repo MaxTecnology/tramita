@@ -14,6 +14,10 @@ export const createTemplateSchema = z.object({
   dueDayOfPeriod: z.number().int().min(1).max(31),
   dueBusinessDayRoll: z.enum(['NONE', 'FORWARD', 'BACKWARD']).default('NONE'),
 
+  // QUARTERLY: 1-3, define o grupo de meses (1="Jan,Abr,Jul,Out", 2="Fev,Mai,Ago,Nov",
+  // 3="Mar,Jun,Set,Dez"). ANNUAL: 1-12, mês literal do vencimento. Ignorado por MONTHLY/WEEKLY.
+  dueMonthAnchor: z.number().int().min(1).max(12).default(1),
+
   competenceMonthOffset: z.number().int().min(0).default(1),
 
   targetOffsetDays: z.number().int().default(0),

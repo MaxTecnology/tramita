@@ -21,7 +21,7 @@ describe('runRecurringTasksGeneration', () => {
 
     const templateTriggersToday = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Dispara hoje', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -31,7 +31,7 @@ describe('runRecurringTasksGeneration', () => {
 
     const templateDoesNotTrigger = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Não dispara hoje', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 5,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -61,7 +61,7 @@ describe('runRecurringTasksGeneration', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Inativo', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -88,7 +88,7 @@ describe('runRecurringTasksGeneration', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'X', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -116,7 +116,7 @@ describe('runRecurringTasksGeneration', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'DAS', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       competenceMonthOffset: 1,
       generationMonthOffset: 1, generationDayOfPeriod: 20,

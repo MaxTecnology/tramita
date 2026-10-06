@@ -158,6 +158,7 @@ export interface RecurringTaskTemplate {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
   dueDayOfPeriod: number
   dueBusinessDayRoll: 'NONE' | 'FORWARD' | 'BACKWARD'
+  dueMonthAnchor: number
   competenceMonthOffset: number
   targetOffsetDays: number
   targetBusinessDayRoll: 'NONE' | 'FORWARD' | 'BACKWARD'

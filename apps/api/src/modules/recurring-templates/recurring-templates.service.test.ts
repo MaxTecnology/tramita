@@ -33,7 +33,7 @@ describe('createTemplate', () => {
       title: 'Folha de pagamento',
       periodicity: 'MONTHLY', priority: 'MEDIUM',
       competenceMonthOffset: 1,
-      dueDayOfPeriod: 15,
+      dueDayOfPeriod: 15, dueMonthAnchor: 1,
       dueBusinessDayRoll: 'NONE',
       targetOffsetDays: -2,
       targetBusinessDayRoll: 'NONE',
@@ -64,7 +64,7 @@ describe('createTemplate', () => {
         title: 'X',
         periodicity: 'MONTHLY', priority: 'MEDIUM',
         competenceMonthOffset: 0,
-        dueDayOfPeriod: 10,
+        dueDayOfPeriod: 10, dueMonthAnchor: 1,
         dueBusinessDayRoll: 'NONE',
         targetOffsetDays: 0,
         targetBusinessDayRoll: 'NONE',
@@ -92,7 +92,7 @@ describe('createTemplate', () => {
         title: 'X',
         periodicity: 'WEEKLY', priority: 'MEDIUM',
         competenceMonthOffset: 0,
-        dueDayOfPeriod: 10,
+        dueDayOfPeriod: 10, dueMonthAnchor: 1,
         dueBusinessDayRoll: 'NONE',
         targetOffsetDays: 0,
         targetBusinessDayRoll: 'NONE',
@@ -120,7 +120,7 @@ describe('updateTemplate', () => {
       title: 'X',
       periodicity: 'MONTHLY', priority: 'MEDIUM',
       competenceMonthOffset: 0,
-      dueDayOfPeriod: 10,
+      dueDayOfPeriod: 10, dueMonthAnchor: 1,
       dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0,
       targetBusinessDayRoll: 'NONE',
@@ -152,7 +152,7 @@ describe('createAssignment', () => {
       title: 'X',
       periodicity: 'MONTHLY', priority: 'MEDIUM',
       competenceMonthOffset: 0,
-      dueDayOfPeriod: 10,
+      dueDayOfPeriod: 10, dueMonthAnchor: 1,
       dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0,
       targetBusinessDayRoll: 'NONE',
@@ -182,7 +182,7 @@ describe('createAssignment', () => {
       title: 'X',
       periodicity: 'MONTHLY', priority: 'MEDIUM',
       competenceMonthOffset: 0,
-      dueDayOfPeriod: 10,
+      dueDayOfPeriod: 10, dueMonthAnchor: 1,
       dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0,
       targetBusinessDayRoll: 'NONE',
@@ -214,7 +214,7 @@ describe('createAssignment', () => {
       title: 'X',
       periodicity: 'MONTHLY', priority: 'MEDIUM',
       competenceMonthOffset: 0,
-      dueDayOfPeriod: 10,
+      dueDayOfPeriod: 10, dueMonthAnchor: 1,
       dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0,
       targetBusinessDayRoll: 'NONE',
@@ -246,7 +246,7 @@ describe('deleteTemplate (com assignment vinculado)', () => {
       title: 'X',
       periodicity: 'MONTHLY', priority: 'MEDIUM',
       competenceMonthOffset: 0,
-      dueDayOfPeriod: 10,
+      dueDayOfPeriod: 10, dueMonthAnchor: 1,
       dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0,
       targetBusinessDayRoll: 'NONE',
@@ -274,7 +274,7 @@ describe('generateTaskForAssignment', () => {
     const client = await createTestClient(org.id)
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Folha de pagamento', periodicity: 'MONTHLY', priority,
-      competenceMonthOffset: 1, dueDayOfPeriod: 15, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 15, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: -2, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -329,7 +329,7 @@ describe('generateTaskForAssignment', () => {
     const { org, dept, client } = await setup()
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'DAS', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       competenceMonthOffset: 1,
       generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -368,7 +368,7 @@ describe('generateTaskForAssignment', () => {
     const client = await createTestClient(org.id)
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Folha de pagamento', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      competenceMonthOffset: 1, dueDayOfPeriod: 15, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 15, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: -2, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
@@ -535,7 +535,7 @@ describe('generateManually', () => {
     const client = await createTestClient(org.id)
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'X', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      competenceMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 0, dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 5,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -589,7 +589,7 @@ describe('generateBulkForTemplate', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Lote', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       competenceMonthOffset: 1,
       generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -628,7 +628,7 @@ describe('generateBulkForTemplate', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Lote com exceção', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       competenceMonthOffset: 1,
       generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -677,7 +677,7 @@ describe('generateBulkForTemplate', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Semanal em lote', periodicity: 'WEEKLY', priority: 'MEDIUM',
-      dueDayOfPeriod: 5, dueBusinessDayRoll: 'NONE',
+      dueDayOfPeriod: 5, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       competenceMonthOffset: 0,
       generationMonthOffset: 0, generationDayOfPeriod: 1,
@@ -710,7 +710,7 @@ describe('generateBulkForAllTemplates', () => {
 
     const withAssignment = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Com vínculo', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       competenceMonthOffset: 1,
       generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -721,7 +721,7 @@ describe('generateBulkForAllTemplates', () => {
 
     await createTemplate(org.id, {
       departmentId: dept.id, title: 'Sem vínculo', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       competenceMonthOffset: 1,
       generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -752,7 +752,7 @@ describe('getFailedGenerations', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Falhável', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       competenceMonthOffset: 1,
       generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -796,7 +796,7 @@ describe('getFailedGenerations', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Falhável com offset', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       competenceMonthOffset: 1,
       generationMonthOffset: 1, generationDayOfPeriod: 20,
