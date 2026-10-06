@@ -21,7 +21,7 @@ describe('runRecurringTasksGeneration', () => {
 
     const templateTriggersToday = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Dispara hoje', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -31,7 +31,7 @@ describe('runRecurringTasksGeneration', () => {
 
     const templateDoesNotTrigger = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Não dispara hoje', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 5,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -61,7 +61,7 @@ describe('runRecurringTasksGeneration', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Inativo', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -88,7 +88,7 @@ describe('runRecurringTasksGeneration', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'X', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
@@ -101,6 +101,37 @@ describe('runRecurringTasksGeneration', () => {
 
     const count = await prisma.task.count({ where: { recurringTemplateId: template.id } })
     expect(count).toBe(0)
+
+    vi.restoreAllMocks()
+  })
+
+  it('tarefa gerada pelo cron nunca nasce com vencimento no passado (regressão do bug original)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'DAS', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    await createAssignment(template.id, org.id, { clientId: client.id })
+
+    const trigger = new Date(Date.UTC(2026, 8, 20)) // 20 de setembro
+    await runRecurringTasksGeneration(trigger)
+
+    const task = await prisma.task.findFirstOrThrow({ where: { recurringTemplateId: template.id } })
+    expect(task.dueDate!.getTime()).toBeGreaterThan(trigger.getTime())
+    expect(task.dueDate?.toISOString().slice(0, 10)).toBe('2026-10-10')
+    expect(task.competence?.toISOString().slice(0, 10)).toBe('2026-09-01')
 
     vi.restoreAllMocks()
   })

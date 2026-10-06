@@ -1,7 +1,7 @@
 import { Queue, Worker } from 'bullmq'
 import { bullmqRedis } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
-import { computeCompetencesToGenerate, type RecurrenceDateRules } from '@/modules/recurring-templates/recurrence-dates'
+import { computeCompetencesToGenerate, computeDueMonthsToGenerate, type RecurrenceDateRules } from '@/modules/recurring-templates/recurrence-dates'
 import { generateTaskForAssignment } from '@/modules/recurring-templates/recurring-templates.service'
 
 export async function runRecurringTasksGeneration(today: Date = new Date()): Promise<void> {
@@ -11,27 +11,28 @@ export async function runRecurringTasksGeneration(today: Date = new Date()): Pro
   })
 
   for (const template of templates) {
-    let competences: Date[]
+    let dueMonths: Date[]
     try {
       const rules: RecurrenceDateRules = template
-      competences = computeCompetencesToGenerate(today, rules)
+      // WEEKLY continua ancorado em competência (a própria semana); as demais periodicidades
+      // agora calculam direto o mês de vencimento — ver spec 2026-10-06.
+      dueMonths = rules.periodicity === 'WEEKLY'
+        ? computeCompetencesToGenerate(today, rules)
+        : computeDueMonthsToGenerate(today, rules)
     } catch {
-      // Falha no cálculo de competência não deve derrubar o cron inteiro — pula esse
-      // template nesta execução, o próximo dia tenta de novo. `generateTaskForAssignment`
-      // já cobre a maioria dos erros com log+alerta; isso aqui é só um cinto de segurança
-      // extra pra um bug de cálculo que nem chega a rodar por assignment.
+      // Falha no cálculo não deve derrubar o cron inteiro — pula esse template nesta
+      // execução, o próximo dia tenta de novo.
       continue
     }
-    if (competences.length === 0) continue
+    if (dueMonths.length === 0) continue
 
     for (const assignment of template.assignments) {
-      for (const competence of competences) {
+      for (const dueMonth of dueMonths) {
         try {
-          await generateTaskForAssignment(template.id, assignment.id, competence)
+          await generateTaskForAssignment(template.id, assignment.id, dueMonth)
         } catch {
           // generateTaskForAssignment já captura e loga qualquer erro esperado (retorna
-          // FAILED, nunca deveria lançar) — esse catch é só defesa extra contra um bug
-          // inesperado, pra garantir que um assignment problemático nunca trava os demais.
+          // FAILED, nunca deveria lançar) — defesa extra contra bug inesperado.
         }
       }
     }
