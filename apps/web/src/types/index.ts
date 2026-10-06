@@ -209,6 +209,8 @@ export interface FailedGeneration {
   clientId: string
   clientName: string
   competence: string
+  dueMonth: string
+  retryable: boolean
   errorMessage: string
   createdAt: string
 }

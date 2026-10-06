@@ -3,9 +3,11 @@ import {
   computeDueDate,
   computeDueDateFromMonth,
   computeCompetenceFromDueMonth,
+  computeDueMonthFromCompetence,
   computeTargetDate,
   computeCompetencesToGenerate,
   computeDueMonthsToGenerate,
+  computeWeeklyCompetencesInMonth,
   computeCurrentPeriodStart,
   normalizeToPeriodStart,
   computeNextDueMonth,
@@ -59,6 +61,11 @@ describe('computeDueDateFromMonth', () => {
     const due = computeDueDateFromMonth(dueMonth, rules)
     expect(due.toISOString().slice(0, 10)).toBe('2026-04-30')
   })
+
+  it('lança erro se chamada com periodicidade WEEKLY', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'WEEKLY' }
+    expect(() => computeDueDateFromMonth(new Date(Date.UTC(2026, 2, 1)), rules)).toThrow()
+  })
 })
 
 describe('computeCompetenceFromDueMonth', () => {
@@ -72,6 +79,33 @@ describe('computeCompetenceFromDueMonth', () => {
     const dueMonth = new Date(Date.UTC(2026, 9, 1))
     const competence = computeCompetenceFromDueMonth(dueMonth, { ...monthlyRules, competenceMonthOffset: 0 })
     expect(competence.toISOString().slice(0, 10)).toBe('2026-10-01')
+  })
+
+  it('lança erro se chamada com periodicidade WEEKLY', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'WEEKLY' }
+    expect(() => computeCompetenceFromDueMonth(new Date(Date.UTC(2026, 9, 1)), rules)).toThrow()
+  })
+})
+
+describe('computeDueMonthFromCompetence', () => {
+  it('inverte computeCompetenceFromDueMonth: competência + competenceMonthOffset meses = mês de vencimento', () => {
+    const competence = new Date(Date.UTC(2026, 8, 1)) // setembro
+    const dueMonth = computeDueMonthFromCompetence(competence, { ...monthlyRules, competenceMonthOffset: 1 })
+    expect(dueMonth.toISOString().slice(0, 10)).toBe('2026-10-01')
+  })
+
+  it('WEEKLY: dueMonth é a própria competência', () => {
+    const competence = new Date(Date.UTC(2026, 1, 2)) // segunda-feira
+    const dueMonth = computeDueMonthFromCompetence(competence, { periodicity: 'WEEKLY', competenceMonthOffset: 1 })
+    expect(dueMonth.toISOString().slice(0, 10)).toBe('2026-02-02')
+  })
+})
+
+describe('computeWeeklyCompetencesInMonth', () => {
+  it('retorna todas as segundas-feiras do mês calendário de outubro/2026', () => {
+    const monthDate = new Date(Date.UTC(2026, 9, 15)) // outubro
+    const mondays = computeWeeklyCompetencesInMonth(monthDate).map((d) => d.toISOString().slice(0, 10))
+    expect(mondays).toEqual(['2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26'])
   })
 })
 

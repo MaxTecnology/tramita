@@ -667,6 +667,37 @@ describe('generateBulkForTemplate', () => {
       vi.restoreAllMocks()
     }
   })
+
+  it('template WEEKLY: gera uma Task por cada segunda-feira do mês escolhido, não só uma', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'Semanal em lote', periodicity: 'WEEKLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 5, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 0,
+      generationMonthOffset: 0, generationDayOfPeriod: 1,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+
+    // outubro/2026 tem 4 segundas-feiras: 05, 12, 19, 26
+    const dueMonth = new Date(Date.UTC(2026, 9, 15)).toISOString()
+    const result = await generateBulkForTemplate(template.id, org.id, dueMonth, [assignment.id])
+
+    expect(result.generated).toBe(4)
+    expect(result.failed).toHaveLength(0)
+
+    const tasks = await prisma.task.findMany({ where: { recurringTemplateId: template.id } })
+    expect(tasks).toHaveLength(4)
+
+    vi.restoreAllMocks()
+  })
 })
 
 describe('generateBulkForAllTemplates', () => {
@@ -751,6 +782,58 @@ describe('getFailedGenerations', () => {
     const orphan = failures.find((f) => f.clientId === 'cmxxxxxxxxxxxxxxxxxxxxxxx1')
     expect(withClient?.clientName).toBe(client.name)
     expect(orphan?.clientName).toBe('(cliente removido)')
+
+    vi.restoreAllMocks()
+  })
+
+  it('deriva dueMonth = competência + competenceMonthOffset meses (não o contrário) e marca retryable corretamente', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const clientWithAssignment = await createTestClient(org.id)
+    const clientWithoutAssignment = await createTestClient(org.id)
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'Falhável com offset', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+
+    // Cliente ainda vinculado (ativo) ao template -> retryable: true
+    await createAssignment(template.id, org.id, { clientId: clientWithAssignment.id })
+
+    // competência logada = setembro/2026; com competenceMonthOffset=1, dueMonth esperado é
+    // outubro/2026 (setembro + 1 mês) — NUNCA agosto/2026 (setembro - 1 mês), que seria o bug
+    // original: retry gerando uma tarefa já vencida.
+    await prisma.recurringGenerationLog.create({
+      data: {
+        templateId: template.id, clientId: clientWithAssignment.id,
+        competence: new Date(Date.UTC(2026, 8, 1)),
+        status: 'FAILED', errorMessage: 'Erro de teste',
+      },
+    })
+    // Cliente sem vínculo ativo ao template -> retryable: false
+    await prisma.recurringGenerationLog.create({
+      data: {
+        templateId: template.id, clientId: clientWithoutAssignment.id,
+        competence: new Date(Date.UTC(2026, 8, 1)),
+        status: 'FAILED', errorMessage: 'Erro de teste 2',
+      },
+    })
+
+    const failures = await getFailedGenerations(org.id)
+    const withAssignment = failures.find((f) => f.clientId === clientWithAssignment.id)
+    const withoutAssignment = failures.find((f) => f.clientId === clientWithoutAssignment.id)
+
+    expect(withAssignment?.dueMonth.slice(0, 10)).toBe('2026-10-01')
+    expect(withAssignment?.retryable).toBe(true)
+    expect(withoutAssignment?.dueMonth.slice(0, 10)).toBe('2026-10-01')
+    expect(withoutAssignment?.retryable).toBe(false)
 
     vi.restoreAllMocks()
   })

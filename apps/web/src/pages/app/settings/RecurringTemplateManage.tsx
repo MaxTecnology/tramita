@@ -86,12 +86,13 @@ export default function RecurringTemplateManage() {
 
   const removeMutation = useMutation({
     mutationFn: (assignmentId: string) => api.delete(`/recurring-templates/${id}/assignments/${assignmentId}`),
-    onSuccess: () => {
+    onSuccess: (_data, assignmentId) => {
       toast.success('Vínculo removido')
       qc.invalidateQueries({ queryKey: ['recurring-assignments', id] })
       qc.invalidateQueries({ queryKey: ['recurring-assignments-all', id] })
       setSelected((prev) => {
         const next = new Set(prev)
+        next.delete(assignmentId)
         return next
       })
     },
@@ -104,7 +105,9 @@ export default function RecurringTemplateManage() {
         assignmentIds: [...selected],
       }).then((r) => r.data),
     onSuccess: (result) => {
-      toast.success(`${result.generated} geradas, ${result.alreadyExists} já existiam, ${result.failed.length} falharam`)
+      const message = `${result.generated} geradas, ${result.alreadyExists} já existiam, ${result.failed.length} falharam`
+      if (result.failed.length > 0) toast.error(message)
+      else toast.success(message)
       qc.invalidateQueries({ queryKey: ['recurring-generation-log', id] })
       qc.invalidateQueries({ queryKey: ['recurring-failed-generations'] })
       setSelected(new Set())
@@ -118,7 +121,7 @@ export default function RecurringTemplateManage() {
   const retryMutation = useMutation({
     mutationFn: (failure: FailedGeneration) =>
       api.post<BulkGenerationResult>(`/recurring-templates/${failure.templateId}/assignments/bulk-generate`, {
-        dueMonth: failure.competence,
+        dueMonth: failure.dueMonth,
         // Usa allAssignments (sem filtro de busca) — não assignments (filtrado pelo search state),
         // senão o cliente da falha pode não estar na lista filtrada e assignmentIds fica vazio,
         // o que falha a validação .min(1) do backend e quebra o botão "Gerar novamente".
@@ -177,14 +180,20 @@ export default function RecurringTemplateManage() {
             {templateFailures.map((f, i) => (
               <li key={i} className="flex items-center justify-between text-xs text-danger-text">
                 <span>{f.clientName} — competência {new Date(f.competence).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })} — {f.errorMessage}</span>
-                <button
-                  type="button"
-                  onClick={() => retryMutation.mutate(f)}
-                  disabled={retryMutation.isPending}
-                  className="underline hover:no-underline flex-shrink-0 ml-2"
-                >
-                  Gerar novamente
-                </button>
+                {f.retryable ? (
+                  <button
+                    type="button"
+                    onClick={() => retryMutation.mutate(f)}
+                    disabled={retryMutation.isPending}
+                    className="underline hover:no-underline flex-shrink-0 ml-2"
+                  >
+                    Gerar novamente
+                  </button>
+                ) : (
+                  <span className="flex-shrink-0 ml-2 text-right italic">
+                    Cliente não está mais vinculado a este template — vincule novamente pra poder gerar
+                  </span>
+                )}
               </li>
             ))}
           </ul>

@@ -69,6 +69,9 @@ export function computeDueDate(competence: Date, rules: RecurrenceDateRules): Da
  * vencimento é a âncora (não mais derivado de uma "competência" abstrata).
  */
 export function computeDueDateFromMonth(dueMonthStart: Date, rules: RecurrenceDateRules): Date {
+  if (rules.periodicity === 'WEEKLY') {
+    throw new Error('computeDueDateFromMonth não serve pra WEEKLY — use computeDueDate')
+  }
   const year = dueMonthStart.getUTCFullYear()
   const month = dueMonthStart.getUTCMonth()
   const day = clampDayOfMonth(year, month, rules.dueDayOfPeriod)
@@ -78,7 +81,24 @@ export function computeDueDateFromMonth(dueMonthStart: Date, rules: RecurrenceDa
 
 /** Competência derivada do mês de vencimento — sempre `competenceMonthOffset` meses antes. */
 export function computeCompetenceFromDueMonth(dueMonthStart: Date, rules: RecurrenceDateRules): Date {
+  if (rules.periodicity === 'WEEKLY') {
+    throw new Error('computeCompetenceFromDueMonth não serve pra WEEKLY — dueMonth já É a competência nesse caso')
+  }
   return addMonthsUTC(dueMonthStart, -rules.competenceMonthOffset)
+}
+
+/**
+ * Inverso de computeCompetenceFromDueMonth — dado uma competência já conhecida (ex: de um
+ * log de geração que falhou), devolve o mês de vencimento que a gerou. Pra WEEKLY, dueMonth
+ * É a própria competência (mesma convenção usada em generateTaskForAssignment). Usado pelo
+ * retry de falhas: regenerar com a MESMA competência que falhou, não com um valor arbitrário.
+ */
+export function computeDueMonthFromCompetence(
+  competence: Date,
+  rules: Pick<RecurrenceDateRules, 'periodicity' | 'competenceMonthOffset'>,
+): Date {
+  if (rules.periodicity === 'WEEKLY') return competence
+  return addMonthsUTC(competence, rules.competenceMonthOffset)
 }
 
 export function computeTargetDate(dueDate: Date, rules: RecurrenceDateRules): Date {
@@ -134,6 +154,25 @@ export function computeCompetencesToGenerate(today: Date, rules: RecurrenceDateR
   let cursor = mondayOfWeek(competenceMonthStart)
   if (cursor < competenceMonthStart) cursor = addDaysUTC(cursor, 7)
   while (cursor < competenceMonthEnd) {
+    competences.push(cursor)
+    cursor = addDaysUTC(cursor, 7)
+  }
+  return competences
+}
+
+/**
+ * Todas as segundas-feiras (= competências semanais) dentro do mês calendário que contém
+ * `monthDate`. Diferente de computeCompetencesToGenerate (que deriva o mês a partir de "hoje"
+ * + generationMonthOffset, pro cron), esta função recebe o mês já escolhido explicitamente —
+ * usada pela geração em lote, onde o operador escolhe o mês na tela.
+ */
+export function computeWeeklyCompetencesInMonth(monthDate: Date): Date[] {
+  const monthStart = startOfMonthUTC(monthDate)
+  const monthEnd = addMonthsUTC(monthStart, 1)
+  const competences: Date[] = []
+  let cursor = mondayOfWeek(monthStart)
+  if (cursor < monthStart) cursor = addDaysUTC(cursor, 7)
+  while (cursor < monthEnd) {
     competences.push(cursor)
     cursor = addDaysUTC(cursor, 7)
   }

@@ -313,9 +313,10 @@ Cadastro de novo escritório (público — sem autenticação).
   "title": "string",
   "description": "string?",
   "periodicity": "WEEKLY|MONTHLY|QUARTERLY|ANNUAL",
-  "dueMonthOffset": 0,
+  "priority": "LOW|MEDIUM|HIGH|URGENT",
   "dueDayOfPeriod": 1,
   "dueBusinessDayRoll": "NONE|FORWARD|BACKWARD",
+  "competenceMonthOffset": 1,
   "targetOffsetDays": 0,
   "targetBusinessDayRoll": "NONE|FORWARD|BACKWARD",
   "generationMonthOffset": 1,
@@ -329,26 +330,43 @@ Cadastro de novo escritório (público — sem autenticação).
   "documentDeliveries": [{ "name": "string" }]
 }
 ```
+→ Vencimento é a âncora: `dueDayOfPeriod`/`dueBusinessDayRoll` definem o vencimento dentro do mês de vencimento; `competenceMonthOffset` deriva a competência subtraindo esse número de meses do mês de vencimento (exceto WEEKLY, onde a competência É a segunda-feira da semana — não há mês de vencimento isolado)
 ### PATCH `/recurring-templates/:id` _(ORG_ADMIN)_ — mesmo payload, todos os campos opcionais
 ### DELETE `/recurring-templates/:id` _(ORG_ADMIN)_ — 409 se houver vínculo de cliente ativo
 
-### GET `/recurring-templates/:id/assignments` _(ORG_ADMIN | ORG_MANAGER)_ — lista vínculos de cliente do template
+### GET `/recurring-templates/:id/assignments` _(ORG_ADMIN | ORG_MANAGER)_ — lista vínculos de cliente do template — `?q=` filtra por nome do cliente
 ### POST `/recurring-templates/:id/assignments` _(ORG_ADMIN)_
 ```json
-{ "clientId": "string", "boardId": "string", "columnId": "string" }
+{ "clientId": "string" }
 ```
 → 409 se o cliente já estiver vinculado a este template
-### PATCH `/recurring-templates/:id/assignments/:assignmentId` _(ORG_ADMIN)_ — `{ "boardId": "string?", "columnId": "string?", "isActive": "boolean?" }`
+### PATCH `/recurring-templates/:id/assignments/:assignmentId` _(ORG_ADMIN)_ — `{ "isActive": "boolean?" }`
 ### DELETE `/recurring-templates/:id/assignments/:assignmentId` _(ORG_ADMIN)_
 
 ### POST `/recurring-templates/:id/assignments/:assignmentId/generate` _(ORG_ADMIN)_ — geração manual, fora do gatilho diário
 ```json
-{ "competence": "ISO8601?" }
+{ "dueMonth": "ISO8601?" }
 ```
-→ Sem `competence`, usa o início do período corrente; com `competence`, o valor é canonicalizado pro início do período (semana/mês/trimestre/ano) a que pertence, pra bater com a chave de idempotência do cron
+→ `dueMonth` é o mês de VENCIMENTO (âncora), não a competência — a competência é derivada dele via `competenceMonthOffset` (WEEKLY: `dueMonth` já é a própria competência/semana). Sem `dueMonth`, usa o próximo ciclo normal do template (o que o cron geraria no próximo disparo); com `dueMonth`, o valor é canonicalizado pro início do período (semana/mês/trimestre/ano) a que pertence, pra bater com a chave de idempotência do cron
 → 409 se já existe geração `SUCCESS` pra essa competência+cliente
 
 ### GET `/recurring-templates/:id/generation-log` _(ORG_ADMIN | ORG_MANAGER)_ — histórico de gerações (SUCCESS/FAILED) por competência
+
+### POST `/recurring-templates/:id/assignments/bulk-generate` _(ORG_ADMIN)_ — geração manual em lote, pra um template e uma lista de vínculos escolhidos na tela
+```json
+{ "dueMonth": "ISO8601", "assignmentIds": ["string"] }
+```
+→ `dueMonth` é sempre o mês de vencimento escolhido no seletor da tela (não a competência) — ver nota do endpoint de geração manual acima. Pra templates WEEKLY, gera uma Task por cada segunda-feira contida no mês escolhido (não apenas uma semana)
+→ Resposta: `{ "generated": number, "alreadyExists": number, "failed": [{ "clientName": "string", "errorMessage": "string" }] }` — uma falha isolada (ID inválido, erro de negócio, exceção pontual) nunca derruba o lote inteiro; cada item entra no balde correspondente
+### POST `/recurring-templates/bulk-generate` _(ORG_ADMIN)_ — mesma geração em lote, porém pra TODOS os templates ativos da organização de uma vez (console global), cada um com seus próprios vínculos ativos
+```json
+{ "dueMonth": "ISO8601" }
+```
+→ Resposta: `[{ "templateId": "string", "templateTitle": "string", "result": <mesmo formato de bulk-generate acima> }]` — um item por template ativo da org, mesmo os sem vínculo (0 geradas)
+### GET `/recurring-templates/failed-generations` _(ORG_ADMIN | ORG_MANAGER)_ — lista todas as gerações `FAILED` da org, com nome do cliente resolvido
+→ Resposta: `[{ "templateId": "string", "templateTitle": "string", "clientId": "string", "clientName": "string", "competence": "ISO8601", "dueMonth": "ISO8601", "retryable": boolean, "errorMessage": "string", "createdAt": "ISO8601" }]`
+→ `dueMonth` é o mês de vencimento que gerou aquela competência (derivado via `competenceMonthOffset`) — usado pelo botão "Gerar novamente" da tela, que deve reenviar esse valor como `dueMonth` em `POST /:id/assignments/bulk-generate`, nunca a `competence` crua (regenerar com a competência errada gera uma tarefa já vencida)
+→ `retryable: false` quando o cliente não está mais vinculado (ativo) a esse template — a tela deve desabilitar/explicar o botão de retry nesse caso em vez de permitir uma tentativa que nunca resolve a falha
 
 ---
 

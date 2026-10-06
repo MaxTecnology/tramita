@@ -10,9 +10,11 @@ import {
   computeDueDate,
   computeDueDateFromMonth,
   computeCompetenceFromDueMonth,
+  computeDueMonthFromCompetence,
   computeTargetDate,
   computeNextDueMonth,
   normalizeToPeriodStart,
+  computeWeeklyCompetencesInMonth,
   type RecurrenceDateRules,
 } from './recurrence-dates'
 import type {
@@ -415,7 +417,15 @@ export async function generateBulkForTemplate(
   assignmentIds: string[],
 ): Promise<BulkGenerationResult> {
   const template = await getTemplateById(templateId, organizationId)
-  const dueMonth = normalizeToPeriodStart(new Date(dueMonthRaw), template.periodicity)
+  const targetMonth = normalizeToPeriodStart(new Date(dueMonthRaw), template.periodicity)
+  // WEEKLY: o mês escolhido na tela não é uma única competência — é um mês calendário que
+  // pode conter várias semanas (segundas-feiras). Gerar só a semana canonicalizada pelo mês
+  // (como as demais periodicidades fazem) deixaria o resto do mês sem tarefa — ver finding 3
+  // da revisão final. Demais periodicidades: mantém o comportamento de sempre, uma única
+  // competência derivada do mês escolhido.
+  const dueMonths = template.periodicity === 'WEEKLY'
+    ? computeWeeklyCompetencesInMonth(targetMonth)
+    : [targetMonth]
 
   const assignments = await prisma.recurringTaskAssignment.findMany({
     where: { id: { in: assignmentIds }, templateId },
@@ -435,19 +445,21 @@ export async function generateBulkForTemplate(
   }
 
   for (const assignment of assignments) {
-    // generateTaskForAssignment só protege o trecho pós-checagem de idempotência com try/catch
-    // interno — busca de template/assignment, derivação de competência e lookup do log ficam
-    // fora dele e podem lançar (ex.: blip transitório de banco). Sem este try/catch aqui, uma
-    // exceção num item abortaria a chamada inteira, perdendo o `result` já acumulado dos itens
-    // anteriores — contradizendo a regra de que uma falha isolada nunca derruba o lote.
-    try {
-      const outcome = await generateTaskForAssignment(templateId, assignment.id, dueMonth)
-      if (outcome.status === 'SUCCESS') result.generated++
-      else if (outcome.status === 'ALREADY_EXISTS') result.alreadyExists++
-      else result.failed.push({ clientName: assignment.client.name, errorMessage: outcome.errorMessage })
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err)
-      result.failed.push({ clientName: assignment.client.name, errorMessage })
+    for (const dueMonth of dueMonths) {
+      // generateTaskForAssignment só protege o trecho pós-checagem de idempotência com try/catch
+      // interno — busca de template/assignment, derivação de competência e lookup do log ficam
+      // fora dele e podem lançar (ex.: blip transitório de banco). Sem este try/catch aqui, uma
+      // exceção num item abortaria a chamada inteira, perdendo o `result` já acumulado dos itens
+      // anteriores — contradizendo a regra de que uma falha isolada nunca derruba o lote.
+      try {
+        const outcome = await generateTaskForAssignment(templateId, assignment.id, dueMonth)
+        if (outcome.status === 'SUCCESS') result.generated++
+        else if (outcome.status === 'ALREADY_EXISTS') result.alreadyExists++
+        else result.failed.push({ clientName: assignment.client.name, errorMessage: outcome.errorMessage })
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        result.failed.push({ clientName: assignment.client.name, errorMessage })
+      }
     }
   }
 
@@ -486,6 +498,8 @@ export interface FailedGeneration {
   clientId: string
   clientName: string
   competence: string
+  dueMonth: string
+  retryable: boolean
   errorMessage: string
   createdAt: string
 }
@@ -493,7 +507,7 @@ export interface FailedGeneration {
 export async function getFailedGenerations(organizationId: string): Promise<FailedGeneration[]> {
   const logs = await prisma.recurringGenerationLog.findMany({
     where: { status: 'FAILED', template: { organizationId } },
-    include: { template: { select: { id: true, title: true } } },
+    include: { template: { select: { id: true, title: true, periodicity: true, competenceMonthOffset: true } } },
     orderBy: { createdAt: 'desc' },
   })
   if (logs.length === 0) return []
@@ -502,13 +516,31 @@ export async function getFailedGenerations(organizationId: string): Promise<Fail
   const clients = await prisma.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, name: true } })
   const clientNameById = new Map(clients.map((c) => [c.id, c.name]))
 
-  return logs.map((log) => ({
-    templateId: log.template.id,
-    templateTitle: log.template.title,
-    clientId: log.clientId,
-    clientName: clientNameById.get(log.clientId) ?? '(cliente removido)',
-    competence: log.competence.toISOString(),
-    errorMessage: log.errorMessage ?? '',
-    createdAt: log.createdAt.toISOString(),
-  }))
+  // Um log só é "retryable" se o cliente ainda está vinculado (ativo) a esse template —
+  // senão o retry não teria pra qual assignmentId mandar, e travaria o banner pra sempre
+  // (ver finding 4 da revisão final). Uma query batched pra todos os pares, não N+1.
+  const activeAssignments = await prisma.recurringTaskAssignment.findMany({
+    where: {
+      templateId: { in: [...new Set(logs.map((l) => l.templateId))] },
+      clientId: { in: clientIds },
+      isActive: true,
+    },
+    select: { templateId: true, clientId: true },
+  })
+  const retryableKeys = new Set(activeAssignments.map((a) => `${a.templateId}:${a.clientId}`))
+
+  return logs.map((log) => {
+    const rules: Pick<RecurrenceDateRules, 'periodicity' | 'competenceMonthOffset'> = log.template
+    return {
+      templateId: log.template.id,
+      templateTitle: log.template.title,
+      clientId: log.clientId,
+      clientName: clientNameById.get(log.clientId) ?? '(cliente removido)',
+      competence: log.competence.toISOString(),
+      dueMonth: computeDueMonthFromCompetence(log.competence, rules).toISOString(),
+      retryable: retryableKeys.has(`${log.templateId}:${log.clientId}`),
+      errorMessage: log.errorMessage ?? '',
+      createdAt: log.createdAt.toISOString(),
+    }
+  })
 }
