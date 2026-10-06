@@ -75,6 +75,7 @@ export default function RecurringTemplateManage() {
     onSuccess: () => {
       toast.success('Cliente vinculado')
       qc.invalidateQueries({ queryKey: ['recurring-assignments', id] })
+      qc.invalidateQueries({ queryKey: ['recurring-assignments-all', id] })
       setClientId('')
     },
     onError: (err: unknown) => {
@@ -88,6 +89,7 @@ export default function RecurringTemplateManage() {
     onSuccess: () => {
       toast.success('Vínculo removido')
       qc.invalidateQueries({ queryKey: ['recurring-assignments', id] })
+      qc.invalidateQueries({ queryKey: ['recurring-assignments-all', id] })
       setSelected((prev) => {
         const next = new Set(prev)
         return next
@@ -115,17 +117,29 @@ export default function RecurringTemplateManage() {
 
   const retryMutation = useMutation({
     mutationFn: (failure: FailedGeneration) =>
-      api.post(`/recurring-templates/${failure.templateId}/assignments/bulk-generate`, {
+      api.post<BulkGenerationResult>(`/recurring-templates/${failure.templateId}/assignments/bulk-generate`, {
         dueMonth: failure.competence,
         // Usa allAssignments (sem filtro de busca) — não assignments (filtrado pelo search state),
         // senão o cliente da falha pode não estar na lista filtrada e assignmentIds fica vazio,
         // o que falha a validação .min(1) do backend e quebra o botão "Gerar novamente".
         assignmentIds: allAssignments.filter((a) => a.clientId === failure.clientId).map((a) => a.id),
-      }),
-    onSuccess: () => {
-      toast.success('Tentativa de nova geração enviada')
+      }).then((r) => r.data),
+    onSuccess: (result) => {
+      // A chamada pode retornar 200 e ainda assim o item retentado continuar na lista de falhas
+      // (ex: erro de negócio persistente) — só mostrar sucesso se algo de fato avançou.
+      if (result.failed.length > 0) {
+        toast.error(`Ainda falhou: ${result.failed[0].errorMessage}`)
+      } else if (result.generated > 0 || result.alreadyExists > 0) {
+        toast.success('Tentativa de nova geração enviada')
+      } else {
+        toast.error('Nenhum vínculo encontrado pra essa falha — verifique se o cliente ainda está vinculado')
+      }
       qc.invalidateQueries({ queryKey: ['recurring-failed-generations'] })
       qc.invalidateQueries({ queryKey: ['recurring-generation-log', id] })
+    },
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(message ?? 'Erro ao tentar gerar novamente')
     },
   })
 
