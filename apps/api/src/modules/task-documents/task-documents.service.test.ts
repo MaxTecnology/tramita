@@ -119,7 +119,7 @@ describe('checklist de documento — impedimento automático', () => {
 
     const template = await createTemplate(org.id, {
       departmentId: dept.id, title: 'X', periodicity: 'MONTHLY', priority: 'MEDIUM',
-      dueMonthOffset: 0, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
       targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
       generationMonthOffset: 1, generationDayOfPeriod: 5,
       autoCompleteOnAllActivitiesDone: true, notifyViaWhatsapp: false, notifyViaEmail: false,

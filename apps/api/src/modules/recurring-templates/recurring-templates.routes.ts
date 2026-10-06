@@ -9,6 +9,8 @@ import {
   createAssignmentSchema,
   updateAssignmentSchema,
   manualGenerateSchema,
+  bulkGenerateSchema,
+  bulkGenerateAllSchema,
 } from './recurring-templates.schema'
 import {
   listTemplates,
@@ -22,6 +24,9 @@ import {
   deleteAssignment,
   generateManually,
   listGenerationLog,
+  generateBulkForTemplate,
+  generateBulkForAllTemplates,
+  getFailedGenerations,
 } from './recurring-templates.service'
 
 export async function recurringTemplatesRoutes(app: FastifyInstance) {
@@ -36,6 +41,12 @@ export async function recurringTemplatesRoutes(app: FastifyInstance) {
     return reply.send(await listTemplates(request.user.organizationId!))
   })
 
+  app.get('/failed-generations', {
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER')],
+  }, async (request, reply) => {
+    return reply.send(await getFailedGenerations(request.user.organizationId!))
+  })
+
   app.get('/:id', {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER')],
   }, async (request, reply) => {
@@ -47,7 +58,8 @@ export async function recurringTemplatesRoutes(app: FastifyInstance) {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    return reply.send(await listAssignments(id, request.user.organizationId!))
+    const { q } = request.query as { q?: string }
+    return reply.send(await listAssignments(id, request.user.organizationId!, q))
   })
 
   app.get('/:id/generation-log', {
@@ -108,7 +120,22 @@ export async function recurringTemplatesRoutes(app: FastifyInstance) {
     const result = manualGenerateSchema.safeParse(request.body ?? {})
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     return reply.status(201).send(
-      await generateManually(id, assignmentId, request.user.organizationId!, result.data.competence),
+      await generateManually(id, assignmentId, request.user.organizationId!, result.data.dueMonth),
     )
+  })
+
+  app.post('/:id/assignments/bulk-generate', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const result = bulkGenerateSchema.safeParse(request.body)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(
+      await generateBulkForTemplate(id, request.user.organizationId!, result.data.dueMonth, result.data.assignmentIds),
+    )
+  })
+
+  app.post('/bulk-generate', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {
+    const result = bulkGenerateAllSchema.safeParse(request.body)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(await generateBulkForAllTemplates(request.user.organizationId!, result.data.dueMonth))
   })
 }

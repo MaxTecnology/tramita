@@ -48,3 +48,20 @@ describe('POST /recurring-templates — mutation stays ORG_ADMIN-only', () => {
     expect(res.statusCode).toBe(403)
   })
 })
+
+describe('GET /recurring-templates/failed-generations — rota estática não colide com /:id', () => {
+  it('retorna 200 (não cai no handler de /:id)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const header = await getAuthHeader(admin.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/recurring-templates/failed-generations',
+      headers: { authorization: header },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toEqual([])
+  })
+})
