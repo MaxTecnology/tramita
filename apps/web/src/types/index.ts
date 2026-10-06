@@ -175,10 +175,7 @@ export interface RecurringTaskAssignment {
   id: string
   templateId: string
   clientId: string
-  client: { id: string; name: string }
-  boardId: string
-  board: { id: string; title: string }
-  columnId: string
+  client: { id: string; name: string; codigo: string | null }
   isActive: boolean
 }
 

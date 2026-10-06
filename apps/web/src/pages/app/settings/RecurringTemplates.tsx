@@ -161,7 +161,7 @@ function ManageTemplateDialog({ template, onClose }: { template: RecurringTaskTe
               <div className="space-y-1.5 mt-2">
                 {assignments.map((a) => (
                   <div key={a.id} className="flex items-center justify-between text-sm bg-neutral-bg rounded px-2 py-1.5">
-                    <span>{a.client.name} — {a.board.title}</span>
+                    <span>{a.client.codigo ? `${a.client.codigo} - ${a.client.name}` : a.client.name}</span>
                     <div className="flex items-center gap-2">
                       <button onClick={() => generateMutation.mutate(a.id)} className="text-xs text-accent hover:underline">Gerar agora</button>
                       <button onClick={() => removeMutation.mutate(a.id)} className="text-muted-foreground hover:text-danger-text">

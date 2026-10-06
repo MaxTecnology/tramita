@@ -114,7 +114,7 @@ export async function listAssignments(templateId: string, organizationId: string
   await getTemplateById(templateId, organizationId)
   return prisma.recurringTaskAssignment.findMany({
     where: { templateId },
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, codigo: true } } },
     orderBy: { createdAt: 'asc' },
   })
 }
