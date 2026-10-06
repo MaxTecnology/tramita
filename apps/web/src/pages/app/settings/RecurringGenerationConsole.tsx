@@ -50,7 +50,12 @@ export default function RecurringGenerationConsole() {
       setLastRun(summaries)
       const totalGenerated = summaries.reduce((acc, s) => acc + s.result.generated, 0)
       const totalFailed = summaries.reduce((acc, s) => acc + s.result.failed.length, 0)
-      toast.success(`${totalGenerated} tarefas geradas em ${summaries.length} templates, ${totalFailed} falharam`)
+      const message = `${totalGenerated} tarefas geradas em ${summaries.length} templates, ${totalFailed} falharam`
+      if (totalFailed > 0) {
+        toast.error(message)
+      } else {
+        toast.success(message)
+      }
       qc.invalidateQueries({ queryKey: ['recurring-failed-generations'] })
     },
     onError: (err: unknown) => {
