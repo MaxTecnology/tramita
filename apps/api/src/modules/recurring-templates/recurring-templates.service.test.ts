@@ -617,6 +617,56 @@ describe('generateBulkForTemplate', () => {
 
     vi.restoreAllMocks()
   })
+
+  it('exceção lançada por generateTaskForAssignment num item não aborta o lote: os demais completam e o item quebrado vira failed[]', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const clientA = await createTestClient(org.id)
+    const clientB = await createTestClient(org.id)
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'Lote com exceção', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    const assignmentA = await createAssignment(template.id, org.id, { clientId: clientA.id })
+    const assignmentB = await createAssignment(template.id, org.id, { clientId: clientB.id })
+
+    // Força generateTaskForAssignment a lançar sincronicamente pro assignmentB — simula um blip
+    // de banco no trecho de generateTaskForAssignment que fica FORA do try/catch interno (a
+    // busca do assignment por findUnique, antes da checagem de idempotência). Isso exercita
+    // exatamente o caminho de exceção que generateBulkForTemplate precisa isolar, não o caminho
+    // de "ID inválido" (já coberto pelo teste anterior, que nunca lança — só entra em failed[]
+    // pela checagem de `foundIds`).
+    const originalFindUnique = prisma.recurringTaskAssignment.findUnique.bind(prisma.recurringTaskAssignment)
+    const patchedFindUnique = ((args: { where?: { id?: string } }) => {
+      if (args?.where?.id === assignmentB.id) {
+        throw new Error('simulated db blip')
+      }
+      return originalFindUnique(args as Parameters<typeof originalFindUnique>[0])
+    }) as unknown as typeof originalFindUnique
+    ;(prisma.recurringTaskAssignment as unknown as { findUnique: unknown }).findUnique = patchedFindUnique
+
+    try {
+      const dueMonth = new Date(Date.UTC(2026, 9, 1)).toISOString()
+      const result = await generateBulkForTemplate(template.id, org.id, dueMonth, [assignmentA.id, assignmentB.id])
+
+      expect(result.generated).toBe(1)
+      expect(result.alreadyExists).toBe(0)
+      expect(result.failed).toHaveLength(1)
+      expect(result.failed[0].clientName).toBe(clientB.name)
+      expect(result.failed[0].errorMessage).toContain('simulated db blip')
+    } finally {
+      ;(prisma.recurringTaskAssignment as unknown as { findUnique: unknown }).findUnique = originalFindUnique
+      vi.restoreAllMocks()
+    }
+  })
 })
 
 describe('generateBulkForAllTemplates', () => {

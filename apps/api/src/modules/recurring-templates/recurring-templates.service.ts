@@ -435,10 +435,20 @@ export async function generateBulkForTemplate(
   }
 
   for (const assignment of assignments) {
-    const outcome = await generateTaskForAssignment(templateId, assignment.id, dueMonth)
-    if (outcome.status === 'SUCCESS') result.generated++
-    else if (outcome.status === 'ALREADY_EXISTS') result.alreadyExists++
-    else result.failed.push({ clientName: assignment.client.name, errorMessage: outcome.errorMessage })
+    // generateTaskForAssignment só protege o trecho pós-checagem de idempotência com try/catch
+    // interno — busca de template/assignment, derivação de competência e lookup do log ficam
+    // fora dele e podem lançar (ex.: blip transitório de banco). Sem este try/catch aqui, uma
+    // exceção num item abortaria a chamada inteira, perdendo o `result` já acumulado dos itens
+    // anteriores — contradizendo a regra de que uma falha isolada nunca derruba o lote.
+    try {
+      const outcome = await generateTaskForAssignment(templateId, assignment.id, dueMonth)
+      if (outcome.status === 'SUCCESS') result.generated++
+      else if (outcome.status === 'ALREADY_EXISTS') result.alreadyExists++
+      else result.failed.push({ clientName: assignment.client.name, errorMessage: outcome.errorMessage })
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      result.failed.push({ clientName: assignment.client.name, errorMessage })
+    }
   }
 
   return result
