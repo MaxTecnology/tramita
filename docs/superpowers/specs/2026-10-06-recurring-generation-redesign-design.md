@@ -151,7 +151,7 @@ export async function generateBulkForTemplate(
 ): Promise<BulkGenerationResult>
 ```
 
-Itera os `assignmentIds`; qualquer ID que não pertença a esse `templateId`/organização é **ignorado silenciosamente** (não entra em `failed[]` — não é uma falha de geração, é um ID inválido que não deveria ter chegado ali, e travar o lote inteiro por isso seria pior que ignorar). Pra cada assignment válido, chama `generateTaskForAssignment`, categoriza o resultado (`SUCCESS` → `generated++`, `ALREADY_EXISTS` → `alreadyExists++`, `FAILED` → entra em `failed[]` com o nome do cliente) — **nunca lança exceção por causa de um item individual**, processa a lista inteira e retorna o resumo agregado.
+Itera os `assignmentIds`. **Nada é ignorado silenciosamente**: um ID que não pertença a esse `templateId`/organização entra em `failed[]` com `errorMessage: 'Cliente não encontrado ou não vinculado a este template'`, do mesmo jeito que uma falha de geração de verdade — do ponto de vista de quem olha o resultado, as duas coisas significam a mesma coisa ("essa tarefa não foi gerada, alguém precisa agir"). Pra cada assignment válido, chama `generateTaskForAssignment`, categoriza o resultado (`SUCCESS` → `generated++`, `ALREADY_EXISTS` → `alreadyExists++`, `FAILED` → entra em `failed[]` com o nome do cliente e o motivo) — **nunca lança exceção por causa de um item individual**, processa a lista inteira e retorna o resumo agregado. Gera parcial de propósito (não é transação atômica pro lote inteiro): se 8 de 10 geram certo e 2 falham, os 8 ficam gerados — reverter os 8 porque 2 falharam seria pior pro risco de multa, não melhor. O que não pode acontecer é essas 2 falhas ficarem invisíveis depois que o toast da resposta sumir (ver seção "Falhas persistentes" abaixo).
 
 ### Novo: `generateBulkForAllTemplates`
 
@@ -223,6 +223,28 @@ export const manualGenerateSchema = z.object({
 })
 ```
 
+## Falhas persistentes — visibilidade até resolução
+
+Requisito explícito: geração em lote pode ser parcial (alguns clientes geram, outros falham), mas uma falha **nunca pode ficar visível só no toast da resposta e depois sumir**. Enquanto não for resolvida (= gerada com sucesso), ela precisa aparecer todo santo lugar relevante, sem exigir que alguém lembre de ir conferir.
+
+Base: `RecurringGenerationLog` já persiste cada falha (`status: 'FAILED'`, `errorMessage`) desde a spec original — isso vale tanto pra falha do cron quanto pra falha de geração manual/lote (mesmo código, `generateTaskForAssignment`). "Resolvida" = o log daquela combinação `(templateId, clientId, competence)` virou `SUCCESS` numa tentativa seguinte (mecanismo de claim que já existe, não muda). Não existe "descartar"/"marcar como ciente" sem gerar de verdade — esconder um alerta de vencimento sem resolver o problema é exatamente o que não pode acontecer.
+
+### Novo endpoint
+
+```
+GET /recurring-templates/failed-generations
+Response: { templateId: string; templateTitle: string; clientId: string; clientName: string; competence: string; errorMessage: string; createdAt: string }[]
+```
+
+Retorna todo `RecurringGenerationLog` com `status: 'FAILED'` da organização, mais recente primeiro — cru, sem agregação, pra alimentar tanto o contador (badge = `length`) quanto a lista detalhada.
+
+### Onde aparece
+
+1. **Badge no item "Configurações" da sidebar** (mesmo padrão que "Solicitações" já usa hoje com `pendingCount`, `AppLayout.tsx`) — contagem total de falhas não resolvidas, visível em qualquer tela do sistema, não só dentro de Configurações.
+2. **Card "Geração manual" no hub** (`/app/settings`) — mesmo número, badge no card.
+3. **Banner no topo da Tela 1** (gestão do template): se esse template específico tem falhas não resolvidas (de qualquer competência, não só o mês selecionado no seletor), mostra uma faixa vermelha fixa listando cliente + competência + motivo, com botão "Gerar novamente" por linha — nunca depende de o operador escolher o mês certo no seletor pra enxergar o problema.
+4. **Seção "Falhas pendentes" na Tela 2** (console global): lista agrupada por template, mesma fonte de dados, com "Gerar novamente" por linha.
+
 ## Frontend
 
 ### Tela 1 — Gestão do template (`/app/settings/recurring-templates/:id/manage`)
@@ -231,21 +253,23 @@ Substitui `ManageTemplateDialog` por uma página própria (`RecurringTemplateMan
 
 Seções da página, de cima pra baixo:
 1. Header: título do template + link "← Tarefas Recorrentes"
-2. Seletor de mês de vencimento (`<input type="month">` ou equivalente), default = próximo ciclo normal do template (mesmo cálculo do `generateManually` sem override)
-3. Campo de busca por nome (`?q=`, debounced, reflete na listagem abaixo)
-4. Lista de clientes vinculados: checkbox + "código - nome" + status da competência correspondente ao mês selecionado (ex: "Gerado 10/10", "Pendente", "Falhou: <motivo>") + botão de desvincular individual
-5. "Selecionar todos" / "Limpar seleção" (opera sobre os itens filtrados visíveis, não a lista inteira se houver busca ativa)
-6. Botão "Gerar selecionados" → `POST .../bulk-generate` com o mês escolhido e os IDs marcados; mostra toast com o resumo (ex: "3 geradas, 1 já existia")
-7. Formulário de vincular novo cliente (reaproveita o que já existe no popup)
-8. Log de geração (reaproveita a lista que já existe no popup, sem mudança)
+2. **Banner de falhas não resolvidas** (ver seção "Falhas persistentes" acima) — só aparece se houver, fixo no topo, acima de tudo o resto
+3. Seletor de mês de vencimento (`<input type="month">` ou equivalente), default = próximo ciclo normal do template (mesmo cálculo do `generateManually` sem override)
+4. Campo de busca por nome (`?q=`, debounced, reflete na listagem abaixo)
+5. Lista de clientes vinculados: checkbox + "código - nome" + status da competência correspondente ao mês selecionado (ex: "Gerado 10/10", "Pendente", "Falhou: <motivo>") + botão de desvincular individual
+6. "Selecionar todos" / "Limpar seleção" (opera sobre os itens filtrados visíveis, não a lista inteira se houver busca ativa)
+7. Botão "Gerar selecionados" → `POST .../bulk-generate` com o mês escolhido e os IDs marcados; toast com o resumo é só feedback imediato (ex: "3 geradas, 1 já existia, 2 falharam") — as 2 falhas, além do toast, entram automaticamente no banner do passo 2 (mesma fonte de dados, sem ação extra do operador)
+8. Formulário de vincular novo cliente (reaproveita o que já existe no popup)
+9. Log de geração (reaproveita a lista que já existe no popup, sem mudança)
 
 ### Tela 2 — Console global (`/app/settings/recurring-generation`)
 
 Página nova (`RecurringGenerationConsole.tsx`), pensada como ferramenta de exceção (recuperar cron que falhou, adiantar o mês inteiro), não uso diário:
-1. Seletor de mês de vencimento
-2. Lista de templates ativos (nome, periodicidade, departamento) — sem seleção de cliente, é tudo-ou-nada por template
-3. Botão "Gerar todos" → `POST /recurring-templates/bulk-generate` com o mês escolhido
-4. Resultado exibido inline por template (não só toast, porque pode ser uma lista longa): nome do template + "N geradas / M já existiam / K falharam", expansível pra ver os nomes dos clientes que falharam
+1. **Seção "Falhas pendentes"** (ver "Falhas persistentes" acima) no topo — agrupada por template, com "Gerar novamente" por linha
+2. Seletor de mês de vencimento
+3. Lista de templates ativos (nome, periodicidade, departamento) — sem seleção de cliente, é tudo-ou-nada por template
+4. Botão "Gerar todos" → `POST /recurring-templates/bulk-generate` com o mês escolhido
+5. Resultado exibido inline por template (não só toast, porque pode ser uma lista longa): nome do template + "N geradas / M já existiam / K falharam", expansível pra ver os nomes dos clientes que falharam — essas falhas também alimentam a seção 1 automaticamente
 
 ### Tela 3 — Hub de Configurações (`/app/settings`)
 
@@ -265,7 +289,7 @@ Página nova (`SettingsHub.tsx`) com grid de cards, um por seção: Templates, N
 ## Review Focus
 
 - **Vencimento nunca no passado em relação a hoje, no fluxo automático do cron**: com `generationMonthOffset >= 1` (nunca 0 seria o caso de risco, mas um operador pode configurar 0 por engano) — vale validação no schema Zod: alertar/bloquear `generationMonthOffset=0` seria gerar o mês corrente, que pode já ter passado o dia de vencimento dependendo do `dueDayOfPeriod` configurado. Decisão: **não bloquear no schema** (pode ser caso de uso legítimo pra ciclos curtos), mas o form do frontend mostra um aviso quando `generationMonthOffset=0`.
-- **Geração em lote parcialmente falha não deve reverter os sucessos**: já coberto pelo desenho de `generateBulkForTemplate`/`generateBulkForAllTemplates` (processamento item a item, sem transação única cobrindo o lote inteiro).
+- **Geração em lote parcialmente falha não deve reverter os sucessos, e as falhas nunca podem ficar invisíveis**: já coberto pelo desenho de `generateBulkForTemplate`/`generateBulkForAllTemplates` (processamento item a item) + a seção "Falhas persistentes" (badge na sidebar, banner na Tela 1, seção dedicada na Tela 2 — tudo alimentado por `GET /recurring-templates/failed-generations`, que só esvazia quando o log vira `SUCCESS` de verdade, nunca por dispensa manual).
 - **Busca por nome na Tela 1 some com clientes que tem tarefa já gerada**: a busca filtra só por nome, nunca deve esconder itens baseado em status de geração — só o texto digitado afeta a lista.
 - **`competenceMonthOffset` configurado maior que o próprio ciclo de periodicidade** (ex: QUARTERLY com `competenceMonthOffset=12`) — não há validação hoje impedindo um valor "sem sentido". Decisão: aceitar qualquer inteiro ≥ 0, sem validação de coerência — é uma config avançada, e o preview no form (mostrar o exemplo calculado) é a proteção suficiente, não uma trava rígida.
 - **Templates `WEEKLY` na Tela 1/2**: o seletor de mês ainda precisa funcionar pra eles (gera todas as semanas daquele mês, reaproveitando a janela que `computeCompetencesToGenerate` já calcula) — não ficam de fora das telas novas, só do novo modelo de cálculo mensal.
