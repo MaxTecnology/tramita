@@ -6,8 +6,9 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Pencil, Trash2, Building2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Building2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import { Link } from 'react-router-dom'
 import type { Department } from '@/types'
 
 export default function Departments() {
@@ -71,12 +72,17 @@ export default function Departments() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg md:text-xl font-bold text-foreground">Departamentos</h1>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus size={16} />
-          Novo departamento
-        </Button>
+      <div>
+        <Link to="/app/settings" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2">
+          <ArrowLeft size={12} /> Configurações
+        </Link>
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg md:text-xl font-bold text-foreground">Departamentos</h1>
+          <Button onClick={openCreate} className="gap-2">
+            <Plus size={16} />
+            Novo departamento
+          </Button>
+        </div>
       </div>
 
       {departments.length === 0 ? (

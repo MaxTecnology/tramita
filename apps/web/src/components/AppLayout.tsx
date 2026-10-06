@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { useRequestsBadgeStream } from '@/hooks/useRequestsBadgeStream'
 import { api } from '@/lib/api'
-import { LayoutDashboard, Users, UserCheck, Bell, CreditCard, Settings, LogOut, ClipboardList, ListChecks, Inbox, Menu, X, UserCircle, Building2, Repeat, UserCog, FileStack } from 'lucide-react'
+import { LayoutDashboard, Users, UserCheck, Settings, LogOut, ClipboardList, ListChecks, Inbox, Menu, X, UserCircle, FileStack } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER']
@@ -37,6 +37,14 @@ export default function AppLayout() {
     enabled: isOrgRole,
     refetchOnWindowFocus: true,
   })
+
+  const { data: failedGenerations } = useQuery<{ length: number }>({
+    queryKey: ['recurring-failed-generations'],
+    queryFn: () => api.get('/recurring-templates/failed-generations').then((r) => r.data),
+    enabled: ADMIN_ROLES.includes(role),
+    refetchOnWindowFocus: true,
+  })
+  const failedGenerationsCount = failedGenerations?.length ?? 0
 
   useRequestsBadgeStream()
 
@@ -108,29 +116,14 @@ export default function AppLayout() {
             <SidebarLink to="/app/users" icon={<Users size={16} />} label="Usuários" onClick={handleNavClick} />
           )}
 
-          {ADMIN_ROLES.includes(role) && (
-            <SidebarSectionLabel>Configurações</SidebarSectionLabel>
-          )}
-          {ADMIN_ROLES.includes(role) && (
-            <SidebarLink to="/app/settings/templates" icon={<Settings size={16} />} label="Templates" onClick={handleNavClick} />
-          )}
-          {ADMIN_ROLES.includes(role) && (
-            <SidebarLink to="/app/settings/notifications" icon={<Bell size={16} />} label="Notificações" onClick={handleNavClick} />
-          )}
-          {ADMIN_ROLES.includes(role) && (
-            <SidebarLink to="/app/settings/subscription" icon={<CreditCard size={16} />} label="Assinatura" onClick={handleNavClick} />
-          )}
-          {ADMIN_ROLES.includes(role) && (
-            <SidebarLink to="/app/settings/departments" icon={<Building2 size={16} />} label="Departamentos" onClick={handleNavClick} />
-          )}
           {MANAGER_ROLES.includes(role) && (
-            <SidebarLink to="/app/settings/client-users" icon={<UserCog size={16} />} label="Usuários de Cliente" onClick={handleNavClick} />
-          )}
-          {ADMIN_ROLES.includes(role) && (
-            <SidebarLink to="/app/settings/recurring-templates" icon={<Repeat size={16} />} label="Tarefas Recorrentes" onClick={handleNavClick} />
-          )}
-          {ADMIN_ROLES.includes(role) && (
-            <SidebarLink to="/app/settings/os-templates" icon={<FileStack size={16} />} label="Templates de OS" onClick={handleNavClick} />
+            <SidebarLink
+              to="/app/settings"
+              icon={<Settings size={16} />}
+              label="Configurações"
+              badge={failedGenerationsCount}
+              onClick={handleNavClick}
+            />
           )}
         </nav>
 

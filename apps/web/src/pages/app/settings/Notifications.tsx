@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -6,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { FileSearch, Search, Send } from 'lucide-react'
+import { FileSearch, Search, Send, ArrowLeft } from 'lucide-react'
 
 interface Config {
   whatsappEnabled?: boolean
@@ -166,6 +167,9 @@ export default function Notifications() {
     <div className="p-4 md:p-6 max-w-3xl">
       {/* Header */}
       <div className="mb-6">
+        <Link to="/app/settings" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2">
+          <ArrowLeft size={12} /> Configurações
+        </Link>
         <h1 className="text-lg md:text-xl font-bold text-foreground">Notificações</h1>
         <p className="text-sm text-muted-foreground mt-1">Configure os canais e eventos de notificação do escritório.</p>
       </div>

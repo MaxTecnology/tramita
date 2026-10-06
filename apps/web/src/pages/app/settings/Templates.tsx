@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { TemplateEditor } from '@/components/TemplateEditor'
 
 const EVENTS = ['TASK_CREATED', 'TASK_MOVED', 'TASK_COMPLETED', 'TASK_COMMENT_ADDED', 'TASK_DUE_DATE_APPROACHING', 'TASK_BLOCKED'] as const
@@ -20,6 +22,9 @@ export default function Templates() {
   return (
     <div className="p-4 md:p-6 max-w-3xl">
       <div className="mb-6">
+        <Link to="/app/settings" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2">
+          <ArrowLeft size={12} /> Configurações
+        </Link>
         <h1 className="text-lg md:text-xl font-bold text-foreground">Templates de Mensagem</h1>
         <p className="text-sm text-muted-foreground mt-1">Personalize as mensagens enviadas automaticamente para cada evento.</p>
       </div>

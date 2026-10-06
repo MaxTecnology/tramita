@@ -13,6 +13,7 @@ import OrgSubscription from '@/pages/org/Subscription'
 import Board from '@/pages/app/Board'
 import Clients from '@/pages/app/Clients'
 import Users from '@/pages/app/Users'
+import SettingsHub from '@/pages/app/settings/SettingsHub'
 import Templates from '@/pages/app/settings/Templates'
 import Notifications from '@/pages/app/settings/Notifications'
 import AppSubscription from '@/pages/app/settings/Subscription'
@@ -93,6 +94,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <Users />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings',
+        element: (
+          <ProtectedRoute allowedRoles={MANAGER_ROLES}>
+            <SettingsHub />
           </ProtectedRoute>
         ),
       },

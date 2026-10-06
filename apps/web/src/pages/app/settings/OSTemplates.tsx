@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Plus, Pencil, Trash2, ClipboardList } from 'lucide-react'
+import { Plus, Pencil, Trash2, ClipboardList, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import type { OSTemplate } from '@/types'
 
@@ -32,12 +32,17 @@ export default function OSTemplates() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg md:text-xl font-bold text-foreground">Templates de OS</h1>
-        <Button onClick={() => navigate('/app/settings/os-templates/new')} className="gap-2">
-          <Plus size={16} />
-          Novo template
-        </Button>
+      <div>
+        <Link to="/app/settings" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2">
+          <ArrowLeft size={12} /> Configurações
+        </Link>
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg md:text-xl font-bold text-foreground">Templates de OS</h1>
+          <Button onClick={() => navigate('/app/settings/os-templates/new')} className="gap-2">
+            <Plus size={16} />
+            Novo template
+          </Button>
+        </div>
       </div>
 
       {templates.length === 0 ? (
