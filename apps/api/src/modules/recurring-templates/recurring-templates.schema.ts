@@ -11,9 +11,10 @@ export const createTemplateSchema = z.object({
   periodicity: z.enum(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUAL']),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
 
-  dueMonthOffset: z.number().int().min(-12).max(12).default(0),
   dueDayOfPeriod: z.number().int().min(1).max(31),
   dueBusinessDayRoll: z.enum(['NONE', 'FORWARD', 'BACKWARD']).default('NONE'),
+
+  competenceMonthOffset: z.number().int().min(0).default(1),
 
   targetOffsetDays: z.number().int().default(0),
   targetBusinessDayRoll: z.enum(['NONE', 'FORWARD', 'BACKWARD']).default('NONE'),
@@ -50,7 +51,20 @@ export type CreateAssignmentBody = z.infer<typeof createAssignmentSchema>
 export type UpdateAssignmentBody = z.infer<typeof updateAssignmentSchema>
 
 export const manualGenerateSchema = z.object({
-  competence: z.string().datetime().optional(),
+  dueMonth: z.string().datetime().optional(),
 })
 
 export type ManualGenerateBody = z.infer<typeof manualGenerateSchema>
+
+export const bulkGenerateSchema = z.object({
+  dueMonth: z.string().datetime(),
+  assignmentIds: z.array(z.string().cuid()).min(1, 'Selecione ao menos um cliente'),
+})
+
+export type BulkGenerateBody = z.infer<typeof bulkGenerateSchema>
+
+export const bulkGenerateAllSchema = z.object({
+  dueMonth: z.string().datetime(),
+})
+
+export type BulkGenerateAllBody = z.infer<typeof bulkGenerateAllSchema>

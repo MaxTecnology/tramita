@@ -441,9 +441,10 @@ model RecurringTaskTemplate {
   periodicity    RecurrencePeriodicity
   priority       Priority              @default(MEDIUM)
 
-  dueMonthOffset     Int             @default(0)
   dueDayOfPeriod     Int
   dueBusinessDayRoll BusinessDayRoll @default(NONE)
+
+  competenceMonthOffset Int @default(1)
 
   targetOffsetDays      Int             @default(0)
   targetBusinessDayRoll BusinessDayRoll @default(NONE)

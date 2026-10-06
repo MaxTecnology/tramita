@@ -1,16 +1,20 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeDueDate,
+  computeDueDateFromMonth,
+  computeCompetenceFromDueMonth,
   computeTargetDate,
   computeCompetencesToGenerate,
+  computeDueMonthsToGenerate,
   computeCurrentPeriodStart,
   normalizeToPeriodStart,
+  computeNextDueMonth,
   type RecurrenceDateRules,
 } from './recurrence-dates'
 
 const monthlyRules: RecurrenceDateRules = {
   periodicity: 'MONTHLY',
-  dueMonthOffset: 1,
+  competenceMonthOffset: 1,
   dueDayOfPeriod: 15,
   dueBusinessDayRoll: 'NONE',
   targetOffsetDays: -2,
@@ -19,152 +23,152 @@ const monthlyRules: RecurrenceDateRules = {
   generationDayOfPeriod: 20,
 }
 
-describe('computeDueDate', () => {
-  it('mensal: competência fevereiro, vence dia 15 de março (dueMonthOffset=1)', () => {
-    const competence = new Date(Date.UTC(2026, 1, 1)) // 2026-02-01
-    const due = computeDueDate(competence, monthlyRules)
+describe('computeDueDateFromMonth', () => {
+  it('mensal: mês de vencimento março, dia 15', () => {
+    const dueMonth = new Date(Date.UTC(2026, 2, 1))
+    const due = computeDueDateFromMonth(dueMonth, monthlyRules)
     expect(due.toISOString().slice(0, 10)).toBe('2026-03-15')
   })
 
-  it('trimestral: competência Q1 (jan), vence dia 10 do 3º mês do trimestre (março)', () => {
-    const rules: RecurrenceDateRules = {
-      ...monthlyRules,
-      periodicity: 'QUARTERLY',
-      dueMonthOffset: 2,
-      dueDayOfPeriod: 10,
-    }
-    const competence = new Date(Date.UTC(2026, 0, 1)) // 2026-01-01
-    const due = computeDueDate(competence, rules)
+  it('trimestral: mês de vencimento março, dia 10', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'QUARTERLY', dueDayOfPeriod: 10 }
+    const dueMonth = new Date(Date.UTC(2026, 2, 1))
+    const due = computeDueDateFromMonth(dueMonth, rules)
     expect(due.toISOString().slice(0, 10)).toBe('2026-03-10')
   })
 
-  it('anual: competência jan/2027, vence dia 31 do 3º mês depois (março/2027)', () => {
-    const rules: RecurrenceDateRules = {
-      ...monthlyRules,
-      periodicity: 'ANNUAL',
-      dueMonthOffset: 2,
-      dueDayOfPeriod: 31,
-    }
-    const competence = new Date(Date.UTC(2027, 0, 1))
-    const due = computeDueDate(competence, rules)
-    expect(due.toISOString().slice(0, 10)).toBe('2027-03-31')
-  })
-
-  it('semanal: competência é a segunda-feira da semana; dueDayOfPeriod=5 (sexta) cai na mesma semana', () => {
-    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'WEEKLY', dueDayOfPeriod: 5 }
-    const competence = new Date(Date.UTC(2026, 1, 2)) // segunda-feira 2026-02-02
-    const due = computeDueDate(competence, rules)
-    expect(due.toISOString().slice(0, 10)).toBe('2026-02-06') // sexta da mesma semana
-  })
-
   it('ajusta pro próximo dia útil quando dueBusinessDayRoll=FORWARD e a data cai num sábado', () => {
-    // competência fevereiro + dueMonthOffset=1 (herdado de monthlyRules) = base março; dia 14 de março de 2026 é um sábado
     const rules: RecurrenceDateRules = { ...monthlyRules, dueDayOfPeriod: 14, dueBusinessDayRoll: 'FORWARD' }
-    const competence = new Date(Date.UTC(2026, 1, 1))
-    const due = computeDueDate(competence, rules)
+    const dueMonth = new Date(Date.UTC(2026, 2, 1)) // 14 de março de 2026 é sábado
+    const due = computeDueDateFromMonth(dueMonth, rules)
     expect(due.getUTCDay()).not.toBe(0)
     expect(due.getUTCDay()).not.toBe(6)
-    expect(due.toISOString().slice(0, 10)).toBe('2026-03-16') // segunda seguinte
+    expect(due.toISOString().slice(0, 10)).toBe('2026-03-16')
   })
 
   it('antecipa pro dia útil anterior quando dueBusinessDayRoll=BACKWARD e a data cai num domingo', () => {
-    // dueDayOfPeriod=20 em setembro/2026 cai num domingo -> deve antecipar pra sexta (18)
-    const rules: RecurrenceDateRules = { ...monthlyRules, dueMonthOffset: 0, dueDayOfPeriod: 20, dueBusinessDayRoll: 'BACKWARD' }
-    const competence = new Date(Date.UTC(2026, 8, 1)) // setembro/2026
-    const due = computeDueDate(competence, rules)
+    const rules: RecurrenceDateRules = { ...monthlyRules, dueDayOfPeriod: 20, dueBusinessDayRoll: 'BACKWARD' }
+    const dueMonth = new Date(Date.UTC(2026, 8, 1)) // setembro/2026 — dia 20 é domingo
+    const due = computeDueDateFromMonth(dueMonth, rules)
     expect(due.toISOString().slice(0, 10)).toBe('2026-09-18')
   })
 
-  it('ajusta o dia pro último dia do mês quando dueDayOfPeriod excede os dias do mês de destino', () => {
-    const rules: RecurrenceDateRules = { ...monthlyRules, dueMonthOffset: 0, dueDayOfPeriod: 31 }
-    const competence = new Date(Date.UTC(2026, 3, 1)) // abril, tem 30 dias
-    const due = computeDueDate(competence, rules)
+  it('ajusta o dia pro último dia do mês quando dueDayOfPeriod excede os dias do mês', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, dueDayOfPeriod: 31 }
+    const dueMonth = new Date(Date.UTC(2026, 3, 1)) // abril, 30 dias
+    const due = computeDueDateFromMonth(dueMonth, rules)
     expect(due.toISOString().slice(0, 10)).toBe('2026-04-30')
+  })
+})
+
+describe('computeCompetenceFromDueMonth', () => {
+  it('competência = mês de vencimento - competenceMonthOffset', () => {
+    const dueMonth = new Date(Date.UTC(2026, 9, 1)) // outubro
+    const competence = computeCompetenceFromDueMonth(dueMonth, { ...monthlyRules, competenceMonthOffset: 1 })
+    expect(competence.toISOString().slice(0, 10)).toBe('2026-09-01')
+  })
+
+  it('competenceMonthOffset=0: competência igual ao mês de vencimento', () => {
+    const dueMonth = new Date(Date.UTC(2026, 9, 1))
+    const competence = computeCompetenceFromDueMonth(dueMonth, { ...monthlyRules, competenceMonthOffset: 0 })
+    expect(competence.toISOString().slice(0, 10)).toBe('2026-10-01')
   })
 })
 
 describe('computeTargetDate', () => {
   it('meta = vencimento + targetOffsetDays (negativo = antes)', () => {
-    const due = new Date(Date.UTC(2026, 2, 15)) // 2026-03-15
+    const due = new Date(Date.UTC(2026, 2, 15))
     const target = computeTargetDate(due, monthlyRules)
     expect(target.toISOString().slice(0, 10)).toBe('2026-03-13')
   })
 
   it('ajusta a meta pro próximo dia útil independente do ajuste do vencimento', () => {
-    // due=2026-03-16 (segunda) + targetOffsetDays=-1 = 2026-03-15 (domingo) — cai em fim de semana
     const rules: RecurrenceDateRules = { ...monthlyRules, targetOffsetDays: -1, targetBusinessDayRoll: 'FORWARD' }
-    const due = new Date(Date.UTC(2026, 2, 16)) // segunda 2026-03-16 -> meta cai em 2026-03-15 (domingo)
+    const due = new Date(Date.UTC(2026, 2, 16)) // segunda -> meta cai domingo 15
     const target = computeTargetDate(due, rules)
-    expect(target.toISOString().slice(0, 10)).toBe('2026-03-16') // empurra pra segunda
+    expect(target.toISOString().slice(0, 10)).toBe('2026-03-16')
   })
 })
 
-describe('computeCompetencesToGenerate', () => {
-  it('mensal: dispara só no dia configurado, gera 1 competência (mês seguinte)', () => {
-    const trigger = new Date(Date.UTC(2026, 0, 20)) // 20 de janeiro
+describe('computeDueMonthsToGenerate', () => {
+  it('mensal: dispara só no dia configurado, gera 1 mês de vencimento (gatilho + generationMonthOffset)', () => {
+    const trigger = new Date(Date.UTC(2026, 0, 20))
     const notTrigger = new Date(Date.UTC(2026, 0, 19))
-    expect(computeCompetencesToGenerate(trigger, monthlyRules).map((d) => d.toISOString().slice(0, 10)))
+    expect(computeDueMonthsToGenerate(trigger, monthlyRules).map((d) => d.toISOString().slice(0, 10)))
       .toEqual(['2026-02-01'])
-    expect(computeCompetencesToGenerate(notTrigger, monthlyRules)).toEqual([])
+    expect(computeDueMonthsToGenerate(notTrigger, monthlyRules)).toEqual([])
   })
 
-  it('trimestral: só gera quando o mês seguinte inicia um trimestre novo', () => {
+  it('generationMonthOffset=0 gera o mês de vencimento no próprio mês do gatilho', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, generationMonthOffset: 0 }
+    const trigger = new Date(Date.UTC(2026, 8, 20))
+    expect(computeDueMonthsToGenerate(trigger, rules).map((d) => d.toISOString().slice(0, 10)))
+      .toEqual(['2026-09-01'])
+  })
+
+  it('trimestral: só gera quando o mês de vencimento calculado inicia um trimestre novo', () => {
     const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'QUARTERLY' }
-    const triggersNewQuarter = new Date(Date.UTC(2025, 11, 20)) // dezembro -> gera Q1 (janeiro)
-    const doesNotTrigger = new Date(Date.UTC(2026, 0, 20)) // janeiro -> mês seguinte é fevereiro, não é início de trimestre
-    expect(computeCompetencesToGenerate(triggersNewQuarter, rules).map((d) => d.toISOString().slice(0, 10)))
+    const triggersNewQuarter = new Date(Date.UTC(2025, 11, 20)) // dezembro -> +1 mês = janeiro (Q1)
+    const doesNotTrigger = new Date(Date.UTC(2026, 0, 20)) // janeiro -> +1 mês = fevereiro
+    expect(computeDueMonthsToGenerate(triggersNewQuarter, rules).map((d) => d.toISOString().slice(0, 10)))
       .toEqual(['2026-01-01'])
-    expect(computeCompetencesToGenerate(doesNotTrigger, rules)).toEqual([])
+    expect(computeDueMonthsToGenerate(doesNotTrigger, rules)).toEqual([])
   })
 
-  it('anual: só gera quando o mês seguinte é janeiro', () => {
+  it('anual: só gera quando o mês de vencimento calculado é janeiro', () => {
     const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'ANNUAL' }
-    const triggersNewYear = new Date(Date.UTC(2026, 11, 20)) // dezembro -> gera ano seguinte
+    const triggersNewYear = new Date(Date.UTC(2026, 11, 20))
     const doesNotTrigger = new Date(Date.UTC(2026, 0, 20))
-    expect(computeCompetencesToGenerate(triggersNewYear, rules).map((d) => d.toISOString().slice(0, 10)))
+    expect(computeDueMonthsToGenerate(triggersNewYear, rules).map((d) => d.toISOString().slice(0, 10)))
       .toEqual(['2027-01-01'])
-    expect(computeCompetencesToGenerate(doesNotTrigger, rules)).toEqual([])
+    expect(computeDueMonthsToGenerate(doesNotTrigger, rules)).toEqual([])
   })
 
-  it('semanal: gera uma competência por cada dueDayOfPeriod que cai no mês seguinte inteiro', () => {
-    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'WEEKLY', dueDayOfPeriod: 1 } // segundas-feiras
-    const trigger = new Date(Date.UTC(2026, 0, 20)) // gera pro mês de fevereiro/2026
+  it('lança erro se chamada com periodicidade WEEKLY', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'WEEKLY' }
+    expect(() => computeDueMonthsToGenerate(new Date(Date.UTC(2026, 0, 20)), rules)).toThrow()
+  })
+
+  it('regressão do bug original: DAS com generationDayOfPeriod=20, generationMonthOffset=1, dueDayOfPeriod=10, competenceMonthOffset=1 — dispara 20/set, vence 10/out, competência setembro', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, dueDayOfPeriod: 10, generationDayOfPeriod: 20, generationMonthOffset: 1, competenceMonthOffset: 1 }
+    const trigger = new Date(Date.UTC(2026, 8, 20))
+    const [dueMonth] = computeDueMonthsToGenerate(trigger, rules)
+    expect(dueMonth.toISOString().slice(0, 10)).toBe('2026-10-01')
+    expect(computeDueDateFromMonth(dueMonth, rules).toISOString().slice(0, 10)).toBe('2026-10-10')
+    expect(computeCompetenceFromDueMonth(dueMonth, rules).toISOString().slice(0, 10)).toBe('2026-09-01')
+  })
+})
+
+describe('computeDueDate (só WEEKLY)', () => {
+  it('semanal: competência é a segunda-feira da semana; dueDayOfPeriod=5 (sexta) cai na mesma semana', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'WEEKLY', dueDayOfPeriod: 5 }
+    const competence = new Date(Date.UTC(2026, 1, 2)) // segunda-feira
+    const due = computeDueDate(competence, rules)
+    expect(due.toISOString().slice(0, 10)).toBe('2026-02-06')
+  })
+})
+
+describe('computeCompetencesToGenerate (só WEEKLY)', () => {
+  it('gera uma competência por cada dueDayOfPeriod que cai no mês seguinte inteiro', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'WEEKLY', dueDayOfPeriod: 1 }
+    const trigger = new Date(Date.UTC(2026, 0, 20))
     const mondaysOfFebruary2026 = computeCompetencesToGenerate(trigger, rules).map((d) => d.toISOString().slice(0, 10))
     expect(mondaysOfFebruary2026).toEqual(['2026-02-02', '2026-02-09', '2026-02-16', '2026-02-23'])
   })
 
-  it('mensal: generationMonthOffset=0 gera competência no próprio mês do gatilho (ex: DAS — gera em setembro a competência de setembro)', () => {
-    const rules: RecurrenceDateRules = { ...monthlyRules, generationMonthOffset: 0 }
-    const trigger = new Date(Date.UTC(2026, 8, 20)) // 20 de setembro
-    expect(computeCompetencesToGenerate(trigger, rules).map((d) => d.toISOString().slice(0, 10)))
-      .toEqual(['2026-09-01'])
-  })
-
-  it('mensal: generationMonthOffset=2 gera a competência com dois meses de antecedência', () => {
-    const rules: RecurrenceDateRules = { ...monthlyRules, generationMonthOffset: 2 }
-    const trigger = new Date(Date.UTC(2026, 8, 20)) // 20 de setembro
-    expect(computeCompetencesToGenerate(trigger, rules).map((d) => d.toISOString().slice(0, 10)))
-      .toEqual(['2026-11-01'])
-  })
-
-  it('trimestral: generationMonthOffset=0 só gera quando o próprio mês do gatilho inicia um trimestre', () => {
-    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'QUARTERLY', generationMonthOffset: 0 }
-    const triggersQuarter = new Date(Date.UTC(2026, 0, 20)) // janeiro -> início do Q1
-    const doesNotTrigger = new Date(Date.UTC(2026, 1, 20)) // fevereiro -> não é início de trimestre
-    expect(computeCompetencesToGenerate(triggersQuarter, rules).map((d) => d.toISOString().slice(0, 10)))
-      .toEqual(['2026-01-01'])
-    expect(computeCompetencesToGenerate(doesNotTrigger, rules)).toEqual([])
+  it('lança erro se chamada com periodicidade não-WEEKLY', () => {
+    expect(() => computeCompetencesToGenerate(new Date(Date.UTC(2026, 0, 20)), monthlyRules)).toThrow()
   })
 })
 
 describe('computeCurrentPeriodStart', () => {
   it('mensal: início do mês corrente', () => {
-    const today = new Date(Date.UTC(2026, 2, 17)) // 17 de março
+    const today = new Date(Date.UTC(2026, 2, 17))
     expect(computeCurrentPeriodStart(today, 'MONTHLY').toISOString().slice(0, 10)).toBe('2026-03-01')
   })
 
   it('semanal: segunda-feira da semana corrente', () => {
-    const today = new Date(Date.UTC(2026, 2, 18)) // quarta-feira 2026-03-18
+    const today = new Date(Date.UTC(2026, 2, 18)) // quarta-feira
     expect(computeCurrentPeriodStart(today, 'WEEKLY').toISOString().slice(0, 10)).toBe('2026-03-16')
   })
 
@@ -181,12 +185,12 @@ describe('computeCurrentPeriodStart', () => {
 
 describe('normalizeToPeriodStart', () => {
   it('mensal: canonicaliza um instante qualquer do mês pro dia 1 do mesmo mês', () => {
-    const arbitrary = new Date(Date.UTC(2026, 8, 17, 13, 22, 0)) // 2026-09-17T13:22:00Z
+    const arbitrary = new Date(Date.UTC(2026, 8, 17, 13, 22, 0))
     expect(normalizeToPeriodStart(arbitrary, 'MONTHLY').toISOString().slice(0, 10)).toBe('2026-09-01')
   })
 
   it('semanal: canonicaliza um instante qualquer da semana pra segunda-feira daquela semana', () => {
-    const arbitrary = new Date(Date.UTC(2026, 8, 18, 23, 59, 0)) // sexta-feira 2026-09-18
+    const arbitrary = new Date(Date.UTC(2026, 8, 18, 23, 59, 0)) // sexta-feira
     expect(normalizeToPeriodStart(arbitrary, 'WEEKLY').toISOString().slice(0, 10)).toBe('2026-09-14')
   })
 
@@ -198,5 +202,18 @@ describe('normalizeToPeriodStart', () => {
   it('anual: canonicaliza um instante qualquer do ano pro dia 1º de janeiro', () => {
     const arbitrary = new Date(Date.UTC(2026, 8, 17, 13, 22, 0))
     expect(normalizeToPeriodStart(arbitrary, 'ANNUAL').toISOString().slice(0, 10)).toBe('2026-01-01')
+  })
+})
+
+describe('computeNextDueMonth', () => {
+  it('mensal: mesmo cálculo que o cron faria se disparasse hoje (gatilho + generationMonthOffset)', () => {
+    const today = new Date(Date.UTC(2026, 8, 15)) // qualquer dia de setembro, não precisa ser o dia de gatilho
+    expect(computeNextDueMonth(today, monthlyRules).toISOString().slice(0, 10)).toBe('2026-10-01')
+  })
+
+  it('semanal: usa computeCurrentPeriodStart (semana corrente), ignora generationMonthOffset', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'WEEKLY' }
+    const today = new Date(Date.UTC(2026, 2, 18)) // quarta-feira
+    expect(computeNextDueMonth(today, rules).toISOString().slice(0, 10)).toBe('2026-03-16')
   })
 })
