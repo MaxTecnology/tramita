@@ -224,6 +224,44 @@ describe('notifyIfBlocked (via recalculateTaskStatus)', () => {
     spy.mockRestore()
   })
 
+  it('não notifica quando a tarefa tem visibleToClient=false', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { visibleToClient: false } })
+    await prisma.taskDocumentRequirement.create({ data: { taskId: task.id, name: 'Contrato', position: 0 } })
+
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+    await recalculateTaskStatus(task.id)
+
+    const blockedCalls = spy.mock.calls.filter((c) => (c[0] as { event: string }).event === 'TASK_BLOCKED')
+    expect(blockedCalls).toHaveLength(0)
+    spy.mockRestore()
+  })
+
+  it('notifica quando a tarefa tem visibleToClient=true (default)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    expect(task.visibleToClient).toBe(true)
+    await prisma.taskDocumentRequirement.create({ data: { taskId: task.id, name: 'Contrato', position: 0 } })
+
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+    await recalculateTaskStatus(task.id)
+
+    const blockedCalls = spy.mock.calls.filter((c) => (c[0] as { event: string }).event === 'TASK_BLOCKED')
+    expect(blockedCalls).toHaveLength(1)
+    spy.mockRestore()
+  })
+
   it('não notifica ao resolver o impedimento (BLOCKED -> OPEN)', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

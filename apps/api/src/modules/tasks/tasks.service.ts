@@ -194,7 +194,7 @@ export async function moveTask(
     })
   }
 
-  await notifyIfBlocked(taskId, task.status, nextStatus, toColumn.board.clientId, organizationId)
+  await notifyIfBlocked(taskId, task.status, nextStatus, toColumn.board.clientId, organizationId, task.visibleToClient)
 
   await publishBoardEvent(toColumn.board.id, {
     event: 'task:moved',
@@ -338,7 +338,7 @@ export async function updateTask(
   })
 
   if (data.status !== undefined) {
-    await notifyIfBlocked(id, task.status, data.status, task.column.board.clientId, organizationId)
+    await notifyIfBlocked(id, task.status, data.status, task.column.board.clientId, organizationId, updated.visibleToClient)
   }
 
   await publishBoardEvent(task.column.board.id, {
@@ -392,12 +392,30 @@ export async function listTasks(
     ...(query.status ? { status: query.status } : {}),
     ...(query.recurringTemplateId ? { recurringTemplateId: query.recurringTemplateId } : {}),
     ...(query.dateFrom || query.dateTo
-      ? {
-          targetDate: {
-            ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-            ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
-          },
-        }
+      ? query.dateField === 'effective'
+        ? {
+            OR: [
+              {
+                targetDate: {
+                  ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+                  ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+                },
+              },
+              {
+                targetDate: null,
+                dueDate: {
+                  ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+                  ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+                },
+              },
+            ],
+          }
+        : {
+            targetDate: {
+              ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+              ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+            },
+          }
       : {}),
     ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
   }

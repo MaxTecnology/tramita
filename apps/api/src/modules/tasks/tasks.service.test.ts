@@ -8,6 +8,7 @@ import {
   reorderTasks,
   deleteTask,
   getTaskHistory,
+  listTasks,
 } from '@/modules/tasks/tasks.service'
 import {
   createTestPlan,
@@ -180,6 +181,27 @@ describe('moveTask', () => {
 
     const requirementsAfter = await prisma.taskDocumentRequirement.findMany({ where: { taskId: task.id } })
     expect(requirementsAfter).toHaveLength(2)
+  })
+
+  it('column statusEffect STARTED (não BLOCKED) com ColumnDocuments ainda termina BLOCKED e notifica exatamente uma vez', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col1 = await createTestColumn(board.id, { position: 0 })
+    const startedCol = await createTestColumn(board.id, { position: 1, statusEffect: 'STARTED' })
+    await prisma.columnDocument.create({ data: { columnId: startedCol.id, name: 'Contrato Social', position: 0 } })
+    const task = await createTestTask(col1.id, user.id)
+
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+    const result = await moveTask(task.id, org.id, { columnId: startedCol.id, position: 0 }, { id: user.id, type: 'user' })
+
+    // O status derivado dos documentos pendentes vence o statusEffect STARTED da coluna.
+    expect(result.status).toBe('BLOCKED')
+    const blockedCalls = spy.mock.calls.filter((c) => (c[0] as { event: string }).event === 'TASK_BLOCKED')
+    expect(blockedCalls).toHaveLength(1)
+    spy.mockRestore()
   })
 })
 
@@ -492,6 +514,71 @@ describe('updateTask (status)', () => {
   })
 })
 
+describe('listTasks (dateField)', () => {
+  it('dateFrom/dateTo (padrão) exclui tarefa sem targetDate mesmo com dueDate dentro da janela', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { dueDate: new Date('2026-06-15T00:00:00Z') } })
+
+    const result = await listTasks(org.id, { id: user.id, role: 'ORG_ADMIN' }, {
+      dateFrom: '2026-06-01T00:00:00.000Z',
+      dateTo: '2026-06-30T00:00:00.000Z',
+    })
+
+    expect(result.items.find((t) => t.id === task.id)).toBeUndefined()
+  })
+
+  it('dateField=effective inclui tarefa sem targetDate cujo dueDate cai na janela', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { dueDate: new Date('2026-06-15T00:00:00Z') } })
+
+    const result = await listTasks(org.id, { id: user.id, role: 'ORG_ADMIN' }, {
+      dateFrom: '2026-06-01T00:00:00.000Z',
+      dateTo: '2026-06-30T00:00:00.000Z',
+      dateField: 'effective',
+    })
+
+    expect(result.items.find((t) => t.id === task.id)).toBeDefined()
+  })
+
+  it('dateField=effective continua filtrando por targetDate quando ele está presente, ignorando dueDate', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    // targetDate fora da janela, dueDate dentro — com targetDate presente, dueDate nunca entra em jogo.
+    await prisma.task.update({
+      where: { id: task.id },
+      data: {
+        targetDate: new Date('2026-07-15T00:00:00Z'),
+        dueDate: new Date('2026-06-15T00:00:00Z'),
+      },
+    })
+
+    const result = await listTasks(org.id, { id: user.id, role: 'ORG_ADMIN' }, {
+      dateFrom: '2026-06-01T00:00:00.000Z',
+      dateTo: '2026-06-30T00:00:00.000Z',
+      dateField: 'effective',
+    })
+
+    expect(result.items.find((t) => t.id === task.id)).toBeUndefined()
+  })
+})
+
 describe('notifyIfBlocked (via moveTask e updateTask)', () => {
   it('moveTask: notifica exatamente uma vez quando a coluna de destino é BLOCKED e tem documentos configurados', async () => {
     const plan = await createTestPlan()
@@ -525,6 +612,11 @@ describe('notifyIfBlocked (via moveTask e updateTask)', () => {
     await updateTask(task.id, org.id, { status: 'BLOCKED' }, { id: user.id, type: 'user' })
 
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ event: 'TASK_BLOCKED', taskId: task.id }))
+    // notifyIfBlocked nunca pode bypassar o toggle taskBlocked da org via forceChannels — isso é
+    // uma escolha explícita por coluna (notifyClient, via Template de OS) pra outro evento
+    // (TASK_MOVED), nunca pro impedimento genérico.
+    const blockedCall = spy.mock.calls.find((c) => (c[0] as { event: string }).event === 'TASK_BLOCKED')
+    expect((blockedCall?.[0] as { forceChannels?: unknown }).forceChannels).toBeUndefined()
     spy.mockRestore()
   })
 

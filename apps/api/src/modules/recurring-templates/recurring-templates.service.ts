@@ -5,6 +5,7 @@ import { Prisma, type MessageChannel } from '@prisma/client'
 import { enqueueNotification } from '@/lib/queue'
 import { logger } from '@/lib/logger'
 import { ensureRecurringSystemBoard } from '@/modules/tasks/tasks.service'
+import { notifyIfBlocked } from '@/modules/task-documents/task-documents.service'
 import {
   computeDueDate,
   computeTargetDate,
@@ -276,6 +277,21 @@ export async function generateTaskForAssignment(
 
       return task.id
     })
+
+    // Tarefa recorrente pode nascer já BLOCKED (template com documentos exigidos) — não há um
+    // "status anterior" real pra uma tarefa recém-criada, mas passar 'OPEN' como anterior sintético
+    // é correto pro guard de notifyIfBlocked (previousStatus !== 'BLOCKED'), disparando a notificação
+    // exatamente quando initialStatus === 'BLOCKED'. Mesmo raciocínio de isolamento do bloco
+    // TASK_CREATED abaixo: a Task e o log SUCCESS já foram commitados, então uma falha só nessa
+    // notificação nunca pode cair no catch genérico (que reescreveria o log pra FAILED).
+    try {
+      await notifyIfBlocked(taskId, 'OPEN', initialStatus, assignment.clientId, template.organizationId, template.visibleToClient)
+    } catch (notifyErr) {
+      logger.error(
+        { err: notifyErr, taskId, templateId, clientId: assignment.clientId },
+        'Falha ao enfileirar notificação TASK_BLOCKED — geração da tarefa já foi concluída com sucesso',
+      )
+    }
 
     if (template.notifyViaWhatsapp || template.notifyViaEmail) {
       const channels: MessageChannel[] = []

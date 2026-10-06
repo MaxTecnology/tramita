@@ -45,6 +45,11 @@ export const listTasksQuerySchema = z.object({
   recurringTemplateId: z.string().cuid().optional(),
   dateFrom: z.string().datetime().optional(),
   dateTo: z.string().datetime().optional(),
+  // 'target' (default) filtra só por targetDate — comportamento histórico da Lista/Kanban
+  // ("Meta de"/"Meta até"). 'effective' filtra por targetDate OU, se a tarefa não tiver
+  // targetDate, por dueDate — é o que a visão Calendário precisa pra não excluir tarefas
+  // regulares (que nunca ganham targetDate, só as recorrentes) da janela do mês.
+  dateField: z.enum(['target', 'effective']).optional(),
   q: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
   cursor: z.string().cuid().optional(),

@@ -305,6 +305,49 @@ describe('generateTaskForAssignment', () => {
     spy.mockRestore()
   })
 
+  it('gera com TASK_BLOCKED (exatamente uma vez) quando o template tem documento exigido', async () => {
+    const { template, assignment } = await setup()
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const competence = new Date(Date.UTC(2026, 1, 1))
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+    expect(outcome.status).toBe('SUCCESS')
+
+    const blockedCalls = spy.mock.calls.filter((c) => (c[0] as { event: string }).event === 'TASK_BLOCKED')
+    expect(blockedCalls).toHaveLength(1)
+    spy.mockRestore()
+  })
+
+  it('não gera TASK_BLOCKED quando o template não tem documento exigido (tarefa nasce OPEN)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'Folha de pagamento', periodicity: 'MONTHLY',
+      dueMonthOffset: 1, dueDayOfPeriod: 15, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: -2, targetBusinessDayRoll: 'NONE',
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true,
+      documentRequests: [], documentDeliveries: [],
+    })
+    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const competence = new Date(Date.UTC(2026, 1, 1))
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, competence)
+    expect(outcome.status).toBe('SUCCESS')
+    if (outcome.status !== 'SUCCESS') throw new Error('unreachable')
+
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: outcome.taskId } })
+    expect(task.status).toBe('OPEN')
+
+    const blockedCalls = spy.mock.calls.filter((c) => (c[0] as { event: string }).event === 'TASK_BLOCKED')
+    expect(blockedCalls).toHaveLength(0)
+    spy.mockRestore()
+  })
+
   it('falha ao enfileirar TASK_CREATED (ex.: blip do Redis) não reverte o SUCCESS nem reabre a idempotência', async () => {
     const { template, assignment } = await setup()
     const spy = vi.spyOn(queue, 'enqueueNotification').mockRejectedValueOnce(new Error('ECONNREFUSED'))

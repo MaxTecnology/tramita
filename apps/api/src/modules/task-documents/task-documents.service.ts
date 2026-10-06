@@ -189,18 +189,26 @@ export async function deliverDocument(
 }
 
 // Ponto único de disparo da notificação TASK_BLOCKED — chamado por recalculateTaskStatus (abaixo,
-// quando um documento pendente/rejeitado bloqueia a tarefa) e por tasks.service.ts's moveTask/
-// updateTask (os outros dois — e únicos outros, confirmado por varredura do código inteiro — pontos
-// que escrevem Task.status). Só dispara na transição DE ENTRADA em BLOCKED, nunca em edições
-// subsequentes enquanto já está bloqueada, nunca ao sair de BLOCKED.
+// quando um documento pendente/rejeitado bloqueia a tarefa), por tasks.service.ts's moveTask/
+// updateTask, e por recurring-templates.service.ts's generateTaskForAssignment (uma tarefa
+// recorrente pode nascer já BLOCKED quando o template exige documentos). A varredura original só
+// buscava `task.update(` e por isso perdeu esse quarto ponto, que escreve o status via
+// `task.create(` — não há garantia de que esses sejam os únicos; qualquer novo escritor de
+// Task.status precisa chamar este helper. Só dispara na transição DE ENTRADA em BLOCKED, nunca em
+// edições subsequentes enquanto já está bloqueada, nunca ao sair de BLOCKED, e nunca para uma
+// tarefa que o cliente não pode ver no portal (visibleToClient=false) — ver notification.worker.ts,
+// que hoje não filtra o envio de WhatsApp por visibleToClient pros demais eventos (débito técnico
+// pré-existente, fora do escopo deste helper).
 export async function notifyIfBlocked(
   taskId: string,
   previousStatus: TaskStatus,
   newStatus: TaskStatus,
   clientId: string,
   organizationId: string,
+  visibleToClient: boolean,
 ): Promise<void> {
   if (newStatus !== 'BLOCKED' || previousStatus === 'BLOCKED') return
+  if (!visibleToClient) return
   await enqueueNotification({
     event: 'TASK_BLOCKED',
     organizationId,
@@ -255,6 +263,9 @@ export async function recalculateTaskStatus(taskId: string) {
       }),
     ])
 
-    await notifyIfBlocked(taskId, task.status, nextStatus, task.column.board.clientId, task.column.board.organizationId)
+    await notifyIfBlocked(
+      taskId, task.status, nextStatus, task.column.board.clientId, task.column.board.organizationId,
+      task.visibleToClient,
+    )
   }
 }
