@@ -26,6 +26,7 @@ export async function getConfig(organizationId: string) {
       slaTargetWarningDays: true,
       slaDueCriticalDays: true,
       slaDigestEnabled: true,
+      customSlaSoundLabel: true,
       requestCreated: true,
       requestApproved: true,
       requestRejected: true,
