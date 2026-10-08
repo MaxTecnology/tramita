@@ -654,6 +654,47 @@ describe('listTasks (dateField)', () => {
   })
 })
 
+describe('listTasks (boardType / openOnly)', () => {
+  it('boardType=OS exclui tarefas de board RECURRING_SYSTEM', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const osBoard = await createTestBoard(org.id, client.id)
+    const recurringBoard = await prisma.board.create({
+      data: { title: 'Recorrente', organizationId: org.id, clientId: client.id, type: 'RECURRING_SYSTEM' },
+    })
+    const osColumn = await createTestColumn(osBoard.id)
+    const recurringColumn = await createTestColumn(recurringBoard.id)
+    const osTask = await createTestTask(osColumn.id, user.id)
+    await createTestTask(recurringColumn.id, user.id)
+
+    const result = await listTasks(org.id, { id: user.id, role: 'ORG_ADMIN' }, { boardType: 'OS' })
+
+    const ids = result.items.map((t) => t.id)
+    expect(ids).toContain(osTask.id)
+    expect(ids.length).toBe(1)
+  })
+
+  it('openOnly=true exclui tarefas DONE e DISREGARDED', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const openTask = await createTestTask(column.id, user.id)
+    const doneTask = await createTestTask(column.id, user.id)
+    await prisma.task.update({ where: { id: doneTask.id }, data: { status: 'DONE' } })
+
+    const result = await listTasks(org.id, { id: user.id, role: 'ORG_ADMIN' }, { openOnly: true })
+
+    const ids = result.items.map((t) => t.id)
+    expect(ids).toContain(openTask.id)
+    expect(ids).not.toContain(doneTask.id)
+  })
+})
+
 describe('notifyIfBlocked (via moveTask e updateTask)', () => {
   it('moveTask: notifica exatamente uma vez quando a coluna de destino é BLOCKED e tem documentos configurados', async () => {
     const plan = await createTestPlan()

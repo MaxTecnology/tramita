@@ -393,11 +393,16 @@ export async function listTasks(
       board: {
         organizationId,
         ...(query.clientId ? { clientId: query.clientId } : {}),
+        ...(query.boardType ? { type: query.boardType } : {}),
       },
     },
     ...(query.assigneeId ? { assigneeId: query.assigneeId } : {}),
     ...(query.departmentId ? { departmentId: query.departmentId } : {}),
-    ...(query.status ? { status: query.status } : {}),
+    ...(query.status
+      ? { status: query.status }
+      : query.openOnly
+        ? { status: { notIn: ['DONE', 'DISREGARDED'] } }
+        : {}),
     ...(query.recurringTemplateId ? { recurringTemplateId: query.recurringTemplateId } : {}),
     ...(query.dateFrom || query.dateTo
       ? query.dateField === 'effective'
