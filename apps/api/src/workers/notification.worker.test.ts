@@ -200,3 +200,57 @@ describe('processNotificationJob — WhatsApp respeita visibleToClient (igual ao
     expect(logs.some((l) => l.status === 'SENT')).toBe(true)
   })
 })
+
+describe('processNotificationJob — SLA_DIGEST por usuário', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('envia por EMAIL e WHATSAPP quando o usuário tem phone e a org tem WhatsApp configurado', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await prisma.notificationConfig.upsert({
+      where: { organizationId: org.id },
+      create: { organizationId: org.id, whatsappEnabled: true, maximizebotToken: 'Bearer test-token', slaDigestEnabled: true },
+      update: { whatsappEnabled: true, maximizebotToken: 'Bearer test-token', slaDigestEnabled: true },
+    })
+    const user = await createTestUser(org.id, { role: 'ORG_ADMIN', phone: '5511999999999' })
+
+    await processNotificationJob({
+      data: {
+        event: 'SLA_DIGEST',
+        organizationId: org.id,
+        recipientType: 'USER',
+        userId: user.id,
+        metadata: { taskCount: '2', criticalCount: '1', taskListText: '- Tarefa X — crítico' },
+      },
+    })
+
+    const logs = await prisma.notificationLog.findMany({ where: { organizationId: org.id, event: 'SLA_DIGEST' } })
+    expect(logs.map((l) => l.channel).sort()).toEqual(['EMAIL', 'WHATSAPP'])
+  })
+
+  it('envia só por EMAIL quando o usuário não tem phone cadastrado', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await prisma.notificationConfig.upsert({
+      where: { organizationId: org.id },
+      create: { organizationId: org.id, whatsappEnabled: true, maximizebotToken: 'Bearer test-token' },
+      update: { whatsappEnabled: true, maximizebotToken: 'Bearer test-token' },
+    })
+    const user = await createTestUser(org.id, { role: 'ORG_ADMIN' }) // sem phone
+
+    await processNotificationJob({
+      data: {
+        event: 'SLA_DIGEST',
+        organizationId: org.id,
+        recipientType: 'USER',
+        userId: user.id,
+        metadata: { taskCount: '1', criticalCount: '0', taskListText: '- Tarefa Y — atenção' },
+      },
+    })
+
+    const logs = await prisma.notificationLog.findMany({ where: { organizationId: org.id, event: 'SLA_DIGEST' } })
+    expect(logs.map((l) => l.channel)).toEqual(['EMAIL'])
+  })
+})

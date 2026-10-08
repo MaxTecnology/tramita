@@ -14,13 +14,13 @@ const EVENT_FLAG_MAP: Record<string, keyof NotificationConfig> = {
   TASK_MOVED: 'taskMoved',
   TASK_COMPLETED: 'taskCompleted',
   TASK_COMMENT_ADDED: 'commentAdded',
-  TASK_DUE_DATE_APPROACHING: 'dueDateAlert',
   TASK_BLOCKED: 'taskBlocked',
   REQUEST_CREATED: 'requestCreated',
   REQUEST_APPROVED: 'requestApproved',
   REQUEST_REJECTED: 'requestRejected',
   RECURRING_GENERATION_FAILED: 'recurringGenerationFailed',
   DOCUMENT_REJECTED: 'documentRejected',
+  SLA_DIGEST: 'slaDigestEnabled',
 }
 
 export async function processNotificationJob(job: { data: NotificationJob }): Promise<void> {
@@ -39,7 +39,7 @@ export async function processNotificationJob(job: { data: NotificationJob }): Pr
 
   if (recipientType === 'USER') {
     if (!userId) return
-    await processUserNotification(config, { event, organizationId, userId, taskId, requestId, metadata })
+    await processUserNotification(config, { event, organizationId, userId, taskId, requestId, metadata, channels })
     return
   }
 
@@ -196,11 +196,10 @@ async function processUserNotification(
     taskId?: string
     requestId?: string
     metadata: Record<string, string | undefined>
+    channels?: MessageChannel[]
   },
 ): Promise<void> {
-  const { event, organizationId, userId, taskId, requestId, metadata } = params
-
-  if (!config.emailEnabled) return
+  const { event, organizationId, userId, taskId, requestId, metadata, channels: channelOverride } = params
 
   const [user, org] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
@@ -216,42 +215,61 @@ async function processUserNotification(
     requestTitle: metadata.requestTitle,
     commentText: metadata.commentText,
     commentAuthorName: metadata.commentAuthorName,
-    portalUrl: event === 'TASK_COMMENT_ADDED' ? `${appUrl}/app` : `${appUrl}/app/requests`,
+    taskCount: metadata.taskCount,
+    criticalCount: metadata.criticalCount,
+    taskListText: metadata.taskListText,
+    portalUrl: event === 'TASK_COMMENT_ADDED' ? `${appUrl}/app` : event === 'SLA_DIGEST' ? `${appUrl}/app` : `${appUrl}/app/requests`,
   }
 
-  const template = await getTemplate(organizationId, event as NotificationEvent, 'EMAIL')
-  const rendered = renderTemplate(template.body, vars)
+  const availableChannels: MessageChannel[] = []
+  if (config.emailEnabled) availableChannels.push('EMAIL')
+  if (config.whatsappEnabled && config.maximizebotToken && user.phone) availableChannels.push('WHATSAPP')
+  const effectiveChannels = channelOverride ? availableChannels.filter((c) => channelOverride.includes(c)) : availableChannels
 
-  let status: 'SENT' | 'FAILED' = 'SENT'
-  let error: string | undefined
+  for (const channel of effectiveChannels) {
+    const template = await getTemplate(organizationId, event as NotificationEvent, channel)
+    const rendered = renderTemplate(template.body, vars)
 
-  try {
-    const subject = renderTemplate(template.subject ?? '', vars)
-    await sendEmail(
-      user.email,
-      subject,
-      rendered,
-      wrapEmailHtml(subject, rendered, vars.portalUrl, 'Ver solicitação'),
-    )
-  } catch (err) {
-    status = 'FAILED'
-    error = err instanceof Error ? err.message : String(err)
+    let status: 'SENT' | 'FAILED' = 'SENT'
+    let error: string | undefined
+    let recipient: string
+
+    try {
+      if (channel === 'EMAIL') {
+        recipient = user.email
+        const subject = renderTemplate(template.subject ?? '', vars)
+        await sendEmail(user.email, subject, rendered, wrapEmailHtml(subject, rendered, vars.portalUrl, 'Ver no painel'))
+      } else {
+        recipient = user.phone!
+        await sendWhatsApp(config.maximizebotToken!, {
+          number: user.phone!,
+          body: rendered,
+          saveOnTicket: config.saveOnTicket,
+          startChatbot: config.startChatbot,
+          linkPreview: true,
+        })
+      }
+    } catch (err) {
+      status = 'FAILED'
+      error = err instanceof Error ? err.message : String(err)
+      recipient = channel === 'EMAIL' ? user.email : (user.phone ?? '')
+    }
+
+    await prisma.notificationLog.create({
+      data: {
+        organizationId,
+        event: event as NotificationEvent,
+        channel,
+        taskId,
+        requestId,
+        recipient,
+        message: rendered,
+        status,
+        error,
+        sentAt: status === 'SENT' ? new Date() : undefined,
+      },
+    })
   }
-
-  await prisma.notificationLog.create({
-    data: {
-      organizationId,
-      event: event as NotificationEvent,
-      channel: 'EMAIL',
-      taskId,
-      requestId,
-      recipient: user.email,
-      message: rendered,
-      status,
-      error,
-      sentAt: status === 'SENT' ? new Date() : undefined,
-    },
-  })
 }
 
 export function startNotificationWorker() {

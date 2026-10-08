@@ -38,6 +38,7 @@ export async function createTestUser(
     role: 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'
     email: string
     password: string
+    phone: string
   }>,
 ) {
   const password = overrides?.password ?? 'Test@1234'
@@ -47,6 +48,7 @@ export async function createTestUser(
       email: overrides?.email ?? `user-${Date.now()}-${++testUserCounter}@test.com`,
       passwordHash: await bcrypt.hash(password, 10),
       role: overrides?.role ?? 'ORG_ADMIN',
+      phone: overrides?.phone,
       organizationId,
     },
   })
