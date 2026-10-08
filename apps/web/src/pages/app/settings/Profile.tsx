@@ -106,14 +106,22 @@ export default function Profile() {
     queryFn: () => api.get('/sla/custom-sound-url').then((r) => r.data),
   })
 
+  // Mudança só de volume não mostra toast — o slider já dá feedback visual (%) a cada pixel do
+  // drag, e um toast por pixel seria tão ruidoso quanto a enxurrada de requests que o commit só
+  // no soltar do mouse já evita.
+  const isVolumeOnlyChange = (data: Partial<SlaPreference>) =>
+    Object.keys(data).every((k) => k === 'targetWarningVolume' || k === 'dueCriticalVolume')
+
   const slaPrefMutation = useMutation({
     mutationFn: (data: Partial<SlaPreference>) => api.patch('/sla/preferences', data).then((r) => r.data),
-    onSuccess: () => {
-      toast.success('Preferência de som atualizada')
+    onSuccess: (_result, variables) => {
+      if (!isVolumeOnlyChange(variables)) toast.success('Preferência de som atualizada')
       queryClient.invalidateQueries({ queryKey: ['sla-preference'] })
     },
     onError: () => toast.error('Erro ao atualizar preferência de som'),
   })
+
+  const [localVolumes, setLocalVolumes] = useState<{ targetWarning?: number; dueCritical?: number }>({})
 
   const soundOptions = customSound?.url
     ? ['CHIME', 'BELL', 'SOFT_PING', 'MUTE', 'ORG_CUSTOM']
@@ -258,8 +266,15 @@ export default function Profile() {
             const soundKey = level === 'targetWarning' ? 'targetWarningSound' : 'dueCriticalSound'
             const volumeKey = level === 'targetWarning' ? 'targetWarningVolume' : 'dueCriticalVolume'
             const label = level === 'targetWarning' ? 'Som ao aproximar da meta' : 'Som ao ficar crítico'
-            const sound = slaPreference?.[soundKey] ?? (level === 'targetWarning' ? 'SOFT_PING' : 'BELL')
-            const volume = slaPreference?.[volumeKey] ?? (level === 'targetWarning' ? 50 : 70)
+            const fallback = level === 'targetWarning' ? 'SOFT_PING' : 'BELL'
+            const sound = slaPreference?.[soundKey] ?? fallback
+            const savedVolume = slaPreference?.[volumeKey] ?? (level === 'targetWarning' ? 50 : 70)
+            const volume = localVolumes[level] ?? savedVolume
+
+            const commitVolume = (v: number) => {
+              setLocalVolumes((prev) => ({ ...prev, [level]: undefined }))
+              slaPrefMutation.mutate({ [volumeKey]: v })
+            }
 
             return (
               <div key={level} className="space-y-2">
@@ -277,7 +292,7 @@ export default function Profile() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => void playSound(sound, volume, customSound?.url ?? null)}
+                    onClick={() => void playSound(sound, volume, customSound?.url ?? null, fallback)}
                   >
                     <Volume2 size={14} />
                     Testar
@@ -290,7 +305,10 @@ export default function Profile() {
                     max={100}
                     value={volume}
                     disabled={sound === 'MUTE'}
-                    onChange={(e) => slaPrefMutation.mutate({ [volumeKey]: Number(e.target.value) })}
+                    onChange={(e) => setLocalVolumes((prev) => ({ ...prev, [level]: Number(e.target.value) }))}
+                    onMouseUp={(e) => commitVolume(Number((e.target as HTMLInputElement).value))}
+                    onTouchEnd={(e) => commitVolume(Number((e.target as HTMLInputElement).value))}
+                    onKeyUp={(e) => commitVolume(Number((e.target as HTMLInputElement).value))}
                     className="flex-1"
                   />
                   <span className="text-xs text-muted-foreground w-10 text-right">{volume}%</span>

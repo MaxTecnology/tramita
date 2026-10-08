@@ -4,9 +4,19 @@ const SOUND_FILES: Record<string, string> = {
   SOFT_PING: '/sounds/soft-ping.mp3',
 }
 
-export async function playSound(soundKey: string, volume: number, orgCustomUrl: string | null) {
+// fallbackSoundKey é usado quando soundKey === 'ORG_CUSTOM' mas a organização removeu o som
+// customizado depois do usuário já ter salvo essa preferência — cai pro som padrão do nível
+// (BELL/SOFT_PING) em vez de ficar silenciosamente mudo sem o usuário entender por quê.
+export async function playSound(
+  soundKey: string,
+  volume: number,
+  orgCustomUrl: string | null,
+  fallbackSoundKey?: string,
+) {
   if (soundKey === 'MUTE') return
-  const src = soundKey === 'ORG_CUSTOM' ? orgCustomUrl : SOUND_FILES[soundKey]
+  const effectiveKey = soundKey === 'ORG_CUSTOM' && !orgCustomUrl ? fallbackSoundKey : soundKey
+  if (!effectiveKey || effectiveKey === 'MUTE') return
+  const src = effectiveKey === 'ORG_CUSTOM' ? orgCustomUrl : SOUND_FILES[effectiveKey]
   if (!src) return
   try {
     const audio = new Audio(src)
