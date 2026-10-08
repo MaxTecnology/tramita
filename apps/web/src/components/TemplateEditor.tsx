@@ -15,6 +15,9 @@ const TEMPLATE_VARS: { key: string; label: string }[] = [
   { key: 'portalUrl',         label: 'Link do portal' },
   { key: 'commentText',       label: 'Texto do comentário' },
   { key: 'commentAuthorName', label: 'Autor do comentário' },
+  { key: 'taskCount',         label: 'Qtd. de tarefas em alerta' },
+  { key: 'criticalCount',     label: 'Qtd. de tarefas críticas' },
+  { key: 'taskListText',      label: 'Lista de tarefas em alerta' },
 ]
 
 interface Props {

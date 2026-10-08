@@ -156,6 +156,12 @@ export async function listLogs(
 
 const SLA_SOUND_MAX_SIZE = 500 * 1024
 const SLA_SOUND_ALLOWED_TYPES = new Set(['audio/mpeg', 'audio/wav', 'audio/x-wav'])
+const SLA_SOUND_EXTENSION: Record<string, string> = {
+  'audio/mpeg': 'mp3',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+}
+const SLA_SOUND_LABEL_MAX_LENGTH = 100
 
 export function isAllowedSlaSoundType(mimeType: string): boolean {
   return SLA_SOUND_ALLOWED_TYPES.has(mimeType)
@@ -163,16 +169,36 @@ export function isAllowedSlaSoundType(mimeType: string): boolean {
 
 export const SLA_SOUND_MAX_SIZE_BYTES = SLA_SOUND_MAX_SIZE
 
+// O Content-Type é declarado pelo cliente e pode ser forjado — confirma a assinatura real dos
+// primeiros bytes do arquivo antes de aceitar, como qualquer validação de upload deveria fazer.
+export function hasValidAudioSignature(buffer: Buffer, mimeType: string): boolean {
+  if (mimeType === 'audio/mpeg') {
+    const isId3 = buffer.length >= 3 && buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33 // "ID3"
+    const isMpegFrameSync = buffer.length >= 2 && buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0
+    return isId3 || isMpegFrameSync
+  }
+  if (mimeType === 'audio/wav' || mimeType === 'audio/x-wav') {
+    return (
+      buffer.length >= 12 &&
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WAVE'
+    )
+  }
+  return false
+}
+
 export async function uploadSlaSound(
   organizationId: string,
   file: { buffer: Buffer; mimeType: string; label: string },
 ): Promise<void> {
-  const key = `sla-sounds/${organizationId}.mp3`
+  const extension = SLA_SOUND_EXTENSION[file.mimeType] ?? 'mp3'
+  const key = `sla-sounds/${organizationId}.${extension}`
+  const label = file.label.slice(0, SLA_SOUND_LABEL_MAX_LENGTH)
   await uploadFile(key, file.buffer, file.mimeType)
   await prisma.notificationConfig.upsert({
     where: { organizationId },
-    create: { organizationId, customSlaSoundKey: key, customSlaSoundLabel: file.label },
-    update: { customSlaSoundKey: key, customSlaSoundLabel: file.label },
+    create: { organizationId, customSlaSoundKey: key, customSlaSoundLabel: label },
+    update: { customSlaSoundKey: key, customSlaSoundLabel: label },
   })
 }
 

@@ -166,13 +166,21 @@ export default function Notifications() {
   const uploadSoundMutation = useMutation({
     mutationFn: (file: File) => {
       const data = new FormData()
-      data.append('file', file)
+      // label precisa vir ANTES de file no FormData — o backend lê esse campo via
+      // `file.fields.label` do fastify/multipart, que só captura campos que já chegaram no
+      // stream antes do arquivo ser processado.
       data.append('label', file.name)
+      data.append('file', file)
       return api.post('/notifications/config/sla-sound', data)
     },
     onSuccess: () => {
       toast.success('Som do escritório atualizado')
+      // Três telas dependem do som da org: esta (notifications-config), o Perfil e o próprio
+      // useSlaAlerts (sla-config/sla-custom-sound-url) — sem invalidar as três, ficam até 5min
+      // (staleTime) mostrando o estado antigo.
       queryClient.invalidateQueries({ queryKey: ['notifications-config'] })
+      queryClient.invalidateQueries({ queryKey: ['sla-config'] })
+      queryClient.invalidateQueries({ queryKey: ['sla-custom-sound-url'] })
     },
     onError: () => toast.error('Erro ao enviar som — use MP3 ou WAV, até 500KB'),
   })
@@ -182,6 +190,8 @@ export default function Notifications() {
     onSuccess: () => {
       toast.success('Som do escritório removido')
       queryClient.invalidateQueries({ queryKey: ['notifications-config'] })
+      queryClient.invalidateQueries({ queryKey: ['sla-config'] })
+      queryClient.invalidateQueries({ queryKey: ['sla-custom-sound-url'] })
     },
     onError: () => toast.error('Erro ao remover som'),
   })

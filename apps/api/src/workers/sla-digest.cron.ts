@@ -54,14 +54,19 @@ async function runSlaDigestForOrg(
   org: { id: string; notificationConfig: { slaDigestEnabled: boolean; slaTargetWarningDays: number; slaDueCriticalDays: number } | null },
   now: Date,
 ): Promise<void> {
-  // Org sem linha em NotificationConfig (nunca configurou nada) conta como "digest habilitado,
-  // thresholds padrão" — só um `slaDigestEnabled` explicitamente false desliga. Mantém o default
-  // "ligado por padrão" prometido mesmo pra quem nunca visitou a tela de Configurações.
   if (org.notificationConfig?.slaDigestEnabled === false) return
 
+  // Org sem linha em NotificationConfig (nunca visitou a tela de Configurações) provisiona aqui,
+  // com os defaults do schema — sem isso, o enqueue abaixo funcionaria mas o worker de envio
+  // descartaria o job silenciosamente (`processNotificationJob` retorna se `!config`), quebrando
+  // o "digest ligado por padrão" pra qualquer org nova.
+  const notificationConfig = org.notificationConfig ?? await prisma.notificationConfig.create({
+    data: { organizationId: org.id },
+  })
+
   const config = {
-    slaTargetWarningDays: org.notificationConfig?.slaTargetWarningDays ?? 3,
-    slaDueCriticalDays: org.notificationConfig?.slaDueCriticalDays ?? 1,
+    slaTargetWarningDays: notificationConfig.slaTargetWarningDays,
+    slaDueCriticalDays: notificationConfig.slaDueCriticalDays,
   }
 
   const tasks = await prisma.task.findMany({

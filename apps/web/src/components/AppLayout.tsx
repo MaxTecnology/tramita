@@ -53,7 +53,6 @@ export default function AppLayout() {
 
   return (
     <SlaConfigProvider>
-      <SlaAlertsBar />
       <div className="flex h-screen bg-background">
         {/* Mobile overlay */}
         {sidebarOpen && (
@@ -146,6 +145,7 @@ export default function AppLayout() {
 
         {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0">
+          <SlaAlertsBar />
           {/* Mobile top-bar */}
           <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-surface border-b border-border flex-shrink-0">
             <button

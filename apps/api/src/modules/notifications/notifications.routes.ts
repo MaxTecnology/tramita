@@ -29,6 +29,7 @@ import {
   uploadSlaSound,
   deleteSlaSound,
   isAllowedSlaSoundType,
+  hasValidAudioSignature,
   SLA_SOUND_MAX_SIZE_BYTES,
 } from './notifications.service'
 
@@ -121,10 +122,26 @@ export async function notificationsRoutes(app: FastifyInstance) {
       throw new AppError(422, 'Tipo de arquivo não permitido — use MP3 ou WAV')
     }
 
-    const buffer = await file.toBuffer()
-    if (buffer.length > SLA_SOUND_MAX_SIZE_BYTES) throw new AppError(413, 'Arquivo excede o limite de 500KB')
+    let buffer: Buffer
+    try {
+      buffer = await file.toBuffer()
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number; code?: string }
+      if (e?.statusCode === 413 || e?.code === 'FST_FILES_LIMIT' || e?.code === 'FST_REQ_FILE_TOO_LARGE') {
+        throw new AppError(413, 'Arquivo excede o limite de 500KB')
+      }
+      throw err
+    }
 
-    const label = (request.body as { label?: string } | undefined)?.label ?? file.filename
+    if (!hasValidAudioSignature(buffer, file.mimetype)) {
+      throw new AppError(422, 'Arquivo não é um áudio válido (assinatura não corresponde ao tipo declarado)')
+    }
+
+    // Campo "label" só aparece aqui se tiver sido enviado ANTES do arquivo no multipart — o
+    // fastify/multipart só acumula em `file.fields` o que já passou no stream até este ponto.
+    const labelField = file.fields.label
+    const label = (!Array.isArray(labelField) && labelField?.type === 'field' ? String(labelField.value) : null) ?? file.filename
+
     await uploadSlaSound(request.user.organizationId!, { buffer, mimeType: file.mimetype, label })
     return reply.status(201).send({ ok: true })
   })

@@ -155,4 +155,28 @@ describe('runSlaDigest', () => {
 
     expect(enqueueNotification).not.toHaveBeenCalled()
   })
+
+  it('provisiona NotificationConfig com defaults pra org que nunca configurou nada, garantindo que o worker de envio não descarte o job por falta de config', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { dueDate: new Date() } })
+
+    const before = await prisma.notificationConfig.findUnique({ where: { organizationId: org.id } })
+    expect(before).toBeNull()
+
+    await runSlaDigest(new Date())
+
+    expect(enqueueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'SLA_DIGEST', userId: user.id }),
+    )
+    const after = await prisma.notificationConfig.findUnique({ where: { organizationId: org.id } })
+    expect(after).not.toBeNull()
+    expect(after?.slaDigestEnabled).toBe(true)
+  })
 })
