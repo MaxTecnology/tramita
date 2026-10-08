@@ -250,7 +250,19 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
      sem nenhuma movimentação real). `MonthYearPicker` substitui `<input type="month">` (sem
      suporte no Firefox). Ver `docs/superpowers/specs/2026-10-06-recurring-generation-redesign-design.md`
      e `docs/superpowers/plans/2026-10-06-recurring-generation-redesign.md`.
-3. [ ] SLA e alertas de prazo (visual/sonoro) — estende o modelo de Task/Board já existente
+3. [x] **SLA e alertas de prazo (visual/sonoro)** (concluído em 2026-10-08) — nível de alerta
+   (`TARGET_WARNING`/`DUE_CRITICAL`) é derivado, nunca armazenado (`computeSlaLevel`, espelhado
+   backend/frontend), a partir de `targetDate`/`dueDate` + thresholds configuráveis por org
+   (`slaTargetWarningDays`/`slaDueCriticalDays`). Badge visual no `TaskCard`; push em tempo real
+   (toast + Web Notification + som) só pra boards tipo OS, via polling leve (sem SSE/Service
+   Worker novo) com dedup por `sessionStorage`. Som customizável por usuário
+   (`UserSlaPreference`: escolha + volume por nível) e som próprio por organização (upload B2,
+   `ORG_ADMIN`). Substitui integralmente o antigo `duedate.cron.ts`/`TASK_DUE_DATE_APPROACHING`
+   (cron horário sem dedup, repetia a mesma notificação até 24x) por `sla-digest.cron.ts`: 1 job
+   diário (8h) agregando OS + Recorrente num resumo único por email/WhatsApp. Ver
+   `docs/superpowers/specs/2026-10-08-sla-alertas-prazo-design.md` e
+   `docs/superpowers/plans/2026-10-08-sla-alertas-prazo-plan.md`. Pendente: 3 arquivos de som
+   padrão do sistema (`.mp3`) ainda não existem — registrado em `docs/tech-debt.md`.
 4. [ ] Métricas de produtividade por usuário/departamento — depende dos itens 2 e 3 existirem primeiro
 5. [ ] Evolução de Solicitações → Ordem de Serviço
 6. [ ] Automação de documentos (robô que lê/classifica documentos do cliente, inspirado no Nibo) — maior risco técnico, decidir fonte de dados (upload manual vs. leitura de pasta) antes de especificar
@@ -258,4 +270,4 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
 8. [x] **Usuários de cliente com acesso por departamento** (concluído em 2026-09-21) — `ClientUser`/`ClientUserAccess`, login do portal desacoplado de `Client`, `Task.departmentId` obrigatório. Um `ClientUser` (pessoa) pode acessar mais de uma empresa (`Client`), com escopo de departamento por empresa; rotas de portal (`requests`, `tasks`, `documents`) agora exigem `clientId` explícito e validam contra o escopo de acesso do usuário. Tela dedicada de Usuários de Cliente (CRUD + reaproveitamento de usuário existente ao cadastrar empresa), seletor de empresa no portal quando há mais de uma. Ver `docs/superpowers/sdd/2026-09-21-client-users/`.
 9. [x] **Kanban dinâmico, Templates de OS e código do cliente** (concluído em 2026-09-22) — coluna passa a ter `statusEffect` (`NONE`/`OPEN`/`STARTED`/`BLOCKED`/`DISREGARDED`/`DONE`, aplica o status na tarefa ao entrar na coluna) e `notifyClient` (notifica o cliente ao mover pra essa coluna, independente do toggle global da org), substituindo o antigo `isFinal`; `TaskStatus` ganha o valor `STARTED`. `OSTemplate`/`OSTemplateColumn`/`OSTemplateColumnDocument` (CRUD em `/os-templates`, `ORG_ADMIN` pra mutação) definem de uma vez as colunas (com `statusEffect`/`notifyClient`/checklist de documentos) que um board nasce com, usado tanto em `POST /boards` quanto em `POST /requests/:id/approve` (modo `NEW_BOARD`, template escolhido pelo cliente ao abrir a Solicitação via `GET /portal/os-templates`). `Client.codigo` — identificador curto opcional usado na busca e como prefixo do título do board criado a partir de uma Solicitação aprovada. `RecurringTaskAssignment` simplificado (vínculo direto por cliente, sem exigir board/coluna pré-existentes — board/coluna foram removidos do vínculo, não tornados diretos) e board oculto `RECURRING_SYSTEM` como "casa" das Tarefas Recorrentes sem processo. `GET /tasks` — listagem flat e filtrável (cliente, responsável, departamento, status, template recorrente, período, busca textual) atravessando todos os boards da org, inclusive o `RECURRING_SYSTEM`; base da tela unificada Tarefas (alternância Lista/Kanban dinâmico agrupado por status, cruzando tarefas de clientes diferentes). Frontend: telas de gestão de Templates de OS e Lista de OS, `Client.codigo` nos formulários/lista de clientes, seletor de tipo de solicitação (Template de OS) no portal. Ver `docs/superpowers/specs/2026-09-22-kanban-os-recorrente-redesign.md` e `docs/superpowers/plans/2026-09-22-kanban-os-recorrente-redesign.md`.
 
-Próximo passo: usuário escolhe entre os itens 3-7 do roadmap (SLA e alertas, métricas, evolução de Solicitações, automação de documentos, protocolo digital) pra entrar em brainstorming a seguir.
+Próximo passo: usuário escolhe entre os itens 4-7 do roadmap (métricas, evolução de Solicitações, automação de documentos, protocolo digital) pra entrar em brainstorming a seguir.
