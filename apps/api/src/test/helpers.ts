@@ -17,7 +17,10 @@ export async function createTestPlan(overrides?: Partial<{ name: string; maxClie
 
 let testOrgCounter = 0
 
-export async function createTestOrg(planId: string, overrides?: Partial<{ slug: string }>) {
+export async function createTestOrg(
+  planId: string,
+  overrides?: Partial<{ slug: string; isActive: boolean; subscriptionStatus: 'TRIAL' | 'ACTIVE' | 'GRACE_PERIOD' | 'SUSPENDED' | 'CANCELLED' }>,
+) {
   const unique = `${Date.now()}-${++testOrgCounter}`
   return prisma.organization.create({
     data: {
@@ -25,7 +28,8 @@ export async function createTestOrg(planId: string, overrides?: Partial<{ slug: 
       slug: overrides?.slug ?? `test-org-${unique}`,
       email: `org-${unique}@test.com`,
       planId,
-      subscriptionStatus: 'ACTIVE',
+      isActive: overrides?.isActive ?? true,
+      subscriptionStatus: overrides?.subscriptionStatus ?? 'ACTIVE',
     },
   })
 }
@@ -39,6 +43,7 @@ export async function createTestUser(
     email: string
     password: string
     phone: string
+    isActive: boolean
   }>,
 ) {
   const password = overrides?.password ?? 'Test@1234'
@@ -49,6 +54,7 @@ export async function createTestUser(
       passwordHash: await bcrypt.hash(password, 10),
       role: overrides?.role ?? 'ORG_ADMIN',
       phone: overrides?.phone,
+      isActive: overrides?.isActive ?? true,
       organizationId,
     },
   })

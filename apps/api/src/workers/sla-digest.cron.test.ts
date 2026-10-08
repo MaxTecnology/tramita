@@ -100,4 +100,59 @@ describe('runSlaDigest', () => {
       expect.objectContaining({ event: 'SLA_DIGEST', userId: admin.id }),
     )
   })
+
+  it('não enfileira pro assignee desativado — cai pro fallback de admins ativos', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const inactiveAssignee = await createTestUser(org.id, { role: 'ORG_MEMBER', isActive: false })
+    const activeAdmin = await createTestUser(org.id, { role: 'ORG_ADMIN', isActive: true })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, activeAdmin.id)
+    await prisma.task.update({ where: { id: task.id }, data: { dueDate: new Date(), assigneeId: inactiveAssignee.id } })
+
+    await runSlaDigest(new Date())
+
+    expect(enqueueNotification).not.toHaveBeenCalledWith(
+      expect.objectContaining({ userId: inactiveAssignee.id }),
+    )
+    expect(enqueueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'SLA_DIGEST', userId: activeAdmin.id }),
+    )
+  })
+
+  it('não usa admin desativado no fallback', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const inactiveAdmin = await createTestUser(org.id, { role: 'ORG_ADMIN', isActive: false })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, inactiveAdmin.id) // sem assignee
+
+    await prisma.task.update({ where: { id: task.id }, data: { dueDate: new Date() } })
+
+    await runSlaDigest(new Date())
+
+    expect(enqueueNotification).not.toHaveBeenCalled()
+  })
+
+  it('não enfileira nada pra organização inativa ou com assinatura suspensa', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const plan = await createTestPlan()
+    const suspendedOrg = await createTestOrg(plan.id, { subscriptionStatus: 'SUSPENDED' })
+    const user = await createTestUser(suspendedOrg.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(suspendedOrg.id)
+    const board = await createTestBoard(suspendedOrg.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { dueDate: new Date() } })
+
+    await runSlaDigest(new Date())
+
+    expect(enqueueNotification).not.toHaveBeenCalled()
+  })
 })

@@ -253,4 +253,54 @@ describe('processNotificationJob — SLA_DIGEST por usuário', () => {
     const logs = await prisma.notificationLog.findMany({ where: { organizationId: org.id, event: 'SLA_DIGEST' } })
     expect(logs.map((l) => l.channel)).toEqual(['EMAIL'])
   })
+
+  it('não envia nada pra um usuário desativado, mesmo com phone e WhatsApp configurados', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await prisma.notificationConfig.upsert({
+      where: { organizationId: org.id },
+      create: { organizationId: org.id, whatsappEnabled: true, maximizebotToken: 'Bearer test-token' },
+      update: { whatsappEnabled: true, maximizebotToken: 'Bearer test-token' },
+    })
+    const user = await createTestUser(org.id, { role: 'ORG_ADMIN', phone: '5511999999999', isActive: false })
+
+    await processNotificationJob({
+      data: {
+        event: 'SLA_DIGEST',
+        organizationId: org.id,
+        recipientType: 'USER',
+        userId: user.id,
+        metadata: { taskCount: '1', criticalCount: '0', taskListText: '- Tarefa Z — atenção' },
+      },
+    })
+
+    const logs = await prisma.notificationLog.findMany({ where: { organizationId: org.id, event: 'SLA_DIGEST' } })
+    expect(logs).toHaveLength(0)
+  })
+})
+
+describe('processNotificationJob — eventos USER pré-existentes nunca ganham WHATSAPP de volta', () => {
+  it('TASK_COMMENT_ADDED continua só por EMAIL mesmo com WhatsApp da org configurado e usuário com phone', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await prisma.notificationConfig.upsert({
+      where: { organizationId: org.id },
+      create: { organizationId: org.id, whatsappEnabled: true, maximizebotToken: 'Bearer test-token', commentAdded: true },
+      update: { whatsappEnabled: true, maximizebotToken: 'Bearer test-token', commentAdded: true },
+    })
+    const user = await createTestUser(org.id, { role: 'ORG_ADMIN', phone: '5511999999999' })
+
+    await processNotificationJob({
+      data: {
+        event: 'TASK_COMMENT_ADDED',
+        organizationId: org.id,
+        recipientType: 'USER',
+        userId: user.id,
+        metadata: { taskTitle: 'Tarefa X', commentText: 'oi', commentAuthorName: 'Fulano' },
+      },
+    })
+
+    const logs = await prisma.notificationLog.findMany({ where: { organizationId: org.id, event: 'TASK_COMMENT_ADDED' } })
+    expect(logs.map((l) => l.channel)).toEqual(['EMAIL'])
+  })
 })

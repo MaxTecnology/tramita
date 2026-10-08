@@ -206,6 +206,9 @@ async function processUserNotification(
     prisma.organization.findUnique({ where: { id: organizationId } }),
   ])
   if (!user || !org || user.organizationId !== organizationId) return
+  // Usuário desativado (ex-funcionário) nunca pode continuar recebendo notificações — mesmo que
+  // ainda esteja como assignee de tasks antigas (desatribuir é responsabilidade de outro fluxo).
+  if (!user.isActive) return
 
   const appUrl = process.env.APP_URL ?? 'https://tramita.autohubs.com.br'
   const vars: TemplateVars = {
@@ -223,7 +226,13 @@ async function processUserNotification(
 
   const availableChannels: MessageChannel[] = []
   if (config.emailEnabled) availableChannels.push('EMAIL')
-  if (config.whatsappEnabled && config.maximizebotToken && user.phone) availableChannels.push('WHATSAPP')
+  // WHATSAPP pra notificação USER é opt-in por evento — só SLA_DIGEST foi desenhado pra esse
+  // canal. Sem essa trava, TASK_COMMENT_ADDED/REQUEST_CREATED/etc (eventos já existentes, que
+  // sempre foram só EMAIL) passariam a mandar WhatsApp pra equipe interna assim que a org
+  // configurasse o MaximizeBot — uma mudança de comportamento silenciosa fora do escopo deles.
+  if (event === 'SLA_DIGEST' && config.whatsappEnabled && config.maximizebotToken && user.phone) {
+    availableChannels.push('WHATSAPP')
+  }
   const effectiveChannels = channelOverride ? availableChannels.filter((c) => channelOverride.includes(c)) : availableChannels
 
   for (const channel of effectiveChannels) {
