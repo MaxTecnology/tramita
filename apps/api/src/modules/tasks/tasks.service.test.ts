@@ -753,3 +753,74 @@ describe('notifyIfBlocked (via moveTask e updateTask)', () => {
     spy.mockRestore()
   })
 })
+
+describe('updateTask — completedAt', () => {
+  it('seta completedAt ao mudar status pra DONE', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, user.id)
+
+    const before = Date.now()
+    const updated = await updateTask(task.id, org.id, { status: 'DONE' }, { id: user.id, type: 'user' })
+
+    expect(updated.completedAt).not.toBeNull()
+    expect(updated.completedAt!.getTime()).toBeGreaterThanOrEqual(before)
+  })
+
+  it('limpa completedAt ao reabrir uma tarefa concluída', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, user.id)
+    await updateTask(task.id, org.id, { status: 'DONE' }, { id: user.id, type: 'user' })
+
+    const reopened = await updateTask(task.id, org.id, { status: 'OPEN' }, { id: user.id, type: 'user' })
+
+    expect(reopened.completedAt).toBeNull()
+  })
+})
+
+describe('moveTask — completedAt e status_changed', () => {
+  it('seta completedAt e grava status_changed ao mover pra coluna com statusEffect DONE', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const openColumn = await createTestColumn(board.id, { position: 0 })
+    const doneColumn = await createTestColumn(board.id, { position: 1, statusEffect: 'DONE' })
+    const task = await createTestTask(openColumn.id, user.id)
+
+    const moved = await moveTask(task.id, org.id, { columnId: doneColumn.id, position: 0 }, { id: user.id, type: 'user' })
+
+    expect(moved.completedAt).not.toBeNull()
+    expect(moved.status).toBe('DONE')
+
+    const history = await prisma.taskHistory.findMany({ where: { taskId: task.id, action: 'status_changed' } })
+    expect(history).toHaveLength(1)
+    expect(history[0].toValue).toBe('DONE')
+  })
+
+  it('não grava status_changed quando a coluna de destino não tem statusEffect (fase organizacional)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const colA = await createTestColumn(board.id, { position: 0 })
+    const colB = await createTestColumn(board.id, { position: 1, statusEffect: 'NONE' })
+    const task = await createTestTask(colA.id, user.id)
+
+    await moveTask(task.id, org.id, { columnId: colB.id, position: 0 }, { id: user.id, type: 'user' })
+
+    const history = await prisma.taskHistory.findMany({ where: { taskId: task.id, action: 'status_changed' } })
+    expect(history).toHaveLength(0)
+  })
+})

@@ -5,6 +5,7 @@ import { publishBoardEvent } from '@/lib/sse'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
 import { recalculateTaskStatus, notifyIfBlocked } from '@/modules/task-documents/task-documents.service'
 import { Prisma } from '@prisma/client'
+import { resolveCompletedAt } from '@/lib/task-completion'
 import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, ListTasksQuery } from './tasks.schema'
 
 export interface Actor {
@@ -149,11 +150,12 @@ export async function moveTask(
   const actorName = await resolveActorName(actor.id, actor.type)
 
   const nextStatus = toColumn.statusEffect !== 'NONE' ? toColumn.statusEffect : task.status
+  const completedAt = resolveCompletedAt(task.status, nextStatus, new Date())
 
   const updatedTask = await prisma.$transaction(async (tx) => {
     const updated = await tx.task.update({
       where: { id: taskId },
-      data: { columnId: data.columnId, position: data.position, status: nextStatus },
+      data: { columnId: data.columnId, position: data.position, status: nextStatus, completedAt },
     })
 
     await tx.taskHistory.create({
@@ -167,6 +169,24 @@ export async function moveTask(
         actorName,
       },
     })
+
+    // Correção: moveTask mudava status via Column.statusEffect sem nunca gravar status_changed,
+    // só moved_to — reconstruir "quando ficou DONE/BLOCKED" a partir disso exigiria saber o
+    // statusEffect da coluna NO MOMENTO (pode ter sido reconfigurado depois). Unifica com
+    // updateTask: toda mudança de status real grava status_changed, independente do caminho.
+    if (nextStatus !== task.status) {
+      await tx.taskHistory.create({
+        data: {
+          taskId,
+          action: 'status_changed',
+          fromValue: task.status,
+          toValue: nextStatus,
+          actorType: actor.type,
+          actorId: actor.id,
+          actorName,
+        },
+      })
+    }
 
     return updated
   })
@@ -301,6 +321,10 @@ export async function updateTask(
     })
   }
 
+  const completedAt = data.status !== undefined
+    ? resolveCompletedAt(task.status, data.status, new Date())
+    : undefined
+
   const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.task.update({
       where: { id },
@@ -309,6 +333,7 @@ export async function updateTask(
         description: data.description,
         priority: data.priority,
         status: data.status,
+        completedAt,
         assigneeId: data.assigneeId,
         dueDate:
           data.dueDate === null ? null

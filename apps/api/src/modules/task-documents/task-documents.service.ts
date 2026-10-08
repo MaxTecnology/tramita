@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { uploadFile, getSignedDownloadUrl } from '@/lib/b2'
 import { enqueueNotification } from '@/lib/queue'
+import { resolveCompletedAt } from '@/lib/task-completion'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 import type { TaskStatus } from '@prisma/client'
 
@@ -248,8 +249,9 @@ export async function recalculateTaskStatus(taskId: string) {
   }
 
   if (nextStatus && nextStatus !== task.status) {
+    const completedAt = resolveCompletedAt(task.status, nextStatus, new Date())
     await prisma.$transaction([
-      prisma.task.update({ where: { id: taskId }, data: { status: nextStatus } }),
+      prisma.task.update({ where: { id: taskId }, data: { status: nextStatus, completedAt } }),
       prisma.taskHistory.create({
         data: {
           taskId,

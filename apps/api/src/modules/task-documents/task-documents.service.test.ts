@@ -141,6 +141,7 @@ describe('checklist de documento — impedimento automático', () => {
 
     const updated = await prisma.task.findUniqueOrThrow({ where: { id: outcome.taskId } })
     expect(updated.status).toBe('DONE')
+    expect(updated.completedAt).not.toBeNull()
 
     vi.restoreAllMocks()
   })
