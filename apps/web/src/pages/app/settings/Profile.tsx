@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
-import { Lock, Mail } from 'lucide-react'
+import { Lock, Mail, Volume2 } from 'lucide-react'
+import { playSound } from '@/lib/sla-sound'
 
 interface Profile {
   id: string
@@ -25,6 +26,21 @@ const ROLE_LABEL: Record<string, string> = {
   ORG_ADMIN: 'Administrador',
   ORG_MANAGER: 'Gerente',
   ORG_MEMBER: 'Colaborador',
+}
+
+const SOUND_LABEL: Record<string, string> = {
+  CHIME: 'Toque',
+  BELL: 'Sino',
+  SOFT_PING: 'Ping suave',
+  MUTE: 'Mudo',
+  ORG_CUSTOM: 'Som do escritório',
+}
+
+interface SlaPreference {
+  targetWarningSound: string
+  targetWarningVolume: number
+  dueCriticalSound: string
+  dueCriticalVolume: number
 }
 
 export default function Profile() {
@@ -79,6 +95,29 @@ export default function Profile() {
     setPwError('')
     pwMutation.mutate()
   }
+
+  const { data: slaPreference } = useQuery<SlaPreference>({
+    queryKey: ['sla-preference'],
+    queryFn: () => api.get('/sla/preferences').then((r) => r.data),
+  })
+
+  const { data: customSound } = useQuery<{ url: string | null }>({
+    queryKey: ['sla-custom-sound-url'],
+    queryFn: () => api.get('/sla/custom-sound-url').then((r) => r.data),
+  })
+
+  const slaPrefMutation = useMutation({
+    mutationFn: (data: Partial<SlaPreference>) => api.patch('/sla/preferences', data).then((r) => r.data),
+    onSuccess: () => {
+      toast.success('Preferência de som atualizada')
+      queryClient.invalidateQueries({ queryKey: ['sla-preference'] })
+    },
+    onError: () => toast.error('Erro ao atualizar preferência de som'),
+  })
+
+  const soundOptions = customSound?.url
+    ? ['CHIME', 'BELL', 'SOFT_PING', 'MUTE', 'ORG_CUSTOM']
+    : ['CHIME', 'BELL', 'SOFT_PING', 'MUTE']
 
   return (
     <div className="p-4 md:p-6 max-w-lg space-y-6">
@@ -206,6 +245,59 @@ export default function Profile() {
               {pwMutation.isPending ? 'Alterando...' : 'Alterar senha'}
             </Button>
           </div>
+        </div>
+      </div>
+
+      {/* Alertas de prazo */}
+      <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-border bg-neutral-bg">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Alertas de prazo</p>
+        </div>
+        <div className="px-5 py-5 space-y-5">
+          {(['targetWarning', 'dueCritical'] as const).map((level) => {
+            const soundKey = level === 'targetWarning' ? 'targetWarningSound' : 'dueCriticalSound'
+            const volumeKey = level === 'targetWarning' ? 'targetWarningVolume' : 'dueCriticalVolume'
+            const label = level === 'targetWarning' ? 'Som ao aproximar da meta' : 'Som ao ficar crítico'
+            const sound = slaPreference?.[soundKey] ?? (level === 'targetWarning' ? 'SOFT_PING' : 'BELL')
+            const volume = slaPreference?.[volumeKey] ?? (level === 'targetWarning' ? 50 : 70)
+
+            return (
+              <div key={level} className="space-y-2">
+                <Label>{label}</Label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={sound}
+                    onChange={(e) => slaPrefMutation.mutate({ [soundKey]: e.target.value })}
+                    className="flex h-9 flex-1 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5] focus:border-transparent transition"
+                  >
+                    {soundOptions.map((opt) => (
+                      <option key={opt} value={opt}>{SOUND_LABEL[opt]}</option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void playSound(sound, volume, customSound?.url ?? null)}
+                  >
+                    <Volume2 size={14} />
+                    Testar
+                  </Button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={volume}
+                    disabled={sound === 'MUTE'}
+                    onChange={(e) => slaPrefMutation.mutate({ [volumeKey]: Number(e.target.value) })}
+                    className="flex-1"
+                  />
+                  <span className="text-xs text-muted-foreground w-10 text-right">{volume}%</span>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>
