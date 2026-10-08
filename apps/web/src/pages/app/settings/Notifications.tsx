@@ -25,6 +25,7 @@ interface Config {
   slaTargetWarningDays?: number
   slaDueCriticalDays?: number
   slaDigestEnabled?: boolean
+  lateClosureThresholdDays?: number
   customSlaSoundLabel?: string | null
   maximizebotToken?: string        // write-only: sent on save, never returned by API
   maximizebotTokenPreview?: string | null  // read-only: masked preview returned by API
@@ -332,6 +333,17 @@ export default function Notifications() {
                   max={90}
                   value={form.slaDueCriticalDays ?? 1}
                   onChange={(e) => setForm({ ...form, slaDueCriticalDays: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="late-closure-days">Alerta de fechamento tardio (dias parados antes de concluir)</Label>
+                <Input
+                  id="late-closure-days"
+                  type="number"
+                  min={0}
+                  max={90}
+                  value={form.lateClosureThresholdDays ?? 2}
+                  onChange={(e) => setForm({ ...form, lateClosureThresholdDays: Number(e.target.value) })}
                 />
               </div>
             </div>

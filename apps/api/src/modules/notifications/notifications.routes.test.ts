@@ -76,4 +76,22 @@ describe('PATCH /notifications/config', () => {
     expect(body.slaDueCriticalDays).toBe(2)
     expect(body.slaDigestEnabled).toBe(false)
   })
+
+  it('persiste lateClosureThresholdDays e o GET subsequente confirma', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const auth = await getAuthHeader(user.email, 'Test@1234')
+
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: '/notifications/config',
+      headers: { authorization: auth },
+      payload: { lateClosureThresholdDays: 5 },
+    })
+    expect(patchRes.statusCode).toBe(200)
+
+    const getRes = await app.inject({ method: 'GET', url: '/notifications/config', headers: { authorization: auth } })
+    expect(JSON.parse(getRes.body).lateClosureThresholdDays).toBe(5)
+  })
 })

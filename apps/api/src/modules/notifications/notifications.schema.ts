@@ -12,6 +12,7 @@ export const updateConfigSchema = z.object({
   slaTargetWarningDays: z.number().int().min(0).max(90).optional(),
   slaDueCriticalDays: z.number().int().min(0).max(90).optional(),
   slaDigestEnabled: z.boolean().optional(),
+  lateClosureThresholdDays: z.number().int().min(0).max(90).optional(),
   requestCreated: z.boolean().optional(),
   requestApproved: z.boolean().optional(),
   requestRejected: z.boolean().optional(),
