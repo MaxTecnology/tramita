@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { getDashboardMetrics } from '@/modules/dashboard/dashboard.service'
+import { getDashboardMetrics, getTeamMembers } from '@/modules/dashboard/dashboard.service'
 import { ensureRecurringSystemBoard } from '@/modules/tasks/tasks.service'
 import {
   createTestPlan,
@@ -186,5 +186,28 @@ describe('getDashboardMetrics', () => {
     expect(result.kpis.completedTasksThisMonth).toBe(1)
     expect(result.tasksByStatus.OPEN).toBe(1)
     expect(result.tasksByStatus.DONE).toBe(1)
+  })
+})
+
+describe('getTeamMembers', () => {
+  it('lista id e nome dos usuários ativos da organização', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+
+    const result = await getTeamMembers(org.id)
+
+    expect(result).toEqual([{ id: user.id, name: user.name }])
+  })
+
+  it('não inclui usuário de outra organização', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id)
+    await createTestUser(orgB.id)
+
+    const result = await getTeamMembers(orgA.id)
+
+    expect(result).toEqual([])
   })
 })

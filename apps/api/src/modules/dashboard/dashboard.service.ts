@@ -140,3 +140,11 @@ export async function getDashboardMetrics(organizationId: string) {
     atRisk,
   }
 }
+
+export async function getTeamMembers(organizationId: string): Promise<{ id: string; name: string }[]> {
+  return prisma.user.findMany({
+    where: { organizationId, isActive: true },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  })
+}
