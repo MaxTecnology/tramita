@@ -201,3 +201,16 @@ match que `computeDueMonthsToGenerate` usa, nunca retrocede. MONTHLY inalterado 
 válido, retorna o candidato mínimo direto). Testes novos cobrindo candidato que já bate de cara,
 candidato que precisa avançar, e um teste de paridade explícito comparando o resultado contra o
 que `computeDueMonthsToGenerate` aceitaria no mês de gatilho correspondente.
+
+## Arquivos de som do sistema não existem ainda (SLA/alertas de prazo, 2026-10-08)
+
+**Contexto:** `useSlaAlerts.ts` referencia `/sounds/chime.mp3`, `/sounds/bell.mp3` e
+`/sounds/soft-ping.mp3` (`apps/web/public/sounds/`), mas esses 3 arquivos de áudio nunca foram
+criados — são binários, não dá pra gerar via código. `playSound` degrada graciosamente (`try/catch`
+silencioso em volta de `audio.play()`), então a ausência não quebra nada: toast e badge visual
+continuam funcionando, só o som não toca.
+
+**Pendente:** antes de considerar a funcionalidade de som "pronta pra usuário final", conseguir (ou
+licenciar) 3 sons curtos (~1s, royalty-free, uso comercial liberado) e salvá-los exatamente nesses
+3 caminhos. Sem isso, a opção de som do sistema (`CHIME`/`BELL`/`SOFT_PING`) fica silenciosa — só o
+som customizado da organização (upload próprio) funciona de fato hoje.

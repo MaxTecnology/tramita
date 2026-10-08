@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { useRequestsBadgeStream } from '@/hooks/useRequestsBadgeStream'
 import { SlaConfigProvider } from '@/hooks/useSlaConfig'
+import { useSlaAlerts } from '@/hooks/useSlaAlerts'
+import { SlaPermissionBanner } from '@/components/SlaPermissionBanner'
 import { api } from '@/lib/api'
 import { LayoutDashboard, Users, UserCheck, Settings, LogOut, ClipboardList, ListChecks, Inbox, Menu, X, UserCircle, FileStack } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -51,6 +53,7 @@ export default function AppLayout() {
 
   return (
     <SlaConfigProvider>
+      <SlaAlertsBar />
       <div className="flex h-screen bg-background">
         {/* Mobile overlay */}
         {sidebarOpen && (
@@ -207,4 +210,12 @@ function SidebarLink({
       )}
     </NavLink>
   )
+}
+
+// Precisa viver dentro de <SlaConfigProvider> (não no corpo de AppLayout) pra useSlaAlerts
+// enxergar o threshold real da org via useSlaConfig, em vez do default do Context.createContext.
+function SlaAlertsBar() {
+  const { permissionNeeded, requestPermission } = useSlaAlerts()
+  if (!permissionNeeded) return null
+  return <SlaPermissionBanner onAccept={requestPermission} />
 }
