@@ -112,6 +112,21 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
     onError: () => toast.error('Erro ao salvar tarefa'),
   })
 
+  const regenerateMutation = useMutation({
+    mutationFn: () => api.post<{ taskId: string }>(`/tasks/${task.id}/regenerate`).then((r) => r.data),
+    onSuccess: () => {
+      toast.success('Tarefa regenerada com a configuração atual do template')
+      queryClient.invalidateQueries({ queryKey: ['board'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['recurring-failed-generations'] })
+      onClose()
+    },
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(message ?? 'Erro ao regenerar tarefa')
+    },
+  })
+
   const { data: attachments = [] } = useQuery<Attachment[]>({
     queryKey: ['attachments', task.id],
     queryFn: () => api.get(`/tasks/${task.id}/attachments`).then((r) => r.data),
@@ -377,6 +392,21 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
               <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700" title="Competência">
                 Competência: {new Date(task.competence).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })}
               </span>
+            )}
+            {isRecurring && role === 'ORG_ADMIN' && (
+              <button
+                type="button"
+                disabled={regenerateMutation.isPending}
+                onClick={() => {
+                  if (window.confirm('Isso apaga essa tarefa e gera uma nova pra mesma competência, usando a configuração atual do template. Só funciona se a tarefa ainda não teve nenhuma movimentação (sem comentário, anexo ou mudança de coluna). Continuar?')) {
+                    regenerateMutation.mutate()
+                  }
+                }}
+                className="text-xs px-2 py-0.5 rounded-full border border-accent text-accent hover:bg-accent/10 disabled:opacity-50"
+                title="Apaga e gera de novo com a config atual do template — só funciona se a tarefa não teve movimentação"
+              >
+                {regenerateMutation.isPending ? 'Regenerando...' : 'Regenerar'}
+              </button>
             )}
 
             {canEdit && (

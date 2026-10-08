@@ -5,6 +5,7 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createTaskSchema, updateTaskSchema, moveTaskSchema, reorderTasksSchema, listTasksQuerySchema } from './tasks.schema'
 import { createTask, moveTask, updateTask, reorderTasks, deleteTask, getTaskHistory, listTasks } from './tasks.service'
+import { regenerateTask } from '@/modules/recurring-templates/recurring-templates.service'
 
 export async function tasksRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
@@ -75,5 +76,12 @@ export async function tasksRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.status(204).send(await deleteTask(id, request.user.organizationId!))
+  })
+
+  app.post('/tasks/:id/regenerate', {
+    preHandler: [requireRole('ORG_ADMIN')],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    return reply.send(await regenerateTask(id, request.user.organizationId!))
   })
 }

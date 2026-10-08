@@ -13,6 +13,7 @@ import {
   generateBulkForTemplate,
   generateBulkForAllTemplates,
   getFailedGenerations,
+  regenerateTask,
 } from './recurring-templates.service'
 import {
   createTestOrg,
@@ -836,5 +837,92 @@ describe('getFailedGenerations', () => {
     expect(withoutAssignment?.retryable).toBe(false)
 
     vi.restoreAllMocks()
+  })
+})
+
+describe('regenerateTask', () => {
+  async function setup(competenceMonthOffset = 1) {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'DAS', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE', dueMonthAnchor: 1,
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+
+    // competência setembro/2026, dueMonth = competência + offset (outubro, se offset=1)
+    const competence = new Date(Date.UTC(2026, 8, 1))
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, new Date(Date.UTC(2026, 9, 1)))
+    if (outcome.status !== 'SUCCESS') throw new Error('setup falhou ao gerar a tarefa original')
+
+    return { org, dept, client, template, assignment, competence, taskId: outcome.taskId }
+  }
+
+  it('apaga a tarefa sem movimentação e gera uma nova pra mesma competência, com a config atual do template', async () => {
+    const { org, template, taskId } = await setup()
+
+    // Corrige o template (como se o operador tivesse ajustado a config errada) antes de regenerar
+    await updateTemplate(template.id, org.id, { dueDayOfPeriod: 15 })
+
+    const result = await regenerateTask(taskId, org.id)
+    expect(result.taskId).not.toBe(taskId)
+
+    const oldTask = await prisma.task.findUnique({ where: { id: taskId } })
+    expect(oldTask).toBeNull()
+
+    const newTask = await prisma.task.findUniqueOrThrow({ where: { id: result.taskId } })
+    expect(newTask.competence?.toISOString().slice(0, 10)).toBe('2026-09-01')
+    expect(newTask.dueDate?.toISOString().slice(0, 10)).toBe('2026-10-15') // dia novo (15), mês igual
+  })
+
+  it('bloqueia regeneração se a tarefa já tem histórico além de "created"', async () => {
+    const { org, taskId } = await setup()
+    await prisma.taskHistory.create({
+      data: { taskId, action: 'priority_changed', fromValue: 'MEDIUM', toValue: 'URGENT', actorType: 'user', actorId: 'x', actorName: 'Teste' },
+    })
+
+    await expect(regenerateTask(taskId, org.id)).rejects.toMatchObject({ statusCode: 409 })
+    const stillThere = await prisma.task.findUnique({ where: { id: taskId } })
+    expect(stillThere).not.toBeNull()
+  })
+
+  it('bloqueia regeneração se a tarefa tem comentário', async () => {
+    const { org, taskId } = await setup()
+    await prisma.comment.create({ data: { taskId, content: 'oi', authorType: 'USER' } })
+
+    await expect(regenerateTask(taskId, org.id)).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('bloqueia regeneração se a tarefa tem anexo', async () => {
+    const { org, taskId } = await setup()
+    const uploader = await createTestUser(org.id)
+    await prisma.attachment.create({
+      data: { taskId, filename: 'doc.pdf', mimeType: 'application/pdf', size: 10, storageKey: 'x', uploadedBy: uploader.id },
+    })
+
+    await expect(regenerateTask(taskId, org.id)).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('lança 400 se a tarefa não é recorrente', async () => {
+    const { org, taskId } = await setup()
+    await prisma.task.update({ where: { id: taskId }, data: { recurringTemplateId: null } })
+
+    await expect(regenerateTask(taskId, org.id)).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  it('lança 409 se o cliente foi desvinculado do template antes de regenerar', async () => {
+    const { org, assignment, taskId } = await setup()
+    await prisma.recurringTaskAssignment.delete({ where: { id: assignment.id } })
+
+    await expect(regenerateTask(taskId, org.id)).rejects.toMatchObject({ statusCode: 409 })
   })
 })

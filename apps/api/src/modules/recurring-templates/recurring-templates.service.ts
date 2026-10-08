@@ -544,3 +544,74 @@ export async function getFailedGenerations(organizationId: string): Promise<Fail
     }
   })
 }
+
+/**
+ * Regenera uma tarefa recorrente que nasceu com dados errados (ex: template mal configurado) —
+ * apaga a tarefa atual e gera uma nova pra mesma competência, usando a config ATUAL do template
+ * (já corrigida). Só permitido se a tarefa não teve nenhuma movimentação real: sem histórico além
+ * do "created", sem comentário, sem anexo — "sem movimentação" aqui é literal, qualquer rastro de
+ * uso trava a regeneração automática (a correção vira um caso manual, fora deste fluxo).
+ *
+ * Vive neste módulo (não em tasks.service.ts) pra evitar import circular: este arquivo já importa
+ * de tasks.service.ts (ensureRecurringSystemBoard), então o caminho inverso quebraria a resolução
+ * de módulos ESM/CJS.
+ */
+export async function regenerateTask(taskId: string, organizationId: string) {
+  const task = await prisma.task.findFirst({
+    where: { id: taskId },
+    include: { column: { include: { board: { select: { organizationId: true, clientId: true } } } } },
+  })
+  if (!task || task.column.board.organizationId !== organizationId) {
+    throw new AppError(404, 'Tarefa não encontrada')
+  }
+  if (!task.recurringTemplateId) {
+    throw new AppError(400, 'Essa tarefa não é recorrente')
+  }
+  if (!task.competence) {
+    throw new AppError(400, 'Tarefa recorrente sem competência registrada — não é possível regenerar')
+  }
+
+  const [historyCount, commentCount, attachmentCount] = await Promise.all([
+    prisma.taskHistory.count({ where: { taskId, action: { not: 'created' } } }),
+    prisma.comment.count({ where: { taskId } }),
+    prisma.attachment.count({ where: { taskId } }),
+  ])
+  if (historyCount > 0 || commentCount > 0 || attachmentCount > 0) {
+    throw new AppError(409, 'Essa tarefa já teve movimentação — não pode ser regenerada automaticamente')
+  }
+
+  const template = await prisma.recurringTaskTemplate.findUnique({ where: { id: task.recurringTemplateId } })
+  if (!template) throw new AppError(404, 'Template de recorrência não encontrado')
+
+  const clientId = task.column.board.clientId
+  const assignment = await prisma.recurringTaskAssignment.findFirst({
+    where: { templateId: template.id, clientId },
+  })
+  if (!assignment) {
+    throw new AppError(409, 'Cliente não está mais vinculado a esse template — vincule novamente antes de regenerar')
+  }
+
+  const dueMonth = computeDueMonthFromCompetence(task.competence, template)
+
+  // Apaga a tarefa e libera a chave de idempotência (templateId, clientId, competence) na mesma
+  // transação — se uma das duas falhar, as duas revertem, nunca fica um log liberado sem a tarefa
+  // correspondente removida (ou vice-versa).
+  await prisma.$transaction([
+    prisma.recurringGenerationLog.deleteMany({
+      where: { templateId: template.id, clientId, competence: task.competence },
+    }),
+    prisma.task.delete({ where: { id: taskId } }),
+  ])
+
+  const outcome = await generateTaskForAssignment(template.id, assignment.id, dueMonth)
+  if (outcome.status === 'FAILED') {
+    throw new AppError(422, `Falha ao regenerar: ${outcome.errorMessage}`)
+  }
+  if (outcome.status === 'ALREADY_EXISTS') {
+    // Corrida rara: outra geração (cron ou outro operador) criou a tarefa pra essa competência
+    // entre o delete acima e esta chamada. A tarefa antiga já foi removida de qualquer forma —
+    // reportar como falha pro operador conferir o estado atual, não fingir sucesso.
+    throw new AppError(409, 'Já existe outra tarefa gerada pra essa competência — confira o board')
+  }
+  return { taskId: outcome.taskId }
+}
