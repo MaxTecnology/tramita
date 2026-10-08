@@ -202,7 +202,7 @@ válido, retorna o candidato mínimo direto). Testes novos cobrindo candidato qu
 candidato que precisa avançar, e um teste de paridade explícito comparando o resultado contra o
 que `computeDueMonthsToGenerate` aceitaria no mês de gatilho correspondente.
 
-## Arquivos de som do sistema não existem ainda (SLA/alertas de prazo, 2026-10-08)
+## Arquivos de som do sistema não existem ainda (SLA/alertas de prazo, 2026-10-05) ✅ (resolvido em 2026-10-08)
 
 **Contexto:** `useSlaAlerts.ts` referencia `/sounds/chime.mp3`, `/sounds/bell.mp3` e
 `/sounds/soft-ping.mp3` (`apps/web/public/sounds/`), mas esses 3 arquivos de áudio nunca foram
@@ -210,7 +210,10 @@ criados — são binários, não dá pra gerar via código. `playSound` degrada 
 silencioso em volta de `audio.play()`), então a ausência não quebra nada: toast e badge visual
 continuam funcionando, só o som não toca.
 
-**Pendente:** antes de considerar a funcionalidade de som "pronta pra usuário final", conseguir (ou
-licenciar) 3 sons curtos (~1s, royalty-free, uso comercial liberado) e salvá-los exatamente nesses
-3 caminhos. Sem isso, a opção de som do sistema (`CHIME`/`BELL`/`SOFT_PING`) fica silenciosa — só o
-som customizado da organização (upload próprio) funciona de fato hoje.
+**Resolvido:** usuário forneceu 3 arquivos MP3 reais (confirmado via magic bytes — assinatura
+`0xFF 0xFB`, mesma validação usada no upload de som customizado), salvos em
+`apps/web/public/sounds/` com os nomes exatos que o código espera. Mapeamento escolhido por nome
+de arquivo original (sem conseguir ouvir o conteúdo): `soft-ping.mp3` (era "notificacao.mp3"),
+`chime.mp3` e `bell.mp3` (eram os dois arquivos da pack "universfield-new-notification"). O
+usuário pode reatribuir/trocar os arquivos a qualquer momento — os 3 caminhos e nomes são fixos no
+código, qualquer `.mp3` colocado no lugar certo passa a ser o som padrão daquele nível.

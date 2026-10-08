@@ -261,8 +261,12 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
    (cron horário sem dedup, repetia a mesma notificação até 24x) por `sla-digest.cron.ts`: 1 job
    diário (8h) agregando OS + Recorrente num resumo único por email/WhatsApp. Ver
    `docs/superpowers/specs/2026-10-08-sla-alertas-prazo-design.md` e
-   `docs/superpowers/plans/2026-10-08-sla-alertas-prazo-plan.md`. Pendente: 3 arquivos de som
-   padrão do sistema (`.mp3`) ainda não existem — registrado em `docs/tech-debt.md`.
+   `docs/superpowers/plans/2026-10-08-sla-alertas-prazo-plan.md`. Revisão final (Opus) encontrou
+   1 crítico (vazamento de dado pra usuário desativado/org suspensa) e 6 altos (regressão de
+   WhatsApp em eventos pré-existentes, push que não reagia à passagem do tempo, avalanche de
+   alertas pra admin, entre outros) — todos corrigidos, mais 8 minors de robustez/segurança
+   (magic bytes no upload de som, race condition em preferência de usuário, etc). 3 arquivos de
+   som padrão do sistema fornecidos pelo usuário em 2026-10-08.
 4. [ ] Métricas de produtividade por usuário/departamento — depende dos itens 2 e 3 existirem primeiro
 5. [ ] Evolução de Solicitações → Ordem de Serviço
 6. [ ] Automação de documentos (robô que lê/classifica documentos do cliente, inspirado no Nibo) — maior risco técnico, decidir fonte de dados (upload manual vs. leitura de pasta) antes de especificar
