@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { FileSearch, Search, Send, ArrowLeft } from 'lucide-react'
+import { FileSearch, Search, Send, ArrowLeft, Upload, Volume2, Trash2 } from 'lucide-react'
 
 interface Config {
   whatsappEnabled?: boolean
@@ -16,13 +16,16 @@ interface Config {
   taskMoved?: boolean
   taskCompleted?: boolean
   commentAdded?: boolean
-  dueDateAlert?: boolean
   taskBlocked?: boolean
   requestCreated?: boolean
   requestApproved?: boolean
   requestRejected?: boolean
   recurringGenerationFailed?: boolean
   documentRejected?: boolean
+  slaTargetWarningDays?: number
+  slaDueCriticalDays?: number
+  slaDigestEnabled?: boolean
+  customSlaSoundLabel?: string | null
   maximizebotToken?: string        // write-only: sent on save, never returned by API
   maximizebotTokenPreview?: string | null  // read-only: masked preview returned by API
 }
@@ -41,13 +44,13 @@ const EVENT_LABEL: Record<string, string> = {
   TASK_MOVED: 'Tarefa movida',
   TASK_COMPLETED: 'Tarefa concluída',
   TASK_COMMENT_ADDED: 'Comentário adicionado',
-  TASK_DUE_DATE_APPROACHING: 'Prazo se aproximando',
   TASK_BLOCKED: 'Tarefa com impedimento',
   RECURRING_GENERATION_FAILED: 'Falha na geração de tarefa recorrente',
   DOCUMENT_REJECTED: 'Documento rejeitado',
   REQUEST_CREATED: 'Solicitação criada',
   REQUEST_APPROVED: 'Solicitação aprovada',
   REQUEST_REJECTED: 'Solicitação rejeitada',
+  SLA_DIGEST: 'Resumo diário de prazos',
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -160,6 +163,29 @@ export default function Notifications() {
     onError: () => toast.error('Erro ao enviar email de teste'),
   })
 
+  const uploadSoundMutation = useMutation({
+    mutationFn: (file: File) => {
+      const data = new FormData()
+      data.append('file', file)
+      data.append('label', file.name)
+      return api.post('/notifications/config/sla-sound', data)
+    },
+    onSuccess: () => {
+      toast.success('Som do escritório atualizado')
+      queryClient.invalidateQueries({ queryKey: ['notifications-config'] })
+    },
+    onError: () => toast.error('Erro ao enviar som — use MP3 ou WAV, até 500KB'),
+  })
+
+  const deleteSoundMutation = useMutation({
+    mutationFn: () => api.delete('/notifications/config/sla-sound'),
+    onSuccess: () => {
+      toast.success('Som do escritório removido')
+      queryClient.invalidateQueries({ queryKey: ['notifications-config'] })
+    },
+    onError: () => toast.error('Erro ao remover som'),
+  })
+
   const filteredLogs = useMemo(() => {
     const q = logSearch.toLowerCase().trim()
     return logs.filter((l) => {
@@ -231,12 +257,6 @@ export default function Notifications() {
               onChange={(v) => setForm({ ...form, commentAdded: v })}
             />
             <SwitchRow
-              label="Prazo se aproximando"
-              description="Notifica 24h antes do vencimento"
-              checked={form.dueDateAlert ?? false}
-              onChange={(v) => setForm({ ...form, dueDateAlert: v })}
-            />
-            <SwitchRow
               label="Tarefa com impedimento"
               description="Notifica o cliente quando uma tarefa dele fica com impedimento"
               checked={form.taskBlocked ?? false}
@@ -278,6 +298,79 @@ export default function Notifications() {
               checked={form.recurringGenerationFailed ?? false}
               onChange={(v) => setForm({ ...form, recurringGenerationFailed: v })}
             />
+          </Section>
+
+          <Section title="Alertas de SLA">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="sla-target-days">Aviso de meta (dias antes)</Label>
+                <Input
+                  id="sla-target-days"
+                  type="number"
+                  min={0}
+                  max={90}
+                  value={form.slaTargetWarningDays ?? 3}
+                  onChange={(e) => setForm({ ...form, slaTargetWarningDays: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="sla-critical-days">Aviso crítico (dias antes do vencimento)</Label>
+                <Input
+                  id="sla-critical-days"
+                  type="number"
+                  min={0}
+                  max={90}
+                  value={form.slaDueCriticalDays ?? 1}
+                  onChange={(e) => setForm({ ...form, slaDueCriticalDays: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            <SwitchRow
+              label="Resumo diário de prazos"
+              description="Envia 1 email/WhatsApp por dia (8h) listando tarefas com prazo próximo, em vez de notificação a cada tarefa"
+              checked={form.slaDigestEnabled ?? false}
+              onChange={(v) => setForm({ ...form, slaDigestEnabled: v })}
+            />
+            <div className="space-y-1">
+              <Label>Som customizado do escritório</Label>
+              <p className="text-xs text-muted-foreground">
+                Som usado no alerta sonoro em tempo real (push no navegador). MP3 ou WAV, até 500KB.
+              </p>
+              {config?.customSlaSoundLabel ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-neutral-bg px-3 py-2">
+                  <span className="text-sm text-foreground flex items-center gap-1.5">
+                    <Volume2 size={14} />
+                    {config.customSlaSoundLabel}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={deleteSoundMutation.isPending}
+                    onClick={() => deleteSoundMutation.mutate()}
+                    className="flex items-center gap-1.5"
+                  >
+                    <Trash2 size={14} />
+                    Remover
+                  </Button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground cursor-pointer hover:bg-neutral-bg">
+                  <Upload size={14} />
+                  {uploadSoundMutation.isPending ? 'Enviando...' : 'Escolher arquivo (.mp3/.wav)'}
+                  <input
+                    type="file"
+                    accept="audio/mpeg,audio/wav"
+                    className="hidden"
+                    disabled={uploadSoundMutation.isPending}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) uploadSoundMutation.mutate(file)
+                      e.target.value = ''
+                    }}
+                  />
+                </label>
+              )}
+            </div>
           </Section>
 
           <Section title="WhatsApp — MaximizeBot">
