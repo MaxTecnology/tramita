@@ -267,7 +267,18 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
    alertas pra admin, entre outros) — todos corrigidos, mais 8 minors de robustez/segurança
    (magic bytes no upload de som, race condition em preferência de usuário, etc). 3 arquivos de
    som padrão do sistema fornecidos pelo usuário em 2026-10-08.
-4. [ ] Métricas de produtividade por usuário/departamento — depende dos itens 2 e 3 existirem primeiro
+4. [x] **Métricas de produtividade por usuário/departamento** (concluído em 2026-10-08) —
+   `Task.completedAt` + histórico `status_changed` unificado nos 3 pontos de escrita (editar
+   status direto, mover no Kanban, recálculo automático de checklist) como base confiável pras
+   métricas de tempo. 5 frentes: volume, cumprimento de prazo (meta e vencimento, calculados
+   separadamente — meta só conta tarefas que tinham `targetDate`), tempo médio de conclusão +
+   indicador de fechamento tardio (threshold configurável por org), carga atual, e impedimento
+   (soma de todos os períodos `BLOCKED`, incluindo o período ainda em aberto). Tudo distinguindo
+   OS de Recorrente. Acesso: gestão (`ORG_ADMIN`/`ORG_MANAGER`) vê tudo com filtros de
+   departamento/pessoa; `ORG_MEMBER` vê só o próprio desempenho, trava aplicada no backend (não
+   só escondendo o seletor na UI). Abas novas "Visão geral"/"Produtividade" no Dashboard
+   existente. Ver `docs/superpowers/specs/2026-10-08-metricas-produtividade-design.md` e
+   `docs/superpowers/plans/2026-10-08-metricas-produtividade-plan.md`.
 5. [ ] Evolução de Solicitações → Ordem de Serviço
 6. [ ] Automação de documentos (robô que lê/classifica documentos do cliente, inspirado no Nibo) — maior risco técnico, decidir fonte de dados (upload manual vs. leitura de pasta) antes de especificar
 7. [ ] Protocolo digital com validade jurídica + IP — estende o sistema de notificação/tracking já existente
