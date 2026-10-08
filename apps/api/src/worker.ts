@@ -3,14 +3,14 @@ import { config } from 'dotenv'
 config({ path: resolve(import.meta.dirname, '../../../.env') })
 
 import { startNotificationWorker } from '@/workers/notification.worker'
-import { startDueDateCronWorker } from '@/workers/duedate.cron'
+import { startSlaDigestCronWorker } from '@/workers/sla-digest.cron'
 import { startRecurringTasksCronWorker } from '@/workers/recurring-tasks.cron'
 
 async function main() {
   startNotificationWorker()
-  await startDueDateCronWorker()
+  await startSlaDigestCronWorker()
   await startRecurringTasksCronWorker()
-  console.log('[worker] Notification worker + duedate cron + recurring tasks cron iniciados')
+  console.log('[worker] Notification worker + SLA digest cron + recurring tasks cron iniciados')
 }
 
 main().catch((err) => {
