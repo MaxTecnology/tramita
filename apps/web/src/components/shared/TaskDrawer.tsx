@@ -303,22 +303,25 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
 
             {canEdit ? (
               <div className="flex flex-col gap-1">
-                <input
-                  type="date"
-                  defaultValue={task.dueDate ? task.dueDate.slice(0, 10) : ''}
-                  onChange={(e) => {
-                    const val = e.target.value
-                    updateMutation.mutate({
-                      dueDate: val
-                        ? (() => {
-                            const [y, m, d] = val.split('-').map(Number)
-                            return new Date(Date.UTC(y, m - 1, d)).toISOString()
-                          })()
-                        : null,
-                    })
-                  }}
-                  className="text-xs border border-border rounded px-2 py-0.5 text-foreground bg-surface focus:outline-none focus:ring-2 focus:ring-accent"
-                />
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  Prazo:
+                  <input
+                    type="date"
+                    defaultValue={task.dueDate ? task.dueDate.slice(0, 10) : ''}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      updateMutation.mutate({
+                        dueDate: val
+                          ? (() => {
+                              const [y, m, d] = val.split('-').map(Number)
+                              return new Date(Date.UTC(y, m - 1, d)).toISOString()
+                            })()
+                          : null,
+                      })
+                    }}
+                    className="text-xs border border-border rounded px-2 py-0.5 text-foreground bg-surface focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </label>
                 {/* Aviso quando prazo da tarefa ultrapassa prazo do processo */}
                 {task.dueDate && boardDueDate && new Date(task.dueDate) > new Date(boardDueDate) && (
                   <p className="text-xs text-amber-600">
@@ -335,23 +338,25 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
             )}
 
             {canEdit ? (
-              <input
-                type="date"
-                defaultValue={task.targetDate ? task.targetDate.slice(0, 10) : ''}
-                onChange={(e) => {
-                  const val = e.target.value
-                  updateMutation.mutate({
-                    targetDate: val
-                      ? (() => {
-                          const [y, m, d] = val.split('-').map(Number)
-                          return new Date(Date.UTC(y, m - 1, d)).toISOString()
-                        })()
-                      : null,
-                  })
-                }}
-                title="Meta interna"
-                className="text-xs border border-border rounded px-2 py-0.5 text-foreground bg-surface"
-              />
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground" title="Meta interna">
+                Meta:
+                <input
+                  type="date"
+                  defaultValue={task.targetDate ? task.targetDate.slice(0, 10) : ''}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    updateMutation.mutate({
+                      targetDate: val
+                        ? (() => {
+                            const [y, m, d] = val.split('-').map(Number)
+                            return new Date(Date.UTC(y, m - 1, d)).toISOString()
+                          })()
+                        : null,
+                    })
+                  }}
+                  className="text-xs border border-border rounded px-2 py-0.5 text-foreground bg-surface"
+                />
+              </label>
             ) : (
               task.targetDate && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700" title="Meta interna">
