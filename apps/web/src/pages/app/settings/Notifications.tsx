@@ -12,11 +12,17 @@ import { FileSearch, Search, Send, ArrowLeft } from 'lucide-react'
 interface Config {
   whatsappEnabled?: boolean
   emailEnabled?: boolean
+  taskCreated?: boolean
   taskMoved?: boolean
   taskCompleted?: boolean
   commentAdded?: boolean
   dueDateAlert?: boolean
   taskBlocked?: boolean
+  requestCreated?: boolean
+  requestApproved?: boolean
+  requestRejected?: boolean
+  recurringGenerationFailed?: boolean
+  documentRejected?: boolean
   maximizebotToken?: string        // write-only: sent on save, never returned by API
   maximizebotTokenPreview?: string | null  // read-only: masked preview returned by API
 }
@@ -39,6 +45,9 @@ const EVENT_LABEL: Record<string, string> = {
   TASK_BLOCKED: 'Tarefa com impedimento',
   RECURRING_GENERATION_FAILED: 'Falha na geração de tarefa recorrente',
   DOCUMENT_REJECTED: 'Documento rejeitado',
+  REQUEST_CREATED: 'Solicitação criada',
+  REQUEST_APPROVED: 'Solicitação aprovada',
+  REQUEST_REJECTED: 'Solicitação rejeitada',
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -196,7 +205,13 @@ export default function Notifications() {
       {/* Aba: Configurações */}
       {tab === 'config' && (
         <div className="space-y-4">
-          <Section title="Eventos">
+          <Section title="Eventos — Tarefas">
+            <SwitchRow
+              label="Tarefa criada"
+              description="Notifica o cliente quando uma nova tarefa é aberta pra ele (inclusive tarefas recorrentes)"
+              checked={form.taskCreated ?? false}
+              onChange={(v) => setForm({ ...form, taskCreated: v })}
+            />
             <SwitchRow
               label="Tarefa movida"
               description="Notifica quando uma tarefa muda de etapa"
@@ -226,6 +241,42 @@ export default function Notifications() {
               description="Notifica o cliente quando uma tarefa dele fica com impedimento"
               checked={form.taskBlocked ?? false}
               onChange={(v) => setForm({ ...form, taskBlocked: v })}
+            />
+            <SwitchRow
+              label="Documento rejeitado"
+              description="Notifica o cliente quando um documento enviado por ele é rejeitado"
+              checked={form.documentRejected ?? false}
+              onChange={(v) => setForm({ ...form, documentRejected: v })}
+            />
+          </Section>
+
+          <Section title="Eventos — Solicitações">
+            <SwitchRow
+              label="Solicitação criada"
+              description="Notifica a equipe interna quando um cliente abre uma solicitação"
+              checked={form.requestCreated ?? false}
+              onChange={(v) => setForm({ ...form, requestCreated: v })}
+            />
+            <SwitchRow
+              label="Solicitação aprovada"
+              description="Notifica o cliente quando a solicitação dele é aprovada"
+              checked={form.requestApproved ?? false}
+              onChange={(v) => setForm({ ...form, requestApproved: v })}
+            />
+            <SwitchRow
+              label="Solicitação rejeitada"
+              description="Notifica o cliente quando a solicitação dele não é aprovada"
+              checked={form.requestRejected ?? false}
+              onChange={(v) => setForm({ ...form, requestRejected: v })}
+            />
+          </Section>
+
+          <Section title="Eventos — Tarefas recorrentes">
+            <SwitchRow
+              label="Falha na geração de tarefa recorrente"
+              description="Notifica os administradores quando o sistema não consegue gerar uma tarefa recorrente automaticamente"
+              checked={form.recurringGenerationFailed ?? false}
+              onChange={(v) => setForm({ ...form, recurringGenerationFailed: v })}
             />
           </Section>
 

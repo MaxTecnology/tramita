@@ -109,7 +109,7 @@ Testes atualizados pra ler `.items`/`.nextCursor` em vez do array direto, mais u
 **Resolvido:** seed reescrito pra criar um `Department` "Geral", um `ClientUser` com as credenciais que os specs Playwright já esperavam, e um `ClientUserAccess` ligando cliente+departamento — replicando o fluxo real de login do portal. Testado localmente (seed roda 2x seguidas sem erro, 8/8 specs Playwright passam) e confirmado verde no CI.
 Todos os `services` correspondentes já espalhavam o body do Zod direto no `data` do `prisma.update`, então nenhuma mudança de lógica de service foi necessária — só o tipo do schema e o valor enviado pelo frontend. Teste adicionado em `clients.service.test.ts` confirmando que `codigo`/`notes` voltam a `null` quando enviados explicitamente como `null`. Suítes completas (API 421 testes, web 11 testes) passando.
 
-## Eventos de notificação sem controle completo na UI (encontrado em 2026-10-05, revisão da spec de impedimento)
+## Eventos de notificação sem controle completo na UI ✅ (resolvido em 2026-10-08)
 
 **Contexto:** `recurringGenerationFailed` e `documentRejected` existem em `NotificationConfig` (com
 default `true`) e o worker já os usa via `EVENT_FLAG_MAP`, mas nenhum dos dois tem toggle na tela de
@@ -118,9 +118,21 @@ escritório poder desligar. `Templates.tsx`'s `EVENTS` também não cobre esses 
 `REQUEST_CREATED`/`REQUEST_APPROVED`/`REQUEST_REJECTED` — cinco eventos sem editor de mensagem
 customizada, só o template padrão do sistema.
 
-**Pendente:** nivelar todos os eventos de `NotificationEvent` ao mesmo padrão de controle (toggle em
-`Notifications.tsx` + entrada em `updateConfigSchema` + editor em `Templates.tsx`) que
-`taskMoved`/`taskCompleted`/`commentAdded`/`dueDateAlert`/`taskBlocked` já têm.
+**Resolvido:**
+- `notifications.schema.ts` — `recurringGenerationFailed`/`documentRejected` adicionados ao
+  `updateConfigSchema` (os outros 9 campos já estavam lá, inclusive `taskCreated`/
+  `requestCreated`/`requestApproved`/`requestRejected`, que tinham schema mas faltava UI).
+- `notifications.service.ts` — `getConfig`'s `select` explícito ganhou os dois campos (sem isso o
+  GET nunca devolveria o valor salvo, mesmo com o schema aceitando o PATCH).
+- `Notifications.tsx` — 3 novas seções ("Tarefas", "Solicitações", "Tarefas recorrentes") cobrindo
+  os 6 toggles que faltavam (`taskCreated`, `requestCreated`, `requestApproved`, `requestRejected`,
+  `recurringGenerationFailed`, `documentRejected`), mais os 5 eventos novos no mapa de rótulos da
+  aba de histórico.
+- `Templates.tsx` — os 11 eventos de `NotificationEvent` agora aparecem no seletor do editor de
+  mensagem (antes só 6). `DEFAULT_TEMPLATES` (`apps/api/src/lib/default-templates.ts`) já cobria
+  os 11 de antes — zero mudança de backend necessária aí, só destravar a UI que escondia 5 deles.
+- Teste novo em `notifications.routes.test.ts` confirmando round-trip PATCH→GET dos dois campos
+  que faltavam no schema.
 
 ## `notification.worker.ts` não filtra o envio de WhatsApp por `task.visibleToClient` ✅ (resolvido em 2026-10-08)
 

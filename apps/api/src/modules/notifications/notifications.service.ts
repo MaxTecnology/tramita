@@ -27,6 +27,8 @@ export async function getConfig(organizationId: string) {
       requestApproved: true,
       requestRejected: true,
       taskBlocked: true,
+      recurringGenerationFailed: true,
+      documentRejected: true,
       saveOnTicket: true,
       startChatbot: true,
       createdAt: true,

@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { TemplateEditor } from '@/components/TemplateEditor'
 
-const EVENTS = ['TASK_CREATED', 'TASK_MOVED', 'TASK_COMPLETED', 'TASK_COMMENT_ADDED', 'TASK_DUE_DATE_APPROACHING', 'TASK_BLOCKED'] as const
+const EVENTS = [
+  'TASK_CREATED', 'TASK_MOVED', 'TASK_COMPLETED', 'TASK_COMMENT_ADDED', 'TASK_DUE_DATE_APPROACHING', 'TASK_BLOCKED',
+  'DOCUMENT_REJECTED', 'REQUEST_CREATED', 'REQUEST_APPROVED', 'REQUEST_REJECTED', 'RECURRING_GENERATION_FAILED',
+] as const
 const CHANNELS = ['WHATSAPP', 'EMAIL'] as const
 
 const EVENT_LABEL: Record<string, string> = {
@@ -13,6 +16,11 @@ const EVENT_LABEL: Record<string, string> = {
   TASK_COMMENT_ADDED: 'Comentário adicionado',
   TASK_DUE_DATE_APPROACHING: 'Prazo se aproximando',
   TASK_BLOCKED: 'Tarefa com impedimento',
+  DOCUMENT_REJECTED: 'Documento rejeitado',
+  REQUEST_CREATED: 'Solicitação criada',
+  REQUEST_APPROVED: 'Solicitação aprovada',
+  REQUEST_REJECTED: 'Solicitação rejeitada',
+  RECURRING_GENERATION_FAILED: 'Falha na geração de tarefa recorrente',
 }
 
 export default function Templates() {
