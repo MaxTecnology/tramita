@@ -375,6 +375,8 @@ model Task {
   @@index([competence])
   @@index([targetDate])
   @@index([departmentId])
+  @@index([completedAt])
+  @@index([assigneeId])
   @@map("tasks")
 }
 
@@ -645,6 +647,9 @@ model TaskHistory {
 
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
+  // Postgres não indexa FK automaticamente (diferente de MySQL) — sem isso, toda consulta de
+  // métricas (`taskId: { in: [...] }`) varre a tabela inteira sequencialmente.
+  @@index([taskId, action, createdAt])
   @@map("task_history")
 }
 

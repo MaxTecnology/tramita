@@ -264,6 +264,23 @@ export async function generateTaskForAssignment(
         },
       })
 
+      // Tarefa nasce BLOCKED quando o template exige documento — sem essa entrada, a métrica de
+      // impedimento nunca enxerga esse período (só veria uma "saída" de BLOCKED quando o cliente
+      // enviasse o documento, sem entrada correspondente pra reconstruir o intervalo).
+      if (initialStatus === 'BLOCKED') {
+        await tx.taskHistory.create({
+          data: {
+            taskId: task.id,
+            action: 'status_changed',
+            fromValue: 'OPEN',
+            toValue: 'BLOCKED',
+            actorType: 'system',
+            actorId: 'system',
+            actorName: 'Sistema (recorrência)',
+          },
+        })
+      }
+
       // Reserva a chave de idempotência por último, dentro da mesma transação: se outra
       // execução concorrente já reservou essa combinação (templateId, clientId, competence)
       // entre a checagem acima e aqui, o unique constraint derruba a transação inteira —

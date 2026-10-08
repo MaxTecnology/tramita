@@ -310,6 +310,14 @@ describe('generateTaskForAssignment', () => {
     expect(task.deliverables).toHaveLength(1)
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ event: 'TASK_CREATED', channels: ['WHATSAPP'] }))
 
+    // A tarefa nasce BLOCKED (tem documento a cobrar) — precisa de uma entrada status_changed
+    // no histórico desde o nascimento, senão a métrica de impedimento nunca enxerga esse
+    // período de bloqueio (não tem "entrada" pra reconstruir, só uma "saída" quando o cliente
+    // enviar o documento depois).
+    const statusHistory = await prisma.taskHistory.findMany({ where: { taskId: task.id, action: 'status_changed' } })
+    expect(statusHistory).toHaveLength(1)
+    expect(statusHistory[0].toValue).toBe('BLOCKED')
+
     spy.mockRestore()
   })
 

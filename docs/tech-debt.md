@@ -217,3 +217,19 @@ de arquivo original (sem conseguir ouvir o conteúdo): `soft-ping.mp3` (era "not
 `chime.mp3` e `bell.mp3` (eram os dois arquivos da pack "universfield-new-notification"). O
 usuário pode reatribuir/trocar os arquivos a qualquer momento — os 3 caminhos e nomes são fixos no
 código, qualquer `.mp3` colocado no lugar certo passa a ser o som padrão daquele nível.
+
+## `Task.completedAt` não tem backfill pra tarefas concluídas antes deste deploy (métricas de produtividade, 2026-10-08)
+
+**Contexto:** a feature de Métricas de Produtividade introduziu `Task.completedAt`, setado só a
+partir de agora (nos 3 pontos de escrita de status). Toda tarefa que já estava `DONE` antes desse
+deploy tem `completedAt = NULL` — ela não aparece em volume, cumprimento de prazo nem tempo médio
+de conclusão de nenhum período anterior à entrada em produção dessa feature, mesmo estando
+genuinamente concluída.
+
+**Pendente:** decidir entre (a) uma migration de backfill que derive `completedAt` a partir da
+última entrada `status_changed` com `toValue='DONE'` no `TaskHistory` de cada tarefa (com
+fallback em `updatedAt` pra tarefas concluídas só via Kanban antes da correção que unificou o
+histórico), ou (b) um aviso explícito na UI informando a partir de quando a coleta de dados de
+produtividade começa, sem tentar reconstruir o passado. Ambiente de produção é descartável
+(confirmado em sessões anteriores), então o backfill pode ser adiado sem risco imediato — mas
+precisa ser resolvido antes de um uso real e contínuo da tela de Produtividade.

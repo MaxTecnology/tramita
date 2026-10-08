@@ -247,6 +247,24 @@ describe('getProductivityMetrics', () => {
     expect(person.onTimeRate.due).toEqual({ onTime: 1, late: 0, applicable: 1 })
   })
 
+  it('conclusão no mesmo dia do vencimento conta como dentro do prazo, mesmo horas depois da meia-noite UTC do dueDate', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, user.id)
+    const dueDate = new Date('2026-06-20T00:00:00Z') // vencimento gravado à meia-noite UTC
+    const completedAt = new Date('2026-06-20T13:00:00Z') // concluída no mesmo dia, 10h BRT
+    await prisma.task.update({ where: { id: task.id }, data: { status: 'DONE', dueDate, completedAt, assigneeId: user.id } })
+
+    const result = await getProductivityMetrics(org.id, { from: new Date('2026-06-01'), to: new Date('2026-06-30') })
+
+    const person = result.byPerson.find((p) => p.userId === user.id)!
+    expect(person.onTimeRate.due).toEqual({ onTime: 1, late: 0, applicable: 1 })
+  })
+
   it('não conta meta (targetDate) no denominador quando a tarefa nunca teve targetDate (task OS comum)', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
@@ -302,15 +320,25 @@ describe('getProductivityMetrics', () => {
     const client = await createTestClient(org.id)
     const board = await createTestBoard(org.id, client.id)
     const column = await createTestColumn(board.id)
-    await createTestTask(column.id, me.id, { departmentId: dept.id })
-    await createTestTask(column.id, colleague.id, { departmentId: dept.id })
+    const myTask = await createTestTask(column.id, me.id, { departmentId: dept.id })
+    const colleagueTask = await createTestTask(column.id, colleague.id, { departmentId: dept.id })
+    // createTestTask só seta creatorId — assigneeId precisa ser atribuído explicitamente, que é
+    // o campo que a trava de isolamento realmente filtra.
+    await prisma.task.update({ where: { id: myTask.id }, data: { assigneeId: me.id, status: 'OPEN' } })
+    await prisma.task.update({ where: { id: colleagueTask.id }, data: { assigneeId: colleague.id, status: 'OPEN' } })
 
     const result = await getProductivityMetrics(org.id, {
       from: new Date('2020-01-01'), to: new Date('2030-01-01'),
       departmentId: dept.id, userId: me.id,
     })
 
-    expect(result.byPerson.every((p) => p.userId === me.id)).toBe(true)
+    expect(result.byPerson).toHaveLength(1)
+    expect(result.byPerson[0].userId).toBe(me.id)
+    // A quebra por departamento também precisa refletir só a carga da própria tarefa, não a do
+    // colega — a trava é no filtro de assigneeId antes de qualquer agregação, então o
+    // departamento "visto" por um ORG_MEMBER já vem pré-filtrado pro próprio escopo.
+    const department = result.byDepartment.find((d) => d.departmentId === dept.id)!
+    expect(department.currentLoad.os).toBe(1)
   })
 
   it('não acusa fechamento tardio quando a tarefa foi concluída sem nenhum evento de histórico anterior', async () => {
@@ -332,5 +360,72 @@ describe('getProductivityMetrics', () => {
 
     const person = result.byPerson.find((p) => p.userId === user.id)!
     expect(person.lateClosureCount).toBe(0)
+  })
+
+  it('tempo médio de conclusão aparece tanto na quebra por pessoa quanto na quebra por departamento, pra uma mesma tarefa com responsável', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, user.id, { departmentId: dept.id })
+    const createdAt = new Date('2026-06-10T00:00:00Z')
+    const completedAt = new Date('2026-06-13T00:00:00Z') // 3 dias depois
+    await prisma.task.update({
+      where: { id: task.id },
+      data: { status: 'DONE', createdAt, completedAt, assigneeId: user.id, departmentId: dept.id },
+    })
+
+    const result = await getProductivityMetrics(org.id, { from: new Date('2026-06-01'), to: new Date('2026-06-30') })
+
+    const person = result.byPerson.find((p) => p.userId === user.id)!
+    const department = result.byDepartment.find((d) => d.departmentId === dept.id)!
+    expect(person.avgCompletionDays.os).toBe(3)
+    expect(department.avgCompletionDays.os).toBe(3)
+  })
+
+  it('conta tempo de impedimento desde a criação quando a tarefa está BLOCKED e não tem nenhuma entrada de histórico de status (ex: dado legado de antes da correção)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, user.id)
+    const createdAt = new Date()
+    createdAt.setUTCDate(createdAt.getUTCDate() - 4)
+    await prisma.task.update({ where: { id: task.id }, data: { status: 'BLOCKED', assigneeId: user.id, createdAt } })
+    // nenhuma entrada de taskHistory criada — simula dado legado sem o status_changed
+
+    const from = new Date()
+    from.setUTCDate(from.getUTCDate() - 30)
+    const result = await getProductivityMetrics(org.id, { from, to: new Date() })
+
+    const person = result.byPerson.find((p) => p.userId === user.id)!
+    expect(person.blocked.taskCount).toBe(1)
+    expect(person.blocked.totalDays).toBeGreaterThanOrEqual(3)
+  })
+
+  it('não conta como concluída uma tarefa com completedAt preenchido mas status diferente de DONE (proteção contra corrida entre duas escritas concorrentes)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, user.id)
+    // Estado inconsistente proposital: completedAt setado mas status BLOCKED (o que uma corrida
+    // real entre updateTask e recalculateTaskStatus poderia produzir) — não deve contar como
+    // volume concluído nem cumprimento de prazo.
+    await prisma.task.update({ where: { id: task.id }, data: { status: 'BLOCKED', completedAt: new Date(), assigneeId: user.id } })
+
+    const from = new Date()
+    from.setUTCDate(from.getUTCDate() - 1)
+    const result = await getProductivityMetrics(org.id, { from, to: new Date() })
+
+    const person = result.byPerson.find((p) => p.userId === user.id)
+    expect(person?.volume.os ?? 0).toBe(0)
   })
 })

@@ -152,6 +152,24 @@ export async function getTeamMembers(organizationId: string): Promise<{ id: stri
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
+const DUE_DATE_TIMEZONE = 'America/Sao_Paulo'
+
+function calendarDateKey(date: Date, timeZone: string): string {
+  return date.toLocaleDateString('en-CA', { timeZone }) // formato YYYY-MM-DD, comparável como string
+}
+
+// dueDate/targetDate são gravados como data pura em meia-noite UTC (o motor de recorrência gera
+// assim, propositalmente timezone-agnostic — "dia 20", não um instante) — o dia calendário dessa
+// data é sempre o dia UTC, não o dia convertido pro fuso da org (converter deslocaria pra véspera
+// em qualquer fuso negativo, tornando a comparação PIOR, não melhor). Já completedAt é um instante
+// real; o dia em que "aconteceu de verdade" é o dia local da organização. Comparar o dia local de
+// completedAt contra o dia UTC do vencimento evita que qualquer conclusão depois das 00:00 UTC do
+// dia do vencimento conte como atrasada só por causa da diferença de fuso.
+function isOnTimeByCalendarDay(completedAt: Date, referenceDate: Date): boolean {
+  const completedDay = calendarDateKey(completedAt, DUE_DATE_TIMEZONE)
+  const referenceDay = calendarDateKey(referenceDate, 'UTC')
+  return completedDay <= referenceDay
+}
 
 function emptyBreakdown(): MetricsBreakdown {
   return {
@@ -202,6 +220,7 @@ export async function getProductivityMetrics(
 
   const taskSelect = {
     id: true,
+    status: true,
     createdAt: true,
     completedAt: true,
     targetDate: true,
@@ -215,7 +234,7 @@ export async function getProductivityMetrics(
 
   const [completedTasks, openTasks] = await Promise.all([
     prisma.task.findMany({
-      where: { ...baseWhere, completedAt: { gte: query.from, lte: query.to } },
+      where: { ...baseWhere, status: 'DONE', completedAt: { gte: query.from, lte: query.to } },
       select: taskSelect,
     }),
     prisma.task.findMany({
@@ -280,11 +299,15 @@ export async function getProductivityMetrics(
 
   const now = new Date()
 
-  const completionDaysAccumulator = new Map<string, { os: number[]; recurring: number[] }>()
-  function accDays(key: string, days: number, type: 'os' | 'recurring') {
-    const acc = completionDaysAccumulator.get(key) ?? { os: [], recurring: [] }
+  // Chaveado pela própria referência do objeto breakdown (não por uma string "p:id"/"d:id"
+  // derivada da tarefa) — uma tarefa concluída sempre alimenta DUAS quebras ao mesmo tempo
+  // (pessoa responsável + departamento), e uma chave só por tarefa perdia uma das duas sempre
+  // que havia responsável.
+  const completionDaysAccumulator = new Map<MetricsBreakdown, { os: number[]; recurring: number[] }>()
+  function accDays(breakdown: MetricsBreakdown, days: number, type: 'os' | 'recurring') {
+    const acc = completionDaysAccumulator.get(breakdown) ?? { os: [], recurring: [] }
     acc[type].push(days)
-    completionDaysAccumulator.set(key, acc)
+    completionDaysAccumulator.set(breakdown, acc)
   }
 
   for (const task of completedTasks) {
@@ -296,18 +319,17 @@ export async function getProductivityMetrics(
 
       if (task.targetDate) {
         breakdown.onTimeRate.target.applicable++
-        if (task.completedAt! <= task.targetDate) breakdown.onTimeRate.target.onTime++
+        if (isOnTimeByCalendarDay(task.completedAt!, task.targetDate)) breakdown.onTimeRate.target.onTime++
         else breakdown.onTimeRate.target.late++
       }
       if (task.dueDate) {
         breakdown.onTimeRate.due.applicable++
-        if (task.completedAt! <= task.dueDate) breakdown.onTimeRate.due.onTime++
+        if (isOnTimeByCalendarDay(task.completedAt!, task.dueDate)) breakdown.onTimeRate.due.onTime++
         else breakdown.onTimeRate.due.late++
       }
 
       const completionDays = (task.completedAt!.getTime() - task.createdAt.getTime()) / MS_PER_DAY
-      const accKey = task.assignee ? `p:${task.assignee.id}` : `d:${task.department.id}`
-      accDays(accKey, completionDays, type)
+      accDays(breakdown, completionDays, type)
 
       const taskHistoryEntries = lateClosureHistoryByTask.get(task.id) ?? []
       const priorEntry = taskHistoryEntries.find((h) => h.createdAt.getTime() < task.completedAt!.getTime())
@@ -326,23 +348,33 @@ export async function getProductivityMetrics(
   }
 
   const allCandidateTasks = [...completedTasks, ...openTasks]
-  const taskById = new Map(allCandidateTasks.map((t) => [t.id, t]))
 
-  for (const [taskId, entries] of historyByTask) {
-    const task = taskById.get(taskId)
-    if (!task) continue
+  // Itera por TODA task candidata (não só as que têm entrada em historyByTask) — uma task
+  // BLOCKED sem nenhuma entrada de status_changed (dado legado de antes da correção que unificou
+  // os pontos de escrita, ou qualquer lacuna futura) ainda precisa aparecer na métrica, não ficar
+  // invisível só porque não tem histórico pra reconstruir.
+  for (const task of allCandidateTasks) {
+    const entries = historyByTask.get(task.id) ?? []
 
     let blockedSince: Date | null = null
     let totalClippedMs = 0
     for (const entry of entries) {
       if (entry.toValue === 'BLOCKED') blockedSince = entry.createdAt
-      else if (entry.fromValue === 'BLOCKED' && blockedSince) {
-        totalClippedMs += clippedDurationMs(blockedSince, entry.createdAt, query.from, query.to)
+      else if (entry.fromValue === 'BLOCKED') {
+        // Saída de BLOCKED sem abertura correspondente (histórico incompleto) — assume bloqueada
+        // desde a criação da tarefa em vez de descartar o intervalo inteiro silenciosamente
+        // (isso subcontava o impedimento real, nunca superconta).
+        const openedAt = blockedSince ?? task.createdAt
+        totalClippedMs += clippedDurationMs(openedAt, entry.createdAt, query.from, query.to)
         blockedSince = null
       }
     }
     if (blockedSince) {
       totalClippedMs += clippedDurationMs(blockedSince, now, query.from, query.to)
+    } else if (task.status === 'BLOCKED') {
+      // Ainda bloqueada agora mas sem nenhum evento de histórico que prove isso — conta desde a
+      // criação da tarefa.
+      totalClippedMs += clippedDurationMs(task.createdAt, now, query.from, query.to)
     }
 
     if (totalClippedMs > 0) {
@@ -353,12 +385,7 @@ export async function getProductivityMetrics(
     }
   }
 
-  for (const [key, acc] of completionDaysAccumulator) {
-    const [kind, id] = key.split(':', 2) as ['p' | 'd', string]
-    const breakdown = kind === 'p'
-      ? byPerson.get(id)?.breakdown
-      : byDepartment.get(id)?.breakdown
-    if (!breakdown) continue
+  for (const [breakdown, acc] of completionDaysAccumulator) {
     breakdown.avgCompletionDays.os = average(acc.os)
     breakdown.avgCompletionDays.recurring = average(acc.recurring)
   }

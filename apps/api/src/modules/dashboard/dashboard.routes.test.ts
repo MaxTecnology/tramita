@@ -53,4 +53,19 @@ describe('GET /dashboard/productivity', () => {
     const body = JSON.parse(res.body)
     expect(body.byPerson.find((p: { userId: string }) => p.userId === member.id)).toBeDefined()
   })
+
+  it('rejeita from depois de to', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const auth = await getAuthHeader(user.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/dashboard/productivity?from=2030-01-01T00:00:00.000Z&to=2020-01-01T00:00:00.000Z',
+      headers: { authorization: auth },
+    })
+
+    expect(res.statusCode).toBe(400)
+  })
 })

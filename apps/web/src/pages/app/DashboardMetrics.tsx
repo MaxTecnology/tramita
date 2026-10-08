@@ -166,12 +166,21 @@ interface ProductivityMetrics {
 
 type Preset = '7d' | '30d' | '90d' | 'month' | 'custom'
 
+// new Date('YYYY-MM-DD') é interpretado como meia-noite UTC pelo motor JS — num fuso negativo
+// (Brasil), "até 08/10" vira um corte horas ANTES da meia-noite local de 08/10, excluindo
+// qualquer coisa concluída naquele dia. Monta a partir dos componentes Y/M/D em hora local em
+// vez de deixar o parser de string decidir o fuso.
+function parseLocalDateInput(value: string, endOfDay: boolean): Date {
+  const [y, m, d] = value.split('-').map(Number)
+  return endOfDay ? new Date(y, m - 1, d, 23, 59, 59, 999) : new Date(y, m - 1, d, 0, 0, 0, 0)
+}
+
 function presetToRange(preset: Preset, customFrom?: string, customTo?: string): { from: Date; to: Date } {
   const now = new Date()
   if (preset === 'custom') {
     return {
-      from: customFrom ? new Date(customFrom) : new Date(now.getFullYear(), now.getMonth(), 1),
-      to: customTo ? new Date(customTo) : now,
+      from: customFrom ? parseLocalDateInput(customFrom, false) : new Date(now.getFullYear(), now.getMonth(), 1),
+      to: customTo ? parseLocalDateInput(customTo, true) : now,
     }
   }
   if (preset === 'month') return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now }
@@ -191,7 +200,10 @@ function formatDays(days: number | null): string {
 
 function ProductivityTable({ metrics, viewBy }: { metrics: ProductivityMetrics; viewBy: 'person' | 'department' }) {
   const rows = viewBy === 'person' ? metrics.byPerson : metrics.byDepartment
-  const lateClosureTotal = metrics.byPerson.reduce((sum, p) => sum + p.lateClosureCount, 0)
+  // Soma sobre a dimensão exibida (rows), não sempre byPerson — senão o total diverge da soma
+  // visível quando a visão está em "por departamento" (e tarefas sem responsável nunca entrariam
+  // no total se ele ficasse travado em byPerson).
+  const lateClosureTotal = rows.reduce((sum, r) => sum + r.lateClosureCount, 0)
 
   return (
     <div className="space-y-3">
