@@ -260,6 +260,14 @@ export async function updateTask(
 ) {
   const task = await verifyTaskBelongsToOrg(id, organizationId)
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
+
+  // Tarefa recorrente: vencimento e meta são o prazo legal/interno que o motor de recorrência
+  // calculou — editar aqui corromperia o controle que a tarefa existe pra garantir. Travado pra
+  // todo mundo, sem exceção; quem precisar corrigir ajusta o template e gera de novo.
+  if (task.recurringTemplateId && (data.dueDate !== undefined || data.targetDate !== undefined)) {
+    throw new AppError(400, 'Vencimento e meta de uma tarefa recorrente não podem ser editados diretamente — ajuste o template de recorrência')
+  }
+
   const actorName = await resolveActorName(actor.id, actor.type)
 
   const historyEntries: Array<{ action: string; fromValue?: string; toValue?: string }> = []

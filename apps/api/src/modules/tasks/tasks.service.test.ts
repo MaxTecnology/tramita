@@ -20,6 +20,7 @@ import {
   createTestTask,
   createTestDepartment,
 } from '@/test/helpers'
+import { createTemplate } from '@/modules/recurring-templates/recurring-templates.service'
 
 describe('moveTask', () => {
   it('updates columnId and position', async () => {
@@ -301,6 +302,80 @@ describe('updateTask', () => {
       where: { taskId: task.id, action: 'priority_changed' },
     })
     expect(history).toBeNull()
+  })
+
+  it('rejeita alteração de dueDate numa tarefa recorrente, mesmo pra ORG_ADMIN', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const dept = await createTestDepartment(org.id)
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'DAS', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE', dueMonthAnchor: 1,
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    const task = await createTestTask(col.id, admin.id, { departmentId: dept.id })
+    await prisma.task.update({ where: { id: task.id }, data: { recurringTemplateId: template.id } })
+
+    await expect(
+      updateTask(task.id, org.id, { dueDate: new Date(Date.UTC(2026, 11, 25)).toISOString() }, { id: admin.id, type: 'user' }),
+    ).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  it('rejeita alteração de targetDate numa tarefa recorrente', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const dept = await createTestDepartment(org.id)
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'DAS', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE', dueMonthAnchor: 1,
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    const task = await createTestTask(col.id, admin.id, { departmentId: dept.id })
+    await prisma.task.update({ where: { id: task.id }, data: { recurringTemplateId: template.id } })
+
+    await expect(
+      updateTask(task.id, org.id, { targetDate: new Date(Date.UTC(2026, 11, 20)).toISOString() }, { id: admin.id, type: 'user' }),
+    ).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  it('permite alterar outros campos (ex: prioridade) numa tarefa recorrente, só trava dueDate/targetDate', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const dept = await createTestDepartment(org.id)
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'DAS', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE', dueMonthAnchor: 1,
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    const task = await createTestTask(col.id, admin.id, { departmentId: dept.id, priority: 'LOW' })
+    await prisma.task.update({ where: { id: task.id }, data: { recurringTemplateId: template.id } })
+
+    const result = await updateTask(task.id, org.id, { priority: 'URGENT' }, { id: admin.id, type: 'user' })
+    expect(result.priority).toBe('URGENT')
   })
 
   it('records department_changed history only when departmentId actually changes', async () => {

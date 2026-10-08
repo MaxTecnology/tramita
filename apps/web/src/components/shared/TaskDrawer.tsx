@@ -207,6 +207,12 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
     task.status !== 'DONE' &&
     isPastDateOnlyUTC(task.dueDate)
 
+  // Vencimento e meta de uma tarefa recorrente vêm do motor de recorrência (template) — travados
+  // pra todo mundo, sem exceção, mesmo quem pode editar os outros campos da tarefa. Corrigir
+  // significa ajustar o template e gerar de novo, não editar a tarefa já criada.
+  const isRecurring = task.recurringTemplateId !== null
+  const canEditDates = canEdit && !isRecurring
+
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'comments', label: 'Comentários', icon: <MessageSquare size={14} /> },
     { id: 'documents', label: 'Documentos', icon: <FileCheck size={14} /> },
@@ -301,7 +307,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
               </select>
             )}
 
-            {canEdit ? (
+            {canEditDates ? (
               <div className="flex flex-col gap-1">
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   Prazo:
@@ -331,13 +337,16 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
               </div>
             ) : (
               task.dueDate && (
-                <span className={cn('text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700', isOverdue && 'bg-red-100 text-red-600 font-medium')}>
-                  {isOverdue ? '⚠ ' : ''}Prazo: {formatDateOnlyUTC(task.dueDate)}
+                <span
+                  className={cn('text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700', isOverdue && 'bg-red-100 text-red-600 font-medium')}
+                  title={isRecurring ? 'Tarefa recorrente — vencimento fixado pelo template' : undefined}
+                >
+                  {isOverdue ? '⚠ ' : ''}Prazo: {formatDateOnlyUTC(task.dueDate)}{isRecurring ? ' 🔒' : ''}
                 </span>
               )
             )}
 
-            {canEdit ? (
+            {canEditDates ? (
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground" title="Meta interna">
                 Meta:
                 <input
@@ -359,8 +368,8 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
               </label>
             ) : (
               task.targetDate && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700" title="Meta interna">
-                  Meta: {formatDateOnlyUTC(task.targetDate)}
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700" title={isRecurring ? 'Tarefa recorrente — meta fixada pelo template' : 'Meta interna'}>
+                  Meta: {formatDateOnlyUTC(task.targetDate)}{isRecurring ? ' 🔒' : ''}
                 </span>
               )
             )}
