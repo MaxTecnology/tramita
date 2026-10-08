@@ -1,5 +1,6 @@
 // apps/api/src/modules/notifications/notifications.routes.ts
 import type { FastifyInstance } from 'fastify'
+import multipart from '@fastify/multipart'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
@@ -25,9 +26,14 @@ import {
   testWhatsApp,
   testEmail,
   listLogs,
+  uploadSlaSound,
+  deleteSlaSound,
+  isAllowedSlaSoundType,
+  SLA_SOUND_MAX_SIZE_BYTES,
 } from './notifications.service'
 
 export async function notificationsRoutes(app: FastifyInstance) {
+  await app.register(multipart, { limits: { fileSize: SLA_SOUND_MAX_SIZE_BYTES } })
   app.addHook('preHandler', verifyJWT)
   app.addHook('preHandler', requireRole('ORG_ADMIN'))
 
@@ -96,6 +102,36 @@ export async function notificationsRoutes(app: FastifyInstance) {
     const ch = channelParamSchema.safeParse(channel)
     if (!ev.success || !ch.success) throw new AppError(400, 'Evento ou canal inválido')
     return reply.send(await deleteTemplate(request.user.organizationId!, ev.data, ch.data))
+  })
+
+  app.post('/config/sla-sound', { preHandler: [checkSubscription] }, async (request, reply) => {
+    let file: Awaited<ReturnType<typeof request.file>>
+    try {
+      file = await request.file()
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number; code?: string }
+      if (e?.statusCode === 413 || e?.code === 'FST_FILES_LIMIT' || e?.code === 'FST_REQ_FILE_TOO_LARGE') {
+        throw new AppError(413, 'Arquivo excede o limite de 500KB')
+      }
+      throw err
+    }
+    if (!file) throw new AppError(400, 'Nenhum arquivo enviado')
+    if (!isAllowedSlaSoundType(file.mimetype)) {
+      await file.toBuffer().catch(() => {})
+      throw new AppError(422, 'Tipo de arquivo não permitido — use MP3 ou WAV')
+    }
+
+    const buffer = await file.toBuffer()
+    if (buffer.length > SLA_SOUND_MAX_SIZE_BYTES) throw new AppError(413, 'Arquivo excede o limite de 500KB')
+
+    const label = (request.body as { label?: string } | undefined)?.label ?? file.filename
+    await uploadSlaSound(request.user.organizationId!, { buffer, mimeType: file.mimetype, label })
+    return reply.status(201).send({ ok: true })
+  })
+
+  app.delete('/config/sla-sound', { preHandler: [checkSubscription] }, async (request, reply) => {
+    await deleteSlaSound(request.user.organizationId!)
+    return reply.status(204).send()
   })
 
   // Logs

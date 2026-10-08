@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { getTemplate, renderTemplate, PREVIEW_VARS } from '@/lib/template'
+import { uploadFile, deleteFile } from '@/lib/b2'
 import type { NotificationEvent, MessageChannel, NotificationStatus } from '@prisma/client'
 import type { UpdateConfigBody, UpsertTemplateBody } from './notifications.schema'
 
@@ -149,5 +150,37 @@ export async function listLogs(
     orderBy: { createdAt: 'desc' },
     skip,
     take: filters.limit,
+  })
+}
+
+const SLA_SOUND_MAX_SIZE = 500 * 1024
+const SLA_SOUND_ALLOWED_TYPES = new Set(['audio/mpeg', 'audio/wav', 'audio/x-wav'])
+
+export function isAllowedSlaSoundType(mimeType: string): boolean {
+  return SLA_SOUND_ALLOWED_TYPES.has(mimeType)
+}
+
+export const SLA_SOUND_MAX_SIZE_BYTES = SLA_SOUND_MAX_SIZE
+
+export async function uploadSlaSound(
+  organizationId: string,
+  file: { buffer: Buffer; mimeType: string; label: string },
+): Promise<void> {
+  const key = `sla-sounds/${organizationId}.mp3`
+  await uploadFile(key, file.buffer, file.mimeType)
+  await prisma.notificationConfig.upsert({
+    where: { organizationId },
+    create: { organizationId, customSlaSoundKey: key, customSlaSoundLabel: file.label },
+    update: { customSlaSoundKey: key, customSlaSoundLabel: file.label },
+  })
+}
+
+export async function deleteSlaSound(organizationId: string): Promise<void> {
+  const config = await prisma.notificationConfig.findUnique({ where: { organizationId } })
+  if (!config?.customSlaSoundKey) return
+  await deleteFile(config.customSlaSoundKey)
+  await prisma.notificationConfig.update({
+    where: { organizationId },
+    data: { customSlaSoundKey: null, customSlaSoundLabel: null },
   })
 }
