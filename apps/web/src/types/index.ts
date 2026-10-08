@@ -42,6 +42,7 @@ export interface Board {
   isActive: boolean
   dueDate: string | null
   osTemplateId?: string | null
+  type: 'OS' | 'RECURRING_SYSTEM'
   columns: Column[]
   client: { id: string; name: string; codigo: string | null }
 }

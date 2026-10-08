@@ -15,6 +15,7 @@ const mockBoard: Board = {
   responsibleUser: null,
   isActive: true,
   dueDate: null,
+  type: 'OS',
   client: { id: 'c1', name: 'Empresa ABC', codigo: null },
   columns: [
     {
