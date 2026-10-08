@@ -216,6 +216,11 @@ export interface FailedGeneration {
   createdAt: string
 }
 
+export interface BulkRegenerationResult {
+  regenerated: number
+  failed: { clientName: string; errorMessage: string }[]
+}
+
 export interface TaskDocumentRequirement {
   id: string
   taskId: string

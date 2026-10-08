@@ -11,6 +11,7 @@ import {
   manualGenerateSchema,
   bulkGenerateSchema,
   bulkGenerateAllSchema,
+  bulkRegenerateSchema,
 } from './recurring-templates.schema'
 import {
   listTemplates,
@@ -27,6 +28,7 @@ import {
   generateBulkForTemplate,
   generateBulkForAllTemplates,
   getFailedGenerations,
+  regenerateBulkForTemplate,
 } from './recurring-templates.service'
 
 export async function recurringTemplatesRoutes(app: FastifyInstance) {
@@ -130,6 +132,15 @@ export async function recurringTemplatesRoutes(app: FastifyInstance) {
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     return reply.send(
       await generateBulkForTemplate(id, request.user.organizationId!, result.data.dueMonth, result.data.assignmentIds),
+    )
+  })
+
+  app.post('/:id/assignments/bulk-regenerate', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const result = bulkRegenerateSchema.safeParse(request.body)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(
+      await regenerateBulkForTemplate(id, request.user.organizationId!, result.data.dueMonth, result.data.assignmentIds),
     )
   })
 

@@ -72,3 +72,10 @@ export const bulkGenerateAllSchema = z.object({
 })
 
 export type BulkGenerateAllBody = z.infer<typeof bulkGenerateAllSchema>
+
+export const bulkRegenerateSchema = z.object({
+  dueMonth: z.string().datetime(),
+  assignmentIds: z.array(z.string().cuid()).min(1, 'Selecione ao menos um cliente'),
+})
+
+export type BulkRegenerateBody = z.infer<typeof bulkRegenerateSchema>

@@ -8,12 +8,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ArrowLeft, Trash2, History, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
+import { MonthYearPicker } from '@/components/shared/MonthYearPicker'
 import type {
   RecurringTaskTemplate,
   RecurringTaskAssignment,
   RecurringGenerationLog,
   Client,
   BulkGenerationResult,
+  BulkRegenerationResult,
   FailedGeneration,
 } from '@/types'
 
@@ -118,6 +120,26 @@ export default function RecurringTemplateManage() {
     },
   })
 
+  const bulkRegenerateMutation = useMutation({
+    mutationFn: () =>
+      api.post<BulkRegenerationResult>(`/recurring-templates/${id}/assignments/bulk-regenerate`, {
+        dueMonth: monthValueToISO(dueMonth),
+        assignmentIds: [...selected],
+      }).then((r) => r.data),
+    onSuccess: (result) => {
+      const message = `${result.regenerated} regeneradas, ${result.failed.length} falharam`
+      if (result.failed.length > 0) toast.error(message)
+      else toast.success(message)
+      qc.invalidateQueries({ queryKey: ['recurring-generation-log', id] })
+      qc.invalidateQueries({ queryKey: ['recurring-failed-generations'] })
+      setSelected(new Set())
+    },
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(message ?? 'Erro ao regenerar em lote')
+    },
+  })
+
   const retryMutation = useMutation({
     mutationFn: (failure: FailedGeneration) =>
       api.post<BulkGenerationResult>(`/recurring-templates/${failure.templateId}/assignments/bulk-generate`, {
@@ -203,33 +225,40 @@ export default function RecurringTemplateManage() {
       <Card className="px-4 py-3 space-y-3">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="space-y-1.5">
-            <Label>Mês de vencimento</Label>
-            <input
-              type="month"
-              value={dueMonth}
-              onChange={(e) => setDueMonth(e.target.value)}
-              className="h-9 rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-            />
+            <Label className="block">Mês de vencimento</Label>
+            <MonthYearPicker value={dueMonth} onChange={setDueMonth} />
           </div>
           <div className="space-y-1.5 flex-1">
-            <Label>Buscar cliente</Label>
+            <Label className="block">Buscar cliente</Label>
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nome do cliente..." />
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="flex gap-2">
             <button type="button" onClick={selectAll} className="text-xs text-accent hover:underline">Selecionar todos</button>
             <button type="button" onClick={() => setSelected(new Set())} className="text-xs text-muted-foreground hover:underline">Limpar seleção</button>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => bulkGenerateMutation.mutate()}
-            disabled={selected.size === 0 || bulkGenerateMutation.isPending}
-          >
-            {bulkGenerateMutation.isPending ? 'Gerando...' : `Gerar selecionados (${selected.size})`}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => bulkRegenerateMutation.mutate()}
+              disabled={selected.size === 0 || bulkRegenerateMutation.isPending}
+              title="Apaga e gera de novo os selecionados que já têm tarefa nessa competência — só funciona pra quem não teve movimentação"
+            >
+              {bulkRegenerateMutation.isPending ? 'Regenerando...' : `Regenerar selecionados (${selected.size})`}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => bulkGenerateMutation.mutate()}
+              disabled={selected.size === 0 || bulkGenerateMutation.isPending}
+            >
+              {bulkGenerateMutation.isPending ? 'Gerando...' : `Gerar selecionados (${selected.size})`}
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-1.5 max-h-80 overflow-y-auto">

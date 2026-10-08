@@ -615,3 +615,59 @@ export async function regenerateTask(taskId: string, organizationId: string) {
   }
   return { taskId: outcome.taskId }
 }
+
+export interface BulkRegenerationResult {
+  regenerated: number
+  failed: { clientName: string; errorMessage: string }[]
+}
+
+/**
+ * Mesma ideia de generateBulkForTemplate, mas pra regenerateTask — útil quando a mesma tarefa
+ * recorrente já foi gerada errada pra muitos clientes de uma vez (ex: template mal configurado
+ * desde o início) e corrigir tarefa por tarefa na drawer não escala. Reaproveita regenerateTask
+ * pra cada cliente selecionado, resolvendo qual tarefa regenerar a partir do log SUCCESS daquela
+ * competência — não do ID da tarefa, que o operador não tem na tela de lote.
+ */
+export async function regenerateBulkForTemplate(
+  templateId: string,
+  organizationId: string,
+  dueMonthRaw: string,
+  assignmentIds: string[],
+): Promise<BulkRegenerationResult> {
+  const template = await getTemplateById(templateId, organizationId)
+  const dueMonth = normalizeToPeriodStart(new Date(dueMonthRaw), template.periodicity)
+  const competence = template.periodicity === 'WEEKLY' ? dueMonth : computeCompetenceFromDueMonth(dueMonth, template)
+
+  const assignments = await prisma.recurringTaskAssignment.findMany({
+    where: { id: { in: assignmentIds }, templateId },
+    include: { client: { select: { id: true, name: true } } },
+  })
+  const foundIds = new Set(assignments.map((a) => a.id))
+
+  const result: BulkRegenerationResult = { regenerated: 0, failed: [] }
+
+  for (const requestedId of assignmentIds) {
+    if (!foundIds.has(requestedId)) {
+      result.failed.push({ clientName: '(cliente não encontrado)', errorMessage: 'Cliente não encontrado ou não vinculado a este template' })
+    }
+  }
+
+  for (const assignment of assignments) {
+    try {
+      const log = await prisma.recurringGenerationLog.findUnique({
+        where: { templateId_clientId_competence: { templateId, clientId: assignment.client.id, competence } },
+      })
+      if (!log || log.status !== 'SUCCESS' || !log.taskId) {
+        result.failed.push({ clientName: assignment.client.name, errorMessage: 'Nenhuma tarefa gerada pra essa competência' })
+        continue
+      }
+      await regenerateTask(log.taskId, organizationId)
+      result.regenerated++
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      result.failed.push({ clientName: assignment.client.name, errorMessage })
+    }
+  }
+
+  return result
+}

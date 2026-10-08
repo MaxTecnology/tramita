@@ -14,6 +14,7 @@ import {
   generateBulkForAllTemplates,
   getFailedGenerations,
   regenerateTask,
+  regenerateBulkForTemplate,
 } from './recurring-templates.service'
 import {
   createTestOrg,
@@ -924,5 +925,49 @@ describe('regenerateTask', () => {
     await prisma.recurringTaskAssignment.delete({ where: { id: assignment.id } })
 
     await expect(regenerateTask(taskId, org.id)).rejects.toMatchObject({ statusCode: 409 })
+  })
+})
+
+describe('regenerateBulkForTemplate', () => {
+  it('regenera em lote: sucesso + sem tarefa gerada pra essa competência + ID inválido, sem derrubar os outros', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const clientA = await createTestClient(org.id)
+    const clientB = await createTestClient(org.id)
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'DAS', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE', dueMonthAnchor: 1,
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      competenceMonthOffset: 1,
+      generationMonthOffset: 1, generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    const assignmentA = await createAssignment(template.id, org.id, { clientId: clientA.id })
+    const assignmentB = await createAssignment(template.id, org.id, { clientId: clientB.id })
+
+    // Só gera pra clientA — clientB fica sem tarefa pra essa competência de propósito
+    const outcome = await generateTaskForAssignment(template.id, assignmentA.id, new Date(Date.UTC(2026, 9, 1)))
+    if (outcome.status !== 'SUCCESS') throw new Error('setup falhou')
+
+    const dueMonth = new Date(Date.UTC(2026, 9, 1)).toISOString()
+    const result = await regenerateBulkForTemplate(template.id, org.id, dueMonth, [
+      assignmentA.id,
+      assignmentB.id,
+      'cmxxxxxxxxxxxxxxxxxxxxxxx0',
+    ])
+
+    expect(result.regenerated).toBe(1)
+    expect(result.failed).toHaveLength(2)
+    expect(result.failed.some((f) => f.errorMessage.includes('Nenhuma tarefa gerada'))).toBe(true)
+    expect(result.failed.some((f) => f.errorMessage.includes('não encontrado'))).toBe(true)
+
+    const newTask = await prisma.task.findFirst({ where: { recurringTemplateId: template.id } })
+    expect(newTask?.id).not.toBe(outcome.taskId)
+
+    vi.restoreAllMocks()
   })
 })

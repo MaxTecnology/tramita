@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
+import { MonthYearPicker } from '@/components/shared/MonthYearPicker'
 import type { RecurringTaskTemplate, BulkGenerationSummary, FailedGeneration } from '@/types'
 
 const PERIODICITY_LABEL: Record<RecurringTaskTemplate['periodicity'], string> = {
@@ -93,13 +94,8 @@ export default function RecurringGenerationConsole() {
 
       <Card className="px-4 py-3 space-y-3">
         <div className="space-y-1.5">
-          <Label>Mês de vencimento</Label>
-          <input
-            type="month"
-            value={dueMonth}
-            onChange={(e) => setDueMonth(e.target.value)}
-            className="h-9 rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-          />
+          <Label className="block">Mês de vencimento</Label>
+          <MonthYearPicker value={dueMonth} onChange={setDueMonth} />
         </div>
 
         <div className="space-y-1">
