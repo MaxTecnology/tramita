@@ -1,6 +1,8 @@
 import { Inbox } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/types'
+import { computeSlaLevel } from '@/lib/sla'
+import { useSlaConfig } from '@/hooks/useSlaConfig'
 
 const PRIORITY_STYLES: Record<Task['priority'], string> = {
   LOW: 'bg-gray-100 text-gray-600',
@@ -29,16 +31,21 @@ interface Props {
 }
 
 export function TaskCard({ task, onClick }: Props) {
-  const isOverdue =
-    task.dueDate !== null &&
-    task.status !== 'DONE' &&
-    new Date(task.dueDate) < new Date()
+  const slaConfig = useSlaConfig()
+  const slaLevel = computeSlaLevel(
+    task.targetDate ? new Date(task.targetDate) : null,
+    task.dueDate ? new Date(task.dueDate) : null,
+    new Date(),
+    slaConfig,
+  )
+  const isAlertActive = task.status !== 'DONE' && task.status !== 'DISREGARDED' && slaLevel !== 'NONE'
+  const effectiveLevel = isAlertActive ? slaLevel : 'NONE'
 
   return (
     <div
       className={cn(
         'bg-surface rounded-lg p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow select-none',
-        isOverdue ? 'border-red-400' : 'border-border',
+        effectiveLevel === 'DUE_CRITICAL' ? 'border-red-400' : effectiveLevel === 'TARGET_WARNING' ? 'border-yellow-400' : 'border-border',
       )}
       onClick={onClick}
     >
@@ -58,8 +65,11 @@ export function TaskCard({ task, onClick }: Props) {
         >
           {PRIORITY_LABELS[task.priority]}
         </span>
-        {isOverdue && (
-          <span className="text-xs text-red-500 font-medium">⚠ Prazo vencido</span>
+        {effectiveLevel === 'DUE_CRITICAL' && (
+          <span className="text-xs text-red-500 font-medium">⚠ Prazo crítico</span>
+        )}
+        {effectiveLevel === 'TARGET_WARNING' && (
+          <span className="text-xs text-yellow-600 font-medium">⏰ Meta próxima</span>
         )}
       </div>
       <p className="text-xs text-muted-foreground mt-1.5">{daysOpen(task.createdAt)}</p>
