@@ -350,6 +350,7 @@ model Task {
   tags                String[]
   competence          DateTime?
   targetDate          DateTime?
+  completedAt         DateTime?
   recurringTemplateId String?
   visibleToClient     Boolean    @default(true)
   createdAt           DateTime   @default(now())
@@ -692,6 +693,7 @@ model NotificationConfig {
   slaTargetWarningDays      Int      @default(3)
   slaDueCriticalDays        Int      @default(1)
   slaDigestEnabled          Boolean  @default(true)
+  lateClosureThresholdDays  Int      @default(2)
   customSlaSoundKey         String?
   customSlaSoundLabel       String?
   createdAt                 DateTime @default(now())
