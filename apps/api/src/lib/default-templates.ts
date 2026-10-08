@@ -21,9 +21,12 @@ export const DEFAULT_TEMPLATES: TemplateMap = {
     WHATSAPP: { body: 'Olá, {{clientName}}! Novo comentário em *{{taskTitle}}*:\n\n"{{commentText}}"\n\n— {{commentAuthorName}}\n\nAcompanhe: {{portalUrl}}' },
     EMAIL: { subject: 'Novo comentário — {{taskTitle}}', body: 'Olá, {{clientName}}!\n\nNovo comentário em *{{taskTitle}}*:\n\n"{{commentText}}"\n\n— {{commentAuthorName}}\n\nAcompanhe em: {{portalUrl}}' },
   },
-  TASK_DUE_DATE_APPROACHING: {
-    WHATSAPP: { body: 'Olá, {{clientName}}! O processo *{{taskTitle}}* vence em {{dueDate}}. Acesse: {{portalUrl}}' },
-    EMAIL: { subject: 'Prazo se aproximando — {{taskTitle}}', body: 'Olá, {{clientName}}!\n\nO processo *{{taskTitle}}* vence em {{dueDate}}.\n\nAcompanhe em: {{portalUrl}}' },
+  SLA_DIGEST: {
+    WHATSAPP: { body: 'Olá! Você tem {{taskCount}} tarefa(s) com prazo próximo, sendo {{criticalCount}} crítica(s).\n\n{{taskListText}}\n\nAcesse: {{portalUrl}}' },
+    EMAIL: {
+      subject: 'Resumo de prazos — {{taskCount}} tarefa(s) em alerta',
+      body: 'Olá!\n\nVocê tem {{taskCount}} tarefa(s) com prazo próximo, sendo {{criticalCount}} crítica(s):\n\n{{taskListText}}\n\nAcesse o painel: {{portalUrl}}',
+    },
   },
   TASK_BLOCKED: {
     WHATSAPP: { body: 'Olá, {{clientName}}! A tarefa *{{taskTitle}}* está com impedimento e precisa da sua atenção.\n\nAcesse: {{portalUrl}}' },
