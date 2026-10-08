@@ -100,8 +100,24 @@ model User {
   clientAssignments            ClientAssignment[]
   reviewedDocumentRequirements TaskDocumentRequirement[]
   deliveredDeliverables        TaskDeliverable[]
+  slaPreference                UserSlaPreference?
 
   @@map("users")
+}
+
+model UserSlaPreference {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  targetWarningSound  String   @default("SOFT_PING")
+  targetWarningVolume Int      @default(50)
+  dueCriticalSound    String   @default("BELL")
+  dueCriticalVolume   Int      @default(70)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sla_preferences")
 }
 
 enum UserRole {
@@ -664,7 +680,6 @@ model NotificationConfig {
   taskMoved                 Boolean  @default(true)
   taskCompleted             Boolean  @default(true)
   commentAdded              Boolean  @default(true)
-  dueDateAlert              Boolean  @default(true)
   taskBlocked               Boolean  @default(true)
   requestCreated            Boolean  @default(true)
   requestApproved           Boolean  @default(true)
@@ -674,6 +689,11 @@ model NotificationConfig {
   startChatbot              Boolean  @default(false)
   recurringGenerationFailed Boolean  @default(true)
   documentRejected          Boolean  @default(true)
+  slaTargetWarningDays      Int      @default(3)
+  slaDueCriticalDays        Int      @default(1)
+  slaDigestEnabled          Boolean  @default(true)
+  customSlaSoundKey         String?
+  customSlaSoundLabel       String?
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 
@@ -704,13 +724,13 @@ enum NotificationEvent {
   TASK_MOVED
   TASK_COMPLETED
   TASK_COMMENT_ADDED
-  TASK_DUE_DATE_APPROACHING
   TASK_BLOCKED
   REQUEST_CREATED
   REQUEST_APPROVED
   REQUEST_REJECTED
   RECURRING_GENERATION_FAILED
   DOCUMENT_REJECTED
+  SLA_DIGEST
 }
 
 enum MessageChannel {
