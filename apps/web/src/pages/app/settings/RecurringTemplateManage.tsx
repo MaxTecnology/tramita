@@ -253,15 +253,15 @@ export default function RecurringTemplateManage() {
 
       <Card className="px-4 py-3 space-y-2">
         <Label className="text-xs uppercase tracking-wide text-muted-foreground">Vincular novo cliente</Label>
-        <div className="grid grid-cols-2 gap-2">
-          <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="h-9 rounded-md border border-border bg-surface text-foreground px-2 text-sm">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="h-9 flex-1 rounded-md border border-border bg-surface text-foreground px-2 text-sm">
             <option value="">Cliente</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.codigo ? `${c.codigo} - ${c.name}` : c.name}</option>)}
           </select>
+          <Button type="button" size="sm" onClick={() => addMutation.mutate()} disabled={!clientId || addMutation.isPending} className="flex-shrink-0">
+            Vincular cliente
+          </Button>
         </div>
-        <Button type="button" size="sm" onClick={() => addMutation.mutate()} disabled={!clientId || addMutation.isPending}>
-          Vincular cliente
-        </Button>
       </Card>
 
       <Card className="px-4 py-3 space-y-2">
