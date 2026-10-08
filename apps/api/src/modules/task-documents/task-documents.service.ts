@@ -196,9 +196,9 @@ export async function deliverDocument(
 // `task.create(` — não há garantia de que esses sejam os únicos; qualquer novo escritor de
 // Task.status precisa chamar este helper. Só dispara na transição DE ENTRADA em BLOCKED, nunca em
 // edições subsequentes enquanto já está bloqueada, nunca ao sair de BLOCKED, e nunca para uma
-// tarefa que o cliente não pode ver no portal (visibleToClient=false) — ver notification.worker.ts,
-// que hoje não filtra o envio de WhatsApp por visibleToClient pros demais eventos (débito técnico
-// pré-existente, fora do escopo deste helper).
+// tarefa que o cliente não pode ver no portal (visibleToClient=false) — esse check aqui barra
+// ANTES de enfileirar (nunca chega a entrar na fila pra TASK_BLOCKED); notification.worker.ts
+// tem o mesmo filtro pro branch de WhatsApp como segunda camada, cobrindo os demais eventos.
 export async function notifyIfBlocked(
   taskId: string,
   previousStatus: TaskStatus,

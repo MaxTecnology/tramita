@@ -148,6 +148,11 @@ async function processClientNotification(
       continue // já logou por destinatário acima — pula o log único do fim do loop
     }
 
+    // Mesma regra do branch de EMAIL acima: uma notificação ligada a uma tarefa marcada como
+    // controle interno (visibleToClient=false) nunca pode chegar ao cliente por nenhum canal —
+    // o WhatsApp mandaria o cliente checar o portal por uma tarefa que ele não consegue ver lá.
+    if (task && !task.visibleToClient) continue
+
     let status: 'SENT' | 'FAILED' = 'SENT'
     let error: string | undefined
 

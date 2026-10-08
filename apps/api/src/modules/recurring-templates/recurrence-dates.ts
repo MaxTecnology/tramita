@@ -217,8 +217,26 @@ export function normalizeToPeriodStart(date: Date, periodicity: Periodicity): Da
  * que o cron usaria se disparasse hoje, mas sem exigir que hoje seja o generationDayOfPeriod.
  * Usado por `generateManually` quando o operador não escolhe um mês explícito: "Gerar agora"
  * sem seletor deve fazer o que o cron faria no próximo disparo, não um "mês atual" cru.
+ *
+ * MONTHLY: todo mês é um vencimento válido, então hoje + generationMonthOffset já é a resposta.
+ * QUARTERLY/ANNUAL: nem todo mês bate com dueMonthAnchor (a mesma validação de
+ * computeDueMonthsToGenerate) — avança mês a mês a partir do candidato mínimo até achar um que o
+ * cron de fato produziria, nunca retrocede. Sem isso, "Gerar agora" podia devolver um mês que o
+ * cron jamais geraria sozinho, quebrando a paridade entre os dois caminhos.
  */
 export function computeNextDueMonth(today: Date, rules: RecurrenceDateRules): Date {
   if (rules.periodicity === 'WEEKLY') return computeCurrentPeriodStart(today, rules.periodicity)
-  return addMonthsUTC(startOfMonthUTC(today), rules.generationMonthOffset)
+
+  let candidate = addMonthsUTC(startOfMonthUTC(today), rules.generationMonthOffset)
+  if (rules.periodicity === 'MONTHLY') return candidate
+
+  const matchesAnchor = (d: Date): boolean =>
+    rules.periodicity === 'QUARTERLY'
+      ? d.getUTCMonth() % 3 === (rules.dueMonthAnchor - 1) % 3
+      : d.getUTCMonth() === rules.dueMonthAnchor - 1
+
+  while (!matchesAnchor(candidate)) {
+    candidate = addMonthsUTC(candidate, 1)
+  }
+  return candidate
 }

@@ -122,7 +122,7 @@ customizada, só o template padrão do sistema.
 `Notifications.tsx` + entrada em `updateConfigSchema` + editor em `Templates.tsx`) que
 `taskMoved`/`taskCompleted`/`commentAdded`/`dueDateAlert`/`taskBlocked` já têm.
 
-## `notification.worker.ts` não filtra o envio de WhatsApp por `task.visibleToClient` (encontrado em 2026-10-05, revisão da spec de calendário/impedimento)
+## `notification.worker.ts` não filtra o envio de WhatsApp por `task.visibleToClient` ✅ (resolvido em 2026-10-08)
 
 **Contexto:** o branch de envio de email do worker (`apps/api/src/workers/notification.worker.ts`) já
 pula o envio quando `task.visibleToClient === false` (tarefa marcada como controle interno, nunca
@@ -136,40 +136,56 @@ disparo do evento `TASK_BLOCKED` deste feature, recebeu a correção **só pro p
 `visibleToClient` antes de enfileirar, já que `TASK_BLOCKED` vem ligado por padrão e sua mensagem
 manda o cliente checar o portal por uma tarefa que ele pode não conseguir ver lá.
 
-**Pendente:** aplicar a mesma checagem de `visibleToClient` no branch de WhatsApp de
-`notification.worker.ts`, nivelando com o branch de email, pra cobrir os demais eventos — deliberadamente
-fora do escopo desta wave de correção (ruling do controller: corrigir só `notifyIfBlocked`, não o
-worker inteiro).
+**Resolvido:** branch de WhatsApp em `notification.worker.ts` ganhou o mesmo
+`if (task && !task.visibleToClient) continue` do branch de email, cobrindo todos os eventos com
+`taskId`. Comentário de `notifyIfBlocked` atualizado pra deixar claro que agora são duas camadas
+(enqueue-level pra `TASK_BLOCKED` + worker-level pros demais), não mais um gap conhecido. Testes
+novos em `notification.worker.test.ts` confirmando que WhatsApp some pra `visibleToClient=false` e
+continua mandando normal pra `visibleToClient=true`.
 
-## Lacunas de UX aceitas no redesenho de geração recorrente (encontrado em 2026-10-07, revisão final do plano 2026-10-06)
+## Lacunas de UX aceitas no redesenho de geração recorrente ✅ (resolvidas em 2026-10-08)
 
-**Contexto:** a revisão final do redesenho vencimento-como-âncora (item 2f do roadmap) achou 4 desvios
-entre a spec e o que foi de fato implementado — todos avaliados como simplificações aceitáveis pro
-v1, não bloqueantes, mas registrados porque algum já tinha sido prometido na spec original:
+**Contexto original:** a revisão final do redesenho vencimento-como-âncora (item 2f do roadmap)
+achou 4 desvios entre a spec e o que foi de fato implementado:
 
-1. **Tela do template não mostra status por cliente no mês selecionado** (spec previa "Gerado 10/10 /
-   Pendente / Falhou" por linha) — hoje só o checkbox + nome, sem indicar se aquele cliente já tem
-   tarefa gerada pro mês escolhido no seletor.
-2. **Console global não tem "Gerar novamente" por linha nas falhas pendentes** — só um link pro
-   `RecurringTemplateManage.tsx` daquele template, onde a ação de verdade mora.
-3. **Seletor de mês de vencimento usa o mês atual como default**, não o "próximo ciclo normal do
-   template" (`computeNextDueMonth`) que a spec original pedia — o operador sempre pode trocar
-   manualmente, mas o valor inicial não reflete a antecedência configurada no template.
-4. **Form de template não tem preview calculado** do vencimento/competência resultante da
-   configuração atual — a spec citava isso como "proteção suficiente" contra `competenceMonthOffset`
-   sem sentido, mas nunca foi construído; hoje a única validação é visual (testar gerando).
+1. Tela do template não mostrava status por cliente no mês selecionado.
+2. Console global não tinha "Gerar novamente" por linha nas falhas pendentes, só link pro template.
+3. Seletor de mês de vencimento usava o mês atual como default, não o "próximo ciclo normal".
+4. Form de template não tinha preview calculado do vencimento/competência resultante.
 
-**Pendente:** nenhuma ação imediata — revisitar se o volume de templates recorrentes crescer a ponto
-de o item 1 (status por cliente) fazer falta operacional de verdade.
+**Resolvido:**
+1. `RecurringTemplateManage.tsx` — cada linha de cliente mostra um badge (Pendente/Gerado/Falhou)
+   calculado a partir do `log` daquele cliente pra competência correspondente ao mês selecionado
+   (`computeCompetenceForDueMonth`, espelho client-side de `computeCompetenceFromDueMonth`).
+2. `RecurringGenerationConsole.tsx` — banner de falhas agora lista cada falha com seu próprio botão
+   "Gerar novamente" (busca os assignments do template sob demanda, já que a tela cruza vários
+   templates e não pré-carrega vínculos de todos).
+3. Ambas as telas (`RecurringTemplateManage.tsx`) inicializam o seletor com
+   `computeNextDueMonthClient` (espelho de `computeNextDueMonth` do backend) assim que o template
+   carrega, via `useRef` pra nunca resetar a escolha do operador em refetches seguintes. O console
+   global continua usando o mês atual como default — ele cruza templates com ciclos diferentes,
+   não existe um "próximo ciclo" único pra todos, decisão mantida da spec original.
+4. `RecurringTemplateForm.tsx` ganhou uma caixa "Preview — se gerasse hoje" recalculada a cada
+   mudança de campo, espelhando a cadeia completa do backend (mês-âncora → dia clampado → ajuste de
+   dia útil → competência derivada). Fica oculta pra WEEKLY (fora do redesenho).
 
-## `generateManually` sem override pode gerar mês que o cron nunca produziria, pra QUARTERLY/ANNUAL (encontrado em 2026-10-07, revisão final do plano 2026-10-06)
+Os três espelhos client-side (`computeNextDueMonthClient`, `computeCompetenceForDueMonth`,
+`computePreview`) duplicam lógica que já existe em `recurrence-dates.ts` no backend — aceito
+deliberadamente pra evitar round-trip à API só pra um preview/default, mas **se a lógica de datas
+mudar de novo, os três precisam ser atualizados junto** (não há teste de paridade automatizado
+entre cliente e servidor pra esses três, diferente do teste de paridade que existe no backend entre
+`computeNextDueMonth` e `computeDueMonthsToGenerate`).
+
+## `generateManually` sem override pode gerar mês que o cron nunca produziria, pra QUARTERLY/ANNUAL ✅ (resolvido em 2026-10-08)
 
 **Contexto:** `computeNextDueMonth` (usado quando "Gerar agora" é chamado sem escolher mês) não
 verifica se o mês calculado bate com `dueMonthAnchor` do template — pra MONTHLY sempre bate (todo mês
 é válido), mas pra QUARTERLY/ANNUAL pode devolver um mês que `computeDueMonthsToGenerate` (o cron)
 jamais geraria sozinho, quebrando a paridade entre os dois caminhos que a spec original exigia.
 
-**Pendente:** nenhuma UI hoje chama `POST /:id/assignments/:assignmentId/generate` sem `dueMonth`
-explícito (as telas novas sempre mandam um mês escolhido) — risco adormecido, não ativo. Corrigir
-`computeNextDueMonth` pra respeitar `dueMonthAnchor` se algum caminho futuro passar a chamar o
-endpoint sem override.
+**Resolvido:** `computeNextDueMonth` agora avança mês a mês a partir do candidato mínimo
+(hoje + `generationMonthOffset`) até achar um que bate com `dueMonthAnchor` — mesma regra de
+match que `computeDueMonthsToGenerate` usa, nunca retrocede. MONTHLY inalterado (todo mês é
+válido, retorna o candidato mínimo direto). Testes novos cobrindo candidato que já bate de cara,
+candidato que precisa avançar, e um teste de paridade explícito comparando o resultado contra o
+que `computeDueMonthsToGenerate` aceitaria no mês de gatilho correspondente.

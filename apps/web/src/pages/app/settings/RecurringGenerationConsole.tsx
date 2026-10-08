@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { MonthYearPicker } from '@/components/shared/MonthYearPicker'
-import type { RecurringTaskTemplate, BulkGenerationSummary, FailedGeneration } from '@/types'
+import type { RecurringTaskTemplate, RecurringTaskAssignment, BulkGenerationResult, BulkGenerationSummary, FailedGeneration } from '@/types'
 
 const PERIODICITY_LABEL: Record<RecurringTaskTemplate['periodicity'], string> = {
   WEEKLY: 'Semanal', MONTHLY: 'Mensal', QUARTERLY: 'Trimestral', ANNUAL: 'Anual',
@@ -65,6 +65,33 @@ export default function RecurringGenerationConsole() {
     },
   })
 
+  const retryMutation = useMutation({
+    mutationFn: async (failure: FailedGeneration) => {
+      // Essa tela cruza vários templates, então não tem como pré-carregar os vínculos de todos —
+      // busca os assignments do template da falha sob demanda, só quando o operador clica.
+      const assignments = await api.get<RecurringTaskAssignment[]>(`/recurring-templates/${failure.templateId}/assignments`).then((r) => r.data)
+      const assignmentIds = assignments.filter((a) => a.clientId === failure.clientId).map((a) => a.id)
+      return api.post<BulkGenerationResult>(`/recurring-templates/${failure.templateId}/assignments/bulk-generate`, {
+        dueMonth: failure.dueMonth,
+        assignmentIds,
+      }).then((r) => r.data)
+    },
+    onSuccess: (result) => {
+      if (result.failed.length > 0) {
+        toast.error(`Ainda falhou: ${result.failed[0]?.errorMessage ?? 'motivo desconhecido'}`)
+      } else if (result.generated > 0 || result.alreadyExists > 0) {
+        toast.success('Tentativa de nova geração enviada')
+      } else {
+        toast.error('Nenhum vínculo encontrado pra essa falha — verifique se o cliente ainda está vinculado')
+      }
+      qc.invalidateQueries({ queryKey: ['recurring-failed-generations'] })
+    },
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(message ?? 'Erro ao tentar gerar novamente')
+    },
+  })
+
   return (
     <div className="p-4 md:p-6 max-w-3xl space-y-4">
       <div className="flex items-center gap-3">
@@ -84,9 +111,29 @@ export default function RecurringGenerationConsole() {
             Falhas pendentes
           </div>
           {Object.entries(failuresByTemplate).map(([templateId, { title, items }]) => (
-            <div key={templateId} className="text-xs text-danger-text">
-              <Link to={`/app/settings/recurring-templates/${templateId}/manage`} className="underline font-medium">{title}</Link>
-              {' — '}{items.length} {items.length === 1 ? 'falha' : 'falhas'}
+            <div key={templateId} className="text-xs">
+              <Link to={`/app/settings/recurring-templates/${templateId}/manage`} className="underline font-medium text-danger-text">{title}</Link>
+              <ul className="mt-1 space-y-1 pl-2">
+                {items.map((f, i) => (
+                  <li key={i} className="flex items-center justify-between text-danger-text">
+                    <span>{f.clientName} — competência {new Date(f.competence).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })} — {f.errorMessage}</span>
+                    {f.retryable ? (
+                      <button
+                        type="button"
+                        onClick={() => retryMutation.mutate(f)}
+                        disabled={retryMutation.isPending}
+                        className="underline hover:no-underline flex-shrink-0 ml-2"
+                      >
+                        Gerar novamente
+                      </button>
+                    ) : (
+                      <span className="flex-shrink-0 ml-2 text-right italic">
+                        Cliente não vinculado — vincule de novo pra poder gerar
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           ))}
         </Card>

@@ -34,6 +34,53 @@ const BUSINESS_DAY_ROLL_LABEL: Record<RecurringTaskTemplate['dueBusinessDayRoll'
   BACKWARD: 'Antecipar pro dia útil anterior',
 }
 
+function isWeekendUTC(d: Date): boolean {
+  const day = d.getUTCDay()
+  return day === 0 || day === 6
+}
+
+function rollToBusinessDayUTC(d: Date, direction: RecurringTaskTemplate['dueBusinessDayRoll']): Date {
+  if (direction === 'NONE') return d
+  const step = direction === 'FORWARD' ? 1 : -1
+  const result = new Date(d)
+  while (isWeekendUTC(result)) result.setUTCDate(result.getUTCDate() + step)
+  return result
+}
+
+function clampDayOfMonthUTC(year: number, monthIndex: number, day: number): number {
+  const daysInMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate()
+  return Math.min(day, daysInMonth)
+}
+
+/**
+ * Preview "se gerasse hoje" — mesma cadeia de cálculo do backend (recurrence-dates.ts), espelhada
+ * no cliente pra dar feedback imediato enquanto o usuário ajusta a config, sem round-trip à API.
+ * WEEKLY fica fora (não participa do redesenho vencimento-como-âncora, ver spec).
+ */
+function computePreview(form: FormState): { dueDate: Date; competence: Date } | null {
+  if (form.periodicity === 'WEEKLY') return null
+
+  const today = new Date()
+  let candidate = new Date(Date.UTC(today.getFullYear(), today.getMonth() + form.generationMonthOffset, 1))
+
+  if (form.periodicity !== 'MONTHLY') {
+    const matchesAnchor = (d: Date): boolean =>
+      form.periodicity === 'QUARTERLY'
+        ? d.getUTCMonth() % 3 === (form.dueMonthAnchor - 1) % 3
+        : d.getUTCMonth() === form.dueMonthAnchor - 1
+    while (!matchesAnchor(candidate)) {
+      candidate = new Date(Date.UTC(candidate.getUTCFullYear(), candidate.getUTCMonth() + 1, 1))
+    }
+  }
+
+  const dueDay = clampDayOfMonthUTC(candidate.getUTCFullYear(), candidate.getUTCMonth(), form.dueDayOfPeriod)
+  const dueDateRaw = new Date(Date.UTC(candidate.getUTCFullYear(), candidate.getUTCMonth(), dueDay))
+  const dueDate = rollToBusinessDayUTC(dueDateRaw, form.dueBusinessDayRoll)
+  const competence = new Date(Date.UTC(candidate.getUTCFullYear(), candidate.getUTCMonth() - form.competenceMonthOffset, 1))
+
+  return { dueDate, competence }
+}
+
 interface FormState {
   departmentId: string
   title: string
@@ -156,6 +203,7 @@ export default function RecurringTemplateForm() {
   const isWeekly = form.periodicity === 'WEEKLY'
   const isQuarterlyOrAnnual = form.periodicity === 'QUARTERLY' || form.periodicity === 'ANNUAL'
   const dayOptions = isWeekly ? [1, 2, 3, 4, 5, 6, 7] : Array.from({ length: 31 }, (_, i) => i + 1)
+  const preview = computePreview(form)
 
   if (isEditing && isLoading) return <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
 
@@ -319,6 +367,14 @@ export default function RecurringTemplateForm() {
             </select>
           </div>
         </div>
+
+        {preview && (
+          <div className="rounded-md border border-border bg-neutral-bg px-3 py-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Preview — se gerasse hoje:</span>{' '}
+            vence em {preview.dueDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}, competência{' '}
+            {preview.competence.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })}
+          </div>
+        )}
 
         <DocumentListEditor
           label="Documentos a cobrar do cliente"

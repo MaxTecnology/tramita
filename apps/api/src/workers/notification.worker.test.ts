@@ -157,3 +157,46 @@ describe('processNotificationJob — TASK_BLOCKED respeita config.taskBlocked', 
     expect(logs).toHaveLength(0)
   })
 })
+
+describe('processNotificationJob — WhatsApp respeita visibleToClient (igual ao branch de EMAIL)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('não envia WhatsApp pra uma tarefa marcada como controle interno (visibleToClient=false)', async () => {
+    const { org, client, task } = await setup(true)
+    await prisma.task.update({ where: { id: task.id }, data: { visibleToClient: false } })
+
+    await processNotificationJob({
+      data: {
+        event: 'TASK_MOVED',
+        organizationId: org.id,
+        clientId: client.id,
+        taskId: task.id,
+        metadata: { taskTitle: task.title, fromColumn: 'A', toColumn: 'B' },
+      },
+    })
+
+    expect(maximizebot.sendWhatsApp).not.toHaveBeenCalled()
+    const logs = await prisma.notificationLog.findMany({ where: { taskId: task.id, event: 'TASK_MOVED', channel: 'WHATSAPP' } })
+    expect(logs).toHaveLength(0)
+  })
+
+  it('envia WhatsApp normalmente quando visibleToClient=true (comportamento preservado)', async () => {
+    const { org, client, task } = await setup(true)
+
+    await processNotificationJob({
+      data: {
+        event: 'TASK_MOVED',
+        organizationId: org.id,
+        clientId: client.id,
+        taskId: task.id,
+        metadata: { taskTitle: task.title, fromColumn: 'A', toColumn: 'B' },
+      },
+    })
+
+    expect(maximizebot.sendWhatsApp).toHaveBeenCalledTimes(1)
+    const logs = await prisma.notificationLog.findMany({ where: { taskId: task.id, event: 'TASK_MOVED', channel: 'WHATSAPP' } })
+    expect(logs.some((l) => l.status === 'SENT')).toBe(true)
+  })
+})

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -28,6 +28,44 @@ function monthValueToISO(monthValue: string): string {
   return new Date(`${monthValue}-01T00:00:00.000Z`).toISOString()
 }
 
+function toMonthValue(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * Espelha computeNextDueMonth do backend (recurrence-dates.ts) — "próximo ciclo normal" do
+ * template, o mesmo mês que o cron geraria se disparasse hoje. MONTHLY: todo mês é válido,
+ * devolve direto. QUARTERLY/ANNUAL: avança mês a mês até achar um que bate com dueMonthAnchor,
+ * nunca retrocede. WEEKLY fica fora do redesenho vencimento-como-âncora (ver spec), usa o mês
+ * atual como aproximação razoável pro seletor.
+ */
+function computeNextDueMonthClient(template: RecurringTaskTemplate): string {
+  if (template.periodicity === 'WEEKLY') return currentMonthValue()
+
+  const today = new Date()
+  let candidate = new Date(Date.UTC(today.getFullYear(), today.getMonth() + template.generationMonthOffset, 1))
+  if (template.periodicity === 'MONTHLY') return toMonthValue(candidate)
+
+  const matchesAnchor = (d: Date): boolean =>
+    template.periodicity === 'QUARTERLY'
+      ? d.getUTCMonth() % 3 === (template.dueMonthAnchor - 1) % 3
+      : d.getUTCMonth() === template.dueMonthAnchor - 1
+
+  while (!matchesAnchor(candidate)) {
+    candidate = new Date(Date.UTC(candidate.getUTCFullYear(), candidate.getUTCMonth() + 1, 1))
+  }
+  return toMonthValue(candidate)
+}
+
+/** Espelha computeCompetenceFromDueMonth do backend — usado só pra exibir o status por cliente
+ * no mês selecionado, nunca enviado de volta à API (o backend recalcula do zero). */
+function computeCompetenceForDueMonth(dueMonth: string, template: RecurringTaskTemplate): string {
+  if (template.periodicity === 'WEEKLY') return dueMonth
+  const [y, m] = dueMonth.split('-').map(Number)
+  const d = new Date(Date.UTC(y, m - 1 - template.competenceMonthOffset, 1))
+  return toMonthValue(d)
+}
+
 export default function RecurringTemplateManage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
@@ -40,6 +78,16 @@ export default function RecurringTemplateManage() {
     queryKey: ['recurring-template', id],
     queryFn: () => api.get(`/recurring-templates/${id}`).then((r) => r.data),
   })
+
+  // Default do seletor = próximo ciclo normal do template (o que o cron geraria), não o mês
+  // atual cru — só na primeira carga, nunca reseta a escolha do operador em refetches seguintes.
+  const defaultMonthSetRef = useRef(false)
+  useEffect(() => {
+    if (template && !defaultMonthSetRef.current) {
+      setDueMonth(computeNextDueMonthClient(template))
+      defaultMonthSetRef.current = true
+    }
+  }, [template])
 
   const { data: assignments = [] } = useQuery<RecurringTaskAssignment[]>({
     queryKey: ['recurring-assignments', id, search],
@@ -265,17 +313,31 @@ export default function RecurringTemplateManage() {
           {assignments.length === 0 ? (
             <p className="text-xs text-muted-foreground">Nenhum cliente encontrado.</p>
           ) : (
-            assignments.map((a) => (
-              <div key={a.id} className="flex items-center justify-between text-sm bg-neutral-bg rounded px-2 py-1.5">
-                <label className="flex items-center gap-2 flex-1 cursor-pointer">
-                  <input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelected(a.id)} />
-                  {a.client.codigo ? `${a.client.codigo} - ${a.client.name}` : a.client.name}
-                </label>
-                <button onClick={() => removeMutation.mutate(a.id)} className="text-muted-foreground hover:text-danger-text flex-shrink-0">
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            ))
+            assignments.map((a) => {
+              const competenceValue = computeCompetenceForDueMonth(dueMonth, template)
+              const log = logs.find((l) => l.clientId === a.clientId && l.competence.slice(0, 7) === competenceValue)
+              return (
+                <div key={a.id} className="flex items-center justify-between text-sm bg-neutral-bg rounded px-2 py-1.5">
+                  <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                    <input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelected(a.id)} />
+                    {a.client.codigo ? `${a.client.codigo} - ${a.client.name}` : a.client.name}
+                  </label>
+                  <span
+                    className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 mr-2 ${
+                      !log ? 'bg-neutral-bg text-muted-foreground border border-border'
+                      : log.status === 'SUCCESS' ? 'bg-success-bg text-success-text'
+                      : 'bg-danger-bg text-danger-text'
+                    }`}
+                    title={log?.status === 'FAILED' ? log.errorMessage ?? undefined : undefined}
+                  >
+                    {!log ? 'Pendente' : log.status === 'SUCCESS' ? 'Gerado' : 'Falhou'}
+                  </span>
+                  <button onClick={() => removeMutation.mutate(a.id)} className="text-muted-foreground hover:text-danger-text flex-shrink-0">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              )
+            })
           )}
         </div>
       </Card>

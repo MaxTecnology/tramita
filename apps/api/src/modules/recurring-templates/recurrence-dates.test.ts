@@ -276,4 +276,39 @@ describe('computeNextDueMonth', () => {
     const today = new Date(Date.UTC(2026, 2, 18)) // quarta-feira
     expect(computeNextDueMonth(today, rules).toISOString().slice(0, 10)).toBe('2026-03-16')
   })
+
+  it('trimestral: candidato mínimo já bate com dueMonthAnchor — devolve direto, sem avançar', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'QUARTERLY', dueMonthAnchor: 1, generationMonthOffset: 1 }
+    const today = new Date(Date.UTC(2025, 11, 15)) // dezembro -> +1 mês = janeiro, já é grupo 1 (Jan/Abr/Jul/Out)
+    expect(computeNextDueMonth(today, rules).toISOString().slice(0, 10)).toBe('2026-01-01')
+  })
+
+  it('trimestral: candidato mínimo não bate com dueMonthAnchor — avança até o próximo mês do grupo, nunca retrocede', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'QUARTERLY', dueMonthAnchor: 2, generationMonthOffset: 1 }
+    const today = new Date(Date.UTC(2025, 11, 15)) // dezembro -> +1 mês = janeiro, mas o grupo 2 é Fev/Mai/Ago/Nov
+    expect(computeNextDueMonth(today, rules).toISOString().slice(0, 10)).toBe('2026-02-01')
+  })
+
+  it('anual: candidato mínimo não bate com dueMonthAnchor (DEFIS em março) — avança até março, nunca pula pro ano seguinte sem necessidade', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'ANNUAL', dueMonthAnchor: 3, generationMonthOffset: 1 }
+    const today = new Date(Date.UTC(2026, 0, 15)) // janeiro -> +1 mês = fevereiro, âncora é março
+    expect(computeNextDueMonth(today, rules).toISOString().slice(0, 10)).toBe('2026-03-01')
+  })
+
+  it('resultado de computeNextDueMonth pra QUARTERLY/ANNUAL sempre bate com o que computeDueMonthsToGenerate aceitaria naquele mês (paridade cron vs manual)', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, periodicity: 'ANNUAL', dueMonthAnchor: 3, generationMonthOffset: 1 }
+    const today = new Date(Date.UTC(2026, 0, 15))
+    const nextDueMonth = computeNextDueMonth(today, rules)
+    // Simula o cron disparando exatamente no mês de gatilho que produziria esse dueMonth
+    const triggerMonth = addMonthsUTCForTest(nextDueMonth, -rules.generationMonthOffset)
+    const trigger = new Date(Date.UTC(triggerMonth.getUTCFullYear(), triggerMonth.getUTCMonth(), rules.generationDayOfPeriod))
+    expect(computeDueMonthsToGenerate(trigger, rules).map((d) => d.toISOString().slice(0, 10)))
+      .toEqual([nextDueMonth.toISOString().slice(0, 10)])
+  })
 })
+
+function addMonthsUTCForTest(date: Date, months: number): Date {
+  const result = new Date(date)
+  result.setUTCMonth(result.getUTCMonth() + months)
+  return result
+}
