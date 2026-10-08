@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
@@ -46,19 +47,8 @@ function formatDaysOverdue(daysOverdue: number, dueDate: string | null): string 
   return `Vence em ${Math.abs(daysOverdue)}d`
 }
 
-export default function DashboardMetrics() {
-  const { data, isLoading } = useQuery<Metrics>({
-    queryKey: ['dashboard-metrics'],
-    queryFn: () => api.get('/dashboard/metrics').then((r) => r.data),
-    refetchInterval: 60_000,
-  })
-
-  if (isLoading || !data) {
-    return <div className="p-8 text-muted-foreground">Carregando métricas...</div>
-  }
-
+function OverviewContent({ data }: { data: Metrics }) {
   const { kpis, tasksByStatus, atRisk } = data
-
   const maxTaskCount = Math.max(...Object.values(tasksByStatus), 1)
 
   const kpiCards = [
@@ -69,9 +59,7 @@ export default function DashboardMetrics() {
   ]
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <h1 className="text-lg md:text-xl font-bold text-foreground">Dashboard</h1>
-
+    <div className="space-y-4 md:space-y-6 pt-4">
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpiCards.map((card) => (
@@ -145,6 +133,51 @@ export default function DashboardMetrics() {
           </Link>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ProductivityTab() {
+  return <div className="pt-4 text-muted-foreground">Em construção</div>
+}
+
+export default function DashboardMetrics() {
+  const [tab, setTab] = useState<'overview' | 'productivity'>('overview')
+  const { data, isLoading } = useQuery<Metrics>({
+    queryKey: ['dashboard-metrics'],
+    queryFn: () => api.get('/dashboard/metrics').then((r) => r.data),
+    refetchInterval: 60_000,
+  })
+
+  return (
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <h1 className="text-lg md:text-xl font-bold text-foreground">Dashboard</h1>
+
+      <div className="flex border-b border-border">
+        {(['overview', 'productivity'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={cn(
+              'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+              tab === t ? 'border-[#185FA5] text-[#185FA5]' : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {t === 'overview' ? 'Visão geral' : 'Produtividade'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (
+        isLoading || !data ? (
+          <div className="p-8 text-muted-foreground">Carregando métricas...</div>
+        ) : (
+          <OverviewContent data={data} />
+        )
+      )}
+
+      {tab === 'productivity' && <ProductivityTab />}
     </div>
   )
 }
