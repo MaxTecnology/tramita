@@ -50,4 +50,30 @@ describe('PATCH /notifications/config', () => {
     expect(body.recurringGenerationFailed).toBe(false)
     expect(body.documentRejected).toBe(false)
   })
+
+  it('persiste thresholds de SLA e o GET subsequente confirma', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const auth = await getAuthHeader(user.email, 'Test@1234')
+
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: '/notifications/config',
+      headers: { authorization: auth },
+      payload: { slaTargetWarningDays: 5, slaDueCriticalDays: 2, slaDigestEnabled: false },
+    })
+    expect(patchRes.statusCode).toBe(200)
+
+    const getRes = await app.inject({
+      method: 'GET',
+      url: '/notifications/config',
+      headers: { authorization: auth },
+    })
+    expect(getRes.statusCode).toBe(200)
+    const body = JSON.parse(getRes.body)
+    expect(body.slaTargetWarningDays).toBe(5)
+    expect(body.slaDueCriticalDays).toBe(2)
+    expect(body.slaDigestEnabled).toBe(false)
+  })
 })
