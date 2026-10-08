@@ -140,3 +140,36 @@ manda o cliente checar o portal por uma tarefa que ele pode não conseguir ver l
 `notification.worker.ts`, nivelando com o branch de email, pra cobrir os demais eventos — deliberadamente
 fora do escopo desta wave de correção (ruling do controller: corrigir só `notifyIfBlocked`, não o
 worker inteiro).
+
+## Lacunas de UX aceitas no redesenho de geração recorrente (encontrado em 2026-10-07, revisão final do plano 2026-10-06)
+
+**Contexto:** a revisão final do redesenho vencimento-como-âncora (item 2f do roadmap) achou 4 desvios
+entre a spec e o que foi de fato implementado — todos avaliados como simplificações aceitáveis pro
+v1, não bloqueantes, mas registrados porque algum já tinha sido prometido na spec original:
+
+1. **Tela do template não mostra status por cliente no mês selecionado** (spec previa "Gerado 10/10 /
+   Pendente / Falhou" por linha) — hoje só o checkbox + nome, sem indicar se aquele cliente já tem
+   tarefa gerada pro mês escolhido no seletor.
+2. **Console global não tem "Gerar novamente" por linha nas falhas pendentes** — só um link pro
+   `RecurringTemplateManage.tsx` daquele template, onde a ação de verdade mora.
+3. **Seletor de mês de vencimento usa o mês atual como default**, não o "próximo ciclo normal do
+   template" (`computeNextDueMonth`) que a spec original pedia — o operador sempre pode trocar
+   manualmente, mas o valor inicial não reflete a antecedência configurada no template.
+4. **Form de template não tem preview calculado** do vencimento/competência resultante da
+   configuração atual — a spec citava isso como "proteção suficiente" contra `competenceMonthOffset`
+   sem sentido, mas nunca foi construído; hoje a única validação é visual (testar gerando).
+
+**Pendente:** nenhuma ação imediata — revisitar se o volume de templates recorrentes crescer a ponto
+de o item 1 (status por cliente) fazer falta operacional de verdade.
+
+## `generateManually` sem override pode gerar mês que o cron nunca produziria, pra QUARTERLY/ANNUAL (encontrado em 2026-10-07, revisão final do plano 2026-10-06)
+
+**Contexto:** `computeNextDueMonth` (usado quando "Gerar agora" é chamado sem escolher mês) não
+verifica se o mês calculado bate com `dueMonthAnchor` do template — pra MONTHLY sempre bate (todo mês
+é válido), mas pra QUARTERLY/ANNUAL pode devolver um mês que `computeDueMonthsToGenerate` (o cron)
+jamais geraria sozinho, quebrando a paridade entre os dois caminhos que a spec original exigia.
+
+**Pendente:** nenhuma UI hoje chama `POST /:id/assignments/:assignmentId/generate` sem `dueMonth`
+explícito (as telas novas sempre mandam um mês escolhido) — risco adormecido, não ativo. Corrigir
+`computeNextDueMonth` pra respeitar `dueMonthAnchor` se algum caminho futuro passar a chamar o
+endpoint sem override.

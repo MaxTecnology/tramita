@@ -235,6 +235,21 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
      `taskBlocked` em Configurações, mensagem customizável em Templates) quando uma tarefa do
      cliente entra em impedimento — dispara de um ponto único (`notifyIfBlocked`) cobrindo os três
      caminhos que escrevem `Task.status`. Ver mesma spec/plano do item 2d.
+   - [x] 2f. Vencimento como âncora + gestão em lote + correção pós-geração (concluído em
+     2026-10-07/08) — corrige um defeito conceitual grave do motor de 2b: o cálculo de datas
+     tratava competência como âncora e derivava vencimento dela, o que podia gerar tarefa já
+     vencida no dia em que nascia (achado em uso real de produção). Modelo invertido: vencimento
+     é a âncora (`competenceMonthOffset`), e TRIMESTRAL/ANUAL ganham `dueMonthAnchor` configurável
+     (grupo de meses / mês literal, inspirado no Gestta) em vez de ficarem travados em
+     Jan/Abr/Jul/Out e janeiro. Substitui o popup de vínculos por `RecurringTemplateManage.tsx`
+     (busca, seleção múltipla, geração em lote, banner de falhas persistente) + console global
+     `RecurringGenerationConsole.tsx` + hub `SettingsHub.tsx` (sidebar colapsada num só item com
+     badge de falhas). Vencimento/meta de tarefa recorrente travados contra edição direta (todo
+     mundo, sem exceção — `tasks.service.ts`); correção pós-geração via `regenerateTask`/
+     `regenerateBulkForTemplate` (apaga + gera de novo com a config atual do template, só permitido
+     sem nenhuma movimentação real). `MonthYearPicker` substitui `<input type="month">` (sem
+     suporte no Firefox). Ver `docs/superpowers/specs/2026-10-06-recurring-generation-redesign-design.md`
+     e `docs/superpowers/plans/2026-10-06-recurring-generation-redesign.md`.
 3. [ ] SLA e alertas de prazo (visual/sonoro) — estende o modelo de Task/Board já existente
 4. [ ] Métricas de produtividade por usuário/departamento — depende dos itens 2 e 3 existirem primeiro
 5. [ ] Evolução de Solicitações → Ordem de Serviço
