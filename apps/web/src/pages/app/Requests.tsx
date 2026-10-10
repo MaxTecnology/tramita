@@ -1,20 +1,24 @@
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Comments } from '@/components/shared/Comments'
 import { cn } from '@/lib/utils'
-import { Inbox, Search, X } from 'lucide-react'
+import { Inbox, Search, X, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ClientRequest, Board } from '@/types'
 import { toast } from 'sonner'
+import { useAuth } from '@/hooks/useAuth'
 
 const STATUS_LABEL: Record<ClientRequest['status'], string> = {
   PENDING: 'Pendente',
   APPROVED: 'Aprovada',
   REJECTED: 'Rejeitada',
   CANCELLED: 'Cancelada',
+  NEEDS_INFO: 'Precisa de informação',
 }
 
 const STATUS_STYLE: Record<ClientRequest['status'], string> = {
@@ -22,12 +26,14 @@ const STATUS_STYLE: Record<ClientRequest['status'], string> = {
   APPROVED: 'bg-green-100 text-green-700',
   REJECTED: 'bg-red-100 text-red-700',
   CANCELLED: 'bg-gray-100 text-gray-500',
+  NEEDS_INFO: 'bg-blue-100 text-blue-700',
 }
 
 type Mode = 'NEW_BOARD' | 'EXISTING_BOARD'
 
 export default function Requests() {
   const qc = useQueryClient()
+  const { user } = useAuth()
   const [statusFilter, setStatusFilter] = useState<ClientRequest['status'] | ''>('PENDING')
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -35,9 +41,14 @@ export default function Requests() {
   const [approving, setApproving] = useState<ClientRequest | null>(null)
   const [rejecting, setRejecting] = useState<ClientRequest | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [needsInfoTarget, setNeedsInfoTarget] = useState<ClientRequest | null>(null)
+  const [needsInfoComment, setNeedsInfoComment] = useState('')
+  const [cancelling, setCancelling] = useState<ClientRequest | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
   const [mode, setMode] = useState<Mode>('NEW_BOARD')
   const [boardId, setBoardId] = useState('')
   const [columnId, setColumnId] = useState('')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const { data: requests = [], isLoading } = useQuery<ClientRequest[]>({
     queryKey: ['requests', statusFilter],
@@ -96,6 +107,35 @@ export default function Requests() {
     onError: () => toast.error('Erro ao rejeitar solicitação'),
   })
 
+  const needsInfoMutation = useMutation({
+    mutationFn: () => api.post(`/requests/${needsInfoTarget!.id}/needs-info`, { comment: needsInfoComment }),
+    onSuccess: () => {
+      toast.success('Pedido de informação enviado ao cliente')
+      qc.invalidateQueries({ queryKey: ['requests'] })
+      setNeedsInfoTarget(null)
+      setNeedsInfoComment('')
+    },
+    onError: () => toast.error('Erro ao pedir mais informação'),
+  })
+
+  const cancelApprovedMutation = useMutation({
+    mutationFn: () => api.post(`/requests/${cancelling!.id}/cancel`, { reason: cancelReason }),
+    onSuccess: () => {
+      toast.success('Solicitação cancelada')
+      qc.invalidateQueries({ queryKey: ['requests'] })
+      setCancelling(null)
+      setCancelReason('')
+    },
+    onError: (err: unknown) => {
+      const status = (err as { response?: { status?: number } }).response?.status
+      if (status === 409) {
+        toast.error('Essa tarefa já teve movimentação — não pode ser cancelada por aqui')
+      } else {
+        toast.error('Erro ao cancelar solicitação')
+      }
+    },
+  })
+
   if (isLoading) return <div className="p-8 text-muted-foreground">Carregando...</div>
 
   return (
@@ -104,8 +144,8 @@ export default function Requests() {
         <h1 className="text-lg md:text-xl font-bold text-foreground">Solicitações dos Clientes</h1>
       </div>
 
-      <div className="flex rounded-md border border-border overflow-hidden w-fit">
-        {(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', ''] as const).map((s) => (
+      <div className="flex rounded-md border border-border overflow-hidden w-fit flex-wrap">
+        {(['PENDING', 'NEEDS_INFO', 'APPROVED', 'REJECTED', 'CANCELLED', ''] as const).map((s) => (
           <button
             key={s || 'all'}
             type="button"
@@ -182,30 +222,85 @@ export default function Requests() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((r) => (
-            <div key={r.id} className="bg-surface rounded-lg border border-border px-4 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">{r.title}</p>
-                  <p className="text-xs text-muted-foreground">{r.client?.name}</p>
-                  {r.description && <p className="text-xs text-muted-foreground mt-1">{r.description}</p>}
+          {filtered.map((r) => {
+            const isExpanded = expandedId === r.id
+            return (
+              <div key={r.id} className="bg-surface rounded-lg border border-border px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">{r.title}</p>
+                    <p className="text-xs text-muted-foreground">{r.client?.name}</p>
+                    {r.description && <p className="text-xs text-muted-foreground mt-1">{r.description}</p>}
+                    {r.status === 'CANCELLED' && r.cancelledByType === 'USER' && r.cancellationReason && (
+                      <p className="text-xs text-gray-500 mt-1 italic">Cancelada pelo escritório — motivo: {r.cancellationReason}</p>
+                    )}
+                  </div>
+                  <span className={cn('text-xs px-2 py-0.5 rounded-full flex-shrink-0', STATUS_STYLE[r.status])}>
+                    {STATUS_LABEL[r.status]}
+                  </span>
                 </div>
-                <span className={cn('text-xs px-2 py-0.5 rounded-full flex-shrink-0', STATUS_STYLE[r.status])}>
-                  {STATUS_LABEL[r.status]}
-                </span>
+
+                <div className="flex gap-2 mt-2 items-center flex-wrap">
+                  {r.status === 'PENDING' && (
+                    <>
+                      <Button size="sm" onClick={() => setApproving(r)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+                        Aprovar
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setRejecting(r)} className="text-red-600 border-red-200 hover:bg-red-50">
+                        Rejeitar
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setNeedsInfoTarget(r)}>
+                        Pedir mais informação
+                      </Button>
+                    </>
+                  )}
+                  {r.status === 'NEEDS_INFO' && (
+                    <>
+                      <Button size="sm" onClick={() => setApproving(r)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+                        Aprovar
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setRejecting(r)} className="text-red-600 border-red-200 hover:bg-red-50">
+                        Rejeitar
+                      </Button>
+                    </>
+                  )}
+                  {r.status === 'APPROVED' && (
+                    <Button size="sm" variant="outline" onClick={() => setCancelling(r)} className="text-red-600 border-red-200 hover:bg-red-50">
+                      Cancelar
+                    </Button>
+                  )}
+                  {r.boardId && (
+                    <Link
+                      to={`/app/board/${r.boardId}`}
+                      className="text-xs text-[#185FA5] hover:underline inline-flex items-center gap-1"
+                    >
+                      <ExternalLink size={12} />
+                      Abrir processo
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(isExpanded ? null : r.id)}
+                    className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 ml-auto"
+                  >
+                    {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    Comentários
+                  </button>
+                </div>
+
+                {isExpanded && user && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <Comments
+                      entityType="request"
+                      entityId={r.id}
+                      currentUserId={user.id}
+                      role={user.role as 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'}
+                    />
+                  </div>
+                )}
               </div>
-              {r.status === 'PENDING' && (
-                <div className="flex gap-2 mt-2">
-                  <Button size="sm" onClick={() => setApproving(r)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
-                    Aprovar
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setRejecting(r)} className="text-red-600 border-red-200 hover:bg-red-50">
-                    Rejeitar
-                  </Button>
-                </div>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -303,6 +398,68 @@ export default function Requests() {
                 className="bg-red-600 hover:bg-red-700 text-white"
               >
                 {rejectMutation.isPending ? 'Rejeitando...' : 'Rejeitar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de "pedir mais informação" */}
+      <Dialog open={!!needsInfoTarget} onOpenChange={(open) => { if (!open) setNeedsInfoTarget(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Pedir mais informação</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="needs-info-comment">O que você precisa saber?</Label>
+              <textarea
+                id="needs-info-comment"
+                rows={3}
+                value={needsInfoComment}
+                onChange={(e) => setNeedsInfoComment(e.target.value)}
+                className="flex w-full rounded-md border border-border bg-surface text-foreground px-3 py-2 text-sm resize-none"
+                placeholder="Ex: Qual o CNPJ da empresa?"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setNeedsInfoTarget(null)}>Cancelar</Button>
+              <Button
+                onClick={() => needsInfoMutation.mutate()}
+                disabled={needsInfoMutation.isPending || !needsInfoComment.trim()}
+                className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+              >
+                {needsInfoMutation.isPending ? 'Enviando...' : 'Enviar pedido'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de cancelamento pós-aprovação */}
+      <Dialog open={!!cancelling} onOpenChange={(open) => { if (!open) setCancelling(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Cancelar solicitação aprovada</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-2">
+            <p className="text-xs text-muted-foreground">
+              A tarefa criada a partir desta solicitação será marcada como desconsiderada. Só é possível cancelar se a tarefa ainda não teve nenhuma movimentação (comentário, anexo ou mudança de coluna).
+            </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="cancel-reason">Motivo (obrigatório)</Label>
+              <textarea
+                id="cancel-reason"
+                rows={3}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="flex w-full rounded-md border border-border bg-surface text-foreground px-3 py-2 text-sm resize-none"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCancelling(null)}>Voltar</Button>
+              <Button
+                onClick={() => cancelApprovedMutation.mutate()}
+                disabled={cancelApprovedMutation.isPending || !cancelReason.trim()}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {cancelApprovedMutation.isPending ? 'Cancelando...' : 'Confirmar cancelamento'}
               </Button>
             </div>
           </div>
