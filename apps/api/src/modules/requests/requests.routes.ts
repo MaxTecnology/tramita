@@ -5,12 +5,17 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { verifyAccessToken } from '@/lib/jwt'
 import { attachSSESubscriber } from '@/lib/sse'
 import { AppError } from '@/errors/AppError'
-import { approveRequestSchema, rejectRequestSchema, listRequestsQuerySchema } from './requests.schema'
+import {
+  approveRequestSchema, rejectRequestSchema, listRequestsQuerySchema,
+  needsInfoRequestSchema, cancelApprovedRequestSchema,
+} from './requests.schema'
 import {
   listRequestsForOrg,
   getRequestById,
   approveRequest,
   rejectRequest,
+  markNeedsInfo,
+  cancelApprovedRequest,
   countPendingRequests,
 } from './requests.service'
 
@@ -80,6 +85,28 @@ export async function requestsRoutes(app: FastifyInstance) {
       const result = rejectRequestSchema.safeParse(request.body)
       if (!result.success) throw new AppError(400, result.error.errors[0].message)
       return reply.send(await rejectRequest(id, request.user.organizationId!, request.user.sub, result.data))
+    })
+
+    authed.post('/:id/needs-info', {
+      preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription],
+    }, async (request, reply) => {
+      const { id } = request.params as { id: string }
+      const result = needsInfoRequestSchema.safeParse(request.body)
+      if (!result.success) throw new AppError(400, result.error.errors[0].message)
+      return reply.send(
+        await markNeedsInfo(id, request.user.organizationId!, request.user.sub, result.data.comment),
+      )
+    })
+
+    authed.post('/:id/cancel', {
+      preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription],
+    }, async (request, reply) => {
+      const { id } = request.params as { id: string }
+      const result = cancelApprovedRequestSchema.safeParse(request.body)
+      if (!result.success) throw new AppError(400, result.error.errors[0].message)
+      return reply.send(
+        await cancelApprovedRequest(id, request.user.organizationId!, request.user.sub, result.data.reason),
+      )
     })
   })
 }

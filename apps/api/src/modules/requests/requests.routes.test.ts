@@ -153,6 +153,121 @@ describe('GET /requests/pending-count', () => {
   })
 })
 
+describe('POST /requests/:id/needs-info', () => {
+  it('ORG_MANAGER marca NEEDS_INFO com comentário obrigatório', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
+    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const created = await app.inject({
+      method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
+      payload: { clientId: client.id, title: 'Pedido' },
+    })
+    const request = JSON.parse(created.body)
+
+    const auth = await getAuthHeader(manager.email, 'Test@1234')
+    const res = await app.inject({
+      method: 'POST', url: `/requests/${request.id}/needs-info`, headers: { authorization: auth },
+      payload: { comment: 'Qual o CNPJ?' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body).status).toBe('NEEDS_INFO')
+  })
+
+  it('rejeita sem comment (400)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
+    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const created = await app.inject({
+      method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
+      payload: { clientId: client.id, title: 'Pedido' },
+    })
+    const request = JSON.parse(created.body)
+
+    const auth = await getAuthHeader(manager.email, 'Test@1234')
+    const res = await app.inject({
+      method: 'POST', url: `/requests/${request.id}/needs-info`, headers: { authorization: auth },
+      payload: {},
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+describe('POST /requests/:id/cancel', () => {
+  it('ORG_ADMIN cancela request aprovada sem atividade na task, com motivo obrigatório', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const created = await app.inject({
+      method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
+      payload: { clientId: client.id, title: 'Pedido' },
+    })
+    const request = JSON.parse(created.body)
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+    await app.inject({
+      method: 'POST', url: `/requests/${request.id}/approve`, headers: { authorization: auth },
+      payload: { mode: 'NEW_BOARD' },
+    })
+
+    const res = await app.inject({
+      method: 'POST', url: `/requests/${request.id}/cancel`, headers: { authorization: auth },
+      payload: { reason: 'Cliente desistiu' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body).status).toBe('CANCELLED')
+  })
+
+  it('ORG_MEMBER não pode cancelar (403)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const created = await app.inject({
+      method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
+      payload: { clientId: client.id, title: 'Pedido' },
+    })
+    const request = JSON.parse(created.body)
+    const authAdmin = await getAuthHeader(admin.email, 'Test@1234')
+    await app.inject({
+      method: 'POST', url: `/requests/${request.id}/approve`, headers: { authorization: authAdmin },
+      payload: { mode: 'NEW_BOARD' },
+    })
+
+    const authMember = await getAuthHeader(member.email, 'Test@1234')
+    const res = await app.inject({
+      method: 'POST', url: `/requests/${request.id}/cancel`, headers: { authorization: authMember },
+      payload: { reason: 'x' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('rejeita sem reason (400)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const created = await app.inject({
+      method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
+      payload: { clientId: client.id, title: 'Pedido' },
+    })
+    const request = JSON.parse(created.body)
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+    await app.inject({
+      method: 'POST', url: `/requests/${request.id}/approve`, headers: { authorization: auth },
+      payload: { mode: 'NEW_BOARD' },
+    })
+
+    const res = await app.inject({
+      method: 'POST', url: `/requests/${request.id}/cancel`, headers: { authorization: auth },
+      payload: {},
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
 describe('GET /requests/stream', () => {
   it('retorna 401 sem token', async () => {
     const res = await app.inject({ method: 'GET', url: '/requests/stream' })
