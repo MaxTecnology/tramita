@@ -18,6 +18,7 @@ import { streamRoutes } from '@/modules/stream/stream.routes'
 import { attachmentsRoutes } from '@/modules/attachments/attachments.routes'
 import { taskDocumentsRoutes } from '@/modules/task-documents/task-documents.routes'
 import { requestsRoutes } from '@/modules/requests/requests.routes'
+import { requestCommentsRoutes } from '@/modules/request-comments/request-comments.routes'
 import { dashboardRoutes } from '@/modules/dashboard/dashboard.routes'
 import { departmentsRoutes } from '@/modules/departments/departments.routes'
 import { recurringTemplatesRoutes } from '@/modules/recurring-templates/recurring-templates.routes'
@@ -51,6 +52,7 @@ export function buildApp() {
   app.register(attachmentsRoutes)
   app.register(taskDocumentsRoutes)
   app.register(requestsRoutes, { prefix: '/requests' })
+  app.register(requestCommentsRoutes)
   app.register(dashboardRoutes, { prefix: '/dashboard' })
   app.register(departmentsRoutes, { prefix: '/departments' })
   app.register(recurringTemplatesRoutes, { prefix: '/recurring-templates' })
