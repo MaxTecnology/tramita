@@ -1,12 +1,14 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Comments } from '@/components/shared/Comments'
 import { cn } from '@/lib/utils'
-import { Plus, Inbox } from 'lucide-react'
+import { Plus, Inbox, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ClientRequest } from '@/types'
 import { toast } from 'sonner'
 import { usePortalClient } from './Layout'
@@ -16,6 +18,7 @@ const STATUS_LABEL: Record<ClientRequest['status'], string> = {
   APPROVED: 'Aprovada',
   REJECTED: 'Não aprovada',
   CANCELLED: 'Cancelada',
+  NEEDS_INFO: 'Aguardando resposta',
 }
 
 const STATUS_STYLE: Record<ClientRequest['status'], string> = {
@@ -23,6 +26,7 @@ const STATUS_STYLE: Record<ClientRequest['status'], string> = {
   APPROVED: 'bg-green-100 text-green-700',
   REJECTED: 'bg-red-100 text-red-700',
   CANCELLED: 'bg-gray-100 text-gray-500',
+  NEEDS_INFO: 'bg-blue-100 text-blue-700',
 }
 
 export default function PortalRequests() {
@@ -30,6 +34,7 @@ export default function PortalRequests() {
   const { clientId } = usePortalClient()
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', departmentId: '', osTemplateId: '' })
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const { data: requests = [], isLoading } = useQuery<ClientRequest[]>({
     queryKey: ['portal-requests', clientId],
@@ -93,32 +98,64 @@ export default function PortalRequests() {
         </div>
       ) : (
         <div className="space-y-2">
-          {requests.map((r) => (
-            <div key={r.id} className="bg-surface rounded-lg border border-border px-4 py-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">{r.title}</p>
-                  {r.description && <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>}
-                  {r.status === 'REJECTED' && r.rejectionReason && (
-                    <p className="text-xs text-red-500 mt-1 italic">Motivo: {r.rejectionReason}</p>
-                  )}
+          {requests.map((r) => {
+            const isExpanded = expandedId === r.id
+            return (
+              <div key={r.id} className="bg-surface rounded-lg border border-border px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">{r.title}</p>
+                    {r.description && <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>}
+                    {r.status === 'REJECTED' && r.rejectionReason && (
+                      <p className="text-xs text-red-500 mt-1 italic">Motivo: {r.rejectionReason}</p>
+                    )}
+                    {r.status === 'CANCELLED' && r.cancelledByType === 'USER' && r.cancellationReason && (
+                      <p className="text-xs text-gray-500 mt-1 italic">Cancelada pelo escritório — motivo: {r.cancellationReason}</p>
+                    )}
+                  </div>
+                  <span className={cn('text-xs px-2 py-0.5 rounded-full flex-shrink-0', STATUS_STYLE[r.status])}>
+                    {STATUS_LABEL[r.status]}
+                  </span>
                 </div>
-                <span className={cn('text-xs px-2 py-0.5 rounded-full flex-shrink-0', STATUS_STYLE[r.status])}>
-                  {STATUS_LABEL[r.status]}
-                </span>
+
+                <div className="flex gap-2 mt-2 items-center flex-wrap">
+                  {(r.status === 'PENDING' || r.status === 'NEEDS_INFO') && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { if (window.confirm('Cancelar esta solicitação?')) cancelMutation.mutate(r.id) }}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 -ml-2"
+                    >
+                      Cancelar
+                    </Button>
+                  )}
+                  {r.boardId && (
+                    <Link
+                      to={`/portal/board/${r.boardId}`}
+                      className="text-xs text-[#185FA5] hover:underline inline-flex items-center gap-1"
+                    >
+                      <ExternalLink size={12} />
+                      Ver processo
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(isExpanded ? null : r.id)}
+                    className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 ml-auto"
+                  >
+                    {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    Comentários
+                  </button>
+                </div>
+
+                {isExpanded && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <Comments entityType="request" entityId={r.id} currentUserId={clientId} role="CLIENT" />
+                  </div>
+                )}
               </div>
-              {r.status === 'PENDING' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => { if (window.confirm('Cancelar esta solicitação?')) cancelMutation.mutate(r.id) }}
-                  className="text-red-500 hover:text-red-700 hover:bg-red-50 mt-2 -ml-2"
-                >
-                  Cancelar
-                </Button>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
