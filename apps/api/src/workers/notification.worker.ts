@@ -21,6 +21,9 @@ const EVENT_FLAG_MAP: Record<string, keyof NotificationConfig> = {
   RECURRING_GENERATION_FAILED: 'recurringGenerationFailed',
   DOCUMENT_REJECTED: 'documentRejected',
   SLA_DIGEST: 'slaDigestEnabled',
+  REQUEST_NEEDS_INFO: 'requestNeedsInfo',
+  REQUEST_COMMENT_ADDED: 'requestCommentAdded',
+  REQUEST_CANCELLED: 'requestCancelled',
 }
 
 export async function processNotificationJob(job: { data: NotificationJob }): Promise<void> {

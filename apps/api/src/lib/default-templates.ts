@@ -52,4 +52,16 @@ export const DEFAULT_TEMPLATES: TemplateMap = {
     WHATSAPP: { body: 'Olá, {{clientName}}! O documento *{{documentName}}* enviado em *{{taskTitle}}* foi rejeitado.\n\nMotivo: {{rejectionReason}}\n\nEnvie novamente: {{portalUrl}}' },
     EMAIL: { subject: 'Documento rejeitado — {{documentName}}', body: 'Olá, {{clientName}}!\n\nO documento *{{documentName}}* enviado em *{{taskTitle}}* foi rejeitado.\n\nMotivo: {{rejectionReason}}\n\nEnvie novamente em: {{portalUrl}}' },
   },
+  REQUEST_NEEDS_INFO: {
+    WHATSAPP: { body: 'Olá, {{clientName}}! Precisamos de mais informações sobre sua solicitação *{{requestTitle}}*:\n\n"{{commentText}}"\n\nResponda por lá: {{portalUrl}}' },
+    EMAIL: { subject: 'Precisamos de mais informações — {{requestTitle}}', body: 'Olá, {{clientName}}!\n\nPrecisamos de mais informações sobre sua solicitação *{{requestTitle}}*:\n\n"{{commentText}}"\n\nResponda em: {{portalUrl}}' },
+  },
+  REQUEST_COMMENT_ADDED: {
+    WHATSAPP: { body: 'Olá, {{clientName}}! Novo comentário em sua solicitação *{{requestTitle}}*:\n\n"{{commentText}}"\n\n— {{commentAuthorName}}\n\nAcompanhe: {{portalUrl}}' },
+    EMAIL: { subject: 'Novo comentário — {{requestTitle}}', body: 'Olá, {{clientName}}!\n\nNovo comentário em sua solicitação *{{requestTitle}}*:\n\n"{{commentText}}"\n\n— {{commentAuthorName}}\n\nAcompanhe em: {{portalUrl}}' },
+  },
+  REQUEST_CANCELLED: {
+    WHATSAPP: { body: 'Olá, {{clientName}}! Sua solicitação *{{requestTitle}}*, já aprovada, foi cancelada pelo escritório.\n\nMotivo: {{rejectionReason}}\n\nAcompanhe: {{portalUrl}}' },
+    EMAIL: { subject: 'Solicitação cancelada — {{requestTitle}}', body: 'Olá, {{clientName}}!\n\nSua solicitação *{{requestTitle}}*, já aprovada, foi cancelada pelo escritório.\n\nMotivo: {{rejectionReason}}\n\nAcompanhe em: {{portalUrl}}' },
+  },
 }
