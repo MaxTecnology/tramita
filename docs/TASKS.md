@@ -279,7 +279,25 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
    só escondendo o seletor na UI). Abas novas "Visão geral"/"Produtividade" no Dashboard
    existente. Ver `docs/superpowers/specs/2026-10-08-metricas-produtividade-design.md` e
    `docs/superpowers/plans/2026-10-08-metricas-produtividade-plan.md`.
-5. [ ] Evolução de Solicitações → Ordem de Serviço
+5. [x] **Evolução de Solicitações → Ordem de Serviço** (concluído em 2026-10-10) —
+   fecha os 4 gaps do fluxo Solicitação→OS: link pro processo após aprovação tanto no admin
+   (`/app/board/:boardId`) quanto no portal (`/portal/board/:boardId`), via campo `boardId`
+   agora exposto em `GET /requests`/`GET /requests/:id`/`GET /portal/requests`; status de
+   triagem `NEEDS_INFO` (`POST /requests/:id/needs-info`, ORG_ADMIN/ORG_MANAGER, comentário
+   obrigatório) com reversão automática pra `PENDING` quando o cliente comenta (comentário da
+   equipe não reverte); thread de comentários na própria Request via novo modelo
+   `RequestComment` + módulo `request-comments` (espelho de `Comment`/`comments`, mesmo padrão
+   de soft-delete e visibilidade); cancelamento pós-aprovação pelo escritório
+   (`POST /requests/:id/cancel`, motivo obrigatório, Task associada vira `DISREGARDED`), travado
+   por zero-atividade (mesma regra de `regenerateTask`: sem histórico além de `created`, sem
+   comentário, sem anexo na Task). `approveRequest`/`rejectRequest`/cancelamento do cliente
+   agora também aceitam `NEEDS_INFO` como status de origem, pra não travar a triagem. Componente
+   `Comments` do frontend generalizado (`entityType: 'task' | 'request'`) em vez de duplicado.
+   3 novos eventos de notificação (`REQUEST_NEEDS_INFO`, `REQUEST_COMMENT_ADDED`,
+   `REQUEST_CANCELLED`) nivelados nos 6 pontos de toque padrão (enum, config, flag map,
+   templates default, UI de Notificações, UI de Templates). Ver
+   `docs/superpowers/specs/2026-10-08-evolucao-solicitacoes-os-design.md` e
+   `docs/superpowers/plans/2026-10-08-evolucao-solicitacoes-os-plan.md`.
 6. [ ] Automação de documentos (robô que lê/classifica documentos do cliente, inspirado no Nibo) — maior risco técnico, decidir fonte de dados (upload manual vs. leitura de pasta) antes de especificar
 7. [ ] Protocolo digital com validade jurídica + IP — estende o sistema de notificação/tracking já existente
 8. [x] **Usuários de cliente com acesso por departamento** (concluído em 2026-09-21) — `ClientUser`/`ClientUserAccess`, login do portal desacoplado de `Client`, `Task.departmentId` obrigatório. Um `ClientUser` (pessoa) pode acessar mais de uma empresa (`Client`), com escopo de departamento por empresa; rotas de portal (`requests`, `tasks`, `documents`) agora exigem `clientId` explícito e validam contra o escopo de acesso do usuário. Tela dedicada de Usuários de Cliente (CRUD + reaproveitamento de usuário existente ao cadastrar empresa), seletor de empresa no portal quando há mais de uma. Ver `docs/superpowers/sdd/2026-09-21-client-users/`.
