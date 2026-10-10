@@ -6,7 +6,7 @@ import {
   createTestClientUser, grantClientAccess,
 } from '@/test/helpers'
 import * as queue from '@/lib/queue'
-import { createRequest, markNeedsInfo } from '@/modules/requests/requests.service'
+import { createRequest, markNeedsInfo, approveRequest } from '@/modules/requests/requests.service'
 import { listRequestComments, createRequestComment, deleteRequestComment } from './request-comments.service'
 
 beforeEach(() => {
@@ -80,6 +80,35 @@ describe('createRequestComment', () => {
     await expect(
       createRequestComment(request.id, { content: 'x' }, { id: clientUser.id, role: 'CLIENT', organizationId: org.id }),
     ).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  it('revert usa updateMany guardado por status — não derruba uma request já aprovada de volta pra PENDING mesmo sob corrida real com approveRequest', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    const department = await createTestDepartment(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    await markNeedsInfo(request.id, org.id, admin.id, 'Qual o CNPJ?')
+
+    // Dispara approveRequest e o comentário do cliente concorrentemente — ambos fazem várias
+    // viagens reais ao banco (await), o que dá ao event loop chance real de intercalar as duas
+    // operações. Não força uma ordem específica: a invariante testada vale pra qualquer ordem —
+    // se a request terminou com taskId (ou seja, a aprovação se efetivou), o status nunca pode
+    // ter ficado PENDING por causa do revert do comentário usando um status "lido antes".
+    await Promise.allSettled([
+      approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' }),
+      createRequestComment(request.id, { content: 'Resposta durante a corrida' }, {
+        id: clientUser.id, role: 'CLIENT', organizationId: org.id,
+      }),
+    ])
+
+    const final = await prisma.request.findUniqueOrThrow({ where: { id: request.id } })
+    if (final.taskId) {
+      expect(final.status).not.toBe('PENDING')
+    }
   })
 
   it('departmentId nulo na request cai no fallback ORG_ADMIN/ORG_MANAGER sem erro', async () => {

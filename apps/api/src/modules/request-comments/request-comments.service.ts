@@ -81,9 +81,12 @@ export async function createRequestComment(
 
   // Comentário do CLIENTE enquanto a solicitação está em NEEDS_INFO reabre a fila de triagem
   // automaticamente — comentário da equipe nunca reverte (ela pode responder livremente sem
-  // tirar a request do estado de espera).
-  if (isClient && request.status === 'NEEDS_INFO') {
-    await prisma.request.update({ where: { id: requestId }, data: { status: 'PENDING' } })
+  // tirar a request do estado de espera). updateMany com status no WHERE (em vez de update
+  // incondicional guiado pela leitura em `request.status` acima) evita a corrida em que um
+  // approve/reject concorrente já mudou o status real entre essa leitura e esta escrita —
+  // o WHERE só casa se a request ainda estiver NEEDS_INFO no momento exato da escrita.
+  if (isClient) {
+    await prisma.request.updateMany({ where: { id: requestId, status: 'NEEDS_INFO' }, data: { status: 'PENDING' } })
   }
 
   await publishOrgEvent(actor.organizationId, { event: 'request:changed', data: {} })

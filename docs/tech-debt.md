@@ -233,3 +233,37 @@ acumulado antes de uma feature similar), a abordagem fica registrada aqui como r
 `completedAt` da última entrada `status_changed` com `toValue='DONE'` no `TaskHistory` de cada
 tarefa, com fallback em `updatedAt` pra tarefas concluídas só via Kanban antes da correção que
 unificou o histórico (ver `fix(metrics)` nesta mesma feature).
+
+## Achados do review final — Evolução de Solicitações → OS (2026-10-10), não corrigidos nesta entrega
+
+Revisão final (`docs/superpowers/plans/2026-10-08-evolucao-solicitacoes-os-plan.md`) encontrou os
+seguintes pontos — os 2 "ALTO" e 1 "MÉDIO" ligados ao Review Focus da spec foram corrigidos na
+mesma sessão (race no auto-revert de NEEDS_INFO, `TaskHistory`/`publishBoardEvent` ausentes em
+`cancelApprovedRequest`, e o gate de zero-atividade não contava `TaskDocumentRequirement`/
+`TaskDeliverable`). Os demais, deferidos:
+
+- **Notificação pro staff sem `clientName`** (`request-comments.service.ts`, mesmo padrão
+  pré-existente em `comments.service.ts` `TASK_COMMENT_ADDED`): quando um cliente comenta, a
+  notificação USER usa o template voltado ao cliente, sem passar `clientName` no metadata — o
+  worker lê `metadata.clientName ?? ''` (`notification.worker.ts:218`), então a equipe recebe
+  "Olá, ! Novo comentário...". Não é uma regressão desta feature — já existia em `TASK_COMMENT_ADDED`,
+  só ficou mais visível por mirroring. Corrigir os dois juntos (criar metadata/template dedicado
+  pro destinatário USER) é mais consistente do que corrigir só o caminho novo.
+- **UI não reflete o auto-revert em tempo real**: no portal, o `onSuccess` de criar comentário só
+  invalida `['request-comments', id]`, não `['portal-requests']` — o badge "Aguardando resposta"
+  só atualiza no próximo refetch. No admin, o handler SSE de `request:changed`
+  (`useRequestsBadgeStream.ts`) só invalida a contagem de pendentes, não a lista `['requests']` nem
+  comentários — com o filtro NEEDS_INFO aberto, a lista não se atualiza sozinha.
+- **Aprovar/rejeitar a partir de NEEDS_INFO** deixa a resposta do cliente (se vier depois) perdida
+  na thread de uma Request já fechada, sem refletir na Task. Decisão de produto, não bug — considerar
+  exibir a thread da Request no `TaskDrawer` quando `task.sourceRequestId` existir.
+- **Validação de entrada frouxa**: `createRequestCommentSchema`/`needsInfoRequestSchema`/
+  `cancelApprovedRequestSchema` usam `z.string().min(1)` sem `.trim()` nem `.max()` — texto só com
+  espaços passa, e não há limite de tamanho pro que vai pro WhatsApp/email.
+- **`RequestComment` sem índice** `@@index([requestId, createdAt])` (o `Comment` original também
+  não tem — débito pré-existente, vale corrigir os dois juntos).
+- **Inconsistências menores**: `cancelRequest` (cliente) não grava `cancelledByType: 'CLIENT'`;
+  `listRequestComments` falha aberto se `role==='CLIENT'` sem `clientUserId` (hoje a rota sempre
+  passa, mas o ideal é falhar fechado); `deleteRequestComment` responde 403 pra tenant cruzado em
+  vez de 404 (mesmo padrão do `comments.service.ts` original); link "Ver processo"/"Abrir processo"
+  continua aparecendo numa Request `CANCELLED` com `boardId`.

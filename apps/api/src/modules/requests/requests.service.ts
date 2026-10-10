@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
-import { publishOrgEvent } from '@/lib/sse'
+import { publishOrgEvent, publishBoardEvent } from '@/lib/sse'
 import { createBoard } from '@/modules/boards/boards.service'
 import { createTask, defaultDepartmentForOrg } from '@/modules/tasks/tasks.service'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
@@ -160,17 +160,43 @@ export async function cancelApprovedRequest(
   if (request.status !== 'APPROVED') throw new AppError(422, 'Só solicitações aprovadas podem ser canceladas por este caminho')
   if (!request.taskId) throw new AppError(422, 'Solicitação aprovada sem tarefa associada — estado inconsistente')
 
-  const [historyCount, commentCount, attachmentCount] = await Promise.all([
+  const task = await prisma.task.findUniqueOrThrow({
+    where: { id: request.taskId },
+    include: { column: { select: { boardId: true } } },
+  })
+
+  const [historyCount, commentCount, attachmentCount, requirementCount, deliverableCount] = await Promise.all([
     prisma.taskHistory.count({ where: { taskId: request.taskId, action: { not: 'created' } } }),
     prisma.comment.count({ where: { taskId: request.taskId } }),
     prisma.attachment.count({ where: { taskId: request.taskId } }),
+    // Mesmo furo do gate em regenerateTask (recurring-templates.service.ts): checklist de
+    // documentos a cobrar/entregáveis configurados via Template de OS também conta como
+    // "a tarefa já foi preparada", não só histórico/comentário/anexo.
+    prisma.taskDocumentRequirement.count({ where: { taskId: request.taskId } }),
+    prisma.taskDeliverable.count({ where: { taskId: request.taskId } }),
   ])
-  if (historyCount > 0 || commentCount > 0 || attachmentCount > 0) {
+  if (historyCount > 0 || commentCount > 0 || attachmentCount > 0 || requirementCount > 0 || deliverableCount > 0) {
     throw new AppError(409, 'Essa tarefa já teve movimentação — não pode ser cancelada por este caminho')
   }
 
-  const [, updated] = await prisma.$transaction([
+  const staffUser = await prisma.user.findUnique({ where: { id: staffId }, select: { name: true } })
+
+  const [, , updated] = await prisma.$transaction([
     prisma.task.update({ where: { id: request.taskId }, data: { status: 'DISREGARDED' } }),
+    // Mesma regra de updateTask/moveTask em tasks.service.ts: toda mudança real de status grava
+    // status_changed — sem isso, Métricas de Produtividade (que lê esse histórico) nunca saberia
+    // quando essa tarefa saiu do fluxo.
+    prisma.taskHistory.create({
+      data: {
+        taskId: request.taskId,
+        action: 'status_changed',
+        fromValue: task.status,
+        toValue: 'DISREGARDED',
+        actorType: 'user',
+        actorId: staffId,
+        actorName: staffUser?.name ?? 'Unknown',
+      },
+    }),
     prisma.request.update({
       where: { id },
       data: {
@@ -181,6 +207,13 @@ export async function cancelApprovedRequest(
       },
     }),
   ])
+
+  // Board com essa tarefa pode estar aberto em outra aba — sem isso, quem está olhando o board
+  // só veria a tarefa sair do status ao recarregar a página.
+  await publishBoardEvent(task.column.boardId, {
+    event: 'task:updated',
+    data: { taskId: request.taskId },
+  })
 
   await enqueueNotification({
     event: 'REQUEST_CANCELLED',

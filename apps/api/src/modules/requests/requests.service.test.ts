@@ -388,6 +388,35 @@ describe('cancelApprovedRequest', () => {
     expect(task.status).toBe('DISREGARDED')
   })
 
+  it('grava TaskHistory status_changed e publica task:updated no board ao cancelar', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
+    const taskBefore = await prisma.task.findUniqueOrThrow({ where: { id: approved.taskId! } })
+    const publishSpy = vi.spyOn(redis, 'publish').mockResolvedValue(0 as unknown as number)
+
+    await cancelApprovedRequest(request.id, org.id, admin.id, 'Cliente desistiu')
+
+    const history = await prisma.taskHistory.findFirst({
+      where: { taskId: approved.taskId!, action: 'status_changed' },
+      orderBy: { createdAt: 'desc' },
+    })
+    expect(history?.fromValue).toBe(taskBefore.status)
+    expect(history?.toValue).toBe('DISREGARDED')
+    expect(history?.actorType).toBe('user')
+    expect(history?.actorId).toBe(admin.id)
+
+    const column = await prisma.column.findUniqueOrThrow({ where: { id: taskBefore.columnId } })
+    expect(publishSpy).toHaveBeenCalledWith(
+      `board:${column.boardId}`,
+      expect.stringContaining('"task:updated"'),
+    )
+    publishSpy.mockRestore()
+  })
+
   it('lança 409 se a task já teve movimentação (history além de created)', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
@@ -410,6 +439,18 @@ describe('cancelApprovedRequest', () => {
     const request = await createRequest(org.id, client.id, { title: 'Pedido' })
     const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
     await prisma.comment.create({ data: { taskId: approved.taskId!, content: 'x', authorType: 'USER', userId: admin.id } })
+
+    await expect(cancelApprovedRequest(request.id, org.id, admin.id, 'Motivo')).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('lança 409 se a task já tem documento a cobrar configurado (checklist de OS)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
+    await prisma.taskDocumentRequirement.create({ data: { taskId: approved.taskId!, name: 'Contrato', position: 0 } })
 
     await expect(cancelApprovedRequest(request.id, org.id, admin.id, 'Motivo')).rejects.toMatchObject({ statusCode: 409 })
   })
