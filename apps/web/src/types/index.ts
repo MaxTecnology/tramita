@@ -127,10 +127,13 @@ export interface ClientRequest {
   id: string
   title: string
   description: string | null
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'NEEDS_INFO'
   rejectionReason: string | null
   taskId: string | null
+  boardId: string | null
   departmentId: string | null
+  cancelledByType: 'USER' | 'CLIENT' | null
+  cancellationReason: string | null
   createdAt: string
   attachments?: RequestAttachment[]
   client?: { id: string; name: string }
