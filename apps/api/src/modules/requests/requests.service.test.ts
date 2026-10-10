@@ -18,6 +18,8 @@ import {
   approveRequest,
   rejectRequest,
   countPendingRequests,
+  markNeedsInfo,
+  cancelApprovedRequest,
 } from './requests.service'
 import { createBoard } from '@/modules/boards/boards.service'
 import { createOSTemplate } from '@/modules/os-templates/os-templates.service'
@@ -336,6 +338,112 @@ describe('publishOrgEvent ao mudar status da request', () => {
       expect.stringContaining('"request:changed"'),
     )
     publishSpy.mockRestore()
+  })
+})
+
+describe('markNeedsInfo', () => {
+  it('move PENDING → NEEDS_INFO e registra o comentário obrigatório', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+
+    const updated = await markNeedsInfo(request.id, org.id, admin.id, 'Qual o CNPJ?')
+
+    expect(updated.status).toBe('NEEDS_INFO')
+    const comment = await prisma.requestComment.findFirst({ where: { requestId: request.id } })
+    expect(comment?.content).toBe('Qual o CNPJ?')
+    expect(comment?.authorType).toBe('USER')
+  })
+
+  it('lança 422 se a request não está PENDING', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    await rejectRequest(request.id, org.id, admin.id, {})
+
+    await expect(markNeedsInfo(request.id, org.id, admin.id, 'x')).rejects.toMatchObject({ statusCode: 422 })
+  })
+})
+
+describe('cancelApprovedRequest', () => {
+  it('cancela a request aprovada e marca a task como DISREGARDED quando não há atividade', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
+
+    const cancelled = await cancelApprovedRequest(request.id, org.id, admin.id, 'Cliente desistiu')
+
+    expect(cancelled.status).toBe('CANCELLED')
+    expect(cancelled.cancelledByType).toBe('USER')
+    expect(cancelled.cancelledById).toBe(admin.id)
+    expect(cancelled.cancellationReason).toBe('Cliente desistiu')
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: approved.taskId! } })
+    expect(task.status).toBe('DISREGARDED')
+  })
+
+  it('lança 409 se a task já teve movimentação (history além de created)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
+    await prisma.taskHistory.create({
+      data: { taskId: approved.taskId!, action: 'moved', actorType: 'user', actorId: admin.id, actorName: 'Admin' },
+    })
+
+    await expect(cancelApprovedRequest(request.id, org.id, admin.id, 'Motivo')).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('lança 409 se a task já tem comentário', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
+    await prisma.comment.create({ data: { taskId: approved.taskId!, content: 'x', authorType: 'USER', userId: admin.id } })
+
+    await expect(cancelApprovedRequest(request.id, org.id, admin.id, 'Motivo')).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('lança 422 se a request não está APPROVED', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+
+    await expect(cancelApprovedRequest(request.id, org.id, admin.id, 'Motivo')).rejects.toMatchObject({ statusCode: 422 })
+  })
+})
+
+describe('getRequestById / listRequestsForOrg — boardId', () => {
+  it('expõe boardId quando a request tem task associada, e null quando não tem', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const pending = await createRequest(org.id, client.id, { title: 'Ainda pendente' })
+    const toApprove = await createRequest(org.id, client.id, { title: 'Vai ser aprovada' })
+    const approved = await approveRequest(toApprove.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
+
+    const pendingFetched = await getRequestById(pending.id, org.id)
+    expect(pendingFetched.boardId).toBeNull()
+
+    const approvedFetched = await getRequestById(approved.id, org.id)
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: approved.taskId! } })
+    expect(approvedFetched.boardId).toBe(task.columnId ? (await prisma.column.findUniqueOrThrow({ where: { id: task.columnId } })).boardId : null)
+
+    const list = await listRequestsForOrg(org.id)
+    expect(list.find((r) => r.id === approved.id)?.boardId).toBe(approvedFetched.boardId)
   })
 })
 

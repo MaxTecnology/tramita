@@ -8,6 +8,16 @@ import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.
 import type { CreateRequestBody, ApproveRequestBody, RejectRequestBody } from './requests.schema'
 import type { RequestStatus } from '@prisma/client'
 
+const CANCELLABLE_BY_CLIENT: RequestStatus[] = ['PENDING', 'NEEDS_INFO']
+const REVIEWABLE: RequestStatus[] = ['PENDING', 'NEEDS_INFO']
+
+function withBoardId<T extends { task: { column: { boardId: string } } | null }>(
+  row: T,
+): Omit<T, 'task'> & { boardId: string | null } {
+  const { task, ...rest } = row
+  return { ...rest, boardId: task?.column.boardId ?? null }
+}
+
 export async function createRequest(
   organizationId: string,
   clientId: string,
@@ -64,18 +74,24 @@ export async function createRequest(
 }
 
 export async function listRequestsForOrg(organizationId: string, status?: RequestStatus) {
-  return prisma.request.findMany({
+  const requests = await prisma.request.findMany({
     where: { organizationId, ...(status ? { status } : {}) },
-    include: { client: { select: { id: true, name: true } } },
+    include: {
+      client: { select: { id: true, name: true } },
+      task: { select: { column: { select: { boardId: true } } } },
+    },
     orderBy: { createdAt: 'desc' },
   })
+  return requests.map(withBoardId)
 }
 
 export async function listRequestsForClient(organizationId: string, clientId: string) {
-  return prisma.request.findMany({
+  const requests = await prisma.request.findMany({
     where: { organizationId, clientId },
+    include: { task: { select: { column: { select: { boardId: true } } } } },
     orderBy: { createdAt: 'desc' },
   })
+  return requests.map(withBoardId)
 }
 
 async function getRequestOrThrow(id: string, organizationId: string, clientId?: string) {
@@ -87,20 +103,96 @@ async function getRequestOrThrow(id: string, organizationId: string, clientId?: 
 }
 
 export async function getRequestById(id: string, organizationId: string, clientId?: string) {
-  const request = await getRequestOrThrow(id, organizationId, clientId)
+  const request = await prisma.request.findFirst({
+    where: { id, organizationId, ...(clientId ? { clientId } : {}) },
+    include: { task: { select: { column: { select: { boardId: true } } } } },
+  })
+  if (!request) throw new AppError(404, 'Solicitação não encontrada')
   const attachments = await prisma.requestAttachment.findMany({
     where: { requestId: id },
     orderBy: { createdAt: 'asc' },
   })
-  return { ...request, attachments }
+  return { ...withBoardId(request), attachments }
 }
 
 export async function cancelRequest(id: string, organizationId: string, clientId: string) {
   const request = await getRequestOrThrow(id, organizationId, clientId)
-  if (request.status !== 'PENDING') {
-    throw new AppError(422, 'Apenas solicitações pendentes podem ser canceladas')
+  if (!CANCELLABLE_BY_CLIENT.includes(request.status)) {
+    throw new AppError(422, 'Essa solicitação não pode mais ser cancelada por aqui — fale com o escritório')
   }
   const updated = await prisma.request.update({ where: { id }, data: { status: 'CANCELLED' } })
+  await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
+  return updated
+}
+
+export async function markNeedsInfo(id: string, organizationId: string, staffId: string, comment: string) {
+  const request = await getRequestOrThrow(id, organizationId)
+  if (request.status !== 'PENDING') {
+    throw new AppError(422, 'Só solicitações pendentes podem ser marcadas como "precisa de mais informação"')
+  }
+
+  const [updated] = await prisma.$transaction([
+    prisma.request.update({ where: { id }, data: { status: 'NEEDS_INFO' } }),
+    prisma.requestComment.create({
+      data: { content: comment, requestId: id, authorType: 'USER', userId: staffId },
+    }),
+  ])
+
+  await enqueueNotification({
+    event: 'REQUEST_NEEDS_INFO',
+    organizationId,
+    clientId: request.clientId,
+    requestId: id,
+    metadata: { requestTitle: request.title, commentText: comment },
+  })
+
+  await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
+  return updated
+}
+
+export async function cancelApprovedRequest(
+  id: string,
+  organizationId: string,
+  staffId: string,
+  reason: string,
+) {
+  const request = await getRequestOrThrow(id, organizationId)
+  if (request.status !== 'APPROVED') throw new AppError(422, 'Só solicitações aprovadas podem ser canceladas por este caminho')
+  if (!request.taskId) throw new AppError(422, 'Solicitação aprovada sem tarefa associada — estado inconsistente')
+
+  const [historyCount, commentCount, attachmentCount] = await Promise.all([
+    prisma.taskHistory.count({ where: { taskId: request.taskId, action: { not: 'created' } } }),
+    prisma.comment.count({ where: { taskId: request.taskId } }),
+    prisma.attachment.count({ where: { taskId: request.taskId } }),
+  ])
+  if (historyCount > 0 || commentCount > 0 || attachmentCount > 0) {
+    throw new AppError(409, 'Essa tarefa já teve movimentação — não pode ser cancelada por este caminho')
+  }
+
+  const [, updated] = await prisma.$transaction([
+    prisma.task.update({ where: { id: request.taskId }, data: { status: 'DISREGARDED' } }),
+    prisma.request.update({
+      where: { id },
+      data: {
+        status: 'CANCELLED',
+        cancelledByType: 'USER',
+        cancelledById: staffId,
+        cancellationReason: reason,
+      },
+    }),
+  ])
+
+  await enqueueNotification({
+    event: 'REQUEST_CANCELLED',
+    organizationId,
+    clientId: request.clientId,
+    requestId: id,
+    // rejectionReason é o nome de variável genérico de template.ts pra "motivo exibido ao
+    // cliente" — reaproveitado aqui (não é uma rejeição, é o motivo do cancelamento) em vez de
+    // criar uma TemplateVar nova só pra este evento.
+    metadata: { requestTitle: request.title, rejectionReason: reason },
+  })
+
   await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
   return updated
 }
@@ -113,7 +205,7 @@ export async function approveRequest(
   data: ApproveRequestBody,
 ) {
   const request = await getRequestOrThrow(id, organizationId)
-  if (request.status !== 'PENDING') throw new AppError(422, 'Solicitação já foi avaliada')
+  if (!REVIEWABLE.includes(request.status)) throw new AppError(422, 'Solicitação já foi avaliada')
 
   let columnId: string
 
@@ -184,7 +276,7 @@ export async function rejectRequest(
   data: RejectRequestBody,
 ) {
   const request = await getRequestOrThrow(id, organizationId)
-  if (request.status !== 'PENDING') throw new AppError(422, 'Solicitação já foi avaliada')
+  if (!REVIEWABLE.includes(request.status)) throw new AppError(422, 'Solicitação já foi avaliada')
 
   const updated = await prisma.request.update({
     where: { id },

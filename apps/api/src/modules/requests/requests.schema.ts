@@ -23,11 +23,21 @@ export const rejectRequestSchema = z.object({
   reason: z.string().optional(),
 })
 
+export const needsInfoRequestSchema = z.object({
+  comment: z.string().min(1),
+})
+
+export const cancelApprovedRequestSchema = z.object({
+  reason: z.string().min(1),
+})
+
 export const listRequestsQuerySchema = z.object({
-  status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']).optional(),
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'NEEDS_INFO']).optional(),
 })
 
 export type CreateRequestBody = z.infer<typeof createRequestSchema>
 export type ApproveRequestBody = z.infer<typeof approveRequestSchema>
 export type RejectRequestBody = z.infer<typeof rejectRequestSchema>
+export type NeedsInfoRequestBody = z.infer<typeof needsInfoRequestSchema>
+export type CancelApprovedRequestBody = z.infer<typeof cancelApprovedRequestSchema>
 export type ListRequestsQuery = z.infer<typeof listRequestsQuerySchema>
