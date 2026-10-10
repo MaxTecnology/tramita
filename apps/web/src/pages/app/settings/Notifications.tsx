@@ -20,6 +20,9 @@ interface Config {
   requestCreated?: boolean
   requestApproved?: boolean
   requestRejected?: boolean
+  requestNeedsInfo?: boolean
+  requestCommentAdded?: boolean
+  requestCancelled?: boolean
   recurringGenerationFailed?: boolean
   documentRejected?: boolean
   slaTargetWarningDays?: number
@@ -51,6 +54,9 @@ const EVENT_LABEL: Record<string, string> = {
   REQUEST_CREATED: 'Solicitação criada',
   REQUEST_APPROVED: 'Solicitação aprovada',
   REQUEST_REJECTED: 'Solicitação rejeitada',
+  REQUEST_NEEDS_INFO: 'Solicitação precisa de mais informação',
+  REQUEST_COMMENT_ADDED: 'Comentário em solicitação',
+  REQUEST_CANCELLED: 'Solicitação cancelada (pós-aprovação)',
   SLA_DIGEST: 'Resumo diário de prazos',
 }
 
@@ -299,6 +305,24 @@ export default function Notifications() {
               description="Notifica o cliente quando a solicitação dele não é aprovada"
               checked={form.requestRejected ?? false}
               onChange={(v) => setForm({ ...form, requestRejected: v })}
+            />
+            <SwitchRow
+              label="Precisa de mais informação"
+              description="Notifica o cliente quando a equipe pede mais detalhes sobre a solicitação dele"
+              checked={form.requestNeedsInfo ?? false}
+              onChange={(v) => setForm({ ...form, requestNeedsInfo: v })}
+            />
+            <SwitchRow
+              label="Comentário em solicitação"
+              description="Notifica quando alguém comenta em uma solicitação"
+              checked={form.requestCommentAdded ?? false}
+              onChange={(v) => setForm({ ...form, requestCommentAdded: v })}
+            />
+            <SwitchRow
+              label="Solicitação cancelada"
+              description="Notifica o cliente quando uma solicitação já aprovada é cancelada pelo escritório"
+              checked={form.requestCancelled ?? false}
+              onChange={(v) => setForm({ ...form, requestCancelled: v })}
             />
           </Section>
 
