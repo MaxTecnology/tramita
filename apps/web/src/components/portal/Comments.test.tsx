@@ -30,7 +30,7 @@ it('lista comentários existentes com nome do autor', async () => {
       HttpResponse.json(existingComments),
     ),
   )
-  render(<Comments taskId="task-1" currentUserId="cl1" role="CLIENT" />, { wrapper })
+  render(<Comments entityType="task" entityId="task-1" currentUserId="cl1" role="CLIENT" />, { wrapper })
   await waitFor(() => expect(screen.getByText('Processo iniciado')).toBeInTheDocument())
   expect(screen.getByText('João Escrit.')).toBeInTheDocument()
 })
@@ -52,7 +52,7 @@ it('submits POST /tasks/:taskId/comments com content correto', async () => {
     }),
   )
 
-  render(<Comments taskId="task-1" currentUserId="cl1" role="CLIENT" />, { wrapper })
+  render(<Comments entityType="task" entityId="task-1" currentUserId="cl1" role="CLIENT" />, { wrapper })
   await waitFor(() => screen.getByPlaceholderText('Adicionar comentário...'))
 
   const textarea = screen.getByPlaceholderText('Adicionar comentário...')
@@ -61,5 +61,34 @@ it('submits POST /tasks/:taskId/comments com content correto', async () => {
 
   await waitFor(() => {
     expect(capturedBody).toMatchObject({ content: 'Meu comentário' })
+  })
+})
+
+it('entityType="request" lê e grava em /requests/:id/comments', async () => {
+  let capturedBody: unknown
+  server.use(
+    http.get('http://localhost:3000/requests/req-1/comments', () => HttpResponse.json([])),
+    http.post('http://localhost:3000/requests/req-1/comments', async ({ request }) => {
+      capturedBody = await request.json()
+      return HttpResponse.json({
+        id: 'rc1',
+        content: 'Follow-up',
+        authorType: 'CLIENT',
+        user: null,
+        client: { id: 'cl1', name: 'Empresa ABC' },
+        createdAt: new Date().toISOString(),
+      })
+    }),
+  )
+
+  render(<Comments entityType="request" entityId="req-1" currentUserId="cl1" role="CLIENT" />, { wrapper })
+  await waitFor(() => screen.getByPlaceholderText('Adicionar comentário...'))
+
+  const textarea = screen.getByPlaceholderText('Adicionar comentário...')
+  await userEvent.type(textarea, 'Follow-up')
+  await userEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+  await waitFor(() => {
+    expect(capturedBody).toMatchObject({ content: 'Follow-up' })
   })
 })

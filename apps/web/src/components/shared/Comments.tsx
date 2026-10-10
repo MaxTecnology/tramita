@@ -6,29 +6,41 @@ import { cn } from '@/lib/utils'
 import type { Comment, DrawerRole } from '@/types'
 import { toast } from 'sonner'
 
+type EntityType = 'task' | 'request'
+
 interface Props {
-  taskId: string
+  entityType: EntityType
+  entityId: string
   currentUserId: string
   role: DrawerRole
 }
 
 const CAN_SEE_DELETED = new Set<DrawerRole>(['ORG_ADMIN', 'ORG_MANAGER'])
 
-export function Comments({ taskId, currentUserId, role }: Props) {
+function basePath(entityType: EntityType, entityId: string): string {
+  return entityType === 'task' ? `/tasks/${entityId}/comments` : `/requests/${entityId}/comments`
+}
+
+function deletePath(entityType: EntityType, commentId: string): string {
+  return entityType === 'task' ? `/comments/${commentId}` : `/request-comments/${commentId}`
+}
+
+export function Comments({ entityType, entityId, currentUserId, role }: Props) {
   const queryClient = useQueryClient()
   const [content, setContent] = useState('')
+  const queryKey = [entityType === 'task' ? 'comments' : 'request-comments', entityId]
 
   const { data: comments = [] } = useQuery<Comment[]>({
-    queryKey: ['comments', taskId],
-    queryFn: () => api.get(`/tasks/${taskId}/comments`).then((r) => r.data),
+    queryKey,
+    queryFn: () => api.get(basePath(entityType, entityId)).then((r) => r.data),
   })
 
   const createMutation = useMutation({
     mutationFn: () =>
-      api.post(`/tasks/${taskId}/comments`, { content }).then((r) => r.data),
+      api.post(basePath(entityType, entityId), { content }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Comentário adicionado')
-      queryClient.invalidateQueries({ queryKey: ['comments', taskId] })
+      queryClient.invalidateQueries({ queryKey })
       setContent('')
     },
     onError: () => toast.error('Erro ao adicionar comentário'),
@@ -36,10 +48,10 @@ export function Comments({ taskId, currentUserId, role }: Props) {
 
   const deleteMutation = useMutation({
     mutationFn: (commentId: string) =>
-      api.delete(`/comments/${commentId}`).then((r) => r.data),
+      api.delete(deletePath(entityType, commentId)).then((r) => r.data),
     onSuccess: () => {
       toast.success('Comentário removido')
-      queryClient.invalidateQueries({ queryKey: ['comments', taskId] })
+      queryClient.invalidateQueries({ queryKey })
     },
     onError: () => toast.error('Erro ao remover comentário'),
   })

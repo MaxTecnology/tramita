@@ -465,7 +465,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
         <div className="flex-1 overflow-y-auto p-5">
 
           {tab === 'comments' && (
-            <Comments taskId={task.id} currentUserId={currentUserId} role={role} />
+            <Comments entityType="task" entityId={task.id} currentUserId={currentUserId} role={role} />
           )}
 
           {tab === 'documents' && documents && (
