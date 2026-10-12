@@ -52,6 +52,8 @@ model Organization {
   departments            Department[]
   recurringTaskTemplates RecurringTaskTemplate[]
   osTemplates            OSTemplate[]
+  protocols              Protocol[]
+  protocolCounters       ProtocolCounter[]
 
   @@map("organizations")
 }
@@ -96,6 +98,7 @@ model User {
   reviewedRequests             Request[]                 @relation("RequestReviewer")
   comments                     Comment[]
   requestComments              RequestComment[]
+  protocols                    Protocol[]
   attachments                  Attachment[]
   responsibleBoards            Board[]                   @relation("BoardResponsible")
   clientAssignments            ClientAssignment[]
@@ -157,6 +160,7 @@ model Client {
   requests                 Request[]
   comments                 Comment[]
   requestComments          RequestComment[]
+  protocols                Protocol[]
   attachments              Attachment[]
   clientAssignments        ClientAssignment[]
   recurringTaskAssignments RecurringTaskAssignment[]
@@ -394,6 +398,7 @@ model Task {
   recurringTemplate    RecurringTaskTemplate?    @relation(fields: [recurringTemplateId], references: [id])
   documentRequirements TaskDocumentRequirement[]
   deliverables         TaskDeliverable[]
+  protocols            Protocol[]
 
   @@index([status])
   @@index([priority])
@@ -631,6 +636,77 @@ model TaskDeliverable {
   @@map("task_deliverables")
 }
 
+model Protocol {
+  id             String         @id @default(cuid())
+  organizationId String
+  number         String
+  clientId       String
+  taskId         String
+  attachmentId   String?        @unique
+  title          String
+  content        String?
+  dueDate        DateTime?
+  status         ProtocolStatus @default(SENT)
+  createdById    String
+  createdAt      DateTime       @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  client       Client          @relation(fields: [clientId], references: [id])
+  task         Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  attachment   Attachment?     @relation(fields: [attachmentId], references: [id])
+  createdBy    User            @relation(fields: [createdById], references: [id])
+  events       ProtocolEvent[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status])
+  @@index([organizationId, dueDate])
+  @@index([clientId])
+  @@map("protocols")
+}
+
+enum ProtocolStatus {
+  SENT
+  VIEWED
+  DOWNLOADED
+  EXPIRED
+}
+
+model ProtocolEvent {
+  id         String            @id @default(cuid())
+  protocolId String
+  type       ProtocolEventType
+  actorType  String
+  actorId    String?
+  actorName  String?
+  actorEmail String?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime          @default(now())
+
+  protocol Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+
+  @@index([protocolId, createdAt])
+  @@map("protocol_events")
+}
+
+enum ProtocolEventType {
+  SENT
+  VIEWED
+  DOWNLOADED
+  EXPIRED
+}
+
+model ProtocolCounter {
+  organizationId String
+  year           Int
+  lastNumber     Int    @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@id([organizationId, year])
+  @@map("protocol_counters")
+}
+
 model Comment {
   id            String            @id @default(cuid())
   content       String
@@ -700,6 +776,7 @@ model Attachment {
   uploaderClient      Client?                  @relation(fields: [uploadedByClient], references: [id])
   documentRequirement TaskDocumentRequirement?
   deliverable         TaskDeliverable?
+  protocol            Protocol?
 
   @@map("attachments")
 }
@@ -720,6 +797,7 @@ model NotificationConfig {
   requestNeedsInfo          Boolean  @default(true)
   requestCommentAdded       Boolean  @default(true)
   requestCancelled          Boolean  @default(true)
+  protocolCreated           Boolean  @default(true)
   maximizebotToken          String?
   saveOnTicket              Boolean  @default(true)
   startChatbot              Boolean  @default(false)
@@ -727,6 +805,7 @@ model NotificationConfig {
   documentRejected          Boolean  @default(true)
   slaTargetWarningDays      Int      @default(3)
   slaDueCriticalDays        Int      @default(1)
+  protocolWarningDays       Int      @default(3)
   slaDigestEnabled          Boolean  @default(true)
   lateClosureThresholdDays  Int      @default(2)
   customSlaSoundKey         String?
@@ -771,6 +850,7 @@ enum NotificationEvent {
   REQUEST_NEEDS_INFO
   REQUEST_COMMENT_ADDED
   REQUEST_CANCELLED
+  PROTOCOL_CREATED
 }
 
 enum MessageChannel {
