@@ -134,9 +134,12 @@ async function runSlaDigestForOrg(
       title: task.title,
       clientName: task.column.board.client.name,
       level,
+      // dueDate/targetDate são rótulos de dia-calendário (meia-noite UTC), não instantes reais —
+      // formatar com DIGEST_TIMEZONE (BRT) os reinterpretaria como instante e mostraria o dia
+      // anterior (ver mesmo padrão em apps/web/src/lib/dates.ts). timeZone: 'UTC' lê o rótulo.
       dateLabel: level === 'DUE_CRITICAL'
-        ? `vence ${task.dueDate!.toLocaleDateString('pt-BR', { timeZone: DIGEST_TIMEZONE })}`
-        : `meta ${task.targetDate!.toLocaleDateString('pt-BR', { timeZone: DIGEST_TIMEZONE })}`,
+        ? `vence ${task.dueDate!.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`
+        : `meta ${task.targetDate!.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`,
     }
 
     // Assignee desativado (ex-funcionário) nunca é destinatário — mesma regra de "sem assignee".
@@ -154,7 +157,7 @@ async function runSlaDigestForOrg(
       title: protocol.title,
       clientName: protocol.client.name,
       level: protocol.status === 'EXPIRED' ? 'EXPIRED' : 'TARGET_WARNING',
-      dateLabel: `vence ${protocol.dueDate!.toLocaleDateString('pt-BR', { timeZone: DIGEST_TIMEZONE })}`,
+      dateLabel: `vence ${protocol.dueDate!.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`,
     }
     const recipientIds = protocol.task.assignee?.isActive ? [protocol.task.assignee.id] : admins.map((a) => a.id)
     for (const userId of recipientIds) {

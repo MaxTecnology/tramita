@@ -243,6 +243,32 @@ describe('runSlaDigest — protocolos', () => {
     )
   })
 
+  it('dateLabel do protocolo no digest não sofre off-by-one de fuso (rótulo UTC, não BRT)', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const assignee = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, assignee.id)
+    await prisma.task.update({ where: { id: task.id }, data: { assigneeId: assignee.id } })
+    const attachment = await prisma.attachment.create({
+      data: { taskId: task.id, filename: 'guia.pdf', mimeType: 'application/pdf', size: 10, storageKey: 'k', uploadedBy: assignee.id },
+    })
+    // dueDate = rótulo "20/10/2026" (meia-noite UTC); formatar com fuso BRT mostraria "19/10/2026".
+    const dueDate = new Date(Date.UTC(2026, 9, 20))
+    await createProtocol(task.id, org.id, assignee.id, { title: 'Guia DARF', attachmentId: attachment.id, dueDate })
+
+    await runSlaDigest(new Date(Date.UTC(2026, 9, 19, 11, 0, 0)))
+
+    expect(enqueueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ taskListText: expect.stringContaining('20/10/2026') }),
+      }),
+    )
+  })
+
   it('não inclui protocolo já visualizado no digest', async () => {
     const { enqueueNotification } = await import('@/lib/queue')
     const plan = await createTestPlan()

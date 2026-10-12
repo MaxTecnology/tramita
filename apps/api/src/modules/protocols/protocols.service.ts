@@ -51,6 +51,10 @@ export async function createProtocol(
   if (data.attachmentId) {
     const attachment = await prisma.attachment.findFirst({ where: { id: data.attachmentId, taskId } })
     if (!attachment) throw new AppError(404, 'Anexo não encontrado nesta tarefa')
+    // Protocol.attachmentId é @unique no schema — sem este check, a segunda tentativa de usar o
+    // mesmo anexo cairia num P2002 bruto (500) em vez de um erro de validação claro.
+    const alreadyLinked = await prisma.protocol.findFirst({ where: { attachmentId: data.attachmentId } })
+    if (alreadyLinked) throw new AppError(409, 'Esse anexo já está vinculado a outro protocolo')
   }
 
   const clientId = task.column.board.clientId
@@ -245,11 +249,36 @@ export async function registerDownload(
   return getSignedDownloadUrl(protocol.attachment.storageKey)
 }
 
+// dueDate é armazenado como meia-noite UTC representando o dia-calendário do vencimento como um
+// RÓTULO (ex: "2026-10-20" no formulário -> 2026-10-20T00:00:00Z) — mesma convenção de todo campo
+// date-only no projeto (ver apps/web/src/lib/dates.ts): lê-se pelos getters UTC literalmente,
+// nunca convertendo pro fuso real. Comparar isso contra o instante bruto de `now` (dueDate < now)
+// expiraria o protocolo na MANHÃ do próprio dia do vencimento (o cron roda 8h BRT = 11h UTC),
+// antes do cliente ter o dia inteiro pra visualizar. A regra correta é dia-calendário: o rótulo
+// do vencimento só conta como passado quando o dia de HOJE em BRT (conversão real de fuso, já
+// que `now` é um instante de verdade, não um rótulo) for maior que ele.
+function utcDayLabel(date: Date): number {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+}
+
+function todayInBRT(now: Date): number {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now)
+  const get = (type: string) => Number(parts.find((p) => p.type === type)!.value)
+  return Date.UTC(get('year'), get('month') - 1, get('day'))
+}
+
 export async function expireOverdueProtocols(organizationId: string, now: Date): Promise<number> {
-  const overdue = await prisma.protocol.findMany({
+  // `lt: now` aqui é só um pré-filtro (super-conjunto seguro): todo protocolo vencido pela regra
+  // de dia-calendário também satisfaz essa comparação bruta, então nunca descarta um candidato
+  // real — o filtro definitivo é a comparação de rótulos de dia abaixo.
+  const candidates = await prisma.protocol.findMany({
     where: { organizationId, status: 'SENT', dueDate: { not: null, lt: now } },
-    select: { id: true },
+    select: { id: true, dueDate: true },
   })
+  const today = todayInBRT(now)
+  const overdue = candidates.filter((p) => utcDayLabel(p.dueDate!) < today)
 
   let expiredCount = 0
   for (const p of overdue) {

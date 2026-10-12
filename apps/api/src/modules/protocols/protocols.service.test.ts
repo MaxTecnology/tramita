@@ -99,6 +99,18 @@ describe('createProtocol', () => {
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 
+  it('lança 409 (não 500 de constraint bruta) se o anexo já está vinculado a outro protocolo', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { task, attachment } = await setupTaskWithAttachment(org.id, admin.id)
+    await createProtocol(task.id, org.id, admin.id, { title: 'Primeiro protocolo', attachmentId: attachment.id })
+
+    await expect(
+      createProtocol(task.id, org.id, admin.id, { title: 'Segundo protocolo, mesmo anexo', attachmentId: attachment.id }),
+    ).rejects.toMatchObject({ statusCode: 409 })
+  })
+
   it('números não colidem sob criação concorrente na mesma org/ano', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
@@ -231,6 +243,29 @@ describe('expireOverdueProtocols', () => {
     expect((await prisma.protocol.findUniqueOrThrow({ where: { id: notYet.id } })).status).toBe('SENT')
     const event = await prisma.protocolEvent.findFirst({ where: { protocolId: overdue.id, type: 'EXPIRED' } })
     expect(event).not.toBeNull()
+  })
+
+  it('não expira protocolo que vence HOJE em BRT mesmo rodando de manhã (8h BRT) — só vence no dia seguinte', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { task, attachment } = await setupTaskWithAttachment(org.id, admin.id)
+
+    // dueDate = rótulo "20/10/2026", exatamente como o formulário grava (meia-noite UTC do dia).
+    const dueToday = new Date(Date.UTC(2026, 9, 20))
+    const protocol = await createProtocol(task.id, org.id, admin.id, { title: 'vence hoje', attachmentId: attachment.id, dueDate: dueToday })
+
+    // Cron rodando 8h BRT = 11h UTC do MESMO dia do vencimento — ainda não pode expirar.
+    const cronSameDay = new Date(Date.UTC(2026, 9, 20, 11, 0, 0))
+    const count = await expireOverdueProtocols(org.id, cronSameDay)
+    expect(count).toBe(0)
+    expect((await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })).status).toBe('SENT')
+
+    // No dia seguinte (mesmo horário), já passou o dia do vencimento em BRT — expira.
+    const cronNextDay = new Date(Date.UTC(2026, 9, 21, 11, 0, 0))
+    const countNextDay = await expireOverdueProtocols(org.id, cronNextDay)
+    expect(countNextDay).toBe(1)
+    expect((await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })).status).toBe('EXPIRED')
   })
 
   it('nunca marca EXPIRED um protocolo que já foi visualizado', async () => {
