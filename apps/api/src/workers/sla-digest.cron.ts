@@ -3,11 +3,13 @@ import { bullmqRedis } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import { enqueueNotification } from '@/lib/queue'
 import { computeSlaLevel, type SlaLevel } from '@/lib/sla'
+import { expireOverdueProtocols } from '@/modules/protocols/protocols.service'
 
 interface DigestEntry {
-  taskTitle: string
+  kind: 'task' | 'protocol'
+  title: string
   clientName: string
-  level: SlaLevel
+  level: SlaLevel | 'EXPIRED'
   dateLabel: string
 }
 
@@ -15,17 +17,16 @@ const MAX_DIGEST_LINES = 20
 const DIGEST_TIMEZONE = 'America/Sao_Paulo'
 
 function formatTaskLine(entry: DigestEntry): string {
-  const tag = entry.level === 'DUE_CRITICAL' ? 'crítico' : 'atenção'
-  return `- ${entry.taskTitle} (${entry.clientName}) — ${entry.dateLabel} [${tag}]`
+  const tag = entry.level === 'DUE_CRITICAL' ? 'crítico' : entry.level === 'EXPIRED' ? 'vencido sem visualização' : 'atenção'
+  const prefix = entry.kind === 'protocol' ? '[protocolo] ' : ''
+  return `- ${prefix}${entry.title} (${entry.clientName}) — ${entry.dateLabel} [${tag}]`
 }
 
-// Crítico primeiro, depois mais antigo (quem está esperando há mais tempo sobe na lista) — evita
-// que uma organização com centenas de tarefas vencidas gere uma mensagem de WhatsApp gigante.
+// Vencido sem visualização primeiro, depois crítico, depois atenção — o que já falhou precisa
+// de atenção imediata (ligar pro cliente), o resto ainda dá tempo de agir.
 function formatTaskListText(entries: DigestEntry[]): string {
-  const sorted = [...entries].sort((a, b) => {
-    if (a.level !== b.level) return a.level === 'DUE_CRITICAL' ? -1 : 1
-    return 0
-  })
+  const rank = (level: DigestEntry['level']) => (level === 'EXPIRED' ? 0 : level === 'DUE_CRITICAL' ? 1 : 2)
+  const sorted = [...entries].sort((a, b) => rank(a.level) - rank(b.level))
   const visible = sorted.slice(0, MAX_DIGEST_LINES)
   const lines = visible.map(formatTaskLine)
   const remaining = sorted.length - visible.length
@@ -51,9 +52,23 @@ export async function runSlaDigest(now: Date = new Date()): Promise<void> {
 }
 
 async function runSlaDigestForOrg(
-  org: { id: string; notificationConfig: { slaDigestEnabled: boolean; slaTargetWarningDays: number; slaDueCriticalDays: number } | null },
+  org: {
+    id: string
+    notificationConfig: {
+      slaDigestEnabled: boolean
+      slaTargetWarningDays: number
+      slaDueCriticalDays: number
+      protocolWarningDays: number
+    } | null
+  },
   now: Date,
 ): Promise<void> {
+  // Roda incondicionalmente, ANTES de qualquer early-return — expirar um protocolo vencido é uma
+  // transição de estado de negócio (o Dashboard e o comprovante do cliente dependem dela), não
+  // uma função do email de resumo. Desligar o digest (`slaDigestEnabled: false`) não pode ter o
+  // efeito colateral de travar a expiração de protocolo pra sempre.
+  await expireOverdueProtocols(org.id, now)
+
   if (org.notificationConfig?.slaDigestEnabled === false) return
 
   // Org sem linha em NotificationConfig (nunca visitou a tela de Configurações) provisiona aqui,
@@ -85,6 +100,24 @@ async function runSlaDigestForOrg(
     },
   })
 
+  const protocolThreshold = new Date(now)
+  protocolThreshold.setUTCDate(protocolThreshold.getUTCDate() + notificationConfig.protocolWarningDays)
+
+  // status IN ('SENT','EXPIRED') de propósito — um protocolo já VIEWED/DOWNLOADED não é mais
+  // "sem visualização", sai do digest mesmo que o vencimento ainda esteja próximo.
+  const protocols = await prisma.protocol.findMany({
+    where: {
+      organizationId: org.id,
+      status: { in: ['SENT', 'EXPIRED'] },
+      dueDate: { not: null, lte: protocolThreshold },
+    },
+    select: {
+      id: true, title: true, dueDate: true, status: true,
+      client: { select: { name: true } },
+      task: { select: { assignee: { select: { id: true, isActive: true } } } },
+    },
+  })
+
   const admins = await prisma.user.findMany({
     where: { organizationId: org.id, role: { in: ['ORG_ADMIN', 'ORG_MANAGER'] }, isActive: true },
     select: { id: true },
@@ -97,7 +130,8 @@ async function runSlaDigestForOrg(
     if (level === 'NONE') continue
 
     const entry: DigestEntry = {
-      taskTitle: task.title,
+      kind: 'task',
+      title: task.title,
       clientName: task.column.board.client.name,
       level,
       dateLabel: level === 'DUE_CRITICAL'
@@ -114,8 +148,24 @@ async function runSlaDigestForOrg(
     }
   }
 
+  for (const protocol of protocols) {
+    const entry: DigestEntry = {
+      kind: 'protocol',
+      title: protocol.title,
+      clientName: protocol.client.name,
+      level: protocol.status === 'EXPIRED' ? 'EXPIRED' : 'TARGET_WARNING',
+      dateLabel: `vence ${protocol.dueDate!.toLocaleDateString('pt-BR', { timeZone: DIGEST_TIMEZONE })}`,
+    }
+    const recipientIds = protocol.task.assignee?.isActive ? [protocol.task.assignee.id] : admins.map((a) => a.id)
+    for (const userId of recipientIds) {
+      const bucket = byUserId.get(userId) ?? []
+      bucket.push(entry)
+      byUserId.set(userId, bucket)
+    }
+  }
+
   for (const [userId, entries] of byUserId) {
-    const criticalCount = entries.filter((e) => e.level === 'DUE_CRITICAL').length
+    const criticalCount = entries.filter((e) => e.level === 'DUE_CRITICAL' || e.level === 'EXPIRED').length
     await enqueueNotification({
       event: 'SLA_DIGEST',
       organizationId: org.id,

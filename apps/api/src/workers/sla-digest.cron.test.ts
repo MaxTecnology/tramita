@@ -8,8 +8,12 @@ import {
   createTestBoard,
   createTestColumn,
   createTestTask,
+  createTestDepartment,
+  createTestClientUser,
+  grantClientAccess,
 } from '@/test/helpers'
 import { runSlaDigest } from './sla-digest.cron'
+import { createProtocol, registerView } from '@/modules/protocols/protocols.service'
 
 vi.mock('@/lib/queue', () => ({ enqueueNotification: vi.fn().mockResolvedValue(undefined) }))
 
@@ -178,5 +182,117 @@ describe('runSlaDigest', () => {
     const after = await prisma.notificationConfig.findUnique({ where: { organizationId: org.id } })
     expect(after).not.toBeNull()
     expect(after?.slaDigestEnabled).toBe(true)
+  })
+})
+
+describe('runSlaDigest — protocolos', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('inclui protocolo sem visualização dentro da janela de aviso no digest do assignee da task', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const assignee = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, assignee.id)
+    await prisma.task.update({ where: { id: task.id }, data: { assigneeId: assignee.id } })
+    const attachment = await prisma.attachment.create({
+      data: { taskId: task.id, filename: 'guia.pdf', mimeType: 'application/pdf', size: 10, storageKey: 'k', uploadedBy: assignee.id },
+    })
+    const dueDate = new Date()
+    dueDate.setUTCDate(dueDate.getUTCDate() + 1)
+    await createProtocol(task.id, org.id, assignee.id, { title: 'Guia DARF', attachmentId: attachment.id, dueDate })
+
+    await runSlaDigest(new Date())
+
+    expect(enqueueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'SLA_DIGEST',
+        userId: assignee.id,
+        metadata: expect.objectContaining({ taskListText: expect.stringContaining('Guia DARF') }),
+      }),
+    )
+  })
+
+  it('marca protocolo vencido como EXPIRED e inclui no digest com a tag de vencido', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, admin.id)
+    const attachment = await prisma.attachment.create({
+      data: { taskId: task.id, filename: 'guia.pdf', mimeType: 'application/pdf', size: 10, storageKey: 'k', uploadedBy: admin.id },
+    })
+    const past = new Date(Date.now() - 86400000)
+    const protocol = await createProtocol(task.id, org.id, admin.id, { title: 'Guia vencida', attachmentId: attachment.id, dueDate: past })
+
+    await runSlaDigest(new Date())
+
+    expect((await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })).status).toBe('EXPIRED')
+    expect(enqueueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ taskListText: expect.stringContaining('vencido sem visualização') }),
+      }),
+    )
+  })
+
+  it('não inclui protocolo já visualizado no digest', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, admin.id, { departmentId: department.id })
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const attachment = await prisma.attachment.create({
+      data: { taskId: task.id, filename: 'guia.pdf', mimeType: 'application/pdf', size: 10, storageKey: 'k', uploadedBy: admin.id },
+    })
+    const dueDate = new Date()
+    dueDate.setUTCDate(dueDate.getUTCDate() + 1)
+    const protocol = await createProtocol(task.id, org.id, admin.id, { title: 'Já visto', attachmentId: attachment.id, dueDate })
+    await registerView(protocol.id, org.id, clientUser.id, '1.2.3.4', 'ua')
+
+    await runSlaDigest(new Date())
+
+    expect(enqueueNotification).not.toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: expect.objectContaining({ taskListText: expect.stringContaining('Já visto') }) }),
+    )
+  })
+
+  it('expira protocolo vencido mesmo com slaDigestEnabled desligado — expiração não é uma função do email', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await prisma.notificationConfig.upsert({
+      where: { organizationId: org.id },
+      create: { organizationId: org.id, slaDigestEnabled: false },
+      update: { slaDigestEnabled: false },
+    })
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, admin.id)
+    const attachment = await prisma.attachment.create({
+      data: { taskId: task.id, filename: 'guia.pdf', mimeType: 'application/pdf', size: 10, storageKey: 'k', uploadedBy: admin.id },
+    })
+    const past = new Date(Date.now() - 86400000)
+    const protocol = await createProtocol(task.id, org.id, admin.id, { title: 'x', attachmentId: attachment.id, dueDate: past })
+
+    await runSlaDigest(new Date())
+
+    expect((await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })).status).toBe('EXPIRED')
+    expect(enqueueNotification).not.toHaveBeenCalled() // digest desligado, mas expiração aconteceu
   })
 })
