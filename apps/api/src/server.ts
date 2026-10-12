@@ -29,7 +29,7 @@ import { slaRoutes } from '@/modules/sla/sla.routes'
 import { AppError } from '@/errors/AppError'
 
 export function buildApp() {
-  const app = Fastify({ logger: process.env.NODE_ENV !== 'test' })
+  const app = Fastify({ logger: process.env.NODE_ENV !== 'test', trustProxy: 1 })
 
   app.register(corsPlugin)
   app.register(rateLimitPlugin)

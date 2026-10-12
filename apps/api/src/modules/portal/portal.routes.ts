@@ -16,6 +16,7 @@ import {
   cancelRequest,
 } from '@/modules/requests/requests.service'
 import { createRequestAttachment } from '@/modules/requests/request-attachments.service'
+import { listProtocolsForClient, registerView, registerDownload } from '@/modules/protocols/protocols.service'
 import { listTaskDocuments, uploadForRequirement } from '@/modules/task-documents/task-documents.service'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
@@ -159,5 +160,31 @@ export async function portalRoutes(app: FastifyInstance) {
     )
 
     return reply.status(201).send(attachment)
+  })
+
+  app.get('/protocols', async (request, reply) => {
+    const { clientId, status, search } = request.query as { clientId?: string; status?: string; search?: string }
+    if (!clientId) throw new AppError(400, 'clientId é obrigatório')
+    const scope = await getClientAccessScope(request.user.sub)
+    if (!scope.clientIds.includes(clientId)) throw new AppError(404, 'Empresa não encontrada')
+    return reply.send(
+      await listProtocolsForClient(request.user.organizationId!, clientId, {
+        status: status as never,
+        search,
+      }),
+    )
+  })
+
+  app.get('/protocols/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    return reply.send(
+      await registerView(id, request.user.organizationId!, request.user.sub, request.ip, request.headers['user-agent'] as string | undefined),
+    )
+  })
+
+  app.get('/protocols/:id/download', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const url = await registerDownload(id, request.user.organizationId!, request.user.sub, request.ip, request.headers['user-agent'] as string | undefined)
+    return reply.send({ url })
   })
 }
