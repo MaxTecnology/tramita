@@ -24,6 +24,7 @@ const EVENT_FLAG_MAP: Record<string, keyof NotificationConfig> = {
   REQUEST_NEEDS_INFO: 'requestNeedsInfo',
   REQUEST_COMMENT_ADDED: 'requestCommentAdded',
   REQUEST_CANCELLED: 'requestCancelled',
+  PROTOCOL_CREATED: 'protocolCreated',
 }
 
 export async function processNotificationJob(job: { data: NotificationJob }): Promise<void> {

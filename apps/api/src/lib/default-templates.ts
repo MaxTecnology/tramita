@@ -64,4 +64,8 @@ export const DEFAULT_TEMPLATES: TemplateMap = {
     WHATSAPP: { body: 'Olá, {{clientName}}! Sua solicitação *{{requestTitle}}*, já aprovada, foi cancelada pelo escritório.\n\nMotivo: {{rejectionReason}}\n\nAcompanhe: {{portalUrl}}' },
     EMAIL: { subject: 'Solicitação cancelada — {{requestTitle}}', body: 'Olá, {{clientName}}!\n\nSua solicitação *{{requestTitle}}*, já aprovada, foi cancelada pelo escritório.\n\nMotivo: {{rejectionReason}}\n\nAcompanhe em: {{portalUrl}}' },
   },
+  PROTOCOL_CREATED: {
+    WHATSAPP: { body: 'Olá, {{clientName}}! Você tem um novo protocolo: *{{protocolTitle}}*.\n\nAcesse o portal pra ver os detalhes: {{portalUrl}}' },
+    EMAIL: { subject: 'Novo protocolo — {{protocolTitle}}', body: 'Olá, {{clientName}}!\n\nVocê tem um novo protocolo: *{{protocolTitle}}*.\n\nAcesse o portal pra ver os detalhes: {{portalUrl}}' },
+  },
 }

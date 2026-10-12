@@ -21,6 +21,7 @@ export interface TemplateVars {
   taskCount?: string       // novo — quantidade total de tarefas em alerta (SLA_DIGEST)
   criticalCount?: string   // novo — quantidade em nível crítico (SLA_DIGEST)
   taskListText?: string    // novo — lista formatada em texto simples, uma tarefa por linha (SLA_DIGEST)
+  protocolTitle?: string   // novo — título do protocolo (PROTOCOL_CREATED)
 }
 
 export const PREVIEW_VARS: TemplateVars = {
@@ -39,6 +40,7 @@ export const PREVIEW_VARS: TemplateVars = {
   taskCount: '3',
   criticalCount: '1',
   taskListText: '- Abertura de LTDA (João Silva) — vence 20/10/2026 [crítico]\n- Folha de pagamento (Maria Souza) — meta 25/10/2026 [atenção]',
+  protocolTitle: 'Guia de DARF — Outubro/2026',
 }
 
 export function renderTemplate(body: string, vars: TemplateVars): string {

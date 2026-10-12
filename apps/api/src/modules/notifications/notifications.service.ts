@@ -34,6 +34,8 @@ export async function getConfig(organizationId: string) {
       requestNeedsInfo: true,
       requestCommentAdded: true,
       requestCancelled: true,
+      protocolCreated: true,
+      protocolWarningDays: true,
       taskBlocked: true,
       recurringGenerationFailed: true,
       documentRejected: true,
