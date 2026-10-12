@@ -139,6 +139,41 @@ export interface ClientRequest {
   client?: { id: string; name: string }
 }
 
+export interface ProtocolEvent {
+  id: string
+  type: 'SENT' | 'VIEWED' | 'DOWNLOADED' | 'EXPIRED'
+  actorType: string
+  actorName: string | null
+  actorEmail: string | null
+  ip: string | null
+  userAgent: string | null
+  createdAt: string
+}
+
+export interface Protocol {
+  id: string
+  number: string
+  title: string
+  content: string | null
+  dueDate: string | null
+  status: 'SENT' | 'VIEWED' | 'DOWNLOADED' | 'EXPIRED'
+  attachmentId: string | null
+  taskId: string
+  clientId: string
+  createdAt: string
+  client?: { id: string; name: string }
+  attachment?: { filename: string } | null
+  events?: ProtocolEvent[]
+  boardId?: string   // só presente em GET /protocols (listagem da org) — ver protocols.service.ts
+}
+
+export interface ProtocolSummary {
+  SENT: number
+  VIEWED: number
+  DOWNLOADED: number
+  EXPIRED: number
+}
+
 export interface Department {
   id: string
   name: string
