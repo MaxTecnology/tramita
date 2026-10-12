@@ -168,7 +168,7 @@ export async function portalRoutes(app: FastifyInstance) {
     const scope = await getClientAccessScope(request.user.sub)
     if (!scope.clientIds.includes(clientId)) throw new AppError(404, 'Empresa não encontrada')
     return reply.send(
-      await listProtocolsForClient(request.user.organizationId!, clientId, {
+      await listProtocolsForClient(request.user.organizationId!, clientId, request.user.sub, {
         status: status as never,
         search,
       }),

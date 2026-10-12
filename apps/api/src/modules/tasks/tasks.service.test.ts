@@ -520,6 +520,30 @@ describe('deleteTask', () => {
 
     await expect(deleteTask(task.id, orgB.id)).rejects.toMatchObject({ statusCode: 404 })
   })
+
+  it('throws 409 and keeps the task when it has a protocol — protocols are legal evidence and must not cascade-delete', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.protocol.create({
+      data: {
+        organizationId: org.id,
+        number: '2026-000001',
+        clientId: client.id,
+        taskId: task.id,
+        title: 'Guia DARF',
+        createdById: user.id,
+      },
+    })
+
+    await expect(deleteTask(task.id, org.id)).rejects.toMatchObject({ statusCode: 409 })
+    const stored = await prisma.task.findUnique({ where: { id: task.id } })
+    expect(stored).not.toBeNull()
+  })
 })
 
 describe('getTaskHistory', () => {

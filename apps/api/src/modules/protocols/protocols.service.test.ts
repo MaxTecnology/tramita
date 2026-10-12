@@ -189,6 +189,26 @@ describe('registerView / registerDownload', () => {
       registerDownload(protocol.id, org.id, clientUser.id, '203.0.113.5', 'ua'),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
+
+  it('registerDownload lança 404 quando o anexo do protocolo foi soft-deletado, sem gerar evento DOWNLOADED', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { client, task, attachment } = await setupTaskWithAttachment(org.id, admin.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    await prisma.task.update({ where: { id: task.id }, data: { departmentId: department.id } })
+    const protocol = await createProtocol(task.id, org.id, admin.id, { attachmentId: attachment.id, title: 'Guia DARF' })
+    await prisma.attachment.update({ where: { id: attachment.id }, data: { deletedAt: new Date() } })
+
+    await expect(
+      registerDownload(protocol.id, org.id, clientUser.id, '203.0.113.5', 'ua'),
+    ).rejects.toMatchObject({ statusCode: 404 })
+
+    const events = await prisma.protocolEvent.findMany({ where: { protocolId: protocol.id, type: 'DOWNLOADED' } })
+    expect(events).toHaveLength(0)
+  })
 })
 
 describe('expireOverdueProtocols', () => {
@@ -230,6 +250,30 @@ describe('expireOverdueProtocols', () => {
 
     expect((await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })).status).toBe('VIEWED')
   })
+
+  it('não regride pra EXPIRED se o cliente visualiza concorrentemente com a expiração — qualquer ordem converge pra VIEWED', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { task, attachment, client } = await setupTaskWithAttachment(org.id, admin.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    const department = await createTestDepartment(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    await prisma.task.update({ where: { id: task.id }, data: { departmentId: department.id } })
+    const past = new Date(Date.now() - 86400000)
+    const protocol = await createProtocol(task.id, org.id, admin.id, { title: 'x', attachmentId: attachment.id, dueDate: past })
+
+    // Dispara visualização e expiração ao mesmo tempo contra o banco real — não importa qual
+    // vence a corrida: registerView aceita EXPIRED como origem válida e o updateMany guardado
+    // de expireOverdueProtocols só aplica EXPIRED sobre SENT, então as duas ordens convergem
+    // pro mesmo resultado correto (VIEWED), nunca EXPIRED.
+    await Promise.all([
+      registerView(protocol.id, org.id, clientUser.id, '203.0.113.5', 'ua'),
+      expireOverdueProtocols(org.id, new Date()),
+    ])
+
+    expect((await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })).status).toBe('VIEWED')
+  })
 })
 
 describe('listProtocolsForOrg / listProtocolsForClient / getProtocolById / getProtocolsSummary', () => {
@@ -246,9 +290,42 @@ describe('listProtocolsForOrg / listProtocolsForClient / getProtocolById / getPr
     expect(all).toHaveLength(2)
     expect(all.every((p) => typeof p.boardId === 'string')).toBe(true)
 
-    const onlyA = await listProtocolsForClient(org.id, clientA.id, {})
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, clientA.id, taskA.departmentId)
+
+    const onlyA = await listProtocolsForClient(org.id, clientA.id, clientUser.id, {})
     expect(onlyA).toHaveLength(1)
     expect(onlyA[0].title).toBe('Da A')
+  })
+
+  it('listProtocolsForClient nunca devolve o content — só GET /protocols/:id (registerView) revela o texto, pra não burlar o registro de visualização', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { task, client } = await setupTaskWithAttachment(org.id, admin.id)
+    await createProtocol(task.id, org.id, admin.id, { title: 'Aviso', content: 'Segredo que só pode ser lido via visualização registrada' })
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, task.departmentId)
+
+    const list = await listProtocolsForClient(org.id, client.id, clientUser.id, {})
+
+    expect(list).toHaveLength(1)
+    expect((list[0] as { content?: string }).content).toBeUndefined()
+  })
+
+  it('listProtocolsForClient esconde protocolo de departamento ao qual a ClientUser não tem acesso', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { task, attachment, client } = await setupTaskWithAttachment(org.id, admin.id)
+    await createProtocol(task.id, org.id, admin.id, { title: 'Protocolo de outro depto', attachmentId: attachment.id })
+    const otherDepartment = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, otherDepartment.id)
+
+    const list = await listProtocolsForClient(org.id, client.id, clientUser.id, {})
+
+    expect(list).toHaveLength(0)
   })
 
   it('listProtocolsForClient esconde protocolo cuja task deixou de ser visível ao cliente', async () => {
@@ -258,8 +335,10 @@ describe('listProtocolsForOrg / listProtocolsForClient / getProtocolById / getPr
     const { task, attachment, client } = await setupTaskWithAttachment(org.id, admin.id)
     await createProtocol(task.id, org.id, admin.id, { title: 'Vira interno', attachmentId: attachment.id })
     await prisma.task.update({ where: { id: task.id }, data: { visibleToClient: false } })
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, task.departmentId)
 
-    const list = await listProtocolsForClient(org.id, client.id, {})
+    const list = await listProtocolsForClient(org.id, client.id, clientUser.id, {})
 
     expect(list).toHaveLength(0)
   })
@@ -309,5 +388,22 @@ describe('buildProtocolReceiptHtml', () => {
     expect(html).toContain(detail.number)
     expect(html).toContain('Guia DARF')
     expect(html).toContain('evidência de apoio')
+  })
+
+  it('inclui o nome de quem criou no evento SENT e o vencimento do protocolo', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { task, attachment } = await setupTaskWithAttachment(org.id, admin.id)
+    const dueDate = new Date(Date.UTC(2026, 9, 20))
+    const protocol = await createProtocol(task.id, org.id, admin.id, { title: 'Guia DARF', attachmentId: attachment.id, dueDate })
+    const detail = await getProtocolById(protocol.id, org.id)
+
+    const sentEvent = detail.events.find((e) => e.type === 'SENT')
+    expect(sentEvent?.actorName).toBe(admin.name)
+
+    const html = buildProtocolReceiptHtml(detail)
+    expect(html).toContain(admin.name)
+    expect(html).toContain('20/10/2026')
   })
 })

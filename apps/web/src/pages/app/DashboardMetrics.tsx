@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { Protocol, ProtocolSummary } from '@/types'
+import { formatDateOnlyUTC } from '@/lib/dates'
 
 interface Metrics {
   kpis: {
@@ -467,7 +468,7 @@ function ProtocolsTab() {
               <div className="text-right flex-shrink-0">
                 {p.dueDate && (
                   <p className="text-xs text-muted-foreground">
-                    vence {new Date(p.dueDate).toLocaleDateString('pt-BR')}
+                    vence {formatDateOnlyUTC(p.dueDate)}
                   </p>
                 )}
                 <span className={cn(

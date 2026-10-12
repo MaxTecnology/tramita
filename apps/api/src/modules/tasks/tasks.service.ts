@@ -401,6 +401,10 @@ export async function reorderTasks(items: ReorderTasksBody, organizationId: stri
 
 export async function deleteTask(id: string, organizationId: string) {
   await verifyTaskBelongsToOrg(id, organizationId)
+  const protocolCount = await prisma.protocol.count({ where: { taskId: id } })
+  if (protocolCount > 0) {
+    throw new AppError(409, 'Essa tarefa tem protocolos — eles são evidência legal e não podem ser apagados junto com a tarefa')
+  }
   await prisma.task.delete({ where: { id } })
   return { ok: true }
 }

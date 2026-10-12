@@ -166,6 +166,22 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
     onError: () => toast.error('Erro ao criar protocolo'),
   })
 
+  async function openProtocolReceipt(protocolId: string) {
+    // Abre a aba em branco de forma síncrona com o clique (senão navegadores bloqueiam o popup
+    // quando window.open roda só depois da resposta assíncrona do fetch).
+    const win = window.open('', '_blank')
+    try {
+      const { data: html } = await api.get<string>(`/protocols/${protocolId}/receipt`)
+      if (win) {
+        win.document.write(html)
+        win.document.close()
+      }
+    } catch {
+      win?.close()
+      toast.error('Erro ao abrir comprovante')
+    }
+  }
+
   const { data: history = [] } = useQuery<TaskHistory[]>({
     queryKey: ['task-history', task.id],
     queryFn: () => api.get(historyEndpoint(task.id, role)).then((r) => r.data),
@@ -709,9 +725,18 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                       </div>
                       {p.dueDate && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          Vencimento: {new Date(p.dueDate).toLocaleDateString('pt-BR')}
+                          Vencimento: {formatDateOnlyUTC(p.dueDate)}
                         </p>
                       )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="mt-1 h-auto px-0 text-xs text-[#185FA5] hover:underline"
+                        onClick={() => openProtocolReceipt(p.id)}
+                      >
+                        Ver comprovante
+                      </Button>
                     </div>
                   ))}
                 </div>

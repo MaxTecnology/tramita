@@ -66,6 +66,27 @@ describe('processNotificationJob — Column.notifyClient forceChannels', () => {
     expect(logs.some((l) => l.channel === 'WHATSAPP' && l.status === 'SENT')).toBe(true)
   })
 
+  it('PROTOCOL_CREATED interpola o título do protocolo na mensagem (não manda {{protocolTitle}} vazio)', async () => {
+    const { org, client, task } = await setup(false)
+
+    const job: { data: NotificationJob } = {
+      data: {
+        event: 'PROTOCOL_CREATED',
+        organizationId: org.id,
+        clientId: client.id,
+        taskId: task.id,
+        forceChannels: ['WHATSAPP'],
+        metadata: { protocolTitle: 'Guia DARF outubro/2026' },
+      },
+    }
+
+    await processNotificationJob(job)
+
+    expect(maximizebot.sendWhatsApp).toHaveBeenCalledTimes(1)
+    const sentBody = (maximizebot.sendWhatsApp as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string
+    expect(sentBody).toContain('Guia DARF outubro/2026')
+  })
+
   it('does nothing for TASK_MOVED when config.taskMoved is off and no forceChannels is present (no behavior change)', async () => {
     const { org, client, task } = await setup(false)
 

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { Inbox, Download, Search } from 'lucide-react'
 import type { Protocol } from '@/types'
 import { toast } from 'sonner'
+import { formatDateOnlyUTC } from '@/lib/dates'
 import { usePortalClient } from './Layout'
 
 const STATUS_LABEL: Record<Protocol['status'], string> = {
@@ -27,6 +28,7 @@ export default function PortalProtocols() {
   const [statusFilter, setStatusFilter] = useState<Protocol['status'] | ''>('')
   const [search, setSearch] = useState('')
   const [openedId, setOpenedId] = useState<string | null>(null)
+  const [openedContent, setOpenedContent] = useState<string | null>(null)
 
   const { data: protocols = [], isLoading } = useQuery<Protocol[]>({
     queryKey: ['portal-protocols', clientId, statusFilter, search],
@@ -37,8 +39,11 @@ export default function PortalProtocols() {
   })
 
   const viewMutation = useMutation({
-    mutationFn: (id: string) => api.get(`/portal/protocols/${id}`).then((r) => r.data),
-    onSuccess: (_, id) => setOpenedId(id),
+    mutationFn: (id: string) => api.get<Protocol>(`/portal/protocols/${id}`).then((r) => r.data),
+    onSuccess: (data, id) => {
+      setOpenedId(id)
+      setOpenedContent(data.content)
+    },
     onError: () => toast.error('Erro ao abrir protocolo'),
   })
 
@@ -96,7 +101,7 @@ export default function PortalProtocols() {
                   <p className="text-sm font-medium text-foreground">{p.title}</p>
                   {p.dueDate && (
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Vencimento: {new Date(p.dueDate).toLocaleDateString('pt-BR')}
+                      Vencimento: {formatDateOnlyUTC(p.dueDate)}
                     </p>
                   )}
                 </div>
@@ -125,8 +130,8 @@ export default function PortalProtocols() {
                 )}
               </div>
 
-              {openedId === p.id && p.content && (
-                <p className="text-sm text-foreground mt-2 pt-2 border-t border-border">{p.content}</p>
+              {openedId === p.id && openedContent && (
+                <p className="text-sm text-foreground mt-2 pt-2 border-t border-border">{openedContent}</p>
               )}
             </div>
           ))}

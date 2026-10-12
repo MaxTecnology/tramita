@@ -99,6 +99,7 @@ async function processClientNotification(
     portalUrl: `${process.env.APP_URL ?? 'https://tramita.autohubs.com.br'}/portal`,
     commentText: metadata.commentText,
     commentAuthorName: metadata.commentAuthorName,
+    protocolTitle: metadata.protocolTitle,
   }
 
   const channels: MessageChannel[] = []

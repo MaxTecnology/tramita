@@ -921,6 +921,17 @@ describe('regenerateTask', () => {
     await expect(regenerateTask(taskId, org.id)).rejects.toMatchObject({ statusCode: 409 })
   })
 
+  it('bloqueia regeneração se a tarefa tem protocolo — evidência legal não pode ser apagada', async () => {
+    const { org, client, taskId } = await setup()
+    await prisma.protocol.create({
+      data: { organizationId: org.id, number: '2026-000001', clientId: client.id, taskId, title: 'Guia DARF', createdById: (await createTestUser(org.id)).id },
+    })
+
+    await expect(regenerateTask(taskId, org.id)).rejects.toMatchObject({ statusCode: 409 })
+    const stillThere = await prisma.task.findUnique({ where: { id: taskId } })
+    expect(stillThere).not.toBeNull()
+  })
+
   it('lança 400 se a tarefa não é recorrente', async () => {
     const { org, taskId } = await setup()
     await prisma.task.update({ where: { id: taskId }, data: { recurringTemplateId: null } })

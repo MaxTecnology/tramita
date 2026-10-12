@@ -588,12 +588,13 @@ export async function regenerateTask(taskId: string, organizationId: string) {
     throw new AppError(400, 'Tarefa recorrente sem competência registrada — não é possível regenerar')
   }
 
-  const [historyCount, commentCount, attachmentCount] = await Promise.all([
+  const [historyCount, commentCount, attachmentCount, protocolCount] = await Promise.all([
     prisma.taskHistory.count({ where: { taskId, action: { not: 'created' } } }),
     prisma.comment.count({ where: { taskId } }),
     prisma.attachment.count({ where: { taskId } }),
+    prisma.protocol.count({ where: { taskId } }),
   ])
-  if (historyCount > 0 || commentCount > 0 || attachmentCount > 0) {
+  if (historyCount > 0 || commentCount > 0 || attachmentCount > 0 || protocolCount > 0) {
     throw new AppError(409, 'Essa tarefa já teve movimentação — não pode ser regenerada automaticamente')
   }
 

@@ -13,6 +13,7 @@ interface ProtocolDetail {
   title: string
   content: string | null
   status: ProtocolStatus
+  dueDate: Date | null
   client: { name: string }
   attachment: { filename: string } | null
   events: { type: string; actorName: string | null; actorEmail: string | null; ip: string | null; createdAt: Date }[]
@@ -69,8 +70,16 @@ export async function createProtocol(
     },
   })
 
+  const staffUser = await prisma.user.findUnique({ where: { id: staffId }, select: { name: true, email: true } })
   await prisma.protocolEvent.create({
-    data: { protocolId: protocol.id, type: 'SENT', actorType: 'user', actorId: staffId },
+    data: {
+      protocolId: protocol.id,
+      type: 'SENT',
+      actorType: 'user',
+      actorId: staffId,
+      actorName: staffUser?.name ?? null,
+      actorEmail: staffUser?.email ?? null,
+    },
   })
 
   await enqueueNotification({
@@ -115,8 +124,13 @@ export async function listProtocolsForTask(taskId: string, organizationId: strin
 export async function listProtocolsForClient(
   organizationId: string,
   clientId: string,
+  clientUserId: string,
   filters: { status?: ProtocolStatus; from?: Date; to?: Date; search?: string },
 ) {
+  const scope = await getClientAccessScope(clientUserId)
+  const departmentIds = scope.departmentIdsByClient.get(clientId)
+  if (!departmentIds || departmentIds.size === 0) return []
+
   return prisma.protocol.findMany({
     where: {
       organizationId,
@@ -125,10 +139,17 @@ export async function listProtocolsForClient(
       // pode aparecer nesta lista — senão o card aparece pro cliente mas abrir/baixar (que
       // revalida isso em registerView/registerDownload) devolveria 404, uma inconsistência
       // visível pro próprio cliente.
-      task: { visibleToClient: true },
+      task: { visibleToClient: true, departmentId: { in: [...departmentIds] } },
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.from || filters.to ? { createdAt: { gte: filters.from, lte: filters.to } } : {}),
       ...(filters.search ? { title: { contains: filters.search, mode: 'insensitive' } } : {}),
+    },
+    // Nunca inclui `content` aqui: essa lista não registra VIEWED (só GET /protocols/:id via
+    // registerView faz isso) — mandar o texto completo já nesta resposta deixaria o cliente ler
+    // o conteúdo todo sem nunca gerar o evento que a feature inteira existe pra garantir.
+    select: {
+      id: true, number: true, title: true, dueDate: true, status: true,
+      attachmentId: true, taskId: true, clientId: true, createdAt: true,
     },
     orderBy: { createdAt: 'desc' },
   })
@@ -189,9 +210,10 @@ export async function registerView(
     data: { protocolId, type: 'VIEWED', actorType: 'client', actorId: clientUserId, actorName: actor.name, actorEmail: actor.email, ip, userAgent },
   })
 
-  if (protocol.status === 'SENT') {
-    await prisma.protocol.updateMany({ where: { id: protocolId, status: 'SENT' }, data: { status: 'VIEWED' } })
-  }
+  // Guarda pelo status atual no banco (não pela leitura anterior, que pode estar obsoleta) — e
+  // inclui EXPIRED como origem válida: visualizar depois do vencimento ainda é visualizar, e a
+  // regra de negócio é EXPIRED só vale pra quem nunca viu o protocolo.
+  await prisma.protocol.updateMany({ where: { id: protocolId, status: { in: ['SENT', 'EXPIRED'] } }, data: { status: 'VIEWED' } })
 
   return prisma.protocol.findUniqueOrThrow({ where: { id: protocolId } })
 }
@@ -209,16 +231,16 @@ export async function registerDownload(
   })
   if (!protocol || !protocol.task.visibleToClient) throw new AppError(404, 'Protocolo não encontrado')
   await assertClientAccess(protocol.clientId, protocol.task.departmentId, clientUserId)
-  if (!protocol.attachment) throw new AppError(404, 'Esse protocolo não tem arquivo pra baixar')
+  if (!protocol.attachment || protocol.attachment.deletedAt) throw new AppError(404, 'Esse protocolo não tem arquivo pra baixar')
 
   const actor = await resolveClientUserActor(clientUserId)
   await prisma.protocolEvent.create({
     data: { protocolId, type: 'DOWNLOADED', actorType: 'client', actorId: clientUserId, actorName: actor.name, actorEmail: actor.email, ip, userAgent },
   })
 
-  if (protocol.status === 'SENT' || protocol.status === 'VIEWED') {
-    await prisma.protocol.updateMany({ where: { id: protocolId, status: protocol.status }, data: { status: 'DOWNLOADED' } })
-  }
+  // Mesma guarda por status atual no banco: baixar também conta como ter visto, então sobrepõe
+  // até um EXPIRED tardio (ver comentário equivalente em registerView).
+  await prisma.protocol.updateMany({ where: { id: protocolId, status: { in: ['SENT', 'VIEWED', 'EXPIRED'] } }, data: { status: 'DOWNLOADED' } })
 
   return getSignedDownloadUrl(protocol.attachment.storageKey)
 }
@@ -229,14 +251,21 @@ export async function expireOverdueProtocols(organizationId: string, now: Date):
     select: { id: true },
   })
 
+  let expiredCount = 0
   for (const p of overdue) {
-    await prisma.$transaction([
-      prisma.protocol.update({ where: { id: p.id }, data: { status: 'EXPIRED' } }),
-      prisma.protocolEvent.create({ data: { protocolId: p.id, type: 'EXPIRED', actorType: 'system' } }),
-    ])
+    // updateMany com guarda de status: entre o findMany acima e aqui, o cliente pode ter
+    // visualizado o protocolo (SENT -> VIEWED) — sem a guarda, este update sobrescreveria
+    // incondicionalmente de volta pra EXPIRED, regredindo um protocolo já visualizado.
+    const { count } = await prisma.protocol.updateMany({
+      where: { id: p.id, status: 'SENT' },
+      data: { status: 'EXPIRED' },
+    })
+    if (count === 0) continue
+    await prisma.protocolEvent.create({ data: { protocolId: p.id, type: 'EXPIRED', actorType: 'system' } })
+    expiredCount++
   }
 
-  return overdue.length
+  return expiredCount
 }
 
 const EVENT_TYPE_LABEL: Record<string, string> = {
@@ -278,6 +307,7 @@ export function buildProtocolReceiptHtml(protocol: ProtocolDetail): string {
 <body>
   <h1>Protocolo ${escapeHtml(protocol.number)}</h1>
   <p class="muted">${escapeHtml(protocol.title)} — ${escapeHtml(protocol.client.name)}</p>
+  ${protocol.dueDate ? `<p class="muted">Vencimento: ${new Date(protocol.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</p>` : ''}
   <p>${protocol.content ? escapeHtml(protocol.content) : `Arquivo: ${escapeHtml(protocol.attachment?.filename ?? '—')}`}</p>
   <table>
     <thead><tr><th>Evento</th><th>Quem</th><th>IP</th><th>Quando</th></tr></thead>
