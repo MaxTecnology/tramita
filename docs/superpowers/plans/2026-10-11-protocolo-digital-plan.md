@@ -565,10 +565,24 @@ describe('listProtocolsForOrg / listProtocolsForClient / getProtocolById / getPr
 
     const all = await listProtocolsForOrg(org.id, {})
     expect(all).toHaveLength(2)
+    expect(all.every((p) => typeof p.boardId === 'string')).toBe(true)
 
     const onlyA = await listProtocolsForClient(org.id, clientA.id, {})
     expect(onlyA).toHaveLength(1)
     expect(onlyA[0].title).toBe('Da A')
+  })
+
+  it('listProtocolsForClient esconde protocolo cuja task deixou de ser visível ao cliente', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { task, attachment, client } = await setupTaskWithAttachment(org.id, admin.id)
+    await createProtocol(task.id, org.id, admin.id, { title: 'Vira interno', attachmentId: attachment.id })
+    await prisma.task.update({ where: { id: task.id }, data: { visibleToClient: false } })
+
+    const list = await listProtocolsForClient(org.id, client.id, {})
+
+    expect(list).toHaveLength(0)
   })
 
   it('getProtocolById inclui a timeline de eventos ordenada', async () => {
@@ -721,16 +735,22 @@ export async function listProtocolsForOrg(
   organizationId: string,
   filters: { status?: ProtocolStatus; clientId?: string; from?: Date; to?: Date },
 ) {
-  return prisma.protocol.findMany({
+  const protocols = await prisma.protocol.findMany({
     where: {
       organizationId,
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.clientId ? { clientId: filters.clientId } : {}),
       ...(filters.from || filters.to ? { createdAt: { gte: filters.from, lte: filters.to } } : {}),
     },
-    include: { client: { select: { id: true, name: true } } },
+    include: {
+      client: { select: { id: true, name: true } },
+      // boardId achatado abaixo — o Dashboard (Task 11) linka pro board, não existe rota de
+      // task isolada no app (mesmo padrão já resolvido na feature de Solicitações).
+      task: { select: { column: { select: { boardId: true } } } },
+    },
     orderBy: { createdAt: 'desc' },
   })
+  return protocols.map(({ task, ...rest }) => ({ ...rest, boardId: task.column.boardId }))
 }
 
 export async function listProtocolsForTask(taskId: string, organizationId: string) {
@@ -748,6 +768,11 @@ export async function listProtocolsForClient(
     where: {
       organizationId,
       clientId,
+      // Um protocolo cuja Task foi marcada como visibleToClient: false depois de criado nunca
+      // pode aparecer nesta lista — senão o card aparece pro cliente mas abrir/baixar (que
+      // revalida isso em registerView/registerDownload) devolveria 404, uma inconsistência
+      // visível pro próprio cliente.
+      task: { visibleToClient: true },
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.from || filters.to ? { createdAt: { gte: filters.from, lte: filters.to } } : {}),
       ...(filters.search ? { title: { contains: filters.search, mode: 'insensitive' } } : {}),
@@ -1555,6 +1580,32 @@ describe('runSlaDigest — protocolos', () => {
       expect.objectContaining({ metadata: expect.objectContaining({ taskListText: expect.stringContaining('Já visto') }) }),
     )
   })
+
+  it('expira protocolo vencido mesmo com slaDigestEnabled desligado — expiração não é uma função do email', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await prisma.notificationConfig.upsert({
+      where: { organizationId: org.id },
+      create: { organizationId: org.id, slaDigestEnabled: false },
+      update: { slaDigestEnabled: false },
+    })
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, admin.id)
+    const attachment = await prisma.attachment.create({
+      data: { taskId: task.id, filename: 'guia.pdf', mimeType: 'application/pdf', size: 10, storageKey: 'k', uploadedBy: admin.id },
+    })
+    const past = new Date(Date.now() - 86400000)
+    const protocol = await createProtocol(task.id, org.id, admin.id, { title: 'x', attachmentId: attachment.id, dueDate: past })
+
+    await runSlaDigest(new Date())
+
+    expect((await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })).status).toBe('EXPIRED')
+    expect(enqueueNotification).not.toHaveBeenCalled() // digest desligado, mas expiração aconteceu
+  })
 })
 ```
 
@@ -1644,6 +1695,12 @@ async function runSlaDigestForOrg(
   },
   now: Date,
 ): Promise<void> {
+  // Roda incondicionalmente, ANTES de qualquer early-return — expirar um protocolo vencido é uma
+  // transição de estado de negócio (o Dashboard e o comprovante do cliente dependem dela), não
+  // uma função do email de resumo. Desligar o digest (`slaDigestEnabled: false`) não pode ter o
+  // efeito colateral de travar a expiração de protocolo pra sempre.
+  await expireOverdueProtocols(org.id, now)
+
   if (org.notificationConfig?.slaDigestEnabled === false) return
 
   // Org sem linha em NotificationConfig (nunca visitou a tela de Configurações) provisiona aqui,
@@ -1658,10 +1715,6 @@ async function runSlaDigestForOrg(
     slaTargetWarningDays: notificationConfig.slaTargetWarningDays,
     slaDueCriticalDays: notificationConfig.slaDueCriticalDays,
   }
-
-  // Precisa rodar ANTES de montar as entries de protocolo — senão um protocolo que venceu hoje
-  // ainda apareceria como SENT (tag "atenção") na mesma rodada em que deveria virar EXPIRED.
-  await expireOverdueProtocols(org.id, now)
 
   const tasks = await prisma.task.findMany({
     where: {
@@ -1923,6 +1976,7 @@ export interface Protocol {
   client?: { id: string; name: string }
   attachment?: { filename: string } | null
   events?: ProtocolEvent[]
+  boardId?: string   // só presente em GET /protocols (listagem da org) — ver protocols.service.ts
 }
 
 export interface ProtocolSummary {
@@ -2472,7 +2526,7 @@ function ProtocolsTab() {
           sorted.map((p) => (
             <Link
               key={p.id}
-              to={`/app/board/${p.taskId}`}
+              to={`/app/board/${p.boardId}`}
               className="flex items-center justify-between gap-3 px-5 py-3 border-b border-border last:border-0 hover:bg-neutral-bg transition-colors"
             >
               <div className="min-w-0">
@@ -2501,15 +2555,18 @@ function ProtocolsTab() {
 }
 ```
 
-Adicionar `Protocol, ProtocolSummary` ao import de tipos existente no topo do arquivo (se já
-houver um import de `@/types`, ajustar esse; senão, adicionar
-`import type { Protocol, ProtocolSummary } from '@/types'`).
+`DashboardMetrics.tsx` hoje não importa nada de `@/types` (todas as interfaces usadas no arquivo
+são locais, ex: `ProductivityMetrics`) — adicionar uma linha de import nova, junto dos demais
+imports no topo do arquivo (linha ~8, logo após `import { Label } from '@/components/ui/label'`):
 
-Nota: o link de cada linha da tabela usa `/app/board/${p.taskId}` — isso abre o **board**, não a
-task diretamente (não existe rota de task isolada no app, mesmo padrão já confirmado na feature
-anterior). Pra abrir a task específica dentro do board seria preciso o `boardId`, que o endpoint
-`GET /protocols` não expõe hoje — aceitável como v1 (leva pro board certo, usuário acha a task
-manualmente); registrar como melhoria futura se o fluxo se mostrar lento na prática.
+```typescript
+import type { Protocol, ProtocolSummary } from '@/types'
+```
+
+Nota: o link de cada linha usa `/app/board/${p.boardId}` — `boardId` vem achatado de
+`listProtocolsForOrg` (Task 2, via `task.column.boardId`), mesmo padrão já usado pra `Request` na
+feature anterior. Abre o **board**, não a task específica dentro dele (não existe rota de task
+isolada no app) — aceitável como v1, usuário acha a task manualmente dentro do board certo.
 
 - [ ] **Step 2: Verificar tipos**
 
@@ -2616,3 +2673,23 @@ mesma assinatura exata em Task 3 (rotas staff), Task 4 (rotas portal) e Task 6 (
 **4. Review Focus:** as 5 situações listadas (ClientUser sem acesso, Task não visível, anexo de
 outra task, download sem arquivo, número sob concorrência) têm teste dedicado na Task 2 (as 4
 primeiras) e Task 2/4 (a quinta, testada tanto isolada quanto via rota real).
+
+**5. Re-revisão antes de iniciar a execução (pedida pelo usuário):** achei e corrigi 3 problemas
+reais antes de começar a implementar, todos já refletidos no texto acima:
+- `listProtocolsForClient` não filtrava por `task.visibleToClient` — um protocolo cuja Task
+  virasse interna depois de criada continuaria aparecendo na lista do portal, mesmo que abrir/
+  baixar já desse 404 (inconsistência visível pro próprio cliente). Corrigido com `task: {
+  visibleToClient: true }` no `where` + teste dedicado.
+- O link do Dashboard (Task 11) usava `/app/board/${p.taskId}` — `taskId` não é um `boardId`,
+  isso navegaria pra um board errado/inexistente. Corrigido: `listProtocolsForOrg` agora achata
+  `boardId` via `task.column.boardId` (mesmo padrão já usado pra `Request` na feature anterior),
+  `Protocol.boardId` adicionado ao tipo (Task 8), link corrigido pra `p.boardId`.
+- `expireOverdueProtocols` só rodava se `slaDigestEnabled` estivesse ligado — desligar o email de
+  resumo teria o efeito colateral de travar a expiração de protocolo pra sempre (um protocolo
+  vencido nunca viraria `EXPIRED`, nem apareceria como tal no Dashboard/comprovante). Corrigido:
+  a expiração agora roda incondicionalmente, antes de qualquer `return` antecipado, com teste
+  dedicado confirmando que expira mesmo com o digest desligado.
+
+Também corrigido um teste da Task 3 cujo nome dizia "CLIENT não pode criar (403)" mas na
+verdade só testava ausência de header de autenticação (401) — separado em dois testes
+corretos.
