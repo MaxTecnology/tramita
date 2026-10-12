@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import type { Protocol, ProtocolSummary } from '@/types'
 
 interface Metrics {
   kpis: {
@@ -402,8 +403,90 @@ function ProductivityTab() {
   )
 }
 
+const PROTOCOL_STATUS_LABEL: Record<Protocol['status'], string> = {
+  SENT: 'Enviados',
+  VIEWED: 'Visualizados',
+  DOWNLOADED: 'Baixados',
+  EXPIRED: 'Vencidos',
+}
+
+function ProtocolsTab() {
+  const [statusFilter, setStatusFilter] = useState<Protocol['status'] | ''>('')
+
+  const { data: summary } = useQuery<ProtocolSummary>({
+    queryKey: ['protocols-summary'],
+    queryFn: () => api.get('/protocols/summary').then((r) => r.data),
+  })
+
+  const { data: protocols = [] } = useQuery<Protocol[]>({
+    queryKey: ['protocols', statusFilter],
+    queryFn: () => api.get('/protocols', { params: { status: statusFilter || undefined } }).then((r) => r.data),
+  })
+
+  const sorted = useMemo(() => {
+    return [...protocols].sort((a, b) => {
+      if (!a.dueDate) return 1
+      if (!b.dueDate) return -1
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+    })
+  }, [protocols])
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {(['SENT', 'VIEWED', 'DOWNLOADED', 'EXPIRED'] as const).map((status) => (
+          <button
+            key={status}
+            type="button"
+            onClick={() => setStatusFilter(statusFilter === status ? '' : status)}
+            className={cn(
+              'rounded-xl border p-4 text-left transition-colors',
+              statusFilter === status ? 'border-[#185FA5] bg-[#185FA5]/5' : 'border-border bg-surface',
+            )}
+          >
+            <p className="text-2xl font-bold text-foreground">{summary?.[status] ?? 0}</p>
+            <p className="text-xs text-muted-foreground mt-1">{PROTOCOL_STATUS_LABEL[status]}</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+        {sorted.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-12">Nenhum protocolo encontrado.</p>
+        ) : (
+          sorted.map((p) => (
+            <Link
+              key={p.id}
+              to={`/app/board/${p.boardId}`}
+              className="flex items-center justify-between gap-3 px-5 py-3 border-b border-border last:border-0 hover:bg-neutral-bg transition-colors"
+            >
+              <div className="min-w-0">
+                <p className="text-sm text-foreground truncate">{p.number} — {p.title}</p>
+                <p className="text-xs text-muted-foreground">{p.client?.name}</p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                {p.dueDate && (
+                  <p className="text-xs text-muted-foreground">
+                    vence {new Date(p.dueDate).toLocaleDateString('pt-BR')}
+                  </p>
+                )}
+                <span className={cn(
+                  'text-xs px-2 py-0.5 rounded-full',
+                  p.status === 'EXPIRED' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600',
+                )}>
+                  {PROTOCOL_STATUS_LABEL[p.status]}
+                </span>
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardMetrics() {
-  const [tab, setTab] = useState<'overview' | 'productivity'>('overview')
+  const [tab, setTab] = useState<'overview' | 'productivity' | 'protocols'>('overview')
   const { data, isLoading } = useQuery<Metrics>({
     queryKey: ['dashboard-metrics'],
     queryFn: () => api.get('/dashboard/metrics').then((r) => r.data),
@@ -415,7 +498,7 @@ export default function DashboardMetrics() {
       <h1 className="text-lg md:text-xl font-bold text-foreground">Dashboard</h1>
 
       <div className="flex border-b border-border">
-        {(['overview', 'productivity'] as const).map((t) => (
+        {(['overview', 'productivity', 'protocols'] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -425,7 +508,7 @@ export default function DashboardMetrics() {
               tab === t ? 'border-[#185FA5] text-[#185FA5]' : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
-            {t === 'overview' ? 'Visão geral' : 'Produtividade'}
+            {t === 'overview' ? 'Visão geral' : t === 'productivity' ? 'Produtividade' : 'Protocolos'}
           </button>
         ))}
       </div>
@@ -439,6 +522,8 @@ export default function DashboardMetrics() {
       )}
 
       {tab === 'productivity' && <ProductivityTab />}
+
+      {tab === 'protocols' && <ProtocolsTab />}
     </div>
   )
 }
