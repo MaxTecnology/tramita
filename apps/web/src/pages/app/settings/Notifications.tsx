@@ -23,6 +23,8 @@ interface Config {
   requestNeedsInfo?: boolean
   requestCommentAdded?: boolean
   requestCancelled?: boolean
+  protocolCreated?: boolean
+  protocolWarningDays?: number
   recurringGenerationFailed?: boolean
   documentRejected?: boolean
   slaTargetWarningDays?: number
@@ -57,6 +59,7 @@ const EVENT_LABEL: Record<string, string> = {
   REQUEST_NEEDS_INFO: 'Solicitação precisa de mais informação',
   REQUEST_COMMENT_ADDED: 'Comentário em solicitação',
   REQUEST_CANCELLED: 'Solicitação cancelada (pós-aprovação)',
+  PROTOCOL_CREATED: 'Protocolo criado',
   SLA_DIGEST: 'Resumo diário de prazos',
 }
 
@@ -326,6 +329,15 @@ export default function Notifications() {
             />
           </Section>
 
+          <Section title="Eventos — Protocolos">
+            <SwitchRow
+              label="Protocolo criado"
+              description="Notifica o cliente quando um protocolo formal é criado"
+              checked={form.protocolCreated ?? false}
+              onChange={(v) => setForm({ ...form, protocolCreated: v })}
+            />
+          </Section>
+
           <Section title="Eventos — Tarefas recorrentes">
             <SwitchRow
               label="Falha na geração de tarefa recorrente"
@@ -368,6 +380,17 @@ export default function Notifications() {
                   max={90}
                   value={form.lateClosureThresholdDays ?? 2}
                   onChange={(e) => setForm({ ...form, lateClosureThresholdDays: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="protocol-warning-days">Alerta de protocolo sem visualização (dias antes do vencimento)</Label>
+                <Input
+                  id="protocol-warning-days"
+                  type="number"
+                  min={0}
+                  max={90}
+                  value={form.protocolWarningDays ?? 3}
+                  onChange={(e) => setForm({ ...form, protocolWarningDays: Number(e.target.value) })}
                 />
               </div>
             </div>
