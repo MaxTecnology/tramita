@@ -299,8 +299,29 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
    `docs/superpowers/specs/2026-10-08-evolucao-solicitacoes-os-design.md` e
    `docs/superpowers/plans/2026-10-08-evolucao-solicitacoes-os-plan.md`.
 6. [ ] Automação de documentos (robô que lê/classifica documentos do cliente, inspirado no Nibo) — maior risco técnico, decidir fonte de dados (upload manual vs. leitura de pasta) antes de especificar
-7. [ ] Protocolo digital com validade jurídica + IP — estende o sistema de notificação/tracking já existente
+7. [x] **Protocolo digital com validade jurídica + IP** (concluído em 2026-10-12) —
+   `Protocol`/`ProtocolEvent` (log append-only, mesmo padrão de `TaskHistory`/`NotificationLog`)
+   pra documentos ou avisos formais com vencimento (ex: guia de imposto). Número sequencial por
+   organização (`AAAA-NNNNNN`, via `ProtocolCounter` com increment atômico, sem corrida sob
+   criação concorrente). Dois eventos distintos de visualização — abrir a tela (`VIEWED`) e
+   baixar o arquivo (`DOWNLOADED`), nunca sobrescrevem o anterior — cada um grava IP, user-agent
+   e email do `ClientUser` no momento do evento. Notificação (WhatsApp/email) nunca carrega o
+   arquivo nem link de download direto, só avisa pra acessar o portal — força a visualização a
+   acontecer num lugar rastreável. `EXPIRED` só dispara se o prazo passou e nunca houve
+   visualização; roda incondicionalmente no cron diário, mesmo com o digest de SLA desligado.
+   Digest diário estendido (não um cron novo) com seção de protocolos sem visualização/vencidos.
+   Comprovante exportável em HTML pronto pra impressão (decisão explícita: sem Puppeteer/PDF no
+   servidor, pra evitar problema de Chromium no Alpine), com aviso explícito de que o IP é
+   evidência de apoio, não assinatura digital certificada. `trustProxy: 1` no Fastify —
+   pré-requisito pro IP capturado refletir o cliente real, não o proxy (Traefik). Fora de
+   escopo nesta rodada, por decisão do usuário: assinatura eletrônica certificada e auditoria de
+   isolamento de rede do Dokploy/Traefik (recomendação registrada pra mais tarde). Frontend: aba
+   "Protocolos" no `TaskDrawer` (criar com anexo existente ou texto livre), tela "Meus
+   Protocolos" no portal (filtro de status/busca), aba "Protocolos" no Dashboard (contagem +
+   lista por urgência, linkando pro board certo). Ver
+   `docs/superpowers/specs/2026-10-11-protocolo-digital-design.md` e
+   `docs/superpowers/plans/2026-10-11-protocolo-digital-plan.md`.
 8. [x] **Usuários de cliente com acesso por departamento** (concluído em 2026-09-21) — `ClientUser`/`ClientUserAccess`, login do portal desacoplado de `Client`, `Task.departmentId` obrigatório. Um `ClientUser` (pessoa) pode acessar mais de uma empresa (`Client`), com escopo de departamento por empresa; rotas de portal (`requests`, `tasks`, `documents`) agora exigem `clientId` explícito e validam contra o escopo de acesso do usuário. Tela dedicada de Usuários de Cliente (CRUD + reaproveitamento de usuário existente ao cadastrar empresa), seletor de empresa no portal quando há mais de uma. Ver `docs/superpowers/sdd/2026-09-21-client-users/`.
 9. [x] **Kanban dinâmico, Templates de OS e código do cliente** (concluído em 2026-09-22) — coluna passa a ter `statusEffect` (`NONE`/`OPEN`/`STARTED`/`BLOCKED`/`DISREGARDED`/`DONE`, aplica o status na tarefa ao entrar na coluna) e `notifyClient` (notifica o cliente ao mover pra essa coluna, independente do toggle global da org), substituindo o antigo `isFinal`; `TaskStatus` ganha o valor `STARTED`. `OSTemplate`/`OSTemplateColumn`/`OSTemplateColumnDocument` (CRUD em `/os-templates`, `ORG_ADMIN` pra mutação) definem de uma vez as colunas (com `statusEffect`/`notifyClient`/checklist de documentos) que um board nasce com, usado tanto em `POST /boards` quanto em `POST /requests/:id/approve` (modo `NEW_BOARD`, template escolhido pelo cliente ao abrir a Solicitação via `GET /portal/os-templates`). `Client.codigo` — identificador curto opcional usado na busca e como prefixo do título do board criado a partir de uma Solicitação aprovada. `RecurringTaskAssignment` simplificado (vínculo direto por cliente, sem exigir board/coluna pré-existentes — board/coluna foram removidos do vínculo, não tornados diretos) e board oculto `RECURRING_SYSTEM` como "casa" das Tarefas Recorrentes sem processo. `GET /tasks` — listagem flat e filtrável (cliente, responsável, departamento, status, template recorrente, período, busca textual) atravessando todos os boards da org, inclusive o `RECURRING_SYSTEM`; base da tela unificada Tarefas (alternância Lista/Kanban dinâmico agrupado por status, cruzando tarefas de clientes diferentes). Frontend: telas de gestão de Templates de OS e Lista de OS, `Client.codigo` nos formulários/lista de clientes, seletor de tipo de solicitação (Template de OS) no portal. Ver `docs/superpowers/specs/2026-09-22-kanban-os-recorrente-redesign.md` e `docs/superpowers/plans/2026-09-22-kanban-os-recorrente-redesign.md`.
 
-Próximo passo: usuário escolhe entre os itens 4-7 do roadmap (métricas, evolução de Solicitações, automação de documentos, protocolo digital) pra entrar em brainstorming a seguir.
+Próximo passo: só resta o item 6 do roadmap (automação de documentos) em aberto — maior risco técnico, decidir fonte de dados (upload manual vs. leitura de pasta) antes de entrar em brainstorming.
