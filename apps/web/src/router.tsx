@@ -38,6 +38,7 @@ const PortalBoards = lazy(() => import('@/pages/portal/Boards'))
 const PortalBoard = lazy(() => import('@/pages/portal/Board'))
 const PortalProfile = lazy(() => import('@/pages/portal/Profile'))
 const PortalRequests = lazy(() => import('@/pages/portal/Requests'))
+const PortalProtocols = lazy(() => import('@/pages/portal/Protocols'))
 const PortalTasks = lazy(() => import('@/pages/portal/Tasks'))
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER']
@@ -243,6 +244,7 @@ export const router = createBrowserRouter([
       { path: 'board/:boardId', element: <PortalBoard /> },
       { path: 'tasks', element: <PortalTasks /> },
       { path: 'requests', element: <PortalRequests /> },
+      { path: 'protocols', element: <PortalProtocols /> },
       { path: 'profile', element: <PortalProfile /> },
     ],
   },
