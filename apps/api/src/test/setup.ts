@@ -46,6 +46,11 @@ afterEach(async () => {
     prisma.column.deleteMany(),
     prisma.board.deleteMany(),
     prisma.client.deleteMany(),
+    // Protocol/ProtocolEvent cascadeiam a partir de task.deleteMany() acima (onDelete: Cascade
+    // na FK pra Task, e Protocol->ProtocolEvent). ProtocolCounter não tem relação com Task/
+    // Client/User — só com Organization — então precisa de limpeza explícita antes do
+    // organization.deleteMany() abaixo, senão a FK organizationId bloqueia o delete.
+    prisma.protocolCounter.deleteMany(),
     prisma.user.deleteMany(),
     prisma.notificationConfig.deleteMany(),
     prisma.messageTemplate.deleteMany(),
