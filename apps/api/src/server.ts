@@ -19,6 +19,7 @@ import { attachmentsRoutes } from '@/modules/attachments/attachments.routes'
 import { taskDocumentsRoutes } from '@/modules/task-documents/task-documents.routes'
 import { requestsRoutes } from '@/modules/requests/requests.routes'
 import { requestCommentsRoutes } from '@/modules/request-comments/request-comments.routes'
+import { protocolsRoutes } from '@/modules/protocols/protocols.routes'
 import { dashboardRoutes } from '@/modules/dashboard/dashboard.routes'
 import { departmentsRoutes } from '@/modules/departments/departments.routes'
 import { recurringTemplatesRoutes } from '@/modules/recurring-templates/recurring-templates.routes'
@@ -53,6 +54,7 @@ export function buildApp() {
   app.register(taskDocumentsRoutes)
   app.register(requestsRoutes, { prefix: '/requests' })
   app.register(requestCommentsRoutes)
+  app.register(protocolsRoutes)
   app.register(dashboardRoutes, { prefix: '/dashboard' })
   app.register(departmentsRoutes, { prefix: '/departments' })
   app.register(recurringTemplatesRoutes, { prefix: '/recurring-templates' })
