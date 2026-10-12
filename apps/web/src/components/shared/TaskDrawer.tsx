@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, Paperclip, MessageSquare, Clock, Trash2, FileCheck } from 'lucide-react'
+import { X, Paperclip, MessageSquare, Clock, Trash2, FileCheck, Stamp } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { Comments } from '@/components/shared/Comments'
-import type { Task, Attachment, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable } from '@/types'
+import type { Task, Attachment, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable, Protocol } from '@/types'
 import { toast } from 'sonner'
 
 interface Props {
@@ -69,7 +70,7 @@ export const STATUS_COLOR: Record<Task['status'], string> = {
   BLOCKED: 'bg-red-100 text-red-600',
 }
 
-type Tab = 'comments' | 'documents' | 'attachments' | 'history'
+type Tab = 'comments' | 'documents' | 'attachments' | 'history' | 'protocols'
 
 const isOrgRole = (role: DrawerRole): role is Exclude<DrawerRole, 'CLIENT'> => role !== 'CLIENT'
 
@@ -130,7 +131,39 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
   const { data: attachments = [] } = useQuery<Attachment[]>({
     queryKey: ['attachments', task.id],
     queryFn: () => api.get(`/tasks/${task.id}/attachments`).then((r) => r.data),
-    enabled: tab === 'attachments',
+    enabled: tab === 'attachments' || tab === 'protocols',
+  })
+
+  const { data: protocols = [] } = useQuery<Protocol[]>({
+    queryKey: ['protocols', task.id],
+    queryFn: () => api.get(`/tasks/${task.id}/protocols`).then((r) => r.data),
+    enabled: tab === 'protocols',
+  })
+
+  const [creatingProtocol, setCreatingProtocol] = useState(false)
+  const [protocolMode, setProtocolMode] = useState<'attachment' | 'text'>('attachment')
+  const [protocolTitle, setProtocolTitle] = useState('')
+  const [protocolDueDate, setProtocolDueDate] = useState('')
+  const [protocolAttachmentId, setProtocolAttachmentId] = useState('')
+  const [protocolContent, setProtocolContent] = useState('')
+
+  const createProtocolMutation = useMutation({
+    mutationFn: () => api.post(`/tasks/${task.id}/protocols`, {
+      title: protocolTitle,
+      dueDate: protocolDueDate ? new Date(protocolDueDate).toISOString() : undefined,
+      attachmentId: protocolMode === 'attachment' ? protocolAttachmentId : undefined,
+      content: protocolMode === 'text' ? protocolContent : undefined,
+    }),
+    onSuccess: () => {
+      toast.success('Protocolo criado')
+      queryClient.invalidateQueries({ queryKey: ['protocols', task.id] })
+      setCreatingProtocol(false)
+      setProtocolTitle('')
+      setProtocolDueDate('')
+      setProtocolAttachmentId('')
+      setProtocolContent('')
+    },
+    onError: () => toast.error('Erro ao criar protocolo'),
   })
 
   const { data: history = [] } = useQuery<TaskHistory[]>({
@@ -232,6 +265,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
     { id: 'comments', label: 'Comentários', icon: <MessageSquare size={14} /> },
     { id: 'documents', label: 'Documentos', icon: <FileCheck size={14} /> },
     { id: 'attachments', label: 'Anexos', icon: <Paperclip size={14} /> },
+    ...(canEdit ? [{ id: 'protocols' as Tab, label: 'Protocolos', icon: <Stamp size={14} /> }] : []),
     { id: 'history', label: 'Histórico', icon: <Clock size={14} /> },
   ]
 
@@ -652,6 +686,105 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
                     {uploadMutation.isPending ? 'Enviando...' : '+ Adicionar arquivo'}
                   </span>
                 </label>
+              )}
+            </div>
+          )}
+
+          {tab === 'protocols' && (
+            <div className="space-y-4">
+              <Button size="sm" onClick={() => setCreatingProtocol(true)} className="gap-2">
+                <Stamp size={14} />
+                Criar protocolo
+              </Button>
+
+              {protocols.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum protocolo criado pra esta tarefa.</p>
+              ) : (
+                <div className="space-y-2">
+                  {protocols.map((p) => (
+                    <div key={p.id} className="rounded-lg border border-border p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-foreground">{p.number} — {p.title}</p>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-bg text-muted-foreground">{p.status}</span>
+                      </div>
+                      {p.dueDate && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Vencimento: {new Date(p.dueDate).toLocaleDateString('pt-BR')}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {creatingProtocol && (
+                <div className="rounded-lg border border-border p-4 space-y-3">
+                  <div className="flex rounded-md border border-border overflow-hidden w-fit">
+                    <button
+                      type="button"
+                      onClick={() => setProtocolMode('attachment')}
+                      className={cn('px-3 py-1.5 text-sm font-medium', protocolMode === 'attachment' ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}
+                    >
+                      Anexo existente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProtocolMode('text')}
+                      className={cn('px-3 py-1.5 text-sm font-medium', protocolMode === 'text' ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}
+                    >
+                      Só texto
+                    </button>
+                  </div>
+
+                  <input
+                    placeholder="Título do protocolo"
+                    value={protocolTitle}
+                    onChange={(e) => setProtocolTitle(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 text-sm"
+                  />
+
+                  <input
+                    type="date"
+                    value={protocolDueDate}
+                    onChange={(e) => setProtocolDueDate(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 text-sm"
+                  />
+
+                  {protocolMode === 'attachment' ? (
+                    <select
+                      value={protocolAttachmentId}
+                      onChange={(e) => setProtocolAttachmentId(e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 text-sm"
+                    >
+                      <option value="">Selecione um anexo já enviado nesta tarefa</option>
+                      {attachments.filter((a) => !a.deletedAt).map((a) => (
+                        <option key={a.id} value={a.id}>{a.filename}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <textarea
+                      rows={3}
+                      placeholder="Texto do aviso formal"
+                      value={protocolContent}
+                      onChange={(e) => setProtocolContent(e.target.value)}
+                      className="flex w-full rounded-md border border-border bg-surface text-foreground px-3 py-2 text-sm resize-none"
+                    />
+                  )}
+
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setCreatingProtocol(false)}>Cancelar</Button>
+                    <Button
+                      onClick={() => createProtocolMutation.mutate()}
+                      disabled={
+                        createProtocolMutation.isPending || !protocolTitle.trim() ||
+                        (protocolMode === 'attachment' ? !protocolAttachmentId : !protocolContent.trim())
+                      }
+                      className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+                    >
+                      {createProtocolMutation.isPending ? 'Criando...' : 'Criar'}
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
           )}
