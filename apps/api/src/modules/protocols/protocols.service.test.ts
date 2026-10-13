@@ -230,13 +230,15 @@ describe('expireOverdueProtocols', () => {
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const { task: task1, attachment: att1 } = await setupTaskWithAttachment(org.id, admin.id)
     const { task: task2, attachment: att2 } = await setupTaskWithAttachment(org.id, admin.id)
-    const past = new Date(Date.now() - 86400000)
-    const future = new Date(Date.now() + 86400000)
+    // Datas fixas (não Date.now()) pra não depender do instante real de execução frente ao
+    // limite de dia UTC vs. BRT (ver teste dedicado "não expira protocolo que vence HOJE").
+    const past = new Date(Date.UTC(2026, 9, 18))
+    const future = new Date(Date.UTC(2026, 9, 22))
 
     const overdue = await createProtocol(task1.id, org.id, admin.id, { title: 'vence ontem', attachmentId: att1.id, dueDate: past })
     const notYet = await createProtocol(task2.id, org.id, admin.id, { title: 'vence amanhã', attachmentId: att2.id, dueDate: future })
 
-    const count = await expireOverdueProtocols(org.id, new Date())
+    const count = await expireOverdueProtocols(org.id, new Date(Date.UTC(2026, 9, 20, 11, 0, 0)))
 
     expect(count).toBe(1)
     expect((await prisma.protocol.findUniqueOrThrow({ where: { id: overdue.id } })).status).toBe('EXPIRED')

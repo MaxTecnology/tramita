@@ -5,10 +5,22 @@ export interface SlaConfig {
   slaDueCriticalDays: number
 }
 
-function subtractDaysUTC(date: Date, days: number): Date {
-  const result = new Date(date.getTime())
-  result.setUTCDate(result.getUTCDate() - days)
-  return result
+// targetDate/dueDate são rótulos de dia-calendário (meia-noite UTC), não instantes reais — mesma
+// convenção de apps/web/src/lib/dates.ts. `now` é um instante real; usamos os getters LOCAIS do
+// navegador (assumido BRT, mesma premissa de dates.ts) pra saber o dia de hoje de verdade, em vez
+// de comparar o rótulo contra o instante bruto (dispara ~3h adiantado — ver backend sla.ts).
+function utcDayLabel(date: Date): number {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+}
+
+function todayLocal(now: Date): number {
+  return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
+
+function daysUntilLabel(label: number, today: number): number {
+  return Math.round((label - today) / ONE_DAY_MS)
 }
 
 export function computeSlaLevel(
@@ -17,10 +29,11 @@ export function computeSlaLevel(
   now: Date,
   config: SlaConfig,
 ): SlaLevel {
-  if (dueDate && now >= subtractDaysUTC(dueDate, config.slaDueCriticalDays)) {
+  const today = todayLocal(now)
+  if (dueDate && daysUntilLabel(utcDayLabel(dueDate), today) <= config.slaDueCriticalDays) {
     return 'DUE_CRITICAL'
   }
-  if (targetDate && now >= subtractDaysUTC(targetDate, config.slaTargetWarningDays)) {
+  if (targetDate && daysUntilLabel(utcDayLabel(targetDate), today) <= config.slaTargetWarningDays) {
     return 'TARGET_WARNING'
   }
   return 'NONE'

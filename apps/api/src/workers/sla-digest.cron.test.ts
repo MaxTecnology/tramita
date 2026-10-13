@@ -32,11 +32,13 @@ describe('runSlaDigest', () => {
     const column = await createTestColumn(board.id)
     const task = await createTestTask(column.id, assignee.id)
 
-    const dueDate = new Date()
-    dueDate.setUTCDate(dueDate.getUTCDate() + 1) // dentro da janela crítica padrão (1 dia)
+    // dueDate = rótulo "2026-10-20" (meia-noite UTC); now = meio-dia BRT do dia 19, 1 dia antes
+    // — dentro da janela crítica padrão (1 dia). Datas fixas (não Date.now()) pra não depender
+    // do instante real de execução do teste frente ao limite de dia UTC vs. BRT.
+    const dueDate = new Date(Date.UTC(2026, 9, 20))
     await prisma.task.update({ where: { id: task.id }, data: { dueDate, assigneeId: assignee.id } })
 
-    await runSlaDigest(new Date())
+    await runSlaDigest(new Date(Date.UTC(2026, 9, 19, 15, 0, 0)))
 
     expect(enqueueNotification).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'SLA_DIGEST', userId: assignee.id }),
@@ -230,10 +232,12 @@ describe('runSlaDigest — protocolos', () => {
     const attachment = await prisma.attachment.create({
       data: { taskId: task.id, filename: 'guia.pdf', mimeType: 'application/pdf', size: 10, storageKey: 'k', uploadedBy: admin.id },
     })
-    const past = new Date(Date.now() - 86400000)
+    // Datas fixas (não Date.now()) pra não depender do instante real de execução frente ao
+    // limite de dia UTC vs. BRT — vence 2 dias antes de "now", seguramente no passado em BRT.
+    const past = new Date(Date.UTC(2026, 9, 18))
     const protocol = await createProtocol(task.id, org.id, admin.id, { title: 'Guia vencida', attachmentId: attachment.id, dueDate: past })
 
-    await runSlaDigest(new Date())
+    await runSlaDigest(new Date(Date.UTC(2026, 9, 20, 11, 0, 0)))
 
     expect((await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })).status).toBe('EXPIRED')
     expect(enqueueNotification).toHaveBeenCalledWith(
@@ -313,10 +317,11 @@ describe('runSlaDigest — protocolos', () => {
     const attachment = await prisma.attachment.create({
       data: { taskId: task.id, filename: 'guia.pdf', mimeType: 'application/pdf', size: 10, storageKey: 'k', uploadedBy: admin.id },
     })
-    const past = new Date(Date.now() - 86400000)
+    // Datas fixas, mesmo motivo do teste acima.
+    const past = new Date(Date.UTC(2026, 9, 18))
     const protocol = await createProtocol(task.id, org.id, admin.id, { title: 'x', attachmentId: attachment.id, dueDate: past })
 
-    await runSlaDigest(new Date())
+    await runSlaDigest(new Date(Date.UTC(2026, 9, 20, 11, 0, 0)))
 
     expect((await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })).status).toBe('EXPIRED')
     expect(enqueueNotification).not.toHaveBeenCalled() // digest desligado, mas expiração aconteceu
