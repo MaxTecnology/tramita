@@ -1,11 +1,15 @@
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import type { ProductivityQuery, ProductivityMetrics, MetricsBreakdown } from './dashboard.types'
+import { utcDayLabel, todayInBRT, startOfTodayInBRT, startOfMonthInBRT } from '@/lib/date-only'
 
-export async function getDashboardMetrics(organizationId: string) {
-  const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const in7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+export async function getDashboardMetrics(organizationId: string, now: Date = new Date()) {
+  // startOfMonth usava getters locais do processo (now.getFullYear()/getMonth()) — em produção
+  // o container normalmente roda em UTC, não BRT, então "este mês" virava até 3h adiantado perto
+  // da troca de mês. startOfTodayInBRT/startOfMonthInBRT convertem de verdade pro fuso da org.
+  const startOfMonth = startOfMonthInBRT(now)
+  const todayBRT = startOfTodayInBRT(now)
+  const in7days = new Date(todayInBRT(now) + 7 * 24 * 60 * 60 * 1000)
 
   const [
     activeBoards,
@@ -27,12 +31,12 @@ export async function getDashboardMetrics(organizationId: string) {
             columns: {
               some: {
                 tasks: {
-                  some: { dueDate: { lt: now }, status: { notIn: ['DONE', 'DISREGARDED'] } },
+                  some: { dueDate: { lt: todayBRT }, status: { notIn: ['DONE', 'DISREGARDED'] } },
                 },
               },
             },
           },
-          { dueDate: { lt: now } },
+          { dueDate: { lt: todayBRT } },
         ],
       },
     }),
@@ -112,8 +116,11 @@ export async function getDashboardMetrics(organizationId: string) {
         .map((t) => new Date(t.dueDate!))
         .sort((a, z) => a.getTime() - z.getTime())
       const earliest = allDueDates[0] ?? (b.dueDate ? new Date(b.dueDate) : null)
+      // Dia-calendário em BRT, não ms brutos — comparar instante bruto contra um rótulo de dia
+      // (ver date-only.ts) sub/sobre-contava em até 1 dia dependendo da hora do dia em que o
+      // Dashboard fosse carregado.
       const daysOverdue = earliest
-        ? Math.floor((now.getTime() - earliest.getTime()) / (1000 * 60 * 60 * 24))
+        ? Math.max(0, Math.round((todayInBRT(now) - utcDayLabel(earliest)) / (1000 * 60 * 60 * 24)))
         : 0
       return {
         boardId: b.id,

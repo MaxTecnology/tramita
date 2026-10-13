@@ -50,6 +50,40 @@ describe('runRecurringTasksGeneration', () => {
     vi.restoreAllMocks()
   })
 
+  it('usa o dia-calendário em BRT como "hoje" padrão, não o dia UTC bruto do servidor (janela 00h-03h UTC = 21h-00h BRT do dia anterior)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id, title: 'Dispara dia 19 em BRT', periodicity: 'MONTHLY', priority: 'MEDIUM',
+      competenceMonthOffset: 1, dueDayOfPeriod: 10, dueMonthAnchor: 1, dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
+      generationMonthOffset: 1, generationDayOfPeriod: 19,
+      autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
+      visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+    })
+    await createAssignment(template.id, org.id, { clientId: client.id })
+
+    // 2026-01-20T01:00:00Z = 2026-01-19T22:00 BRT — dia 19 em BRT, mas já dia 20 em UTC. Sem a
+    // correção, o default `new Date()` leria dia 20 (UTC) e não disparado o gatilho do dia 19.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-20T01:00:00Z'))
+
+    await runRecurringTasksGeneration() // sem argumento — usa o default
+
+    vi.useRealTimers()
+
+    const tasks = await prisma.task.count({ where: { recurringTemplateId: template.id } })
+    expect(tasks).toBe(1)
+
+    vi.restoreAllMocks()
+  })
+
   it('não gera nada pra template inativo (isActive=false)', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

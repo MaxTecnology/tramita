@@ -3,8 +3,14 @@ import { bullmqRedis } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import { computeCompetencesToGenerate, computeDueMonthsToGenerate, type RecurrenceDateRules } from '@/modules/recurring-templates/recurrence-dates'
 import { generateTaskForAssignment } from '@/modules/recurring-templates/recurring-templates.service'
+import { startOfTodayInBRT } from '@/lib/date-only'
 
-export async function runRecurringTasksGeneration(today: Date = new Date()): Promise<void> {
+// `today` é lido pelos getters UTC em recurrence-dates.ts (mesma convenção de todo campo
+// date-only do projeto) — por isso o default já entra convertido pro dia-calendário BRT
+// (startOfTodayInBRT), não o instante bruto do servidor. Sem isso, um worker que reinicia e
+// passa a rodar dentro da janela 00h-03h UTC (21h-00h BRT) veria o dia UTC já virado um dia
+// adiante do dia real em BRT, gerando a tarefa recorrente um dia errado.
+export async function runRecurringTasksGeneration(today: Date = startOfTodayInBRT(new Date())): Promise<void> {
   const templates = await prisma.recurringTaskTemplate.findMany({
     where: { isActive: true },
     include: { assignments: { where: { isActive: true } } },

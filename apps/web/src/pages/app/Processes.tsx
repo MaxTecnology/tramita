@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { diffDaysDateOnlyUTC, formatDateOnlyUTC } from '@/lib/dates'
+import { diffDaysDateOnlyUTC, formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { Plus, ChevronDown, ChevronRight, AlertTriangle, Clock, ClipboardList, CheckCircle2, Search, X, FileSearch } from 'lucide-react'
 import type { Board, Client } from '@/types'
 import { toast } from 'sonner'
@@ -196,7 +196,9 @@ export default function Processes() {
       api.post('/boards', {
         title: newProcessForm.title,
         clientId: newProcessForm.clientId,
-        ...(newProcessForm.dueDate ? { dueDate: new Date(newProcessForm.dueDate + 'T00:00:00').toISOString() } : {}),
+        // "YYYY-MM-DD" puro (sem sufixo de hora) já é parseado como meia-noite UTC pelo ISO 8601
+        // — mesmo padrão usado pros outros campos date-only do projeto (ver apps/web/src/lib/dates.ts).
+        ...(newProcessForm.dueDate ? { dueDate: new Date(newProcessForm.dueDate).toISOString() } : {}),
       }).then((r) => r.data),
     onSuccess: (board) => {
       toast.success('Processo criado com sucesso')
@@ -241,7 +243,7 @@ export default function Processes() {
       if (filterStage && !b.columns.some((c) => c.title.toLowerCase().includes(filterStage.toLowerCase()))) return false
       if (showOnlyOverdue) {
         const hasOverdue = b.columns.some((c) =>
-          c.tasks.some((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'DONE' && t.status !== 'DISREGARDED'),
+          c.tasks.some((t) => t.dueDate && isPastDateOnlyUTC(t.dueDate, now) && t.status !== 'DONE' && t.status !== 'DISREGARDED'),
         )
         if (!hasOverdue) return false
       }

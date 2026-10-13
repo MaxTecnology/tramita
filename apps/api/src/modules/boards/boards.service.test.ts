@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { getBoardById, createBoard } from './boards.service'
+import { getBoardById, createBoard, listBoards } from './boards.service'
 import { createOSTemplate } from '@/modules/os-templates/os-templates.service'
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClient,
@@ -152,5 +152,61 @@ describe('createBoard', () => {
         osTemplateId: templateOfOther.id,
       }),
     ).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
+describe('listBoards (filtros overdue/dueSoon)', () => {
+  it('não marca como vencido (overdue) um board cuja tarefa vence HOJE em BRT, mesmo rodando de manhã (8h BRT)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { dueDate: new Date(Date.UTC(2026, 9, 20)) } })
+
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(Date.UTC(2026, 9, 20, 11, 0, 0))) // 8h BRT do mesmo dia do vencimento
+    const result = await listBoards(org.id, { overdue: true })
+    vi.useRealTimers()
+
+    expect(result.map((b) => b.id)).not.toContain(board.id)
+  })
+
+  it('marca como vencido a partir do dia seguinte ao vencimento em BRT', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { dueDate: new Date(Date.UTC(2026, 9, 20)) } })
+
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(Date.UTC(2026, 9, 21, 11, 0, 0)))
+    const result = await listBoards(org.id, { overdue: true })
+    vi.useRealTimers()
+
+    expect(result.map((b) => b.id)).toContain(board.id)
+  })
+
+  it('dueSoon inclui um board cuja tarefa vence hoje (não fica fora da janela por 1 dia)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { dueDate: new Date(Date.UTC(2026, 9, 20)) } })
+
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(Date.UTC(2026, 9, 20, 11, 0, 0)))
+    const result = await listBoards(org.id, { dueSoon: true })
+    vi.useRealTimers()
+
+    expect(result.map((b) => b.id)).toContain(board.id)
   })
 })

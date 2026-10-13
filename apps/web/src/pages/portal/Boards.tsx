@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { ClipboardList, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 
 interface Task {
   id: string
@@ -69,7 +70,7 @@ export default function PortalBoards() {
           {boards.map((board) => {
             const progress = getProgress(board)
             const stage = getCurrentStage(board)
-            const isOverdue = board.dueDate ? new Date(board.dueDate) < new Date() : false
+            const isOverdue = board.dueDate ? isPastDateOnlyUTC(board.dueDate) : false
 
             return (
               <Link
@@ -86,7 +87,7 @@ export default function PortalBoards() {
                   <span className="text-xs bg-neutral-bg text-muted-foreground px-2 py-0.5 rounded-full truncate">{stage}</span>
                   {board.dueDate && (
                     <span className={cn('text-xs ml-auto flex-shrink-0', isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground')}>
-                      {isOverdue ? '⚠ ' : ''}{new Date(board.dueDate).toLocaleDateString('pt-BR')}
+                      {isOverdue ? '⚠ ' : ''}{formatDateOnlyUTC(board.dueDate)}
                     </span>
                   )}
                 </div>

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { CreateBoardBody, UpdateBoardBody, SearchQuery } from './boards.schema'
+import { todayInBRT, startOfTodayInBRT } from '@/lib/date-only'
 
 const DEFAULT_COLUMNS = [
   { title: 'Pendente', position: 0, color: '#6B7280', statusEffect: 'NONE' as const },
@@ -17,9 +18,12 @@ export async function listBoards(
     overdue?: boolean
     dueSoon?: boolean
   } = {},
+  now: Date = new Date(),
 ) {
-  const now = new Date()
-  const in7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  // dueDate é um rótulo de dia-calendário (meia-noite UTC), não instante real — comparar contra
+  // `now` bruto marcava "vencida"/"vence em breve" até ~3h adiantado (ver apps/api/src/lib/date-only.ts).
+  const todayBRT = startOfTodayInBRT(now)
+  const in7days = new Date(todayInBRT(now) + 7 * 24 * 60 * 60 * 1000)
 
   return prisma.board.findMany({
     where: {
@@ -45,7 +49,7 @@ export async function listBoards(
             columns: {
               some: {
                 tasks: {
-                  some: { dueDate: { lt: now }, status: { notIn: ['DONE', 'DISREGARDED'] } },
+                  some: { dueDate: { lt: todayBRT }, status: { notIn: ['DONE', 'DISREGARDED'] } },
                 },
               },
             },
@@ -57,7 +61,7 @@ export async function listBoards(
               some: {
                 tasks: {
                   some: {
-                    dueDate: { gte: now, lte: in7days },
+                    dueDate: { gte: todayBRT, lte: in7days },
                     status: { notIn: ['DONE', 'DISREGARDED'] },
                   },
                 },

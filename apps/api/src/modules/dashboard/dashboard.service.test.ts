@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { getDashboardMetrics, getTeamMembers, getProductivityMetrics } from '@/modules/dashboard/dashboard.service'
 import { ensureRecurringSystemBoard } from '@/modules/tasks/tasks.service'
@@ -54,10 +54,10 @@ describe('getDashboardMetrics', () => {
     const task = await createTestTask(col.id, user.id)
     await prisma.task.update({
       where: { id: task.id },
-      data: { dueDate: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      data: { dueDate: new Date(Date.UTC(2026, 9, 18)) },
     })
 
-    const result = await getDashboardMetrics(org.id)
+    const result = await getDashboardMetrics(org.id, new Date(Date.UTC(2026, 9, 20, 11, 0, 0)))
 
     expect(result.kpis.overdueBoards).toBe(1)
   })
@@ -72,10 +72,34 @@ describe('getDashboardMetrics', () => {
     const task = await createTestTask(col.id, user.id)
     await prisma.task.update({
       where: { id: task.id },
-      data: { dueDate: new Date(Date.now() - 24 * 60 * 60 * 1000), status: 'DONE' },
+      data: { dueDate: new Date(Date.UTC(2026, 9, 18)), status: 'DONE' },
     })
 
+    const result = await getDashboardMetrics(org.id, new Date(Date.UTC(2026, 9, 20, 11, 0, 0)))
+
+    expect(result.kpis.overdueBoards).toBe(0)
+  })
+
+  it('não marca como atrasado um processo cuja tarefa vence HOJE em BRT, mesmo rodando de manhã (8h BRT)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    await prisma.task.update({ where: { id: task.id }, data: { dueDate: new Date(Date.UTC(2026, 9, 20)) } })
+
+    // Relógio real do sistema fixado em 11h UTC = 8h BRT do MESMO dia do vencimento — pra
+    // valer tanto chamando sem argumento (default) quanto com argumento explícito. Comparar
+    // contra o instante bruto marcaria atrasado horas antes do dia terminar; a correção só
+    // considera atrasado a partir de amanhã.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(Date.UTC(2026, 9, 20, 11, 0, 0)))
+
     const result = await getDashboardMetrics(org.id)
+
+    vi.useRealTimers()
 
     expect(result.kpis.overdueBoards).toBe(0)
   })
@@ -129,7 +153,7 @@ describe('getDashboardMetrics', () => {
     const taskSoon = await createTestTask(colSoon.id, user.id)
     await prisma.task.update({
       where: { id: taskSoon.id },
-      data: { dueDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) },
+      data: { dueDate: new Date(Date.UTC(2026, 9, 19)) },
     })
 
     const boardOld = await createTestBoard(org.id, client.id)
@@ -137,10 +161,10 @@ describe('getDashboardMetrics', () => {
     const taskOld = await createTestTask(colOld.id, user.id)
     await prisma.task.update({
       where: { id: taskOld.id },
-      data: { dueDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) },
+      data: { dueDate: new Date(Date.UTC(2026, 9, 15)) },
     })
 
-    const result = await getDashboardMetrics(org.id)
+    const result = await getDashboardMetrics(org.id, new Date(Date.UTC(2026, 9, 20, 11, 0, 0)))
 
     expect(result.atRisk[0].boardId).toBe(boardOld.id)
     expect(result.atRisk[0].daysOverdue).toBeGreaterThanOrEqual(result.atRisk[1].daysOverdue)
@@ -158,11 +182,11 @@ describe('getDashboardMetrics', () => {
       const task = await createTestTask(col.id, user.id)
       await prisma.task.update({
         where: { id: task.id },
-        data: { dueDate: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        data: { dueDate: new Date(Date.UTC(2026, 9, 18)) },
       })
     }
 
-    const result = await getDashboardMetrics(org.id)
+    const result = await getDashboardMetrics(org.id, new Date(Date.UTC(2026, 9, 20, 11, 0, 0)))
 
     expect(result.atRisk.length).toBeLessThanOrEqual(8)
   })
