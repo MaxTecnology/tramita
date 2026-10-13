@@ -118,9 +118,10 @@ export async function getDashboardMetrics(organizationId: string, now: Date = ne
       const earliest = allDueDates[0] ?? (b.dueDate ? new Date(b.dueDate) : null)
       // Dia-calendário em BRT, não ms brutos — comparar instante bruto contra um rótulo de dia
       // (ver date-only.ts) sub/sobre-contava em até 1 dia dependendo da hora do dia em que o
-      // Dashboard fosse carregado.
+      // Dashboard fosse carregado. Sem clamp: negativo é esperado (ainda não venceu, faltam N
+      // dias) — formatDaysOverdue no frontend depende disso pra distinguir "vence em Nd".
       const daysOverdue = earliest
-        ? Math.max(0, Math.round((todayInBRT(now) - utcDayLabel(earliest)) / (1000 * 60 * 60 * 24)))
+        ? Math.round((todayInBRT(now) - utcDayLabel(earliest)) / (1000 * 60 * 60 * 24))
         : 0
       return {
         boardId: b.id,

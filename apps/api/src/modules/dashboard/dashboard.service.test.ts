@@ -104,6 +104,23 @@ describe('getDashboardMetrics', () => {
     expect(result.kpis.overdueBoards).toBe(0)
   })
 
+  it('daysOverdue é negativo (não zerado) pra um processo que ainda vai vencer — o frontend usa o sinal pra distinguir "vence em Nd" de "vencido há Nd"', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    // Vence em 3 dias — dentro da janela de "em risco" (7 dias), mas ainda não vencido.
+    await prisma.task.update({ where: { id: task.id }, data: { dueDate: new Date(Date.UTC(2026, 9, 23)) } })
+
+    const result = await getDashboardMetrics(org.id, new Date(Date.UTC(2026, 9, 20, 11, 0, 0)))
+
+    const entry = result.atRisk.find((b) => b.boardId === board.id)
+    expect(entry?.daysOverdue).toBe(-3)
+  })
+
   it('counts tasks completed this month and urgent open tasks', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

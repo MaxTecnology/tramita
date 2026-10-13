@@ -211,7 +211,6 @@ export default function Processes() {
   })
 
   const now = useMemo(() => new Date(), [])
-  const in7days = useMemo(() => new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), [now])
 
   const uniqueClients = useMemo(
     () => [...new Map(boards.map((b) => [b.client.id, b.client])).values()],
@@ -254,12 +253,15 @@ export default function Processes() {
   const hasActiveFilter = search || filterClient || filterResponsible || filterStage || showOnlyOverdue
 
   const stats = useMemo(() => {
-    const overdue = filtered.filter((b) => { const d = getMostUrgentDueDate(b); return d && d < now }).length
-    const dueSoon = filtered.filter((b) => { const d = getMostUrgentDueDate(b); return d && d >= now && d <= in7days }).length
+    // dueDate é um rótulo de dia-calendário, não instante real — `d < now`/`d >= now` compara
+    // bruto e classifica "vence hoje" como atrasado horas antes do dia terminar. diffDaysDateOnlyUTC
+    // já lê isso corretamente (ver apps/web/src/lib/dates.ts).
+    const overdue = filtered.filter((b) => { const d = getMostUrgentDueDate(b); return d && diffDaysDateOnlyUTC(d, now) < 0 }).length
+    const dueSoon = filtered.filter((b) => { const d = getMostUrgentDueDate(b); const diff = d ? diffDaysDateOnlyUTC(d, now) : null; return diff !== null && diff >= 0 && diff <= 7 }).length
     const completed = filtered.filter((b) => getProgress(b) === 100).length
     const rate = filtered.length > 0 ? Math.round((completed / filtered.length) * 100) : 0
     return { total: filtered.length, overdue, dueSoon, completed, rate }
-  }, [filtered, now, in7days])
+  }, [filtered, now])
 
   const groups = useMemo((): Group[] => {
     if (hasActiveFilter) {
@@ -282,9 +284,9 @@ export default function Processes() {
       ]
     }
 
-    const overdue = filtered.filter((b) => { const d = getMostUrgentDueDate(b); return d && d < now })
-    const dueSoon = filtered.filter((b) => { const d = getMostUrgentDueDate(b); return d && d >= now && d <= in7days })
-    const inProgress = filtered.filter((b) => { const d = getMostUrgentDueDate(b); const p = getProgress(b); return p < 100 && (!d || d > in7days) })
+    const overdue = filtered.filter((b) => { const d = getMostUrgentDueDate(b); return d && diffDaysDateOnlyUTC(d, now) < 0 })
+    const dueSoon = filtered.filter((b) => { const d = getMostUrgentDueDate(b); const diff = d ? diffDaysDateOnlyUTC(d, now) : null; return diff !== null && diff >= 0 && diff <= 7 })
+    const inProgress = filtered.filter((b) => { const d = getMostUrgentDueDate(b); const p = getProgress(b); const diff = d ? diffDaysDateOnlyUTC(d, now) : null; return p < 100 && (diff === null || diff > 7) })
     const completed = filtered.filter((b) => getProgress(b) === 100)
 
     return [
@@ -293,7 +295,7 @@ export default function Processes() {
       { label: 'Em andamento',    boards: inProgress, headerCls: 'bg-accent/10 text-accent',   accentCls: 'border-l-accent',  icon: <ClipboardList size={14} />, defaultOpen: true },
       { label: 'Concluídos',      boards: completed,  headerCls: 'bg-success-bg text-success-text', accentCls: 'border-l-success-text', icon: <CheckCircle2 size={14} />,  defaultOpen: false },
     ].filter((g) => g.boards.length > 0)
-  }, [filtered, hasActiveFilter, now, in7days])
+  }, [filtered, hasActiveFilter, now])
 
   if (isLoading) return <div className="p-8 text-muted-foreground">Carregando processos...</div>
 
