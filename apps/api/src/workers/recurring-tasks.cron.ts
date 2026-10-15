@@ -48,8 +48,15 @@ export async function runRecurringTasksGeneration(today: Date = startOfTodayInBR
 export async function startRecurringTasksCronWorker() {
   const cronQueue = new Queue('recurring-tasks-cron', { connection: bullmqRedis })
 
+  // Horário fixo com fuso (não `every: 24h desde quando o worker iniciou`) — mesmo padrão já
+  // usado em sla-digest.cron.ts. `every` dispara num horário que deriva de quando o processo
+  // subiu pela última vez; um reinício em horário variável (deploy, crash, restart do container)
+  // pode fazer o cron passar a rodar dentro da janela 00h-03h UTC, que é justamente a janela de
+  // risco que o default de `today` acima corrige — melhor eliminar a causa (horário instável) do
+  // que só corrigir o sintoma (cálculo de "hoje"). Roda 6h BRT, antes do digest de SLA (8h BRT),
+  // pra uma tarefa recorrente gerada hoje já poder entrar no resumo da manhã.
   await cronQueue.add('generate', {}, {
-    repeat: { every: 3_600_000 * 24 }, // diário — a idempotência do log garante que múltiplas execuções no mesmo dia não dupliquem nada
+    repeat: { pattern: '0 6 * * *', tz: 'America/Sao_Paulo' },
     jobId: 'recurring-tasks-generate',
   })
 
