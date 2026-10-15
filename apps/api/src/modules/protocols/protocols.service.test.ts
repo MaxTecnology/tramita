@@ -111,6 +111,24 @@ describe('createProtocol', () => {
     ).rejects.toMatchObject({ statusCode: 409 })
   })
 
+  it('lança 409 (não 500) mesmo quando duas tentativas concorrentes passam juntas pela checagem de "já vinculado" (corrida genuína)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { task, attachment } = await setupTaskWithAttachment(org.id, admin.id)
+
+    const results = await Promise.allSettled([
+      createProtocol(task.id, org.id, admin.id, { title: 'Primeira', attachmentId: attachment.id }),
+      createProtocol(task.id, org.id, admin.id, { title: 'Segunda', attachmentId: attachment.id }),
+    ])
+
+    const fulfilled = results.filter((r) => r.status === 'fulfilled')
+    const rejected = results.filter((r) => r.status === 'rejected')
+    expect(fulfilled).toHaveLength(1)
+    expect(rejected).toHaveLength(1)
+    expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({ statusCode: 409 })
+  })
+
   it('números não colidem sob criação concorrente na mesma org/ano', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
@@ -124,6 +142,24 @@ describe('createProtocol', () => {
     ])
 
     expect(p1.number).not.toBe(p2.number)
+  })
+
+  it('numera pelo ano em BRT, não pelo ano UTC, perto da virada do ano (31/dez 23h30 BRT ainda é o ano corrente)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { task } = await setupTaskWithAttachment(org.id, admin.id)
+
+    // 2027-01-01T02:00:00Z = 2026-12-31T23:00 BRT — já é 1º de janeiro em UTC, ainda é 31 de
+    // dezembro em BRT.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2027-01-01T02:00:00Z'))
+
+    const protocol = await createProtocol(task.id, org.id, admin.id, { title: 'x', content: 'y' })
+
+    vi.useRealTimers()
+
+    expect(protocol.number.startsWith('2026-')).toBe(true)
   })
 })
 
@@ -323,7 +359,7 @@ describe('listProtocolsForOrg / listProtocolsForClient / getProtocolById / getPr
     await createProtocol(taskA.id, org.id, admin.id, { title: 'Da A', attachmentId: attA.id })
     await createProtocol(taskB.id, org.id, admin.id, { title: 'Da B', attachmentId: attB.id })
 
-    const all = await listProtocolsForOrg(org.id, {})
+    const all = await listProtocolsForOrg(org.id, { id: admin.id, role: 'ORG_ADMIN' }, {})
     expect(all).toHaveLength(2)
     expect(all.every((p) => typeof p.boardId === 'string')).toBe(true)
 
@@ -404,10 +440,33 @@ describe('listProtocolsForOrg / listProtocolsForClient / getProtocolById / getPr
     const { task, attachment } = await setupTaskWithAttachment(org.id, admin.id)
     await createProtocol(task.id, org.id, admin.id, { title: 'x', attachmentId: attachment.id })
 
-    const summary = await getProtocolsSummary(org.id)
+    const summary = await getProtocolsSummary(org.id, { id: admin.id, role: 'ORG_ADMIN' })
 
     expect(summary.SENT).toBe(1)
     expect(summary.VIEWED).toBe(0)
+  })
+
+  it('ORG_MEMBER só vê (lista e resumo) protocolos de tarefas onde ele é assignee — mesma restrição já aplicada em listTasks', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const otherMember = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const { task: taskMine, attachment: attMine } = await setupTaskWithAttachment(org.id, admin.id)
+    await prisma.task.update({ where: { id: taskMine.id }, data: { assigneeId: member.id } })
+    const { task: taskOthers, attachment: attOthers } = await setupTaskWithAttachment(org.id, admin.id)
+    await prisma.task.update({ where: { id: taskOthers.id }, data: { assigneeId: otherMember.id } })
+    await createProtocol(taskMine.id, org.id, admin.id, { title: 'Minha', attachmentId: attMine.id })
+    await createProtocol(taskOthers.id, org.id, admin.id, { title: 'De outro membro', attachmentId: attOthers.id })
+
+    const list = await listProtocolsForOrg(org.id, { id: member.id, role: 'ORG_MEMBER' }, {})
+    expect(list.map((p) => p.title)).toEqual(['Minha'])
+
+    const summary = await getProtocolsSummary(org.id, { id: member.id, role: 'ORG_MEMBER' })
+    expect(summary.SENT).toBe(1)
+
+    const adminList = await listProtocolsForOrg(org.id, { id: admin.id, role: 'ORG_ADMIN' }, {})
+    expect(adminList).toHaveLength(2)
   })
 })
 

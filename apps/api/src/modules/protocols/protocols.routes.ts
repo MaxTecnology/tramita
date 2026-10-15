@@ -40,7 +40,7 @@ export async function protocolsRoutes(app: FastifyInstance) {
   app.get('/protocols/summary', {
     preHandler: [requireRole(...ORG_ROLES)],
   }, async (request, reply) => {
-    return reply.send(await getProtocolsSummary(request.user.organizationId!))
+    return reply.send(await getProtocolsSummary(request.user.organizationId!, { id: request.user.sub, role: request.user.role }))
   })
 
   app.get('/protocols', {
@@ -48,7 +48,7 @@ export async function protocolsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const result = listProtocolsQuerySchema.safeParse(request.query)
     const query = result.success ? result.data : {}
-    return reply.send(await listProtocolsForOrg(request.user.organizationId!, {
+    return reply.send(await listProtocolsForOrg(request.user.organizationId!, { id: request.user.sub, role: request.user.role }, {
       status: query.status,
       clientId: query.clientId,
       from: query.from ? new Date(query.from) : undefined,

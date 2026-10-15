@@ -1,5 +1,6 @@
 // apps/api/src/modules/protocols/protocols.service.ts
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
@@ -21,7 +22,10 @@ interface ProtocolDetail {
 }
 
 async function nextProtocolNumber(organizationId: string): Promise<string> {
-  const year = new Date().getUTCFullYear()
+  // getUTCFullYear() já viraria o ano pros últimos instantes de 31/dez em BRT (21h-24h BRT =
+  // 00h-03h UTC do dia 1º de janeiro) — mesma classe de bug corrigida em todo lugar date-only
+  // deste módulo, aqui no ano usado pra numerar o protocolo.
+  const year = new Date(todayInBRT(new Date())).getUTCFullYear()
   const counter = await prisma.protocolCounter.upsert({
     where: { organizationId_year: { organizationId, year } },
     create: { organizationId, year, lastNumber: 1 },
@@ -61,19 +65,30 @@ export async function createProtocol(
   const clientId = task.column.board.clientId
   const number = await nextProtocolNumber(organizationId)
 
-  const protocol = await prisma.protocol.create({
-    data: {
-      organizationId,
-      number,
-      clientId,
-      taskId,
-      attachmentId: data.attachmentId,
-      title: data.title,
-      content: data.content,
-      dueDate: data.dueDate,
-      createdById: staffId,
-    },
-  })
+  let protocol
+  try {
+    protocol = await prisma.protocol.create({
+      data: {
+        organizationId,
+        number,
+        clientId,
+        taskId,
+        attachmentId: data.attachmentId,
+        title: data.title,
+        content: data.content,
+        dueDate: data.dueDate,
+        createdById: staffId,
+      },
+    })
+  } catch (err) {
+    // A checagem de "já vinculado" acima tem uma janela de corrida (duas requisições
+    // concorrentes pro mesmo anexo passam as duas pelo findFirst antes de qualquer insert) — sem
+    // isso, a perdedora cairia num P2002 bruto (500) em vez do mesmo erro de validação claro.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      throw new AppError(409, 'Esse anexo já está vinculado a outro protocolo')
+    }
+    throw err
+  }
 
   const staffUser = await prisma.user.findUnique({ where: { id: staffId }, select: { name: true, email: true } })
   await prisma.protocolEvent.create({
@@ -100,11 +115,16 @@ export async function createProtocol(
 
 export async function listProtocolsForOrg(
   organizationId: string,
+  actor: { id: string; role: string },
   filters: { status?: ProtocolStatus; clientId?: string; from?: Date; to?: Date },
 ) {
   const protocols = await prisma.protocol.findMany({
     where: {
       organizationId,
+      // Mesma restrição já aplicada em listTasks: ORG_MEMBER só vê o que é dele — sem isso,
+      // qualquer membro via a lista org-wide de protocolos (de todos os clientes/departamentos),
+      // inclusive os que não tem nenhuma relação com a tarefa.
+      ...(actor.role === 'ORG_MEMBER' ? { task: { assigneeId: actor.id } } : {}),
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.clientId ? { clientId: filters.clientId } : {}),
       ...(filters.from || filters.to ? { createdAt: { gte: filters.from, lte: filters.to } } : {}),
@@ -173,10 +193,12 @@ export async function getProtocolById(id: string, organizationId: string): Promi
   return protocol
 }
 
-export async function getProtocolsSummary(organizationId: string) {
+export async function getProtocolsSummary(organizationId: string, actor: { id: string; role: string }) {
   const counts = await prisma.protocol.groupBy({
     by: ['status'],
-    where: { organizationId },
+    // Mesmo escopo de listProtocolsForOrg — sem isso, o resumo (cards do Dashboard) mostraria
+    // contagem org-wide pro ORG_MEMBER mesmo com a lista abaixo restrita, uma inconsistência.
+    where: { organizationId, ...(actor.role === 'ORG_MEMBER' ? { task: { assigneeId: actor.id } } : {}) },
     _count: { _all: true },
   })
   const summary: Record<ProtocolStatus, number> = { SENT: 0, VIEWED: 0, DOWNLOADED: 0, EXPIRED: 0 }
