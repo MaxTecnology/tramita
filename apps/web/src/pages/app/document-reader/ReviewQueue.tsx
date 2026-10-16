@@ -2,7 +2,6 @@ import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import type { ReceivedDocument } from '@/types'
 import { toast } from 'sonner'
 
@@ -10,10 +9,59 @@ function mensagemDeErro(err: unknown, padrao: string): string {
   return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? padrao
 }
 
+interface ClientOption {
+  id: string
+  name: string
+  codigo?: string | null
+}
+
+interface TaskOption {
+  id: string
+  title: string
+}
+
+function SeletorDeTarefa({ onEscolher, onCancelar }: { onEscolher: (taskId: string) => void; onCancelar: () => void }) {
+  const [clientId, setClientId] = useState('')
+
+  const { data: clients = [] } = useQuery<ClientOption[]>({
+    queryKey: ['clients'],
+    queryFn: () => api.get('/clients').then((r) => r.data),
+  })
+
+  const { data: tasksPage } = useQuery<{ items: TaskOption[] }>({
+    queryKey: ['tasks', { clientId, openOnly: true }],
+    queryFn: () => api.get('/tasks', { params: { clientId, openOnly: true } }).then((r) => r.data),
+    enabled: !!clientId,
+  })
+  const tasks = tasksPage?.items ?? []
+
+  return (
+    <div className="flex gap-2 items-center flex-wrap">
+      <select
+        value={clientId}
+        onChange={(e) => setClientId(e.target.value)}
+        className="h-8 rounded-md border border-border bg-surface text-foreground px-2 text-xs"
+      >
+        <option value="">Escolher cliente...</option>
+        {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+      <select
+        disabled={!clientId}
+        defaultValue=""
+        onChange={(e) => { if (e.target.value) onEscolher(e.target.value) }}
+        className="h-8 rounded-md border border-border bg-surface text-foreground px-2 text-xs disabled:opacity-50"
+      >
+        <option value="" disabled>{clientId ? (tasks.length ? 'Escolher tarefa...' : 'Sem tarefa aberta') : 'Escolha o cliente primeiro'}</option>
+        {tasks.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+      </select>
+      <Button size="sm" variant="ghost" onClick={onCancelar}>Cancelar</Button>
+    </div>
+  )
+}
+
 export default function ReviewQueue() {
   const queryClient = useQueryClient()
   const [trocandoId, setTrocandoId] = useState<string | null>(null)
-  const [novaTaskId, setNovaTaskId] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: fila = [], isLoading } = useQuery<ReceivedDocument[]>({
@@ -41,7 +89,7 @@ export default function ReviewQueue() {
 
   const trocarMutation = useMutation({
     mutationFn: ({ id, taskId }: { id: string; taskId: string }) => api.post(`/document-reader/${id}/trocar-tarefa`, { taskId }),
-    onSuccess: () => { toast.success('Documento anexado na tarefa escolhida'); setTrocandoId(null); setNovaTaskId(''); invalidar() },
+    onSuccess: () => { toast.success('Documento anexado na tarefa escolhida'); setTrocandoId(null); invalidar() },
     onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao trocar tarefa')),
   })
 
@@ -156,17 +204,10 @@ export default function ReviewQueue() {
                     </Button>
                   )}
                   {trocandoId === doc.id ? (
-                    <div className="flex gap-2 items-center">
-                      <Input
-                        placeholder="ID da tarefa"
-                        value={novaTaskId}
-                        onChange={(e) => setNovaTaskId(e.target.value)}
-                        className="h-8 w-48"
-                      />
-                      <Button size="sm" variant="outline" onClick={() => trocarMutation.mutate({ id: doc.id, taskId: novaTaskId })}>
-                        Anexar nessa tarefa
-                      </Button>
-                    </div>
+                    <SeletorDeTarefa
+                      onEscolher={(taskId) => trocarMutation.mutate({ id: doc.id, taskId })}
+                      onCancelar={() => setTrocandoId(null)}
+                    />
                   ) : (
                     <Button size="sm" variant="outline" onClick={() => setTrocandoId(doc.id)}>
                       Trocar tarefa
