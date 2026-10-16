@@ -1,18 +1,23 @@
 // apps/api/src/modules/document-reader/document-reader.service.test.ts
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { processarDocumento, ingerirDocumento } from './document-reader.service'
+import {
+  processarDocumento, ingerirDocumento,
+  confirmarSugestao, trocarTarefa, rejeitarDocumento, reabrirDocumento, listarFilaDeRevisao,
+} from './document-reader.service'
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClient,
-  createTestBoard, createTestColumn, createTestDepartment,
+  createTestBoard, createTestColumn, createTestDepartment, createTestTask,
 } from '@/test/helpers'
 import { gerarPdfComDocumentoArrecadacao } from '@/test/pdf-helpers'
 
-vi.mock('@/lib/b2', () => ({
-  uploadFile: vi.fn(),
-  getSignedDownloadUrl: vi.fn(),
-  downloadFile: vi.fn(),
-}))
+import * as b2Module from '@/lib/b2'
+
+// ingerirDocumento sempre chama uploadFile (real, não mockado por padrão como o vi.mock fazia) —
+// default aqui evita repetir o spy em todo teste que só se importa com o resto do fluxo.
+beforeEach(() => {
+  vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined as never)
+})
 
 async function setupObrigacaoETarefa(org: { id: string }, cnpj: string) {
   const dept = await createTestDepartment(org.id)
@@ -67,7 +72,7 @@ describe('processarDocumento', () => {
         uploadedById: admin.id, status: 'PENDING',
       },
     })
-    vi.spyOn(await import('@/lib/b2'), 'downloadFile').mockResolvedValue(Buffer.from(pdf))
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from(pdf))
 
     await processarDocumento(doc.id)
 
@@ -85,7 +90,7 @@ describe('processarDocumento', () => {
     const doc = await prisma.receivedDocument.create({
       data: { organizationId: org.id, fileHash: 'hash-2', storageKey: 'k2', uploadedById: admin.id, status: 'PENDING' },
     })
-    vi.spyOn(await import('@/lib/b2'), 'downloadFile').mockResolvedValue(Buffer.from('%PDF-1.4 sem texto algum'))
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from('%PDF-1.4 sem texto algum'))
 
     await processarDocumento(doc.id)
 
@@ -104,7 +109,7 @@ describe('processarDocumento', () => {
     const doc = await prisma.receivedDocument.create({
       data: { organizationId: org.id, fileHash: 'hash-3', storageKey: 'k3', uploadedById: admin.id, status: 'PENDING' },
     })
-    vi.spyOn(await import('@/lib/b2'), 'downloadFile').mockResolvedValue(Buffer.from(pdf))
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from(pdf))
 
     await processarDocumento(doc.id)
 
@@ -120,7 +125,7 @@ describe('processarDocumento', () => {
     const doc = await prisma.receivedDocument.create({
       data: { organizationId: org.id, fileHash: 'hash-corrompido', storageKey: 'k-corrompido', uploadedById: admin.id, status: 'PENDING' },
     })
-    vi.spyOn(await import('@/lib/b2'), 'downloadFile').mockResolvedValue(Buffer.from('não é um PDF de verdade, vai falhar no parse'))
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from('não é um PDF de verdade, vai falhar no parse'))
 
     await processarDocumento(doc.id)
 
@@ -140,7 +145,7 @@ describe('processarDocumento', () => {
     const doc = await prisma.receivedDocument.create({
       data: { organizationId: org.id, fileHash: 'hash-4', storageKey: 'k4', uploadedById: admin.id, status: 'PENDING' },
     })
-    vi.spyOn(await import('@/lib/b2'), 'downloadFile').mockResolvedValue(Buffer.from(pdf))
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from(pdf))
 
     await processarDocumento(doc.id)
 
@@ -161,7 +166,7 @@ describe('processarDocumento', () => {
     const doc = await prisma.receivedDocument.create({
       data: { organizationId: org.id, fileHash: 'hash-5', storageKey: 'k5', uploadedById: admin.id, status: 'PENDING' },
     })
-    vi.spyOn(await import('@/lib/b2'), 'downloadFile').mockResolvedValue(Buffer.from(pdf))
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from(pdf))
 
     await processarDocumento(doc.id)
 
@@ -210,5 +215,89 @@ describe('ingerirDocumento', () => {
 
     await expect(ingerirDocumento(orgA.id, { id: adminA.id }, payload)).resolves.toBeDefined()
     await expect(ingerirDocumento(orgB.id, { id: adminB.id }, payload)).resolves.toBeDefined()
+  })
+})
+
+describe('ações da fila de revisão', () => {
+  async function docComSugestao() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, admin.id, { departmentId: dept.id })
+    const doc = await prisma.receivedDocument.create({
+      data: { organizationId: org.id, fileHash: 'h', storageKey: 'k', uploadedById: admin.id, status: 'PENDING', taskId: task.id },
+    })
+    return { org, admin, task, doc }
+  }
+
+  it('confirmarSugestao anexa via createAttachment e marca ATTACHED', async () => {
+    const { org, admin, task, doc } = await docComSugestao()
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from('%PDF-1.4'))
+    vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined as never)
+
+    await confirmarSugestao(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })
+
+    const atualizado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
+    expect(atualizado.status).toBe('ATTACHED')
+    expect(atualizado.how).toBe('confirmado')
+    expect(atualizado.attachmentId).not.toBeNull()
+    const attachment = await prisma.attachment.findUniqueOrThrow({ where: { id: atualizado.attachmentId! } })
+    expect(attachment.taskId).toBe(task.id)
+  })
+
+  it('trocarTarefa anexa na tarefa escolhida pelo revisor, não na sugerida', async () => {
+    const { org, admin, doc } = await docComSugestao()
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const outraTask = await createTestTask(column.id, admin.id, { departmentId: dept.id })
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from('%PDF-1.4'))
+    vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined as never)
+
+    await trocarTarefa(doc.id, org.id, outraTask.id, { id: admin.id, role: 'ORG_ADMIN' })
+
+    const atualizado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
+    expect(atualizado.how).toBe('trocado')
+    const attachment = await prisma.attachment.findUniqueOrThrow({ where: { id: atualizado.attachmentId! } })
+    expect(attachment.taskId).toBe(outraTask.id)
+  })
+
+  it('rejeitarDocumento marca REJECTED sem criar anexo', async () => {
+    const { org, admin, doc } = await docComSugestao()
+
+    await rejeitarDocumento(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })
+
+    const atualizado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
+    expect(atualizado.status).toBe('REJECTED')
+    expect(atualizado.attachmentId).toBeNull()
+  })
+
+  it('reabrirDocumento volta REJECTED pra PENDING', async () => {
+    const { org, admin, doc } = await docComSugestao()
+    await rejeitarDocumento(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })
+
+    await reabrirDocumento(doc.id, org.id)
+
+    const atualizado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
+    expect(atualizado.status).toBe('PENDING')
+  })
+
+  it('listarFilaDeRevisao só mostra PENDING/NOT_IDENTIFIED da própria org', async () => {
+    const { org, doc } = await docComSugestao()
+    const plan = await createTestPlan()
+    const outraOrg = await createTestOrg(plan.id)
+    const outroAdmin = await createTestUser(outraOrg.id, { role: 'ORG_ADMIN' })
+    await prisma.receivedDocument.create({
+      data: { organizationId: outraOrg.id, fileHash: 'h2', storageKey: 'k2', uploadedById: outroAdmin.id, status: 'PENDING' },
+    })
+
+    const fila = await listarFilaDeRevisao(org.id)
+
+    expect(fila.map((d) => d.id)).toEqual([doc.id])
   })
 })

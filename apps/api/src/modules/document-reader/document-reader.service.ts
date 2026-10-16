@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { downloadFile, uploadFile } from '@/lib/b2'
 import { AppError } from '@/errors/AppError'
 import { enqueueDocumentReader } from '@/lib/document-reader-queue'
+import { createAttachment } from '@/modules/attachments/attachments.service'
 import { extrairEInterpretar, decidir, type Modelo, type Base } from './engine/pipeline'
 
 async function carregarModelosDaOrg(organizationId: string): Promise<Modelo[]> {
@@ -151,6 +152,62 @@ export async function ingerirDocumento(
 
   await enqueueDocumentReader(doc.id)
   return doc
+}
+
+export async function listarFilaDeRevisao(organizationId: string) {
+  return prisma.receivedDocument.findMany({
+    where: { organizationId, status: { in: ['PENDING', 'NOT_IDENTIFIED'] } },
+    orderBy: { createdAt: 'asc' },
+  })
+}
+
+async function anexarDocumento(
+  receivedDocumentId: string,
+  organizationId: string,
+  taskId: string,
+  actor: { id: string; role: string },
+  how: 'confirmado' | 'trocado' | 'criado',
+) {
+  const doc = await prisma.receivedDocument.findFirst({ where: { id: receivedDocumentId, organizationId } })
+  if (!doc) throw new AppError(404, 'Documento não encontrado')
+
+  const buffer = await downloadFile(doc.storageKey)
+  const filename = doc.storageKey.split('/').pop() ?? 'documento.pdf'
+  const attachment = await createAttachment(taskId, organizationId, actor, {
+    filename, mimeType: 'application/pdf', size: buffer.length, buffer,
+  })
+
+  await prisma.receivedDocument.update({
+    where: { id: receivedDocumentId },
+    data: { status: 'ATTACHED', taskId, attachmentId: attachment.id, how, reviewedById: actor.id, reviewedAt: new Date() },
+  })
+  return attachment
+}
+
+export async function confirmarSugestao(receivedDocumentId: string, organizationId: string, actor: { id: string; role: string }) {
+  const doc = await prisma.receivedDocument.findFirst({ where: { id: receivedDocumentId, organizationId } })
+  if (!doc) throw new AppError(404, 'Documento não encontrado')
+  if (!doc.taskId) throw new AppError(422, 'Esse documento não tem tarefa sugerida — use trocarTarefa')
+  return anexarDocumento(receivedDocumentId, organizationId, doc.taskId, actor, 'confirmado')
+}
+
+export async function trocarTarefa(receivedDocumentId: string, organizationId: string, taskId: string, actor: { id: string; role: string }) {
+  return anexarDocumento(receivedDocumentId, organizationId, taskId, actor, 'trocado')
+}
+
+export async function rejeitarDocumento(receivedDocumentId: string, organizationId: string, actor: { id: string; role: string }) {
+  const doc = await prisma.receivedDocument.findFirst({ where: { id: receivedDocumentId, organizationId } })
+  if (!doc) throw new AppError(404, 'Documento não encontrado')
+  await prisma.receivedDocument.update({
+    where: { id: receivedDocumentId },
+    data: { status: 'REJECTED', how: 'rejeitado', reviewedById: actor.id, reviewedAt: new Date() },
+  })
+}
+
+export async function reabrirDocumento(receivedDocumentId: string, organizationId: string) {
+  const doc = await prisma.receivedDocument.findFirst({ where: { id: receivedDocumentId, organizationId } })
+  if (!doc) throw new AppError(404, 'Documento não encontrado')
+  await prisma.receivedDocument.update({ where: { id: receivedDocumentId }, data: { status: 'PENDING' } })
 }
 
 // Task.competence é um mês-âncora (DateTime, UTC) — converte pro rótulo "2026-08" que o motor usa
