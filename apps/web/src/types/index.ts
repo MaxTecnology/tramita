@@ -308,3 +308,14 @@ export interface OSTemplate {
   id: string; name: string; description: string | null; isActive: boolean
   columns: OSTemplateColumn[]
 }
+
+export interface ReceivedDocument {
+  id: string
+  status: 'PENDING' | 'ATTACHED' | 'NOT_IDENTIFIED' | 'REJECTED'
+  documentModelId: string | null
+  confidence: number | null
+  extractedFields: Record<string, { bruto: string; valor: string | number | null; valido: boolean }> | null
+  taskId: string | null
+  how: string | null
+  createdAt: string
+}

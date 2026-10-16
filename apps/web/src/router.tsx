@@ -32,6 +32,7 @@ import DashboardMetrics from '@/pages/app/DashboardMetrics'
 import Processes from '@/pages/app/Processes'
 import Requests from '@/pages/app/Requests'
 import Tasks from '@/pages/app/Tasks'
+import DocumentReaderQueue from '@/pages/app/document-reader/ReviewQueue'
 
 const PortalLayout = lazy(() => import('@/pages/portal/Layout'))
 const PortalBoards = lazy(() => import('@/pages/portal/Boards'))
@@ -81,6 +82,7 @@ export const router = createBrowserRouter([
         ),
       },
       { path: 'requests', element: <Requests /> },
+      { path: 'document-reader', element: <DocumentReaderQueue /> },
       { path: 'board/:boardId', element: <Board /> },
       {
         path: 'clients',
