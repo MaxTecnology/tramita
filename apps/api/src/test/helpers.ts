@@ -62,7 +62,7 @@ export async function createTestUser(
 
 export async function createTestClient(
   organizationId: string,
-  overrides: Partial<{ isActive: boolean; name: string; codigo: string }> = {},
+  overrides: Partial<{ isActive: boolean; name: string; codigo: string; cnpj: string }> = {},
 ) {
   return prisma.client.create({
     data: {
@@ -70,6 +70,7 @@ export async function createTestClient(
       organizationId,
       isActive: overrides.isActive ?? true,
       codigo: overrides.codigo,
+      cnpj: overrides.cnpj,
     },
   })
 }

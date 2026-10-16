@@ -38,6 +38,13 @@ export async function getSignedDownloadUrl(key: string, ttlSeconds = 3600): Prom
   return getSignedUrl(getClient(), new GetObjectCommand({ Bucket: getBucket(), Key: key }), { expiresIn: ttlSeconds })
 }
 
+export async function downloadFile(key: string): Promise<Buffer> {
+  const response = await getClient().send(new GetObjectCommand({ Bucket: getBucket(), Key: key }))
+  const chunks: Uint8Array[] = []
+  for await (const chunk of response.Body as AsyncIterable<Uint8Array>) chunks.push(chunk)
+  return Buffer.concat(chunks)
+}
+
 export async function deleteFile(key: string): Promise<void> {
   const bucket = getBucket()
   const client = getClient()
