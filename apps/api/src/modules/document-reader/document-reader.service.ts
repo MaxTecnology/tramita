@@ -16,7 +16,14 @@ async function carregarModelosDaOrg(organizationId: string): Promise<Modelo[]> {
   const registros = await prisma.documentModel.findMany({
     where: { isActive: true, OR: [{ organizationId: null }, { organizationId }] },
   })
-  return registros.map((r) => ({ id: r.id, ...(r.definicao as object) }) as Modelo)
+  // id SEMPRE por último no spread: alguns `definicao` (os 4 modelos globais semeados, herdados da
+  // POC) trazem seu próprio campo "id" (ex.: "darf-rfb", um slug legível, não um cuid) — se viesse
+  // antes do spread, esse "id" interno sobrescreveria o id real do DocumentModel, e
+  // `prisma.documentModel.findUnique({ where: { id: resultado.modelo } })` em processarDocumento()
+  // nunca encontraria o registro, deixando `documentModelId` sempre null (achado ao preparar o
+  // Plano B — bug presente desde o Plano A, nunca pego pelos testes porque nenhum deles usava uma
+  // `definicao` com campo "id" próprio).
+  return registros.map((r) => ({ ...(r.definicao as object), id: r.id }) as Modelo)
 }
 
 // Compara por dígitos (não string crua) — o cadastro de Client grava o CNPJ como o usuário digitou

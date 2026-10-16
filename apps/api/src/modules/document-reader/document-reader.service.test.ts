@@ -83,6 +83,55 @@ describe('processarDocumento', () => {
     expect(atualizado.confidence).toBeGreaterThanOrEqual(0.9)
   })
 
+  it('grava o documentModelId correto mesmo quando a definicao JSON tem seu próprio campo "id" (como os 4 modelos globais semeados, ex.: "darf-rfb") — esse "id" interno nunca pode sobrescrever o cuid real do DocumentModel', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id, { cnpj: '11222333000181' })
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const obrigacao = await prisma.obligationType.create({ data: { code: 'TESTE-ID', name: 'Obrigação de Teste', organizationId: null } })
+    const template = await prisma.recurringTaskTemplate.create({
+      data: {
+        organizationId: org.id, departmentId: dept.id, title: 'Teste', periodicity: 'MONTHLY',
+        dueDayOfPeriod: 10, generationDayOfPeriod: 1, obligationTypeId: obrigacao.id,
+      },
+    })
+    const task = await prisma.task.create({
+      data: {
+        title: 'Obrigação de Teste — 2026-08', columnId: column.id, departmentId: dept.id,
+        competence: new Date(Date.UTC(2026, 7, 1)), recurringTemplateId: template.id, position: 0,
+      },
+    })
+    const modelo = await prisma.documentModel.create({
+      data: {
+        organizationId: null, obligationTypeId: obrigacao.id, name: 'Modelo com id interno',
+        definicao: {
+          id: 'modelo-com-id-interno-no-json', // igual os 4 globais semeados (ex.: "darf-rfb")
+          tipoImposto: 'TESTE-ID',
+          ancoras: [{ texto: 'Documento de Arrecadação', pagina: 1, x: 0.1, y: 0.05 }],
+          zonas: [
+            { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+            { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+          ],
+        },
+      },
+    })
+
+    const pdf = await gerarPdfComDocumentoArrecadacao('11.222.333/0001-81', 'agosto/2026')
+    const doc = await prisma.receivedDocument.create({
+      data: { organizationId: org.id, fileHash: 'hash-id-bug', storageKey: 'k-id-bug', uploadedById: admin.id, status: 'PENDING' },
+    })
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from(pdf))
+
+    await processarDocumento(doc.id)
+
+    const atualizado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
+    expect(atualizado.documentModelId).toBe(modelo.id) // cuid real, nunca "modelo-com-id-interno-no-json"
+    expect(atualizado.taskId).toBe(task.id)
+  })
+
   it('status NOT_IDENTIFIED quando nenhum modelo reconhece o PDF', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
