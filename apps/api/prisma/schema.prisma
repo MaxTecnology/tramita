@@ -54,6 +54,9 @@ model Organization {
   osTemplates            OSTemplate[]
   protocols              Protocol[]
   protocolCounters       ProtocolCounter[]
+  taxObligationTypes     TaxObligationType[]
+  documentModels         DocumentModel[]
+  receivedDocuments      ReceivedDocument[]
 
   @@map("organizations")
 }
@@ -105,6 +108,10 @@ model User {
   reviewedDocumentRequirements TaskDocumentRequirement[]
   deliveredDeliverables        TaskDeliverable[]
   slaPreference                UserSlaPreference?
+  createdTaxObligationTypes    TaxObligationType[]
+  createdDocumentModels        DocumentModel[]
+  uploadedDocuments            ReceivedDocument[]        @relation("ReceivedDocumentUploadedBy")
+  reviewedDocuments            ReceivedDocument[]        @relation("ReceivedDocumentReviewedBy")
 
   @@map("users")
 }
@@ -132,15 +139,18 @@ enum UserRole {
 }
 
 model Client {
-  id         String  @id @default(cuid())
-  name       String
-  clientType String  @default("PJ")
-  codigo     String?
-  cnpj       String?
-  cpf        String?
-  whatsapp   String?
-  phone      String?
-  notes      String?
+  id                String  @id @default(cuid())
+  name              String
+  clientType        String  @default("PJ")
+  codigo            String?
+  cnpj              String?
+  cpf               String?
+  cei               String?
+  caepf             String?
+  inscricaoEstadual String?
+  whatsapp          String?
+  phone             String?
+  notes             String?
 
   cep         String?
   estado      String?
@@ -399,6 +409,7 @@ model Task {
   documentRequirements TaskDocumentRequirement[]
   deliverables         TaskDeliverable[]
   protocols            Protocol[]
+  receivedDocuments    ReceivedDocument[]
 
   @@index([status])
   @@index([priority])
@@ -484,13 +495,16 @@ model OSTemplateColumnDocument {
 }
 
 model RecurringTaskTemplate {
-  id             String                @id @default(cuid())
-  organizationId String
-  departmentId   String
-  title          String
-  description    String?
-  periodicity    RecurrencePeriodicity
-  priority       Priority              @default(MEDIUM)
+  id                  String                @id @default(cuid())
+  organizationId      String
+  departmentId        String
+  // Só preenchido pra templates que geram obrigação fiscal — permite ao robô de documentos casar
+  // (cliente, obrigação, competência) com confiança, em vez de comparar title (texto livre).
+  taxObligationTypeId String?
+  title               String
+  description         String?
+  periodicity         RecurrencePeriodicity
+  priority            Priority              @default(MEDIUM)
 
   dueDayOfPeriod     Int
   dueBusinessDayRoll BusinessDayRoll @default(NONE)
@@ -521,6 +535,7 @@ model RecurringTaskTemplate {
 
   organization       Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   department         Department                      @relation(fields: [departmentId], references: [id])
+  taxObligationType  TaxObligationType?              @relation(fields: [taxObligationTypeId], references: [id])
   documentRequests   RecurringTaskTemplateDocument[] @relation("TemplateDocumentRequests")
   documentDeliveries RecurringTaskTemplateDocument[] @relation("TemplateDocumentDeliveries")
   assignments        RecurringTaskAssignment[]
@@ -777,6 +792,7 @@ model Attachment {
   documentRequirement TaskDocumentRequirement?
   deliverable         TaskDeliverable?
   protocol            Protocol?
+  receivedDocument    ReceivedDocument?
 
   @@map("attachments")
 }
@@ -882,4 +898,79 @@ enum NotificationStatus {
   PENDING
   SENT
   FAILED
+}
+
+model TaxObligationType {
+  id             String   @id @default(cuid())
+  code           String // "IRPJ", "DAS", "CSLL", "PGDAS-D"
+  name           String
+  organizationId String? // null = global (AutoHubs); preenchido = só do escritório
+  isActive       Boolean  @default(true)
+  createdById    String? // null pros globais
+  createdAt      DateTime @default(now())
+
+  organization           Organization?           @relation(fields: [organizationId], references: [id])
+  createdBy              User?                   @relation(fields: [createdById], references: [id])
+  documentModels         DocumentModel[]
+  recurringTaskTemplates RecurringTaskTemplate[]
+
+  @@unique([organizationId, code])
+  @@map("tax_obligation_types")
+}
+
+model DocumentModel {
+  id                  String   @id @default(cuid())
+  organizationId      String? // null = global
+  taxObligationTypeId String
+  name                String
+  version             Int      @default(1)
+  isActive            Boolean  @default(true)
+  // Formato: { ancoras: Ancora[], zonas: Zona[], tipoImpostoCampo?: string, subtipos?: Record<string,string> }
+  definicao           Json
+  createdById         String?
+  createdAt           DateTime @default(now())
+
+  taxObligationType TaxObligationType  @relation(fields: [taxObligationTypeId], references: [id])
+  organization      Organization?      @relation(fields: [organizationId], references: [id])
+  createdBy         User?              @relation(fields: [createdById], references: [id])
+  documentos        ReceivedDocument[]
+
+  @@map("document_models")
+}
+
+model ReceivedDocument {
+  id              String                 @id @default(cuid())
+  organizationId  String
+  attachmentId    String?                @unique
+  fileHash        String
+  documentNumber  String?
+  storageKey      String
+  uploadedById    String?
+  status          ReceivedDocumentStatus @default(PENDING)
+  documentModelId String?
+  modelVersion    Int?
+  confidence      Float?
+  extractedFields Json?
+  taskId          String?
+  how             String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  createdAt       DateTime               @default(now())
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  documentModel DocumentModel? @relation(fields: [documentModelId], references: [id])
+  task          Task?          @relation(fields: [taskId], references: [id])
+  attachment    Attachment?    @relation(fields: [attachmentId], references: [id])
+  uploadedBy    User?          @relation("ReceivedDocumentUploadedBy", fields: [uploadedById], references: [id])
+  reviewedBy    User?          @relation("ReceivedDocumentReviewedBy", fields: [reviewedById], references: [id])
+
+  @@unique([organizationId, fileHash])
+  @@map("received_documents")
+}
+
+enum ReceivedDocumentStatus {
+  PENDING
+  ATTACHED
+  NOT_IDENTIFIED
+  REJECTED
 }
