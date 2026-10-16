@@ -1,0 +1,96 @@
+{
+  "id": "pgdas-declaracao",
+  "nome": "PGDAS-D - Declaração (3 páginas)",
+  "tipoImposto": "PGDAS-D",
+  "ancoras": [
+    {
+      "texto": "Programa Gerador do Documento de Arrecadação",
+      "pagina": 1,
+      "x": 0.37243697478991594,
+      "y": 0.06175771971496437
+    },
+    {
+      "texto": "do Simples Nacional - Declaratório",
+      "pagina": 1,
+      "x": 0.4329411764705883,
+      "y": 0.07600950118764846
+    },
+    {
+      "texto": "1. Identificação do Contribuinte",
+      "pagina": 1,
+      "x": 0.08739495798319327,
+      "y": 0.15795724465558195
+    },
+    {
+      "texto": "3. Informações da Recepção da Declaração",
+      "pagina": 3,
+      "x": 0.08739495798319327,
+      "y": 0.06532066508313539
+    },
+    {
+      "texto": "Valor Total do Débito Declarado (R$)",
+      "pagina": 2,
+      "x": 0.543781512605042,
+      "y": 0.11757719714964371
+    }
+  ],
+  "zonas": [
+    {
+      "campo": "cnpj",
+      "pagina": 1,
+      "x": 0.37,
+      "y": 0.168,
+      "w": 0.2,
+      "h": 0.01,
+      "tipo": "cnpj"
+    },
+    {
+      "campo": "razao_social",
+      "pagina": 1,
+      "x": 0.37,
+      "y": 0.184,
+      "w": 0.4,
+      "h": 0.01,
+      "tipo": "texto",
+      "opcional": true
+    },
+    {
+      "campo": "competencia",
+      "pagina": 1,
+      "x": 0.5,
+      "y": 0.12,
+      "w": 0.25,
+      "h": 0.01,
+      "tipo": "competencia"
+    },
+    {
+      "campo": "valor",
+      "pagina": 2,
+      "x": 0.66,
+      "y": 0.128,
+      "w": 0.1,
+      "h": 0.01,
+      "tipo": "moeda"
+    },
+    {
+      "campo": "numero_documento",
+      "pagina": 3,
+      "x": 0.29,
+      "y": 0.093,
+      "w": 0.22,
+      "h": 0.008,
+      "tipo": "texto",
+      "opcional": true
+    },
+    {
+      "campo": "retificadora",
+      "pagina": 1,
+      "x": 0.085,
+      "y": 0.105,
+      "w": 0.25,
+      "h": 0.01,
+      "tipo": "texto",
+      "opcional": true
+    }
+  ]
+}

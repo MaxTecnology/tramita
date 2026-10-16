@@ -1,0 +1,84 @@
+{
+  "id": "pgdas-recibo",
+  "nome": "PGDAS-D - Recibo de entrega da apuração",
+  "tipoImposto": "PGDAS-D",
+  "ancoras": [
+    {
+      "texto": "RECIBO DE ENTREGA DA APURAÇÃO NO PGDAS-D",
+      "pagina": 1,
+      "x": 0.29831932773109243,
+      "y": 0.08669833729216152
+    },
+    {
+      "texto": "2. Resumo da Apuração",
+      "pagina": 1,
+      "x": 0.08739495798319327,
+      "y": 0.30522565320665085
+    },
+    {
+      "texto": "3. Informações da Recepção da Apuração no PGDAS-D",
+      "pagina": 1,
+      "x": 0.08739495798319327,
+      "y": 0.4346793349168646
+    }
+  ],
+  "zonas": [
+    {
+      "campo": "cnpj",
+      "pagina": 1,
+      "x": 0.5,
+      "y": 0.165,
+      "w": 0.25,
+      "h": 0.01,
+      "tipo": "cnpj"
+    },
+    {
+      "campo": "razao_social",
+      "pagina": 1,
+      "x": 0.085,
+      "y": 0.165,
+      "w": 0.4,
+      "h": 0.01,
+      "tipo": "texto",
+      "opcional": true
+    },
+    {
+      "campo": "competencia",
+      "pagina": 1,
+      "x": 0.11,
+      "y": 0.388,
+      "w": 0.1,
+      "h": 0.01,
+      "tipo": "competencia"
+    },
+    {
+      "campo": "valor",
+      "pagina": 1,
+      "x": 0.52,
+      "y": 0.388,
+      "w": 0.12,
+      "h": 0.01,
+      "tipo": "moeda"
+    },
+    {
+      "campo": "numero_documento",
+      "pagina": 1,
+      "x": 0.085,
+      "y": 0.657,
+      "w": 0.3,
+      "h": 0.01,
+      "tipo": "texto",
+      "opcional": true
+    },
+    {
+      "campo": "retificadora",
+      "pagina": 1,
+      "x": 0.39,
+      "y": 0.105,
+      "w": 0.23,
+      "h": 0.01,
+      "tipo": "texto",
+      "opcional": true
+    }
+  ]
+}

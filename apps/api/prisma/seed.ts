@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { seedDocumentModels } from './seed-document-models'
 
 const prisma = new PrismaClient()
 
@@ -73,6 +74,8 @@ async function main() {
   console.log(
     `Seed concluído: org AutoHubs + usuário MASTER (${masterEmail}) + ${publicPlans.length} planos públicos`,
   )
+
+  await seedDocumentModels(prisma)
 }
 
 main()

@@ -1,0 +1,118 @@
+{
+  "id": "darf-rfb",
+  "nome": "DARF Receita Federal (SENDA) - IRPJ, CSLL e demais",
+  "tipoImposto": "DARF",
+  "tipoImpostoCampo": "tributo",
+  "ancoras": [
+    {
+      "texto": "Documento de Arrecadação",
+      "pagina": 1,
+      "x": 0.5998655462184874,
+      "y": 0.06184085510688842
+    },
+    {
+      "texto": "de Receitas Federais",
+      "pagina": 1,
+      "x": 0.6838151260504202,
+      "y": 0.08232779097387179
+    },
+    {
+      "texto": "Composição do Documento de Arrecadação",
+      "pagina": 1,
+      "x": 0.07226890756302522,
+      "y": 0.27261282660332536
+    },
+    {
+      "texto": "Valor Total do Documento",
+      "pagina": 1,
+      "x": 0.8089915966386555,
+      "y": 0.22467933491686454
+    }
+  ],
+  "zonas": [
+    {
+      "campo": "cnpj",
+      "pagina": 1,
+      "x": 0.06,
+      "y": 0.158,
+      "w": 0.195,
+      "h": 0.01,
+      "tipo": "cnpj"
+    },
+    {
+      "campo": "razao_social",
+      "pagina": 1,
+      "x": 0.263,
+      "y": 0.158,
+      "w": 0.68,
+      "h": 0.01,
+      "tipo": "texto",
+      "opcional": true
+    },
+    {
+      "campo": "competencia",
+      "pagina": 1,
+      "x": 0.065,
+      "y": 0.188,
+      "w": 0.197,
+      "h": 0.01,
+      "tipo": "competencia"
+    },
+    {
+      "campo": "vencimento",
+      "pagina": 1,
+      "x": 0.265,
+      "y": 0.188,
+      "w": 0.2,
+      "h": 0.01,
+      "tipo": "data"
+    },
+    {
+      "campo": "numero_documento",
+      "pagina": 1,
+      "x": 0.47,
+      "y": 0.188,
+      "w": 0.3,
+      "h": 0.01,
+      "tipo": "texto",
+      "opcional": true
+    },
+    {
+      "campo": "valor",
+      "pagina": 1,
+      "x": 0.8,
+      "y": 0.236,
+      "w": 0.15,
+      "h": 0.02,
+      "tipo": "moeda"
+    },
+    {
+      "campo": "codigo_receita",
+      "pagina": 1,
+      "x": 0.07,
+      "y": 0.312,
+      "w": 0.045,
+      "h": 0.008,
+      "tipo": "texto",
+      "opcional": true
+    },
+    {
+      "campo": "tributo",
+      "pagina": 1,
+      "x": 0.122,
+      "y": 0.312,
+      "w": 0.032,
+      "h": 0.008,
+      "tipo": "texto"
+    },
+    {
+      "campo": "pa",
+      "pagina": 1,
+      "x": 0.12,
+      "y": 0.339,
+      "w": 0.5,
+      "h": 0.008,
+      "tipo": "periodo_apuracao"
+    }
+  ]
+}
