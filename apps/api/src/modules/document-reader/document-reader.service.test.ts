@@ -322,6 +322,19 @@ describe('ações da fila de revisão', () => {
     expect(attachment.taskId).toBe(task.id)
   })
 
+  it('o Attachment criado usa o nome original do arquivo, sem o prefixo de timestamp da storageKey', async () => {
+    const { org, admin, doc } = await docComSugestao()
+    await prisma.receivedDocument.update({ where: { id: doc.id }, data: { storageKey: `document-reader/x/${Date.now()}-guia-das-agosto.pdf` } })
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from('%PDF-1.4'))
+    vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined as never)
+
+    await confirmarSugestao(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })
+
+    const atualizado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
+    const attachment = await prisma.attachment.findUniqueOrThrow({ where: { id: atualizado.attachmentId! } })
+    expect(attachment.filename).toBe('guia-das-agosto.pdf')
+  })
+
   it('trocarTarefa anexa na tarefa escolhida pelo revisor, não na sugerida', async () => {
     const { org, admin, doc } = await docComSugestao()
     const dept = await createTestDepartment(org.id)

@@ -56,3 +56,6 @@ apps/api/prisma/*.d.ts.map
 
 # Scratch space (pode conter documentos reais de cliente — nunca commitar)
 /tmp/
+
+# Snapshots/console logs de sessões de QA manual via Playwright MCP
+.playwright-mcp/

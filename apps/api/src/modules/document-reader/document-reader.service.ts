@@ -250,7 +250,7 @@ async function anexarDocumento(
   const doc = await buscarDocumentoRevisavel(receivedDocumentId, organizationId)
 
   const buffer = await downloadFile(doc.storageKey)
-  const filename = doc.storageKey.split('/').pop() ?? 'documento.pdf'
+  const filename = filenameDaStorageKey(doc.storageKey)
   const attachment = await createAttachment(taskId, organizationId, actor, {
     filename, mimeType: 'application/pdf', size: buffer.length, buffer,
   })
