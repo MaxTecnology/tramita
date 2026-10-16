@@ -285,9 +285,12 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   escrever um teste TDD genuíno pra essa trilha: as exportações ESM do `pdfjs-dist@6.4.299` não são
   configuráveis (`vi.spyOn` falha com "Cannot redefine property"), e `src/test/setup.ts` já carrega
   o módulo real via `buildApp()` antes do hoisting de `vi.mock` ter chance de interceptar.
-- **`trocarTarefa`** não confere se a tarefa de destino é do mesmo cliente do CNPJ lido no
-  documento — um erro humano na fila de revisão pode publicar a guia do cliente A na tarefa do
-  cliente B (e, se `visibleToClient`, no portal dele).
+- **`trocarTarefa`** não confere no backend se a tarefa de destino é do mesmo cliente do CNPJ lido
+  no documento — um erro humano na fila de revisão ainda pode publicar a guia do cliente A na
+  tarefa do cliente B (e, se `visibleToClient`, no portal dele). Mitigado em 2026-10-16 (commit
+  2ab126a) na UI: o seletor agora exige escolher o cliente explicitamente antes de listar as
+  tarefas dele (não é mais colar um ID de tarefa às cegas), mas a validação cruzada CNPJ-lido vs.
+  cliente-da-tarefa continua ausente no `document-reader.service.ts`.
 - **Rotas de `document-reader.routes.ts`** não validam `:id` via Zod, ao contrário da convenção do
   resto do projeto.
 - **`ingerirDocumento`** faz upload ao B2 antes do insert no banco — se o `P2002` de dedupe disparar
