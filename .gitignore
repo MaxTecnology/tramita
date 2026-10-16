@@ -53,3 +53,6 @@ apps/api/prisma/*.d.ts.map
 
 # Claude Code
 .claude/settings.json
+
+# Scratch space (pode conter documentos reais de cliente — nunca commitar)
+/tmp/
