@@ -42,8 +42,12 @@ cuidado extra — não vale o risco pro caminho principal. O motor da POC porta 
 Tanto o **tipo de obrigação fiscal** quanto o **modelo de layout** existem em dois níveis — decisão
 do Max (2026-10-15): um erro de cadastro de um escritório nunca pode afetar outro, mas a AutoHubs
 cura uma base comum (DARF, DAS, PGDAS-D... são os mesmos documentos em qualquer escritório) pra não
-duplicar trabalho. `organizationId` nulo = global (só um painel futuro de admin AutoHubs cadastra);
-preenchido = privado daquele escritório.
+duplicar trabalho. `organizationId` nulo = global; preenchido = privado daquele escritório.
+
+**V1 não tem tela de cadastro global** — os 3 globais iniciais (DARF, DAS, PGDAS-D) entram via
+script de seed (igual planos padrão, templates de OS etc.), não por UI. Uma tela de admin AutoHubs
+pra cadastrar global sem precisar de deploy é melhoria futura, só necessária quando precisar
+adicionar um 4º tipo global sem esperar uma release.
 
 ```prisma
 model TaxObligationType {
@@ -97,6 +101,7 @@ model ReceivedDocument {
   fileHash        String   // sha256 do PDF — dedupe primário (bloqueia reprocessar o mesmo arquivo)
   documentNumber  String?  // "numero_documento" extraído — dedupe secundário, não bloqueante (ver fluxo)
   storageKey      String   // B2, antes de virar Attachment oficial
+  uploadedById    String?  // quem subiu o PDF — sempre staff no v1 (ver fluxo)
   status          ReceivedDocumentStatus @default(PENDING)
   documentModelId String?
   modelVersion    Int?
@@ -113,7 +118,8 @@ model ReceivedDocument {
   documentModel DocumentModel?  @relation(fields: [documentModelId], references: [id])
   task          Task?           @relation(fields: [taskId], references: [id])
   attachment    Attachment?     @relation(fields: [attachmentId], references: [id])
-  reviewedBy    User?           @relation(fields: [reviewedById], references: [id])
+  uploadedBy    User?           @relation("ReceivedDocumentUploadedBy", fields: [uploadedById], references: [id])
+  reviewedBy    User?           @relation("ReceivedDocumentReviewedBy", fields: [reviewedById], references: [id])
 
   @@unique([organizationId, fileHash])
   @@map("received_documents")
@@ -165,13 +171,17 @@ política, não só "fica pra sempre":
 
 ## Fluxo
 
-1. **Ingestão** (reaproveita o upload existente): staff ou cliente sobe um PDF como anexo de
-   obrigação fiscal — rota nova, não o fluxo genérico de anexo de task — sha256 → grava no B2 →
-   cria `ReceivedDocument(status=PENDING)` → enfileira job `leitura-documento-fiscal` (BullMQ, mesmo
-   padrão de `sla-digest.cron.ts`/`recurring-tasks.cron.ts`: Queue + Worker). Dedupe por
-   `(organizationId, fileHash)` — mesmo arquivo não processa duas vezes. `documentNumber` repetido
-   na mesma org não bloqueia (pode ser PDF diferente do mesmo documento), mas gera aviso de
-   possível duplicata na fila de revisão.
+1. **Ingestão** (reaproveita o upload existente): só **staff** no v1 (decidido 2026-10-15 — cliente
+   só manda documento pra concluir tarefa, pelo fluxo que já existe; não sobe pro robô sem saber a
+   tarefa). Staff recebeu o PDF por outro canal (e-mail, WhatsApp) e sobe — rota nova, não o fluxo
+   genérico de anexo de task, `requireRole(ORG_ROLES)` — sha256 → grava no B2 → cria
+   `ReceivedDocument(status=PENDING, uploadedById)` → enfileira job `leitura-documento-fiscal`
+   (BullMQ, mesmo padrão de `sla-digest.cron.ts`/`recurring-tasks.cron.ts`: Queue + Worker). Dedupe
+   por `(organizationId, fileHash)` — mesmo arquivo não processa duas vezes; reenvio por engano
+   precisa de checagem explícita antes do insert + captura de P2002 traduzida pra erro claro, mesmo
+   padrão já usado em `protocols.service.ts::createProtocol` pro anexo duplicado (não deixar virar
+   erro bruto de banco). `documentNumber` repetido na mesma org não bloqueia (pode ser PDF diferente
+   do mesmo documento), mas gera aviso de possível duplicata na fila de revisão.
 2. **Worker**: baixa do B2, roda o motor portado (`extrairTexto` → `pontuarModelos` → zona por
    zona → validadores → confiança), carregando os `DocumentModel` ativos da org **mais** os globais.
    Grava em `ReceivedDocument`: campos extraídos, modelo+versão usado, confiança, `status`.
