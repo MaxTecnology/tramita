@@ -26,6 +26,7 @@ import { recurringTemplatesRoutes } from '@/modules/recurring-templates/recurrin
 import { clientUsersRoutes } from '@/modules/client-users/client-users.routes'
 import { osTemplatesRoutes } from '@/modules/os-templates/os-templates.routes'
 import { slaRoutes } from '@/modules/sla/sla.routes'
+import { documentReaderRoutes } from '@/modules/document-reader/document-reader.routes'
 import { AppError } from '@/errors/AppError'
 
 export function buildApp() {
@@ -61,6 +62,7 @@ export function buildApp() {
   app.register(clientUsersRoutes, { prefix: '/client-users' })
   app.register(osTemplatesRoutes, { prefix: '/os-templates' })
   app.register(slaRoutes, { prefix: '/sla' })
+  app.register(documentReaderRoutes)
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     if (error instanceof AppError) {
