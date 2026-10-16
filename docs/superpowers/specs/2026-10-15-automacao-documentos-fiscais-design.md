@@ -94,7 +94,8 @@ model ReceivedDocument {
   id              String   @id @default(cuid())
   organizationId  String
   attachmentId    String?  @unique // preenchido só quando vira anexo de verdade na Task
-  fileHash        String   // sha256 do PDF — dedupe
+  fileHash        String   // sha256 do PDF — dedupe primário (bloqueia reprocessar o mesmo arquivo)
+  documentNumber  String?  // "numero_documento" extraído — dedupe secundário, não bloqueante (ver fluxo)
   storageKey      String   // B2, antes de virar Attachment oficial
   status          ReceivedDocumentStatus @default(PENDING)
   documentModelId String?
@@ -131,19 +132,53 @@ preenchido pra templates que geram obrigação fiscal; é o que permite casar `(
 competência)` contra `Task` com confiança, em vez de comparar `title` (texto livre) contra o tipo
 extraído do PDF.
 
+DAS (guia de pagamento) e PGDAS-D (declaração) não precisam de uma regra especial aqui: cada um
+é o seu próprio `TaxObligationType`, e cada escritório decide se isso vira uma `RecurringTaskTemplate`
+só ou duas — usando os campos que já existem (`visibleToClient`, `notifyViaWhatsapp`,
+`notifyViaEmail`) pra diferenciar tarefa voltada ao cliente de tarefa interna do escritório. O robô
+só casa contra o que existir; não precisa saber nem decidir essa modelagem.
+
+### Identificadores do cliente
+
+`Client` hoje só tem `cnpj`/`cpf`. Decisão (2026-10-15): adicionar `cei`, `caepf` e
+`inscricaoEstadual` (todos `String?`) ao `Client` já nesta feature — produtor rural (CEI) e
+entidades com CAEPF/IE não teriam nenhuma forma de casar automaticamente sem isso. O casamento do
+motor tenta CNPJ, depois CPF, depois CEI, depois CAEPF, depois IE — o primeiro que bater identifica
+o cliente. Fora do motor, isso também toca os formulários/telas existentes de cadastro de cliente
+(fora do escopo de UI desta feature, mas o campo precisa existir no schema e no formulário básico).
+
+### Retenção de dado (LGPD)
+
+`ReceivedDocument` guarda CNPJ/valores extraídos de documento fiscal de cliente — precisa de uma
+política, não só "fica pra sempre":
+- **`ATTACHED`**: sem retenção especial — vira um `Attachment` normal, mesma política de qualquer
+  outro anexo de tarefa (hoje: indefinida, soft-delete por staff).
+- **`REJECTED`**: expurgo automático depois de **30 dias** (decidido com o Max) — apaga o objeto do
+  B2 e os campos extraídos (ou a linha inteira) do `ReceivedDocument`. Tempo suficiente pra reverter
+  uma rejeição por engano; depois disso não há razão de negócio pra guardar dado fiscal de um
+  documento descartado.
+- **`PENDING`/`NOT_IDENTIFIED`** (ainda na fila, ninguém decidiu): sem expurgo automático — é
+  trabalho em aberto, apagar sozinho arrisca perder uma obrigação real antes de alguém olhar. Fica
+  como trabalho futuro um alerta de "pendente há muito tempo" na própria fila.
+- Acesso: já restrito por `organizationId` + `requireRole(ORG_ROLES)`, igual a qualquer outro dado
+  fiscal do sistema — mesma equipe que já vê os anexos do cliente hoje.
+
 ## Fluxo
 
 1. **Ingestão** (reaproveita o upload existente): staff ou cliente sobe um PDF como anexo de
    obrigação fiscal — rota nova, não o fluxo genérico de anexo de task — sha256 → grava no B2 →
    cria `ReceivedDocument(status=PENDING)` → enfileira job `leitura-documento-fiscal` (BullMQ, mesmo
    padrão de `sla-digest.cron.ts`/`recurring-tasks.cron.ts`: Queue + Worker). Dedupe por
-   `(organizationId, fileHash)` — mesmo arquivo não processa duas vezes.
+   `(organizationId, fileHash)` — mesmo arquivo não processa duas vezes. `documentNumber` repetido
+   na mesma org não bloqueia (pode ser PDF diferente do mesmo documento), mas gera aviso de
+   possível duplicata na fila de revisão.
 2. **Worker**: baixa do B2, roda o motor portado (`extrairTexto` → `pontuarModelos` → zona por
    zona → validadores → confiança), carregando os `DocumentModel` ativos da org **mais** os globais.
    Grava em `ReceivedDocument`: campos extraídos, modelo+versão usado, confiança, `status`.
    Limites de segurança (do `INTEGRACAO.md`): timeout, limite de tamanho/páginas,
    `isEvalSupported: false`, processo isolado (PDF é entrada não confiável).
-3. **Casamento**: CNPJ/CPF → `Client`; `taxObligationTypeId` extraído → `Task` aberta cujo
+3. **Casamento**: CNPJ/CPF/CEI/CAEPF/Inscrição Estadual → `Client` (ver identificadores novos
+   abaixo); `taxObligationTypeId` extraído → `Task` aberta cujo
    `recurringTemplate.taxObligationTypeId` bate, do mesmo `Client` (via `board.clientId`) e
    competência tolerante (aceita `2026-06` e `2026-T2`, igual a POC já faz). `taxObligationTypeId`
    mora em `RecurringTaskTemplate`, não em `Task` — o join passa pelo template. Exatamente 1
@@ -181,6 +216,21 @@ extraído do PDF.
   justificar; nessa hora decide-se orçamento por PDF e política de dado saindo do servidor.
 - Anexo automático sem revisão — fase posterior, por modelo, só depois de medir taxa de acerto.
 - Schema-por-tenant — projeto arquitetural próprio, não relacionado a esta feature.
+- Detectar PDF com várias guias combinadas num arquivo só (ver limitação conhecida abaixo).
+
+## Limitações conhecidas (herdadas da POC, aceitas pro v1)
+
+- **Âncora só casa com um único item de texto do pdf.js** — se o pdf.js quebrar uma frase-âncora
+  em vários itens, a âncora não é encontrada e o modelo não reconhece o documento (cai em
+  `NOT_IDENTIFIED`, não em erro silencioso).
+- **Só a primeira linha de composição é lida** — um DARF com várias linhas de retenção não tem
+  todas elas capturadas; o valor principal e os campos de identificação continuam corretos.
+- **PDF com várias guias num arquivo só não é detectado** — o motor assume 1 documento por PDF.
+  Um PDF combinado produz leitura de uma das guias (resultado de baixa confiança ou estranho), que
+  cai na fila de revisão pelo modo sombra — nunca anexa sozinho um resultado desses.
+- **Declaração retificadora do PGDAS-D** gera novo recibo pra mesma competência — isso não precisa
+  de tratamento especial: vira só mais um anexo na mesma Task, igual a qualquer outro documento
+  adicional (mesmo mecanismo que já resolve as 3 cotas do IRPJ/CSLL trimestral).
 
 ## Perguntas em aberto (não bloqueiam a spec, mas afetam quais modelos entram primeiro)
 
@@ -193,12 +243,19 @@ extraído do PDF.
 1. Portar o motor (`extrair-texto`, `ancoras`, `zonal`, `validadores`, `pipeline`) como módulo puro
    em `apps/api/src/modules/document-reader/engine/`, com os testes da POC (sintéticos + PDFs reais
    anonimizados) rodando no CI.
-2. Schema Prisma (`TaxObligationType`, `DocumentModel`, `ReceivedDocument`, campo novo em
+2. Schema Prisma (`TaxObligationType`, `DocumentModel`, `ReceivedDocument`, campos novos
+   `cei`/`caepf`/`inscricaoEstadual` em `Client`, campo novo `taxObligationTypeId` em
    `RecurringTaskTemplate`) + migration + seed dos 3 modelos globais iniciais (DARF, DAS, PGDAS-D).
-3. Ingestão (rota de upload dedicado) + fila BullMQ + worker (com os limites de segurança) +
-   resolvedores assíncronos de cliente/tarefa (substituindo o `Base` em memória da POC).
-4. API + tela da fila de revisão (modo sombra), usando `createAttachment` existente.
-5. API + tela de modelagem (só ORG_ADMIN): analisar PDF, marcar campo/âncora, testar impacto,
+3. **Validação com conjunto separado**: antes de confiar no casamento pra uso real, rodar os 3
+   modelos contra PDFs reais que **não** participaram do desenho das zonas (outro mês, outro
+   cliente) e medir a taxa de acerto de verdade — os 8/8 e 3/3 da POC foram medidos nos mesmos
+   PDFs usados pra desenhar as zonas (validação circular), não provam generalização.
+4. Ingestão (rota de upload dedicado) + fila BullMQ + worker (com os limites de segurança) +
+   resolvedores assíncronos de cliente/tarefa (substituindo o `Base` em memória da POC) + job de
+   expurgo dos `REJECTED` com mais de 30 dias.
+5. API + tela da fila de revisão (modo sombra), usando `createAttachment` existente — inclui aviso
+   de possível duplicata por `documentNumber` repetido.
+6. API + tela de modelagem (só ORG_ADMIN): analisar PDF, marcar campo/âncora, testar impacto,
    versionar.
-6. Métricas (sugestão aceita/trocada/rejeitada, por modelo) — mesma semântica da POC
+7. Métricas (sugestão aceita/trocada/rejeitada, por modelo) — mesma semântica da POC
    (`src/app/servico.ts`), só conta decisão humana.
