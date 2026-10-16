@@ -909,7 +909,10 @@ model TaxObligationType {
   createdById    String? // null pros globais
   createdAt      DateTime @default(now())
 
-  organization           Organization?           @relation(fields: [organizationId], references: [id])
+  // Restrict (não o SetNull default do Prisma pra FK opcional): sem isso, apagar uma org tornaria
+  // os TaxObligationType privados dela GLOBAIS (organizationId vira null = global neste sistema) —
+  // exatamente a classe de vazamento de isolamento entre escritórios que o resto da base evita.
+  organization           Organization?           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   createdBy              User?                   @relation(fields: [createdById], references: [id])
   documentModels         DocumentModel[]
   recurringTaskTemplates RecurringTaskTemplate[]
@@ -931,7 +934,8 @@ model DocumentModel {
   createdAt           DateTime @default(now())
 
   taxObligationType TaxObligationType  @relation(fields: [taxObligationTypeId], references: [id])
-  organization      Organization?      @relation(fields: [organizationId], references: [id])
+  // Restrict pelo mesmo motivo de TaxObligationType.organization acima.
+  organization      Organization?      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   createdBy         User?              @relation(fields: [createdById], references: [id])
   documentos        ReceivedDocument[]
 

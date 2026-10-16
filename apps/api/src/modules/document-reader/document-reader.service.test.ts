@@ -135,6 +135,77 @@ describe('processarDocumento', () => {
     expect((atualizado.extractedFields as any)._erro).toBeDefined()
   })
 
+  it('casa DARF trimestral: Task guarda o mês-âncora (2026-06), PDF traz a linha PA trimestral (2026-T2) — tem que casar pelo competenciaCab, não só pelo periodo', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id, { cnpj: '11222333000181' })
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const obrigacao = await prisma.taxObligationType.create({
+      data: { code: 'TESTE-TRI', name: 'Obrigação Trimestral de Teste', organizationId: null },
+    })
+    const template = await prisma.recurringTaskTemplate.create({
+      data: {
+        organizationId: org.id, departmentId: dept.id, title: 'Teste Trimestral', periodicity: 'QUARTERLY',
+        dueDayOfPeriod: 10, generationDayOfPeriod: 1, dueMonthAnchor: 2, taxObligationTypeId: obrigacao.id,
+      },
+    })
+    const task = await prisma.task.create({
+      data: {
+        title: 'Obrigação Trimestral — 2026-T2', columnId: column.id, departmentId: dept.id,
+        competence: new Date(Date.UTC(2026, 5, 1)), recurringTemplateId: template.id, position: 0,
+      },
+    })
+    await prisma.documentModel.create({
+      data: {
+        organizationId: org.id, taxObligationTypeId: obrigacao.id, name: 'Modelo Trimestral de Teste',
+        definicao: {
+          tipoImposto: 'TESTE-TRI',
+          ancoras: [{ texto: 'Documento de Arrecadação', pagina: 1, x: 0.1, y: 0.05 }],
+          zonas: [
+            { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+            { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+            { campo: 'pa', pagina: 1, x: 0.1, y: 0.25, w: 0.3, h: 0.02, tipo: 'periodo_apuracao' },
+          ],
+        },
+      },
+    })
+
+    const pdfTrimestral = await gerarPdfComDocumentoArrecadacao(
+      '11.222.333/0001-81', 'junho/2026', undefined, 'PA:2º Trimestre/2026',
+    )
+
+    const receivedDoc = await prisma.receivedDocument.create({
+      data: { organizationId: org.id, fileHash: 'hash-trimestral', storageKey: 'k-trimestral', uploadedById: admin.id, status: 'PENDING' },
+    })
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from(pdfTrimestral))
+
+    await processarDocumento(receivedDoc.id)
+
+    const atualizado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: receivedDoc.id } })
+    expect(atualizado.taskId).toBe(task.id)
+  })
+
+  it('casa cliente mesmo quando o CNPJ foi cadastrado com máscara (como o formulário salva por padrão)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { task } = await setupObrigacaoETarefa(org, '11.222.333/0001-81') // com máscara, não só dígitos
+
+    const pdf = await gerarPdfComDocumentoArrecadacao('11.222.333/0001-81', 'agosto/2026')
+    const doc = await prisma.receivedDocument.create({
+      data: { organizationId: org.id, fileHash: 'hash-mascara', storageKey: 'k-mascara', uploadedById: admin.id, status: 'PENDING' },
+    })
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from(pdf))
+
+    await processarDocumento(doc.id)
+
+    const atualizado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
+    expect(atualizado.taskId).toBe(task.id)
+  })
+
   it('não sugere uma Task já DONE pra mesma competência — fica sem tarefa candidata', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
@@ -152,6 +223,7 @@ describe('processarDocumento', () => {
 
     const atualizado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
     expect(atualizado.taskId).toBeNull() // obrigação já cumprida — nenhuma tarefa aberta candidata
+    expect((atualizado.extractedFields as any)._motivo).toContain('Sem tarefa aberta')
   })
 
   it('marca aviso de possível duplicata quando outro ReceivedDocument da mesma org já tem o mesmo numero_documento', async () => {
@@ -288,6 +360,55 @@ describe('ações da fila de revisão', () => {
     expect(atualizado.status).toBe('PENDING')
   })
 
+  it('confirmarSugestao num documento já ATTACHED lança 409 e não cria um segundo anexo (duplo clique / duas abas)', async () => {
+    const { org, admin, task, doc } = await docComSugestao()
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from('%PDF-1.4'))
+    vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined as never)
+    await confirmarSugestao(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })
+
+    await expect(confirmarSugestao(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })).rejects.toMatchObject({ statusCode: 409 })
+
+    const anexos = await prisma.attachment.findMany({ where: { taskId: task.id } })
+    expect(anexos).toHaveLength(1)
+  })
+
+  it('rejeitarDocumento num documento já ATTACHED lança 409 — não pode rejeitar o que já foi anexado', async () => {
+    const { org, admin, doc } = await docComSugestao()
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from('%PDF-1.4'))
+    vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined as never)
+    await confirmarSugestao(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })
+
+    await expect(rejeitarDocumento(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('reabrirDocumento num documento que não está REJECTED lança 409', async () => {
+    const { org, doc } = await docComSugestao()
+
+    await expect(reabrirDocumento(doc.id, org.id)).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('reabrirDocumento recusa reabrir um documento já expurgado pelo cron LGPD (arquivo não existe mais no B2)', async () => {
+    const { org, admin, doc } = await docComSugestao()
+    await rejeitarDocumento(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })
+    // Simula o expurgo do cron: storageKey vazia é como ele marca "arquivo apagado do B2".
+    await prisma.receivedDocument.update({ where: { id: doc.id }, data: { storageKey: '' } })
+
+    await expect(reabrirDocumento(doc.id, org.id)).rejects.toMatchObject({ statusCode: 422 })
+  })
+
+  it('processarDocumento não reverte um documento que um humano já confirmou enquanto o job rodava', async () => {
+    const { org, admin, doc } = await docComSugestao()
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from('%PDF-1.4'))
+    vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined as never)
+    await confirmarSugestao(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })
+
+    // simula o worker rodando de novo (ex.: retry do BullMQ) sobre um documento já decidido por humano
+    await processarDocumento(doc.id)
+
+    const atualizado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
+    expect(atualizado.status).toBe('ATTACHED')
+  })
+
   it('listarFilaDeRevisao só mostra PENDING/NOT_IDENTIFIED da própria org', async () => {
     const { org, doc } = await docComSugestao()
     const plan = await createTestPlan()
@@ -300,6 +421,66 @@ describe('ações da fila de revisão', () => {
     const fila = await listarFilaDeRevisao(org.id)
 
     expect(fila.map((d) => d.id)).toEqual([doc.id])
+  })
+
+  it('listarFilaDeRevisao inclui o nome do arquivo original e, quando há sugestão, a tarefa e o cliente', async () => {
+    const { org, task, doc } = await docComSugestao()
+    // storageKey tem o padrão document-reader/<org>/<timestamp>-<nome-original>.pdf — a fila
+    // precisa mostrar só o nome original, não a chave de armazenamento inteira.
+    await prisma.receivedDocument.update({ where: { id: doc.id }, data: { storageKey: `document-reader/x/${Date.now()}-guia-das-agosto.pdf` } })
+
+    const fila = await listarFilaDeRevisao(org.id)
+
+    expect(fila[0].filename).toBe('guia-das-agosto.pdf')
+    expect(fila[0].task?.id).toBe(task.id)
+    expect(fila[0].task?.client.name).toBeDefined()
+  })
+})
+
+describe('obterUrlVisualizacao', () => {
+  it('devolve uma URL assinada pro PDF, pro revisor conferir o documento antes de decidir', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const doc = await prisma.receivedDocument.create({
+      data: { organizationId: org.id, fileHash: 'h-view', storageKey: 'k-view', uploadedById: admin.id, status: 'PENDING' },
+    })
+    vi.spyOn(b2Module, 'getSignedDownloadUrl').mockResolvedValue('https://b2.example.com/signed-url')
+
+    const { obterUrlVisualizacao } = await import('./document-reader.service')
+    const url = await obterUrlVisualizacao(doc.id, org.id)
+
+    expect(url).toBe('https://b2.example.com/signed-url')
+    expect(b2Module.getSignedDownloadUrl).toHaveBeenCalledWith('k-view')
+  })
+
+  it('lança 404 pra documento de outra org', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const outraOrg = await createTestOrg(plan.id, { slug: 'outra-org-view' })
+    const admin = await createTestUser(outraOrg.id, { role: 'ORG_ADMIN' })
+    const doc = await prisma.receivedDocument.create({
+      data: { organizationId: outraOrg.id, fileHash: 'h-view-2', storageKey: 'k-view-2', uploadedById: admin.id, status: 'PENDING' },
+    })
+
+    const { obterUrlVisualizacao } = await import('./document-reader.service')
+    await expect(obterUrlVisualizacao(doc.id, org.id)).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
+describe('listarObrigacoesFiscais', () => {
+  it('lista obrigações globais e privadas da org, não as de outras orgs', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const outraOrg = await createTestOrg(plan.id, { slug: 'outra-org-obrigacoes' })
+    const global = await prisma.taxObligationType.create({ data: { code: 'GLOBAL-TESTE', name: 'Global', organizationId: null } })
+    const privada = await prisma.taxObligationType.create({ data: { code: 'PRIVADA-TESTE', name: 'Privada', organizationId: org.id } })
+    await prisma.taxObligationType.create({ data: { code: 'OUTRA-ORG-TESTE', name: 'De outra org', organizationId: outraOrg.id } })
+
+    const { listarObrigacoesFiscais } = await import('./document-reader.service')
+    const obrigacoes = await listarObrigacoesFiscais(org.id)
+
+    expect(obrigacoes.map((o) => o.id).sort()).toEqual([global.id, privada.id].sort())
   })
 })
 

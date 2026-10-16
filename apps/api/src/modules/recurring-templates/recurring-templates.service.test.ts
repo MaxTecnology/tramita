@@ -25,6 +25,36 @@ import {
 } from '@/test/helpers'
 
 describe('createTemplate', () => {
+  it('persiste taxObligationTypeId quando o template representa uma obrigação fiscal', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const dept = await createTestDepartment(org.id)
+    const obrigacao = await prisma.taxObligationType.create({ data: { code: 'TESTE-RT', name: 'Obrigação de Teste', organizationId: null } })
+
+    const template = await createTemplate(org.id, {
+      departmentId: dept.id,
+      title: 'DAS mensal',
+      taxObligationTypeId: obrigacao.id,
+      periodicity: 'MONTHLY', priority: 'MEDIUM',
+      competenceMonthOffset: 1,
+      dueDayOfPeriod: 15, dueMonthAnchor: 1,
+      dueBusinessDayRoll: 'NONE',
+      targetOffsetDays: -2,
+      targetBusinessDayRoll: 'NONE',
+      generationMonthOffset: 1,
+      generationDayOfPeriod: 20,
+      autoCompleteOnAllActivitiesDone: false,
+      notifyViaWhatsapp: true,
+      notifyViaEmail: false,
+      visibleToClient: true,
+      isActive: true,
+      documentRequests: [],
+      documentDeliveries: [],
+    })
+
+    expect(template.taxObligationTypeId).toBe(obrigacao.id)
+  })
+
   it('cria template com as duas listas de documento', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

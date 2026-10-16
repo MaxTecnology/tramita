@@ -78,6 +78,10 @@ export interface Resultado {
   tipoImposto?: string
   /** "2026-08" (mensal) ou "2026-T2" (trimestral); vem da linha PA quando existe, senão do campo competencia */
   periodo?: string
+  /** valor cru do campo "competencia" do cabeçalho (ex.: "2026-06", mês final do trimestre) —
+   *  aceito como período alternativo no casamento, porque Task.competence trimestral guarda esse
+   *  mês-âncora, não o rótulo "2026-T2" */
+  competenciaCab?: string
   scoreAncoras: number
   confianca: number
   campos: Record<string, CampoExtraido>

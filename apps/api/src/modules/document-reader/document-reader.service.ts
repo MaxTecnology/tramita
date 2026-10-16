@@ -1,17 +1,41 @@
 import { createHash } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { downloadFile, uploadFile } from '@/lib/b2'
+import { downloadFile, uploadFile, getSignedDownloadUrl } from '@/lib/b2'
 import { AppError } from '@/errors/AppError'
 import { enqueueDocumentReader } from '@/lib/document-reader-queue'
 import { createAttachment } from '@/modules/attachments/attachments.service'
 import { extrairEInterpretar, decidir, type Modelo, type Base } from './engine/pipeline'
+import { soDigitos } from './engine/validadores'
+
+// Estados em que um ReceivedDocument ainda aguarda decisão humana — único momento em que o worker
+// (processarDocumento) ou uma ação da fila de revisão têm permissão de mudar o status.
+const AGUARDANDO_REVISAO: ('PENDING' | 'NOT_IDENTIFIED')[] = ['PENDING', 'NOT_IDENTIFIED']
 
 async function carregarModelosDaOrg(organizationId: string): Promise<Modelo[]> {
   const registros = await prisma.documentModel.findMany({
     where: { isActive: true, OR: [{ organizationId: null }, { organizationId }] },
   })
   return registros.map((r) => ({ id: r.id, ...(r.definicao as object) }) as Modelo)
+}
+
+// Compara por dígitos (não string crua) — o cadastro de Client grava o CNPJ como o usuário digitou
+// (com máscara), mas o motor extrai só dígitos; comparar string-a-string nunca bateria com um
+// cliente real. Busca em ordem de prioridade (CNPJ > CPF > CEI > CAEPF > IE), conforme a spec.
+async function resolverClientePorIdentificador(organizationId: string, identificador: string) {
+  const alvo = soDigitos(identificador)
+  if (!alvo) return null
+
+  const clientes = await prisma.client.findMany({
+    where: { organizationId },
+    select: { id: true, name: true, cnpj: true, cpf: true, cei: true, caepf: true, inscricaoEstadual: true },
+  })
+
+  for (const campo of ['cnpj', 'cpf', 'cei', 'caepf', 'inscricaoEstadual'] as const) {
+    const achado = clientes.find((c) => c[campo] && soDigitos(c[campo]!) === alvo)
+    if (achado) return achado
+  }
+  return null
 }
 
 export async function processarDocumento(receivedDocumentId: string): Promise<void> {
@@ -30,16 +54,19 @@ export async function processarDocumento(receivedDocumentId: string): Promise<vo
   try {
     resultado = await extrairEInterpretar(bytes, modelos)
   } catch (err) {
-    await prisma.receivedDocument.update({
-      where: { id: receivedDocumentId },
+    // Guarda por status: se um humano já decidiu (ATTACHED/REJECTED) enquanto este job rodava —
+    // ex.: retry do BullMQ depois de um timeout, ou uma segunda tentativa agendada — a decisão
+    // humana nunca pode ser revertida por um resultado atrasado do worker.
+    await prisma.receivedDocument.updateMany({
+      where: { id: receivedDocumentId, status: 'PENDING' },
       data: { status: 'NOT_IDENTIFIED', extractedFields: { _erro: err instanceof Error ? err.message : String(err) } },
     })
     return
   }
 
   if (resultado.status === 'sem_texto' || resultado.status === 'nao_identificado') {
-    await prisma.receivedDocument.update({
-      where: { id: receivedDocumentId },
+    await prisma.receivedDocument.updateMany({
+      where: { id: receivedDocumentId, status: 'PENDING' },
       data: { status: 'NOT_IDENTIFIED', confidence: resultado.confianca, extractedFields: resultado.campos as object },
     })
     return
@@ -60,15 +87,13 @@ export async function processarDocumento(receivedDocumentId: string): Promise<vo
   const cnpj = resultado.campos['cnpj']?.valor
   const base: Base = { clientes: [], tarefas: [] }
   if (typeof cnpj === 'string') {
-    const cliente = await prisma.client.findFirst({
-      where: {
-        organizationId: doc.organizationId,
-        OR: [{ cnpj }, { cpf: cnpj }, { cei: cnpj }, { caepf: cnpj }, { inscricaoEstadual: cnpj }],
-      },
-    })
+    const cliente = await resolverClientePorIdentificador(doc.organizationId, cnpj)
     if (cliente) {
       base.clientes = [{ id: cliente.id, razao: cliente.name, cnpj }]
-      const periodos = [resultado.periodo].filter((p): p is string => !!p)
+      // Trimestral: Task.competence guarda o mês-âncora ("2026-06"), não o rótulo "2026-T2" do
+      // motor — aceitamos os dois como período válido pra não perder o casamento (regressão vs.
+      // a POC original, que já passava ambos pro decidir()).
+      const periodos = [resultado.periodo, resultado.competenciaCab].filter((p): p is string => !!p)
       const tarefas = await prisma.task.findMany({
         where: {
           status: { notIn: ['DONE', 'DISREGARDED'] },
@@ -90,16 +115,22 @@ export async function processarDocumento(receivedDocumentId: string): Promise<vo
     }
   }
 
-  const decisao = decidir(resultado.status, resultado.tipoImposto, [resultado.periodo], resultado.campos, resultado.avisos, base)
+  const decisao = decidir(
+    resultado.status, resultado.tipoImposto, [resultado.periodo, resultado.competenciaCab],
+    resultado.campos, resultado.avisos, base,
+  )
 
-  await prisma.receivedDocument.update({
-    where: { id: receivedDocumentId },
+  const atualizado = await prisma.receivedDocument.updateMany({
+    where: { id: receivedDocumentId, status: 'PENDING' },
     data: {
       status: 'PENDING', // v1 modo sombra: nunca grava ATTACHED aqui, só sugere — fila de revisão decide
       documentModelId: documentModelRecord?.id,
       modelVersion: documentModelRecord?.version,
       confidence: resultado.confianca,
-      extractedFields: resultado.campos as object,
+      // _motivo é o texto que decidir() já produz pra explicar a decisão ("cliente não
+      // encontrado", "sem tarefa aberta", "conflito de modelos"...) — sem isso o revisor via o
+      // card na fila sem nenhuma pista de por que o motor não anexou sozinho.
+      extractedFields: { ...(resultado.campos as object), _motivo: decisao.motivo },
       documentNumber: typeof documentNumber === 'string' ? documentNumber : undefined,
       // Não bloqueia — só um aviso pra fila de revisão (ver Task 10/14). Guardamos o id do
       // possível duplicado dentro de extractedFields pra não precisar de coluna nova só pra isso.
@@ -107,10 +138,10 @@ export async function processarDocumento(receivedDocumentId: string): Promise<vo
     },
   })
 
-  if (possivelDuplicata) {
+  if (atualizado.count > 0 && possivelDuplicata) {
     await prisma.receivedDocument.update({
       where: { id: receivedDocumentId },
-      data: { extractedFields: { ...(resultado.campos as object), _possivelDuplicataDe: possivelDuplicata.id } },
+      data: { extractedFields: { ...(resultado.campos as object), _motivo: decisao.motivo, _possivelDuplicataDe: possivelDuplicata.id } },
     })
   }
 }
@@ -154,11 +185,59 @@ export async function ingerirDocumento(
   return doc
 }
 
+export async function obterUrlVisualizacao(receivedDocumentId: string, organizationId: string): Promise<string> {
+  const doc = await prisma.receivedDocument.findFirst({ where: { id: receivedDocumentId, organizationId } })
+  if (!doc) throw new AppError(404, 'Documento não encontrado')
+  if (!doc.storageKey) throw new AppError(422, 'Esse documento já foi expurgado — o arquivo não existe mais')
+  return getSignedDownloadUrl(doc.storageKey)
+}
+
+export async function listarObrigacoesFiscais(organizationId: string) {
+  return prisma.taxObligationType.findMany({
+    where: { isActive: true, OR: [{ organizationId: null }, { organizationId }] },
+    select: { id: true, code: true, name: true },
+    orderBy: { name: 'asc' },
+  })
+}
+
+// storageKey é "document-reader/<org>/<timestamp>-<nome-original>.ext" (ver ingerirDocumento) — a
+// fila de revisão mostra só o nome original, nunca a chave de armazenamento inteira.
+function filenameDaStorageKey(storageKey: string): string {
+  const base = storageKey.split('/').pop() ?? storageKey
+  return base.replace(/^\d+-/, '')
+}
+
 export async function listarFilaDeRevisao(organizationId: string) {
-  return prisma.receivedDocument.findMany({
+  const docs = await prisma.receivedDocument.findMany({
     where: { organizationId, status: { in: ['PENDING', 'NOT_IDENTIFIED'] } },
     orderBy: { createdAt: 'asc' },
+    include: {
+      task: {
+        select: {
+          id: true, title: true, competence: true,
+          column: { select: { board: { select: { client: { select: { name: true } } } } } },
+        },
+      },
+    },
   })
+
+  return docs.map((doc) => {
+    const { task, ...rest } = doc
+    return {
+      ...rest,
+      filename: filenameDaStorageKey(doc.storageKey),
+      task: task ? { id: task.id, title: task.title, competence: task.competence, client: task.column.board.client } : null,
+    }
+  })
+}
+
+async function buscarDocumentoRevisavel(receivedDocumentId: string, organizationId: string) {
+  const doc = await prisma.receivedDocument.findFirst({ where: { id: receivedDocumentId, organizationId } })
+  if (!doc) throw new AppError(404, 'Documento não encontrado')
+  if (!AGUARDANDO_REVISAO.includes(doc.status as 'PENDING' | 'NOT_IDENTIFIED')) {
+    throw new AppError(409, `Documento não está mais aguardando revisão (status atual: ${doc.status})`)
+  }
+  return doc
 }
 
 async function anexarDocumento(
@@ -168,8 +247,7 @@ async function anexarDocumento(
   actor: { id: string; role: string },
   how: 'confirmado' | 'trocado' | 'criado',
 ) {
-  const doc = await prisma.receivedDocument.findFirst({ where: { id: receivedDocumentId, organizationId } })
-  if (!doc) throw new AppError(404, 'Documento não encontrado')
+  const doc = await buscarDocumentoRevisavel(receivedDocumentId, organizationId)
 
   const buffer = await downloadFile(doc.storageKey)
   const filename = doc.storageKey.split('/').pop() ?? 'documento.pdf'
@@ -177,16 +255,20 @@ async function anexarDocumento(
     filename, mimeType: 'application/pdf', size: buffer.length, buffer,
   })
 
-  await prisma.receivedDocument.update({
-    where: { id: receivedDocumentId },
+  // Guarda de novo no update final (não só no findFirst inicial) — fecha a janela entre o check e
+  // o createAttachment acima: se outra revisão venceu a corrida nesse meio-tempo, não sobrescreve.
+  const finalizado = await prisma.receivedDocument.updateMany({
+    where: { id: receivedDocumentId, status: { in: AGUARDANDO_REVISAO } },
     data: { status: 'ATTACHED', taskId, attachmentId: attachment.id, how, reviewedById: actor.id, reviewedAt: new Date() },
   })
+  if (finalizado.count === 0) {
+    throw new AppError(409, 'Documento foi revisado por outra pessoa enquanto este anexo era criado')
+  }
   return attachment
 }
 
 export async function confirmarSugestao(receivedDocumentId: string, organizationId: string, actor: { id: string; role: string }) {
-  const doc = await prisma.receivedDocument.findFirst({ where: { id: receivedDocumentId, organizationId } })
-  if (!doc) throw new AppError(404, 'Documento não encontrado')
+  const doc = await buscarDocumentoRevisavel(receivedDocumentId, organizationId)
   if (!doc.taskId) throw new AppError(422, 'Esse documento não tem tarefa sugerida — use trocarTarefa')
   return anexarDocumento(receivedDocumentId, organizationId, doc.taskId, actor, 'confirmado')
 }
@@ -196,18 +278,25 @@ export async function trocarTarefa(receivedDocumentId: string, organizationId: s
 }
 
 export async function rejeitarDocumento(receivedDocumentId: string, organizationId: string, actor: { id: string; role: string }) {
-  const doc = await prisma.receivedDocument.findFirst({ where: { id: receivedDocumentId, organizationId } })
-  if (!doc) throw new AppError(404, 'Documento não encontrado')
-  await prisma.receivedDocument.update({
-    where: { id: receivedDocumentId },
+  await buscarDocumentoRevisavel(receivedDocumentId, organizationId)
+  const resultado = await prisma.receivedDocument.updateMany({
+    where: { id: receivedDocumentId, organizationId, status: { in: AGUARDANDO_REVISAO } },
     data: { status: 'REJECTED', how: 'rejeitado', reviewedById: actor.id, reviewedAt: new Date() },
   })
+  if (resultado.count === 0) throw new AppError(409, 'Documento foi revisado por outra pessoa')
 }
 
 export async function reabrirDocumento(receivedDocumentId: string, organizationId: string) {
   const doc = await prisma.receivedDocument.findFirst({ where: { id: receivedDocumentId, organizationId } })
   if (!doc) throw new AppError(404, 'Documento não encontrado')
-  await prisma.receivedDocument.update({ where: { id: receivedDocumentId }, data: { status: 'PENDING' } })
+  if (!doc.storageKey) {
+    throw new AppError(422, 'Esse documento já foi expurgado (LGPD, 30 dias) — o arquivo não existe mais, não é possível reabrir')
+  }
+  const resultado = await prisma.receivedDocument.updateMany({
+    where: { id: receivedDocumentId, organizationId, status: 'REJECTED' },
+    data: { status: 'PENDING', how: null, reviewedById: null, reviewedAt: null },
+  })
+  if (resultado.count === 0) throw new AppError(409, `Só é possível reabrir um documento REJECTED (status atual: ${doc.status})`)
 }
 
 export async function obterMetricas(organizationId: string) {

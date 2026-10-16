@@ -208,16 +208,18 @@ function ClientUsersSection({ links, onChange }: {
 
 type CreateForm = AddressFields & {
   name: string; codigo: string; clientType: ClientType; cnpj: string; cpf: string
+  cei: string; caepf: string; inscricaoEstadual: string
   whatsapp: string; phone: string; notes: string; clientUsers: ClientUserLink[]
 }
 
 type EditForm = AddressFields & {
   name: string; codigo: string; clientType: ClientType; cnpj: string; cpf: string
+  cei: string; caepf: string; inscricaoEstadual: string
   whatsapp: string; phone: string; notes: string; clientUsers: ClientUserLink[]
 }
 
 const EMPTY_CREATE: CreateForm = {
-  name: '', codigo: '', clientType: 'PJ', cnpj: '', cpf: '',
+  name: '', codigo: '', clientType: 'PJ', cnpj: '', cpf: '', cei: '', caepf: '', inscricaoEstadual: '',
   whatsapp: '', phone: '', notes: '', clientUsers: [], ...EMPTY_ADDRESS,
 }
 
@@ -253,7 +255,11 @@ interface CnpjLookupResult {
   complemento: string | null
 }
 
-function ClientFields<T extends { name: string; clientType: ClientType; cnpj: string; cpf: string; whatsapp: string; phone: string; notes: string } & AddressFields>({
+function ClientFields<T extends {
+  name: string; clientType: ClientType; cnpj: string; cpf: string
+  cei: string; caepf: string; inscricaoEstadual: string
+  whatsapp: string; phone: string; notes: string
+} & AddressFields>({
   form,
   onChange,
   idPrefix,
@@ -313,6 +319,23 @@ function ClientFields<T extends { name: string; clientType: ClientType; cnpj: st
         <div className="space-y-1">
           <Label htmlFor={`${idPrefix}-cpf`}>CPF</Label>
           <Input id={`${idPrefix}-cpf`} value={form.cpf} onChange={(e) => onChange({ cpf: e.target.value } as Partial<T>)} placeholder="000.000.000-00" />
+        </div>
+      )}
+
+      {form.clientType === 'PJ' && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <Label htmlFor={`${idPrefix}-cei`}>CEI</Label>
+            <Input id={`${idPrefix}-cei`} value={form.cei} onChange={(e) => onChange({ cei: e.target.value } as Partial<T>)} placeholder="Opcional" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor={`${idPrefix}-caepf`}>CAEPF</Label>
+            <Input id={`${idPrefix}-caepf`} value={form.caepf} onChange={(e) => onChange({ caepf: e.target.value } as Partial<T>)} placeholder="Opcional" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor={`${idPrefix}-ie`}>Inscrição Estadual</Label>
+            <Input id={`${idPrefix}-ie`} value={form.inscricaoEstadual} onChange={(e) => onChange({ inscricaoEstadual: e.target.value } as Partial<T>)} placeholder="Opcional" />
+          </div>
         </div>
       )}
 
@@ -384,7 +407,8 @@ export default function Clients() {
 
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [editForm, setEditForm] = useState<EditForm>({
-    name: '', codigo: '', clientType: 'PJ', cnpj: '', cpf: '', whatsapp: '', phone: '', notes: '', clientUsers: [], ...EMPTY_ADDRESS,
+    name: '', codigo: '', clientType: 'PJ', cnpj: '', cpf: '', cei: '', caepf: '', inscricaoEstadual: '',
+    whatsapp: '', phone: '', notes: '', clientUsers: [], ...EMPTY_ADDRESS,
   })
   const [loadingEditUsers, setLoadingEditUsers] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -420,6 +444,9 @@ export default function Clients() {
         clientType: createForm.clientType,
         cnpj: createForm.cnpj || undefined,
         cpf: createForm.cpf || undefined,
+        cei: createForm.cei || undefined,
+        caepf: createForm.caepf || undefined,
+        inscricaoEstadual: createForm.inscricaoEstadual || undefined,
         whatsapp: createForm.whatsapp || undefined,
         phone: createForm.phone || undefined,
         notes: createForm.notes || undefined,
@@ -451,6 +478,9 @@ export default function Clients() {
         clientType: data.clientType,
         cnpj: data.cnpj || null,
         cpf: data.cpf || null,
+        cei: data.cei || null,
+        caepf: data.caepf || null,
+        inscricaoEstadual: data.inscricaoEstadual || null,
         whatsapp: data.whatsapp || null,
         phone: data.phone || null,
         notes: data.notes || null,
@@ -490,6 +520,9 @@ export default function Clients() {
       clientType: client.clientType ?? 'PJ',
       cnpj: client.cnpj ?? '',
       cpf: client.cpf ?? '',
+      cei: client.cei ?? '',
+      caepf: client.caepf ?? '',
+      inscricaoEstadual: client.inscricaoEstadual ?? '',
       whatsapp: client.whatsapp ?? '',
       phone: client.phone ?? '',
       notes: client.notes ?? '',

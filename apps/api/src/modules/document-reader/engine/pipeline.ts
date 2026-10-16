@@ -89,7 +89,10 @@ export async function extrairEInterpretar(arquivo: string | Uint8Array, modelos:
     modelo.tipoImposto
 
   const status = confianca >= LIMIAR_CONFIANCA ? 'ok' : 'revisar'
-  return { status, modelo: modelo.id, tipoImposto, periodo, scoreAncoras: melhor.scoreAncoras, confianca, campos, derivados, avisos }
+  return {
+    status, modelo: modelo.id, tipoImposto, periodo, competenciaCab: competenciaCab ?? undefined,
+    scoreAncoras: melhor.scoreAncoras, confianca, campos, derivados, avisos,
+  }
 }
 
 /** Decide anexar/revisar/não-identificado dado um `Base` já resolvido (cliente/tarefas candidatas reais). */

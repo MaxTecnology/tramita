@@ -7,6 +7,9 @@ const documentItemSchema = z.object({
 export const createTemplateSchema = z.object({
   departmentId: z.string().cuid(),
   title: z.string().trim().min(1, 'Título obrigatório'),
+  // Só preenchido pra templates que geram obrigação fiscal — permite ao robô de documentos
+  // (document-reader) casar (cliente, obrigação, competência) com confiança.
+  taxObligationTypeId: z.string().cuid().nullable().optional(),
   description: z.string().optional(),
   periodicity: z.enum(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUAL']),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),

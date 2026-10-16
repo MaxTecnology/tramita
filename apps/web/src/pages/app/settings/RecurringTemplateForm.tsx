@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ArrowLeft, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { RecurringTaskTemplate, Department } from '@/types'
+import type { RecurringTaskTemplate, Department, TaxObligationType } from '@/types'
 import { PRIORITY_LABEL } from '@/components/shared/TaskDrawer'
 
 const PERIODICITY_LABEL: Record<RecurringTaskTemplate['periodicity'], string> = {
@@ -83,6 +83,9 @@ function computePreview(form: FormState): { dueDate: Date; competence: Date } | 
 
 interface FormState {
   departmentId: string
+  // Só preenchido quando o template representa uma obrigação fiscal — permite ao robô de leitura
+  // de documentos (document-reader) casar o documento lido com a tarefa aberta certa.
+  taxObligationTypeId: string
   title: string
   description: string
   periodicity: RecurringTaskTemplate['periodicity']
@@ -105,7 +108,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
-  departmentId: '', title: '', description: '', periodicity: 'MONTHLY', priority: 'MEDIUM',
+  departmentId: '', taxObligationTypeId: '', title: '', description: '', periodicity: 'MONTHLY', priority: 'MEDIUM',
   dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE', dueMonthAnchor: 1, competenceMonthOffset: 1,
   targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
   generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -169,10 +172,16 @@ export default function RecurringTemplateForm() {
     queryFn: () => api.get('/departments').then((r) => r.data),
   })
 
+  const { data: obrigacoesFiscais = [] } = useQuery<TaxObligationType[]>({
+    queryKey: ['document-reader-obrigacoes-fiscais'],
+    queryFn: () => api.get('/document-reader/obrigacoes-fiscais').then((r) => r.data),
+  })
+
   useEffect(() => {
     if (!template) return
     setForm({
-      departmentId: template.departmentId, title: template.title, description: template.description ?? '',
+      departmentId: template.departmentId, taxObligationTypeId: template.taxObligationTypeId ?? '',
+      title: template.title, description: template.description ?? '',
       periodicity: template.periodicity, priority: template.priority, dueDayOfPeriod: template.dueDayOfPeriod,
       dueBusinessDayRoll: template.dueBusinessDayRoll, dueMonthAnchor: template.dueMonthAnchor, competenceMonthOffset: template.competenceMonthOffset, targetOffsetDays: template.targetOffsetDays,
       targetBusinessDayRoll: template.targetBusinessDayRoll, generationMonthOffset: template.generationMonthOffset,
@@ -185,10 +194,13 @@ export default function RecurringTemplateForm() {
   }, [template])
 
   const saveMutation = useMutation({
-    mutationFn: () =>
-      isEditing
-        ? api.patch(`/recurring-templates/${id}`, form).then((r) => r.data)
-        : api.post('/recurring-templates', form).then((r) => r.data),
+    mutationFn: () => {
+      // taxObligationTypeId é cuid().nullable() na API — string vazia não é um cuid válido.
+      const payload = { ...form, taxObligationTypeId: form.taxObligationTypeId || null }
+      return isEditing
+        ? api.patch(`/recurring-templates/${id}`, payload).then((r) => r.data)
+        : api.post('/recurring-templates', payload).then((r) => r.data)
+    },
     onSuccess: () => {
       toast.success(isEditing ? 'Template atualizado' : 'Template criado')
       qc.invalidateQueries({ queryKey: ['recurring-templates'] })
@@ -238,6 +250,22 @@ export default function RecurringTemplateForm() {
             <option value="">Selecione</option>
             {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Obrigação fiscal (opcional)</Label>
+          <select
+            value={form.taxObligationTypeId}
+            onChange={(e) => setForm({ ...form, taxObligationTypeId: e.target.value })}
+            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
+          >
+            <option value="">Nenhuma — tarefa interna comum</option>
+            {obrigacoesFiscais.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Só preencha se este template gera uma obrigação fiscal (DAS, PGDAS-D, IRPJ...) — permite
+            que o robô de leitura de documentos sugira o anexo automaticamente na tarefa certa.
+          </p>
         </div>
 
         <div className="space-y-1.5">

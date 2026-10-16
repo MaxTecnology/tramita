@@ -60,6 +60,37 @@ describe('GET /document-reader/metricas', () => {
   })
 })
 
+describe('GET /document-reader/:id/visualizar', () => {
+  it('devolve a URL assinada do PDF pro revisor conferir antes de decidir', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+    const doc = await prisma.receivedDocument.create({ data: { organizationId: org.id, fileHash: 'h-view-route', storageKey: 'k-view-route', uploadedById: admin.id, status: 'PENDING' } })
+    vi.spyOn(b2Module, 'getSignedDownloadUrl').mockResolvedValue('https://b2.example.com/signed-url')
+
+    const res = await app.inject({ method: 'GET', url: `/document-reader/${doc.id}/visualizar`, headers: { authorization: auth } })
+
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body).url).toBe('https://b2.example.com/signed-url')
+  })
+})
+
+describe('GET /document-reader/obrigacoes-fiscais', () => {
+  it('lista obrigações fiscais globais pra popular o seletor de templates recorrentes', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+    await prisma.taxObligationType.create({ data: { code: 'ROTA-TESTE', name: 'Obrigação de Rota', organizationId: null } })
+
+    const res = await app.inject({ method: 'GET', url: '/document-reader/obrigacoes-fiscais', headers: { authorization: auth } })
+
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body).some((o: { code: string }) => o.code === 'ROTA-TESTE')).toBe(true)
+  })
+})
+
 describe('POST /document-reader/:id/confirmar', () => {
   it('lança 422 quando o documento não tem tarefa sugerida', async () => {
     const plan = await createTestPlan()

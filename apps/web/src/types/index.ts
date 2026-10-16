@@ -64,6 +64,9 @@ export interface Client {
   clientType: 'PF' | 'PJ'
   cnpj: string | null
   cpf: string | null
+  cei: string | null
+  caepf: string | null
+  inscricaoEstadual: string | null
   whatsapp: string | null
   phone: string | null
   notes: string | null
@@ -191,6 +194,7 @@ export interface RecurringTaskTemplate {
   id: string
   departmentId: string
   department: { id: string; name: string }
+  taxObligationTypeId: string | null
   title: string
   description: string | null
   periodicity: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL'
@@ -309,13 +313,24 @@ export interface OSTemplate {
   columns: OSTemplateColumn[]
 }
 
+export interface TaxObligationType {
+  id: string
+  code: string
+  name: string
+}
+
 export interface ReceivedDocument {
   id: string
   status: 'PENDING' | 'ATTACHED' | 'NOT_IDENTIFIED' | 'REJECTED'
   documentModelId: string | null
   confidence: number | null
-  extractedFields: Record<string, { bruto: string; valor: string | number | null; valido: boolean }> | null
+  // Campos reais do motor misturados com marcadores internos (prefixo "_") — _erro (mensagem de
+  // falha de parsing), _motivo (por que decidir() não anexou sozinho) e _possivelDuplicataDe
+  // (id de outro ReceivedDocument com o mesmo número de documento) nunca têm bruto/valor/valido.
+  extractedFields: Record<string, { bruto: string; valor: string | number | null; valido: boolean } | string> | null
   taskId: string | null
   how: string | null
+  filename: string
+  task: { id: string; title: string; competence: string | null; client: { name: string } } | null
   createdAt: string
 }

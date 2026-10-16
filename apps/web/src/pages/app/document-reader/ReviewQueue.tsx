@@ -6,6 +6,10 @@ import { Input } from '@/components/ui/input'
 import type { ReceivedDocument } from '@/types'
 import { toast } from 'sonner'
 
+function mensagemDeErro(err: unknown, padrao: string): string {
+  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? padrao
+}
+
 export default function ReviewQueue() {
   const queryClient = useQueryClient()
   const [trocandoId, setTrocandoId] = useState<string | null>(null)
@@ -26,26 +30,35 @@ export default function ReviewQueue() {
       return api.post('/document-reader/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })
     },
     onSuccess: () => { toast.success('Documento enviado pra leitura'); invalidar() },
-    onError: (err: any) => toast.error(err?.response?.data?.message ?? 'Erro ao enviar documento'),
+    onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao enviar documento')),
   })
 
   const confirmarMutation = useMutation({
     mutationFn: (id: string) => api.post(`/document-reader/${id}/confirmar`),
     onSuccess: () => { toast.success('Documento anexado'); invalidar() },
-    onError: () => toast.error('Erro ao confirmar'),
+    onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao confirmar')),
   })
 
   const trocarMutation = useMutation({
     mutationFn: ({ id, taskId }: { id: string; taskId: string }) => api.post(`/document-reader/${id}/trocar-tarefa`, { taskId }),
     onSuccess: () => { toast.success('Documento anexado na tarefa escolhida'); setTrocandoId(null); setNovaTaskId(''); invalidar() },
-    onError: () => toast.error('Erro ao trocar tarefa'),
+    onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao trocar tarefa')),
   })
 
   const rejeitarMutation = useMutation({
     mutationFn: (id: string) => api.post(`/document-reader/${id}/rejeitar`),
     onSuccess: () => { toast.success('Documento rejeitado'); invalidar() },
-    onError: () => toast.error('Erro ao rejeitar'),
+    onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao rejeitar')),
   })
+
+  async function abrirPdf(id: string) {
+    try {
+      const { data } = await api.get<{ url: string }>(`/document-reader/${id}/visualizar`)
+      window.open(data.url, '_blank', 'noopener,noreferrer')
+    } catch {
+      toast.error('Erro ao abrir o PDF')
+    }
+  }
 
   if (isLoading) return <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
 
@@ -73,58 +86,99 @@ export default function ReviewQueue() {
         <p className="text-sm text-muted-foreground">Nenhum documento pendente.</p>
       ) : (
         <div className="space-y-2">
-          {fila.map((doc) => (
-            <div key={doc.id} className="rounded-lg border border-border p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-foreground">
-                  {doc.status === 'NOT_IDENTIFIED' ? 'Não identificado' : 'Aguardando revisão'}
-                </span>
-                {doc.confidence !== null && (
-                  <span className="text-xs text-muted-foreground">
-                    Confiança: {Math.round(doc.confidence * 100)}%
-                  </span>
-                )}
-              </div>
+          {fila.map((doc) => {
+            const campos = Object.entries(doc.extractedFields ?? {}).filter(([campo]) => !campo.startsWith('_'))
+            const erro = doc.extractedFields?._erro
+            const motivo = doc.extractedFields?._motivo
+            const duplicataDe = doc.extractedFields?._possivelDuplicataDe
+            const aindaProcessando = doc.status === 'PENDING' && doc.confidence === null
 
-              {doc.extractedFields && (
-                <div className="text-xs text-muted-foreground space-y-0.5">
-                  {Object.entries(doc.extractedFields).map(([campo, v]) => (
-                    <p key={campo}>
-                      {campo}: {String(v.valor ?? v.bruto)} {!v.valido && <span className="text-danger-text">(inválido)</span>}
-                    </p>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                {doc.taskId && (
-                  <Button size="sm" onClick={() => confirmarMutation.mutate(doc.id)} disabled={confirmarMutation.isPending}>
-                    Confirmar anexo
-                  </Button>
-                )}
-                {trocandoId === doc.id ? (
-                  <div className="flex gap-2 items-center">
-                    <Input
-                      placeholder="ID da tarefa"
-                      value={novaTaskId}
-                      onChange={(e) => setNovaTaskId(e.target.value)}
-                      className="h-8 w-48"
-                    />
-                    <Button size="sm" variant="outline" onClick={() => trocarMutation.mutate({ id: doc.id, taskId: novaTaskId })}>
-                      Anexar nessa tarefa
+            return (
+              <div key={doc.id} className="rounded-lg border border-border p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium text-foreground block truncate">{doc.filename}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {aindaProcessando
+                        ? 'Processando...'
+                        : doc.status === 'NOT_IDENTIFIED' ? 'Não identificado' : 'Aguardando revisão'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {doc.confidence !== null && (
+                      <span className="text-xs text-muted-foreground">
+                        Confiança: {Math.round(doc.confidence * 100)}%
+                      </span>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => abrirPdf(doc.id)}>
+                      Ver PDF
                     </Button>
                   </div>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={() => setTrocandoId(doc.id)}>
-                    Trocar tarefa
-                  </Button>
+                </div>
+
+                {doc.task && (
+                  <p className="text-xs text-foreground">
+                    Sugestão: <span className="font-medium">{doc.task.client.name}</span> — {doc.task.title}
+                  </p>
                 )}
-                <Button size="sm" variant="ghost" onClick={() => rejeitarMutation.mutate(doc.id)}>
-                  Rejeitar
-                </Button>
+
+                {typeof motivo === 'string' && (
+                  <p className="text-xs text-muted-foreground">{motivo}</p>
+                )}
+
+                {typeof erro === 'string' && (
+                  <p className="text-xs text-danger-text">Erro ao processar: {erro}</p>
+                )}
+
+                {typeof duplicataDe === 'string' && (
+                  <p className="text-xs text-warning-text">
+                    Possível duplicata de outro documento já enviado (id: {duplicataDe}).
+                  </p>
+                )}
+
+                {campos.length > 0 && (
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    {campos.map(([campo, v]) => {
+                      const field = v as { bruto: string; valor: string | number | null; valido: boolean }
+                      return (
+                        <p key={campo}>
+                          {campo}: {String(field.valor ?? field.bruto)} {!field.valido && <span className="text-danger-text">(inválido)</span>}
+                        </p>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  {doc.taskId && (
+                    <Button size="sm" onClick={() => confirmarMutation.mutate(doc.id)} disabled={confirmarMutation.isPending}>
+                      Confirmar anexo
+                    </Button>
+                  )}
+                  {trocandoId === doc.id ? (
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        placeholder="ID da tarefa"
+                        value={novaTaskId}
+                        onChange={(e) => setNovaTaskId(e.target.value)}
+                        className="h-8 w-48"
+                      />
+                      <Button size="sm" variant="outline" onClick={() => trocarMutation.mutate({ id: doc.id, taskId: novaTaskId })}>
+                        Anexar nessa tarefa
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setTrocandoId(doc.id)}>
+                      Trocar tarefa
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => rejeitarMutation.mutate(doc.id)}>
+                    Rejeitar
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

@@ -21,6 +21,25 @@ import {
 } from '@/test/helpers'
 
 describe('createClient', () => {
+  it('persiste cei/caepf/inscricaoEstadual — identificadores alternativos usados pelo robô de documentos fiscais', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const department = await createTestDepartment(org.id)
+
+    const result = await createClient(org.id, {
+      name: 'Cliente com Identificadores Alternativos',
+      clientType: 'PJ',
+      cei: '12.345.67890/12',
+      caepf: '123.456.789-00/001',
+      inscricaoEstadual: '123.456.789.112',
+      clientUsers: [{ name: 'Portal User', email: `portal-${Date.now()}@test.com`, password: 'Test@1234', departmentIds: [department.id] }],
+    })
+
+    expect(result.cei).toBe('12.345.67890/12')
+    expect(result.caepf).toBe('123.456.789-00/001')
+    expect(result.inscricaoEstadual).toBe('123.456.789.112')
+  })
+
   it('creates a client scoped to the organization', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

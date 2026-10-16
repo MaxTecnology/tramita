@@ -29,6 +29,11 @@ export const createClientSchema = z.object({
   clientType: z.enum(['PF', 'PJ']).default('PJ'),
   cnpj: z.string().optional(),
   cpf: z.string().optional(),
+  // Identificadores alternativos usados pelo robô de leitura de documentos fiscais (document-reader)
+  // pra casar CNPJ de filial/produtor rural/contribuinte estadual quando o CNPJ principal não bate.
+  cei: z.string().optional(),
+  caepf: z.string().optional(),
+  inscricaoEstadual: z.string().optional(),
   whatsapp: z.string().optional(),
   phone: z.string().optional(),
   notes: z.string().optional(),
@@ -42,6 +47,9 @@ export const updateClientSchema = z.object({
   clientType: z.enum(['PF', 'PJ']).optional(),
   cnpj: z.string().nullable().optional(),
   cpf: z.string().nullable().optional(),
+  cei: z.string().nullable().optional(),
+  caepf: z.string().nullable().optional(),
+  inscricaoEstadual: z.string().nullable().optional(),
   whatsapp: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),

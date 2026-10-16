@@ -14,19 +14,34 @@ const TIMEOUT_MS = 15_000
 export async function extrairDocumento(entrada: string | Uint8Array): Promise<DocumentoExtraido> {
   const data = typeof entrada === 'string' ? new Uint8Array(await readFile(entrada)) : entrada
 
-  const resultado = await Promise.race([
-    extrairSemLimite(data),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Timeout ao extrair texto do PDF')), TIMEOUT_MS),
-    ),
-  ])
-  return resultado
-}
-
-async function extrairSemLimite(data: Uint8Array): Promise<DocumentoExtraido> {
   // isEvalSupported é uma opção real do pdf.js (desliga otimizações baseadas em eval — importante
   // porque o PDF é entrada não confiável), mas falta no .d.ts desta versão — daí o `as any`.
-  const pdf = await getDocument({ data, useSystemFonts: true, verbosity: 0, isEvalSupported: false } as any).promise
+  const loadingTask = getDocument({ data, useSystemFonts: true, verbosity: 0, isEvalSupported: false } as any)
+
+  // Se o timeout estourar (ou qualquer outro erro acontecer), destroy() na loading task aborta o
+  // worker interno do pdf.js em vez de deixar o parse rodando em segundo plano (CPU/memória) pelo
+  // resto da vida do worker do document-reader. Não é isolamento de processo de verdade (a spec
+  // original pedia processo/worker_thread separado — não implementado aqui, ver ledger) — um laço
+  // síncrono dentro do pdf.js ainda bloqueia o event loop antes de ceder pro timeout disparar. É
+  // uma rede de segurança parcial, não total.
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      extrairSemLimite(loadingTask),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Timeout ao extrair texto do PDF')), TIMEOUT_MS)
+      }),
+    ])
+  } catch (err) {
+    await loadingTask.destroy().catch(() => {})
+    throw err
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
+}
+
+async function extrairSemLimite(loadingTask: { promise: Promise<any> }): Promise<DocumentoExtraido> {
+  const pdf = await loadingTask.promise
 
   if (pdf.numPages > MAX_PAGINAS) {
     throw new Error(`PDF com ${pdf.numPages} páginas excede o limite de ${MAX_PAGINAS}`)

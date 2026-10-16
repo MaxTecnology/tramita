@@ -8,6 +8,7 @@ import type { CreateClientBody, UpdateClientBody } from './clients.schema'
 
 const SELECT = {
   id: true, name: true, codigo: true, clientType: true, cnpj: true, cpf: true,
+  cei: true, caepf: true, inscricaoEstadual: true,
   whatsapp: true, phone: true, notes: true,
   cep: true, estado: true, cidade: true, bairro: true, logradouro: true, numero: true, complemento: true,
   isActive: true, createdAt: true,
@@ -90,6 +91,9 @@ export async function createClient(organizationId: string, data: CreateClientBod
           clientType: data.clientType ?? 'PJ',
           cnpj: data.cnpj,
           cpf: data.cpf,
+          cei: data.cei,
+          caepf: data.caepf,
+          inscricaoEstadual: data.inscricaoEstadual,
           whatsapp: data.whatsapp,
           phone: data.phone,
           notes: data.notes,

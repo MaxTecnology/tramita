@@ -70,6 +70,25 @@ describe('extrairEInterpretar', () => {
     expect(r.status).toBe('sem_texto')
   })
 
+  it('retorna competenciaCab além de periodo quando a linha PA é trimestral — necessário pro casamento aceitar o mês-âncora da Task', async () => {
+    const modeloTrimestral: Modelo = {
+      ...modeloTeste,
+      zonas: [
+        ...modeloTeste.zonas,
+        { campo: 'pa', pagina: 1, x: 0.1, y: 0.2, w: 0.3, h: 0.02, tipo: 'periodo_apuracao' },
+      ],
+    }
+    const pdf = await gerarPdfSimples([
+      { texto: 'Documento de Arrecadação', x: 0.1, y: 0.05 },
+      { texto: '11.222.333/0001-81', x: 0.1, y: 0.1 },
+      { texto: 'junho/2026', x: 0.1, y: 0.15 },
+      { texto: 'PA:2º Trimestre/2026', x: 0.1, y: 0.2 },
+    ])
+    const r = await extrairEInterpretar(pdf, [modeloTrimestral])
+    expect(r.periodo).toBe('2026-T2')
+    expect(r.competenciaCab).toBe('2026-06')
+  })
+
   it('confiança abaixo do limiar quando o CNPJ é inválido', async () => {
     const pdf = await gerarPdfSimples([
       { texto: 'Documento de Arrecadação', x: 0.1, y: 0.05 },
