@@ -9,7 +9,10 @@ const DIAS_RETENCAO_REJECTED = 30
 export async function purgeRejectedDocuments(now: Date = new Date()): Promise<number> {
   const limite = new Date(now.getTime() - DIAS_RETENCAO_REJECTED * 24 * 60 * 60 * 1000)
   const expirados = await prisma.receivedDocument.findMany({
-    where: { status: 'REJECTED', reviewedAt: { lt: limite } },
+    // storageKey: { not: '' } exclui linhas já expurgadas numa execução anterior — sem isso, o cron
+    // chamaria deleteFile('') todo dia pra sempre, e deleteFile com chave vazia lista/apaga o bucket
+    // inteiro (todas as orgs) via Prefix vazio no S3-compatible API do B2.
+    where: { status: 'REJECTED', reviewedAt: { lt: limite }, storageKey: { not: '' } },
     select: { id: true, storageKey: true },
   })
 

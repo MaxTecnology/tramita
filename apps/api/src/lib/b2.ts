@@ -46,6 +46,8 @@ export async function downloadFile(key: string): Promise<Buffer> {
 }
 
 export async function deleteFile(key: string): Promise<void> {
+  if (!key) throw new Error('deleteFile: key vazia — Prefix vazio no ListObjectVersionsCommand listaria o bucket inteiro')
+
   const bucket = getBucket()
   const client = getClient()
 
@@ -54,9 +56,11 @@ export async function deleteFile(key: string): Promise<void> {
     new ListObjectVersionsCommand({ Bucket: bucket, Prefix: key }),
   )
 
+  // Prefix não é correspondência exata — filtra por Key === key pra nunca apagar um objeto que só
+  // comece com o mesmo prefixo (defesa em profundidade além da guarda de key vazia acima).
   const toDelete = [
-    ...(listed.Versions ?? []).map((v) => ({ Key: v.Key!, VersionId: v.VersionId })),
-    ...(listed.DeleteMarkers ?? []).map((v) => ({ Key: v.Key!, VersionId: v.VersionId })),
+    ...(listed.Versions ?? []).filter((v) => v.Key === key).map((v) => ({ Key: v.Key!, VersionId: v.VersionId })),
+    ...(listed.DeleteMarkers ?? []).filter((v) => v.Key === key).map((v) => ({ Key: v.Key!, VersionId: v.VersionId })),
   ]
 
   if (toDelete.length === 0) {
