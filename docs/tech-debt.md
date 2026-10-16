@@ -267,3 +267,46 @@ mesma sessão (race no auto-revert de NEEDS_INFO, `TaskHistory`/`publishBoardEve
   passa, mas o ideal é falhar fechado); `deleteRequestComment` responde 403 pra tenant cruzado em
   vez de 404 (mesmo padrão do `comments.service.ts` original); link "Ver processo"/"Abrir processo"
   continua aparecendo numa Request `CANCELLED` com `boardId`.
+
+## Automação de documentos fiscais (Plano A) — débitos da revisão final (2026-10-16)
+
+Achados da revisão final (fresh reviewer, Opus) que não bloqueiam uso real e ficaram deferidos.
+Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fiscais-design.md` e
+`docs/superpowers/plans/2026-10-15-automacao-documentos-fiscais-plan-a.md`.
+
+- **Isolamento de processo incompleto no parser de PDF**: a spec original pedia processo/
+  `worker_thread` separado pra extração de texto (PDF é entrada não confiável). O que existe hoje
+  (`apps/api/src/modules/document-reader/engine/extrair-texto.ts`) é um timeout de 15s que chama
+  `destroy()` na loading task do pdf.js quando estoura — mitiga vazamento de CPU/memória no caso
+  comum, mas um laço **síncrono** dentro do pdf.js ainda bloqueia o event loop antes do timeout
+  conseguir disparar. Como o worker de document-reader roda no mesmo processo que o worker de
+  notificações, um PDF verdadeiramente patológico (fora dos limites de página/tamanho já
+  existentes) pode degradar as notificações de WhatsApp/email até o timeout estourar. Não consegui
+  escrever um teste TDD genuíno pra essa trilha: as exportações ESM do `pdfjs-dist@6.4.299` não são
+  configuráveis (`vi.spyOn` falha com "Cannot redefine property"), e `src/test/setup.ts` já carrega
+  o módulo real via `buildApp()` antes do hoisting de `vi.mock` ter chance de interceptar.
+- **`trocarTarefa`** não confere se a tarefa de destino é do mesmo cliente do CNPJ lido no
+  documento — um erro humano na fila de revisão pode publicar a guia do cliente A na tarefa do
+  cliente B (e, se `visibleToClient`, no portal dele).
+- **Rotas de `document-reader.routes.ts`** não validam `:id` via Zod, ao contrário da convenção do
+  resto do projeto.
+- **`ingerirDocumento`** faz upload ao B2 antes do insert no banco — se o `P2002` de dedupe disparar
+  numa corrida de requisições concorrentes, o objeto já subiu ao B2 fica órfão (nunca é limpo).
+- **Seed de `DocumentModel`** (`apps/api/prisma/seed-document-models.ts`) é idempotente só por
+  `name` — editar o JSON de um modelo global (ex.: o ajuste multi-filial do PGDAS-D identificado na
+  validação com conjunto separado) não cria uma nova versão nem atualiza o registro existente.
+  Precisa de uma estratégia de versionamento no seed antes de ajustar os modelos de produção.
+- **`@@unique([organizationId, code])`** em `TaxObligationType` não impede `code` duplicado entre
+  registros globais, porque o Postgres trata múltiplos `NULL` como distintos por padrão — hoje só o
+  próprio seed evita duplicação; avaliar `NULLS NOT DISTINCT` ou índice parcial se o Plano B
+  (cadastro de obrigações pelo usuário) for implementado.
+- **Sem índices** `(organizationId, status)` pra consulta da fila de revisão nem
+  `(status, reviewedAt)` pro cron de expurgo — irrelevante no volume atual, vale revisitar se o
+  volume de documentos crescer.
+- **`getOrgSlug`** duplicado entre `attachments.service.ts` e `document-reader.service.ts`.
+- **Sem tela pra listar documentos `REJECTED` e reabri-los** — o endpoint
+  `reabrirDocumento`/`POST /document-reader/:id/reabrir` já existe e está correto (inclusive recusa
+  reabrir um documento já expurgado pelo cron LGPD), só falta a UI; hoje só é alcançável via
+  chamada direta à API.
+- **`purgeRejectedDocuments`** aborta o laço inteiro se um `deleteFile` falhar no meio (documentos
+  seguintes da mesma execução não são expurgados), e não loga via Pino.
