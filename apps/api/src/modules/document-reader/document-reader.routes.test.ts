@@ -46,6 +46,20 @@ describe('GET /document-reader/fila', () => {
   })
 })
 
+describe('GET /document-reader/metricas', () => {
+  it('devolve porModelo vazio quando não há decisão humana ainda', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+
+    const res = await app.inject({ method: 'GET', url: '/document-reader/metricas', headers: { authorization: auth } })
+
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toEqual({ porModelo: [] })
+  })
+})
+
 describe('POST /document-reader/:id/confirmar', () => {
   it('lança 422 quando o documento não tem tarefa sugerida', async () => {
     const plan = await createTestPlan()

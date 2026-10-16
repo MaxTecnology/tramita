@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import {
   processarDocumento, ingerirDocumento,
   confirmarSugestao, trocarTarefa, rejeitarDocumento, reabrirDocumento, listarFilaDeRevisao,
+  obterMetricas,
 } from './document-reader.service'
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClient,
@@ -299,5 +300,29 @@ describe('ações da fila de revisão', () => {
     const fila = await listarFilaDeRevisao(org.id)
 
     expect(fila.map((d) => d.id)).toEqual([doc.id])
+  })
+})
+
+describe('obterMetricas', () => {
+  it('conta só decisão humana (how), por modelo', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const obrigacao = await prisma.taxObligationType.create({ data: { code: 'T', name: 'T', organizationId: null } })
+    const modelo = await prisma.documentModel.create({ data: { organizationId: null, taxObligationTypeId: obrigacao.id, name: 'Modelo X', definicao: {} } })
+    await prisma.receivedDocument.createMany({
+      data: [
+        { organizationId: org.id, fileHash: 'h1', storageKey: 'k1', uploadedById: admin.id, status: 'ATTACHED', how: 'confirmado', documentModelId: modelo.id },
+        { organizationId: org.id, fileHash: 'h2', storageKey: 'k2', uploadedById: admin.id, status: 'ATTACHED', how: 'trocado', documentModelId: modelo.id },
+        { organizationId: org.id, fileHash: 'h3', storageKey: 'k3', uploadedById: admin.id, status: 'REJECTED', how: 'rejeitado', documentModelId: modelo.id },
+        { organizationId: org.id, fileHash: 'h4', storageKey: 'k4', uploadedById: admin.id, status: 'PENDING' }, // ainda não é decisão humana
+      ],
+    })
+
+    const metricas = await obterMetricas(org.id)
+
+    expect(metricas.porModelo).toEqual([
+      { documentModelId: modelo.id, nome: 'Modelo X', confirmados: 1, trocados: 1, rejeitados: 1 },
+    ])
   })
 })

@@ -210,6 +210,27 @@ export async function reabrirDocumento(receivedDocumentId: string, organizationI
   await prisma.receivedDocument.update({ where: { id: receivedDocumentId }, data: { status: 'PENDING' } })
 }
 
+export async function obterMetricas(organizationId: string) {
+  const docs = await prisma.receivedDocument.findMany({
+    where: { organizationId, how: { in: ['confirmado', 'trocado', 'rejeitado'] }, documentModelId: { not: null } },
+    select: { how: true, documentModel: { select: { id: true, name: true } } },
+  })
+
+  const porModeloMap = new Map<string, { documentModelId: string; nome: string; confirmados: number; trocados: number; rejeitados: number }>()
+  for (const d of docs) {
+    if (!d.documentModel) continue
+    const entry = porModeloMap.get(d.documentModel.id) ?? {
+      documentModelId: d.documentModel.id, nome: d.documentModel.name, confirmados: 0, trocados: 0, rejeitados: 0,
+    }
+    if (d.how === 'confirmado') entry.confirmados++
+    else if (d.how === 'trocado') entry.trocados++
+    else if (d.how === 'rejeitado') entry.rejeitados++
+    porModeloMap.set(d.documentModel.id, entry)
+  }
+
+  return { porModelo: [...porModeloMap.values()] }
+}
+
 // Task.competence é um mês-âncora (DateTime, UTC) — converte pro rótulo "2026-08" que o motor usa
 // no casamento. Trimestral/anual também guardam um único mês-âncora (sem campo de cota — ver spec).
 function competenciaParaRotulo(competence: Date | null): string {

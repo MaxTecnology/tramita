@@ -6,6 +6,7 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import {
   ingerirDocumento, listarFilaDeRevisao, confirmarSugestao, trocarTarefa, rejeitarDocumento, reabrirDocumento,
+  obterMetricas,
 } from './document-reader.service'
 import { trocarTarefaBodySchema } from './document-reader.schema'
 
@@ -48,6 +49,12 @@ export async function documentReaderRoutes(app: FastifyInstance) {
     preHandler: [requireRole(...ORG_ROLES)],
   }, async (request, reply) => {
     return reply.send(await listarFilaDeRevisao(request.user.organizationId!))
+  })
+
+  app.get('/document-reader/metricas', {
+    preHandler: [requireRole(...ORG_ROLES)],
+  }, async (request, reply) => {
+    return reply.send(await obterMetricas(request.user.organizationId!))
   })
 
   app.post('/document-reader/:id/confirmar', {
