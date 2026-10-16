@@ -5,12 +5,14 @@ config({ path: resolve(import.meta.dirname, '../../../.env') })
 import { startNotificationWorker } from '@/workers/notification.worker'
 import { startSlaDigestCronWorker } from '@/workers/sla-digest.cron'
 import { startRecurringTasksCronWorker } from '@/workers/recurring-tasks.cron'
+import { startDocumentReaderWorker } from '@/workers/document-reader.worker'
 
 async function main() {
   startNotificationWorker()
   await startSlaDigestCronWorker()
   await startRecurringTasksCronWorker()
-  console.log('[worker] Notification worker + SLA digest cron + recurring tasks cron iniciados')
+  startDocumentReaderWorker()
+  console.log('[worker] Notification worker + SLA digest cron + recurring tasks cron + document reader worker iniciados')
 }
 
 main().catch((err) => {
