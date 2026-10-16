@@ -1,7 +1,7 @@
 // apps/api/src/modules/document-reader/document-reader.service.test.ts
 import { describe, it, expect, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { processarDocumento } from './document-reader.service'
+import { processarDocumento, ingerirDocumento } from './document-reader.service'
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClient,
   createTestBoard, createTestColumn, createTestDepartment,
@@ -168,5 +168,47 @@ describe('processarDocumento', () => {
     const atualizado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
     expect(atualizado.documentNumber).toBe('12345678901')
     expect((atualizado.extractedFields as any)._possivelDuplicataDe).toBeDefined()
+  })
+})
+
+describe('ingerirDocumento', () => {
+  it('cria ReceivedDocument PENDING e enfileira o processamento', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const enqueueSpy = vi.spyOn(await import('@/lib/document-reader-queue'), 'enqueueDocumentReader').mockResolvedValue()
+
+    const doc = await ingerirDocumento(org.id, { id: admin.id }, {
+      filename: 'guia.pdf', mimeType: 'application/pdf', size: 100, buffer: Buffer.from('%PDF-1.4'),
+    })
+
+    expect(doc.status).toBe('PENDING')
+    expect(doc.uploadedById).toBe(admin.id)
+    expect(enqueueSpy).toHaveBeenCalledWith(doc.id)
+  })
+
+  it('lança 409 (não 500 de constraint bruta) ao reenviar o mesmo arquivo duas vezes', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    vi.spyOn(await import('@/lib/document-reader-queue'), 'enqueueDocumentReader').mockResolvedValue()
+    const payload = { filename: 'guia.pdf', mimeType: 'application/pdf', size: 100, buffer: Buffer.from('conteúdo idêntico') }
+
+    await ingerirDocumento(org.id, { id: admin.id }, payload)
+
+    await expect(ingerirDocumento(org.id, { id: admin.id }, payload)).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('mesmo arquivo em orgs diferentes não colide (hash é por organização)', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id, { slug: 'org-b-document-reader' })
+    const adminA = await createTestUser(orgA.id, { role: 'ORG_ADMIN' })
+    const adminB = await createTestUser(orgB.id, { role: 'ORG_ADMIN' })
+    vi.spyOn(await import('@/lib/document-reader-queue'), 'enqueueDocumentReader').mockResolvedValue()
+    const payload = { filename: 'guia.pdf', mimeType: 'application/pdf', size: 100, buffer: Buffer.from('mesmo conteúdo') }
+
+    await expect(ingerirDocumento(orgA.id, { id: adminA.id }, payload)).resolves.toBeDefined()
+    await expect(ingerirDocumento(orgB.id, { id: adminB.id }, payload)).resolves.toBeDefined()
   })
 })

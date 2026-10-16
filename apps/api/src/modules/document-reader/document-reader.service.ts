@@ -1,5 +1,9 @@
+import { createHash } from 'node:crypto'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { downloadFile } from '@/lib/b2'
+import { downloadFile, uploadFile } from '@/lib/b2'
+import { AppError } from '@/errors/AppError'
+import { enqueueDocumentReader } from '@/lib/document-reader-queue'
 import { extrairEInterpretar, decidir, type Modelo, type Base } from './engine/pipeline'
 
 async function carregarModelosDaOrg(organizationId: string): Promise<Modelo[]> {
@@ -108,6 +112,45 @@ export async function processarDocumento(receivedDocumentId: string): Promise<vo
       data: { extractedFields: { ...(resultado.campos as object), _possivelDuplicataDe: possivelDuplicata.id } },
     })
   }
+}
+
+async function getOrgSlug(organizationId: string): Promise<string> {
+  const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { slug: true } })
+  return org?.slug ?? organizationId
+}
+
+export async function ingerirDocumento(
+  organizationId: string,
+  actor: { id: string },
+  payload: { filename: string; mimeType: string; size: number; buffer: Buffer },
+) {
+  const fileHash = createHash('sha256').update(payload.buffer).digest('hex')
+
+  const existente = await prisma.receivedDocument.findUnique({
+    where: { organizationId_fileHash: { organizationId, fileHash } },
+  })
+  if (existente) throw new AppError(409, 'Esse arquivo já foi enviado antes')
+
+  const orgSlug = await getOrgSlug(organizationId)
+  const storageKey = `document-reader/${orgSlug}/${Date.now()}-${payload.filename}`
+  await uploadFile(storageKey, payload.buffer, payload.mimeType)
+
+  let doc
+  try {
+    doc = await prisma.receivedDocument.create({
+      data: { organizationId, fileHash, storageKey, uploadedById: actor.id, status: 'PENDING' },
+    })
+  } catch (err) {
+    // Janela de corrida: duas requisições concorrentes com o mesmo arquivo passam juntas pelo
+    // findUnique acima — mesma classe de proteção já usada em protocols.service.ts::createProtocol.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      throw new AppError(409, 'Esse arquivo já foi enviado antes')
+    }
+    throw err
+  }
+
+  await enqueueDocumentReader(doc.id)
+  return doc
 }
 
 // Task.competence é um mês-âncora (DateTime, UTC) — converte pro rótulo "2026-08" que o motor usa
