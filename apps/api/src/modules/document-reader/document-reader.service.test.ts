@@ -25,13 +25,13 @@ async function setupObrigacaoETarefa(org: { id: string }, cnpj: string) {
   const client = await createTestClient(org.id, { cnpj })
   const board = await createTestBoard(org.id, client.id)
   const column = await createTestColumn(board.id)
-  const obrigacao = await prisma.taxObligationType.create({
+  const obrigacao = await prisma.obligationType.create({
     data: { code: 'TESTE', name: 'Obrigação de Teste', organizationId: null },
   })
   const template = await prisma.recurringTaskTemplate.create({
     data: {
       organizationId: org.id, departmentId: dept.id, title: 'Teste', periodicity: 'MONTHLY',
-      dueDayOfPeriod: 10, generationDayOfPeriod: 1, taxObligationTypeId: obrigacao.id,
+      dueDayOfPeriod: 10, generationDayOfPeriod: 1, obligationTypeId: obrigacao.id,
     },
   })
   const task = await prisma.task.create({
@@ -44,7 +44,7 @@ async function setupObrigacaoETarefa(org: { id: string }, cnpj: string) {
     data: {
       // Escopado à própria org (não global) — necessário pro teste de isolamento por organização
       // ter sentido: um modelo global seria visível pra qualquer org e nunca provaria isolamento.
-      organizationId: org.id, taxObligationTypeId: obrigacao.id, name: `Modelo de Teste ${org.id}`,
+      organizationId: org.id, obligationTypeId: obrigacao.id, name: `Modelo de Teste ${org.id}`,
       definicao: {
         tipoImposto: 'TESTE', // bate com obrigacao.code — decidir() casa pelo tipoImposto extraído
         ancoras: [{ texto: 'Documento de Arrecadação', pagina: 1, x: 0.1, y: 0.05 }],
@@ -143,13 +143,13 @@ describe('processarDocumento', () => {
     const client = await createTestClient(org.id, { cnpj: '11222333000181' })
     const board = await createTestBoard(org.id, client.id)
     const column = await createTestColumn(board.id)
-    const obrigacao = await prisma.taxObligationType.create({
+    const obrigacao = await prisma.obligationType.create({
       data: { code: 'TESTE-TRI', name: 'Obrigação Trimestral de Teste', organizationId: null },
     })
     const template = await prisma.recurringTaskTemplate.create({
       data: {
         organizationId: org.id, departmentId: dept.id, title: 'Teste Trimestral', periodicity: 'QUARTERLY',
-        dueDayOfPeriod: 10, generationDayOfPeriod: 1, dueMonthAnchor: 2, taxObligationTypeId: obrigacao.id,
+        dueDayOfPeriod: 10, generationDayOfPeriod: 1, dueMonthAnchor: 2, obligationTypeId: obrigacao.id,
       },
     })
     const task = await prisma.task.create({
@@ -160,7 +160,7 @@ describe('processarDocumento', () => {
     })
     await prisma.documentModel.create({
       data: {
-        organizationId: org.id, taxObligationTypeId: obrigacao.id, name: 'Modelo Trimestral de Teste',
+        organizationId: org.id, obligationTypeId: obrigacao.id, name: 'Modelo Trimestral de Teste',
         definicao: {
           tipoImposto: 'TESTE-TRI',
           ancoras: [{ texto: 'Documento de Arrecadação', pagina: 1, x: 0.1, y: 0.05 }],
@@ -481,19 +481,19 @@ describe('obterUrlVisualizacao', () => {
   })
 })
 
-describe('listarObrigacoesFiscais', () => {
+describe('listarObrigacoes', () => {
   it('lista obrigações globais e privadas da org, não as de outras orgs', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const outraOrg = await createTestOrg(plan.id, { slug: 'outra-org-obrigacoes' })
-    const global = await prisma.taxObligationType.create({ data: { code: 'GLOBAL-TESTE', name: 'Global', organizationId: null } })
-    const privada = await prisma.taxObligationType.create({ data: { code: 'PRIVADA-TESTE', name: 'Privada', organizationId: org.id } })
-    await prisma.taxObligationType.create({ data: { code: 'OUTRA-ORG-TESTE', name: 'De outra org', organizationId: outraOrg.id } })
+    const global = await prisma.obligationType.create({ data: { code: 'GLOBAL-TESTE', name: 'Global', organizationId: null } })
+    const privada = await prisma.obligationType.create({ data: { code: 'PRIVADA-TESTE', name: 'Privada', organizationId: org.id } })
+    await prisma.obligationType.create({ data: { code: 'OUTRA-ORG-TESTE', name: 'De outra org', organizationId: outraOrg.id } })
 
-    const { listarObrigacoesFiscais } = await import('./document-reader.service')
-    const obrigacoes = await listarObrigacoesFiscais(org.id)
+    const { listarObrigacoes } = await import('./document-reader.service')
+    const obrigacoes = await listarObrigacoes(org.id)
 
-    expect(obrigacoes.map((o) => o.id).sort()).toEqual([global.id, privada.id].sort())
+    expect(obrigacoes.map((o: { id: string }) => o.id).sort()).toEqual([global.id, privada.id].sort())
   })
 })
 
@@ -502,8 +502,8 @@ describe('obterMetricas', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-    const obrigacao = await prisma.taxObligationType.create({ data: { code: 'T', name: 'T', organizationId: null } })
-    const modelo = await prisma.documentModel.create({ data: { organizationId: null, taxObligationTypeId: obrigacao.id, name: 'Modelo X', definicao: {} } })
+    const obrigacao = await prisma.obligationType.create({ data: { code: 'T', name: 'T', organizationId: null } })
+    const modelo = await prisma.documentModel.create({ data: { organizationId: null, obligationTypeId: obrigacao.id, name: 'Modelo X', definicao: {} } })
     await prisma.receivedDocument.createMany({
       data: [
         { organizationId: org.id, fileHash: 'h1', storageKey: 'k1', uploadedById: admin.id, status: 'ATTACHED', how: 'confirmado', documentModelId: modelo.id },

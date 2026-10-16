@@ -98,16 +98,16 @@ export async function processarDocumento(receivedDocumentId: string): Promise<vo
         where: {
           status: { notIn: ['DONE', 'DISREGARDED'] },
           column: { board: { clientId: cliente.id, organizationId: doc.organizationId } },
-          recurringTemplate: { taxObligationTypeId: { not: null } },
+          recurringTemplate: { obligationTypeId: { not: null } },
         },
-        select: { id: true, competence: true, recurringTemplate: { select: { taxObligationType: { select: { code: true } } } } },
+        select: { id: true, competence: true, recurringTemplate: { select: { obligationType: { select: { code: true } } } } },
       })
       base.tarefas = tarefas
-        .filter((t) => t.recurringTemplate?.taxObligationType)
+        .filter((t) => t.recurringTemplate?.obligationType)
         .map((t) => ({
           id: t.id,
           clienteId: cliente.id,
-          tipoImposto: t.recurringTemplate!.taxObligationType!.code,
+          tipoImposto: t.recurringTemplate!.obligationType!.code,
           competencia: competenciaParaRotulo(t.competence),
           status: 'aberta' as const,
         }))
@@ -192,8 +192,8 @@ export async function obterUrlVisualizacao(receivedDocumentId: string, organizat
   return getSignedDownloadUrl(doc.storageKey)
 }
 
-export async function listarObrigacoesFiscais(organizationId: string) {
-  return prisma.taxObligationType.findMany({
+export async function listarObrigacoes(organizationId: string) {
+  return prisma.obligationType.findMany({
     where: { isActive: true, OR: [{ organizationId: null }, { organizationId }] },
     select: { id: true, code: true, name: true },
     orderBy: { name: 'asc' },

@@ -6,7 +6,7 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import {
   ingerirDocumento, listarFilaDeRevisao, confirmarSugestao, trocarTarefa, rejeitarDocumento, reabrirDocumento,
-  obterMetricas, listarObrigacoesFiscais, obterUrlVisualizacao,
+  obterMetricas, listarObrigacoes, obterUrlVisualizacao,
 } from './document-reader.service'
 import { trocarTarefaBodySchema } from './document-reader.schema'
 
@@ -59,10 +59,10 @@ export async function documentReaderRoutes(app: FastifyInstance) {
     return reply.send({ url })
   })
 
-  app.get('/document-reader/obrigacoes-fiscais', {
+  app.get('/document-reader/obrigacoes', {
     preHandler: [requireRole(...ORG_ROLES)],
   }, async (request, reply) => {
-    return reply.send(await listarObrigacoesFiscais(request.user.organizationId!))
+    return reply.send(await listarObrigacoes(request.user.organizationId!))
   })
 
   app.get('/document-reader/metricas', {

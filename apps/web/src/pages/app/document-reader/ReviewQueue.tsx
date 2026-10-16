@@ -65,7 +65,7 @@ export default function ReviewQueue() {
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-foreground">Fila de revisão — documentos fiscais</h1>
+        <h1 className="text-xl font-semibold text-foreground">Fila de revisão — leitura de documentos</h1>
         <Button onClick={() => fileInputRef.current?.click()} disabled={uploadMutation.isPending}>
           Enviar PDF
         </Button>

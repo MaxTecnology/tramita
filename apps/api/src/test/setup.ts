@@ -46,12 +46,12 @@ afterEach(async () => {
     prisma.comment.deleteMany(),
     prisma.attachment.deleteMany(),
     prisma.task.deleteMany(),
-    // RecurringTaskTemplate/DocumentModel/TaxObligationType têm organizationId opcional (modelos
+    // RecurringTaskTemplate/DocumentModel/ObligationType têm organizationId opcional (modelos
     // globais usam null) — não cascadeiam a partir de organization.deleteMany() quando nulos, e
-    // precisam sumir antes de tax_obligation_types (FK) e antes de organization (FK não-nula).
+    // precisam sumir antes de obligation_types (FK) e antes de organization (FK não-nula).
     prisma.recurringTaskTemplate.deleteMany(),
     prisma.documentModel.deleteMany(),
-    prisma.taxObligationType.deleteMany(),
+    prisma.obligationType.deleteMany(),
     prisma.column.deleteMany(),
     prisma.board.deleteMany(),
     prisma.client.deleteMany(),

@@ -303,7 +303,10 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
    (âncoras + zonas + validadores de CNPJ/CPF/data/competência), sem IA no caminho principal.
    Pipeline dividido em extração pura (`extrairEInterpretar`, sem banco) e decisão (`decidir`, recebe
    um `Base` já resolvido) — service layer (`document-reader.service.ts`) faz a resolução assíncrona
-   de cliente/tarefa real entre os dois. Dois níveis de modelo: `TaxObligationType`/`DocumentModel`
+   de cliente/tarefa real entre os dois. Dois níveis de modelo: `ObligationType`/`DocumentModel`
+   (renomeado de `TaxObligationType` em 2026-10-16 — o robô não é fiscal-específico, serve
+   qualquer departamento/obrigação que gere documento pra anexar numa tarefa, seguindo a mesma
+   ideia dos "robôs personalizados" do Nibo)
    com `organizationId` nulo = global (AutoHubs, seed de 4 modelos: DARF/IRPJ-CSLL, DAS, PGDAS-D
    recibo, PGDAS-D declaração) ou preenchido = privado do escritório — resolve o risco de um
    cadastro errado de um escritório vazar pra todos. **Modo sombra em v1**: o motor sempre roda e

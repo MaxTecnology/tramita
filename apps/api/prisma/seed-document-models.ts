@@ -19,10 +19,10 @@ const MODELOS = [
 export async function seedDocumentModels(prisma: PrismaClient) {
   const obrigacoesPorCode = new Map<string, string>()
   for (const o of OBRIGACOES) {
-    const existente = await prisma.taxObligationType.findFirst({
+    const existente = await prisma.obligationType.findFirst({
       where: { organizationId: null, code: o.code },
     })
-    const criada = existente ?? (await prisma.taxObligationType.create({
+    const criada = existente ?? (await prisma.obligationType.create({
       data: { code: o.code, name: o.name, organizationId: null },
     }))
     obrigacoesPorCode.set(o.code, criada.id)
@@ -32,15 +32,15 @@ export async function seedDocumentModels(prisma: PrismaClient) {
     const definicao = JSON.parse(
       readFileSync(join(import.meta.dirname, 'seed-data/document-models', m.arquivo), 'utf-8'),
     )
-    const taxObligationTypeId = obrigacoesPorCode.get(m.obrigacaoPrincipal)!
+    const obligationTypeId = obrigacoesPorCode.get(m.obrigacaoPrincipal)!
     const existente = await prisma.documentModel.findFirst({
       where: { organizationId: null, name: definicao.nome },
     })
     if (existente) continue // seed idempotente — não duplica em reruns
     await prisma.documentModel.create({
-      data: { organizationId: null, taxObligationTypeId, name: definicao.nome, definicao },
+      data: { organizationId: null, obligationTypeId, name: definicao.nome, definicao },
     })
   }
 
-  console.log(`Seed: ${OBRIGACOES.length} obrigações fiscais + ${MODELOS.length} modelos globais`)
+  console.log(`Seed: ${OBRIGACOES.length} obrigações + ${MODELOS.length} modelos globais`)
 }

@@ -114,7 +114,7 @@ export default function AppLayout() {
               />
             )}
             {ORG_ROLES.includes(role) && (
-              <SidebarLink to="/app/document-reader" icon={<FileSearch size={16} />} label="Documentos Fiscais" onClick={handleNavClick} />
+              <SidebarLink to="/app/document-reader" icon={<FileSearch size={16} />} label="Leitura de Documentos" onClick={handleNavClick} />
             )}
             {MANAGER_ROLES.includes(role) && (
               <SidebarLink to="/app/clients" icon={<UserCheck size={16} />} label="Clientes" onClick={handleNavClick} />

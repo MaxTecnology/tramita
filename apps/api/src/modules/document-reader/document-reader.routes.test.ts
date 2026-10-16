@@ -76,15 +76,15 @@ describe('GET /document-reader/:id/visualizar', () => {
   })
 })
 
-describe('GET /document-reader/obrigacoes-fiscais', () => {
+describe('GET /document-reader/obrigacoes', () => {
   it('lista obrigações fiscais globais pra popular o seletor de templates recorrentes', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const auth = await getAuthHeader(admin.email, 'Test@1234')
-    await prisma.taxObligationType.create({ data: { code: 'ROTA-TESTE', name: 'Obrigação de Rota', organizationId: null } })
+    await prisma.obligationType.create({ data: { code: 'ROTA-TESTE', name: 'Obrigação de Rota', organizationId: null } })
 
-    const res = await app.inject({ method: 'GET', url: '/document-reader/obrigacoes-fiscais', headers: { authorization: auth } })
+    const res = await app.inject({ method: 'GET', url: '/document-reader/obrigacoes', headers: { authorization: auth } })
 
     expect(res.statusCode).toBe(200)
     expect(JSON.parse(res.body).some((o: { code: string }) => o.code === 'ROTA-TESTE')).toBe(true)

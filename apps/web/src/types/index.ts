@@ -194,7 +194,7 @@ export interface RecurringTaskTemplate {
   id: string
   departmentId: string
   department: { id: string; name: string }
-  taxObligationTypeId: string | null
+  obligationTypeId: string | null
   title: string
   description: string | null
   periodicity: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL'
@@ -313,7 +313,7 @@ export interface OSTemplate {
   columns: OSTemplateColumn[]
 }
 
-export interface TaxObligationType {
+export interface ObligationType {
   id: string
   code: string
   name: string
