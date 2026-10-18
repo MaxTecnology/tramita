@@ -24,6 +24,18 @@ import type {
   UpdateAssignmentBody,
 } from './recurring-templates.schema'
 
+// Antes do Plano B (modelagem de documentos) só existia ObligationType global, então vincular
+// qualquer id aqui era seguro por construção. Desde que orgs passaram a criar ObligationType
+// privados, um actor podia gravar o id de uma obrigação privada de outra org aqui sem nenhuma
+// checagem de escopo — mesmo padrão de `obterObligationTypeOuFalhar` em
+// document-reader-models.service.ts.
+async function assertObligationTypeAccessible(obligationTypeId: string, organizationId: string) {
+  const obrigacao = await prisma.obligationType.findFirst({
+    where: { id: obligationTypeId, isActive: true, OR: [{ organizationId: null }, { organizationId }] },
+  })
+  if (!obrigacao) throw new AppError(404, 'Obrigação não encontrada')
+}
+
 function assertDayOfPeriodValid(periodicity: string, dueDayOfPeriod: number, generationDayOfPeriod: number) {
   if (periodicity === 'WEEKLY') {
     if (dueDayOfPeriod > 7) {
@@ -54,6 +66,7 @@ export async function getTemplateById(id: string, organizationId: string) {
 
 export async function createTemplate(organizationId: string, data: CreateTemplateBody) {
   await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
+  if (data.obligationTypeId) await assertObligationTypeAccessible(data.obligationTypeId, organizationId)
   assertDayOfPeriodValid(data.periodicity, data.dueDayOfPeriod, data.generationDayOfPeriod)
 
   const { documentRequests, documentDeliveries, ...templateData } = data
@@ -73,6 +86,7 @@ export async function updateTemplate(id: string, organizationId: string, data: U
   const existing = await getTemplateById(id, organizationId)
 
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
+  if (data.obligationTypeId) await assertObligationTypeAccessible(data.obligationTypeId, organizationId)
   assertDayOfPeriodValid(
     data.periodicity ?? existing.periodicity,
     data.dueDayOfPeriod ?? existing.dueDayOfPeriod,
