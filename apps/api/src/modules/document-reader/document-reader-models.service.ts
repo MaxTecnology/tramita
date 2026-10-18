@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { CreateObligationTypeBody } from './document-reader-models.schema'
+import { extrairDocumento } from './engine/extrair-texto'
+import type { DocumentoExtraido } from './engine/types'
 
 // Mesmo princípio dos codes globais existentes (IRPJ, DAS, PGDAS-D): maiúsculas, hífen no lugar
 // de espaço, qualquer caractere fora de [A-Z0-9-] removido. "Recibo RH" -> "RECIBO-RH".
@@ -37,4 +39,18 @@ export async function criarObligationType(organizationId: string, actor: { id: s
     }
     throw err
   }
+}
+
+export async function analisarPdfParaModelagem(buffer: Buffer): Promise<DocumentoExtraido> {
+  const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+  let resultado: DocumentoExtraido
+  try {
+    resultado = await extrairDocumento(bytes)
+  } catch (err) {
+    throw new AppError(422, `Não foi possível ler o PDF: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  if (!resultado.temTexto) {
+    throw new AppError(422, 'PDF sem camada de texto (provavelmente escaneado) — OCR ainda não é suportado')
+  }
+  return resultado
 }
