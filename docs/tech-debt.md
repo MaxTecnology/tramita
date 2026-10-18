@@ -318,3 +318,18 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   (`document-reader.worker.ts`). Aceitável pro v1: rota só acessível a `ORG_ADMIN`, PDF de amostra
   limitado a 20MB, sem persistência. Revisitar se virar vetor de lentidão (muitos admins
   modelando ao mesmo tempo) ou de negação de serviço.
+- **Salvar um `DocumentModel` privado pode desligar o reconhecimento de outro modelo ativo da
+  mesma org (global ou privado) sem nenhum aviso**, achado na revisão final do Plano B
+  (2026-10-18). O motor (`engine/pipeline.ts`/`ancoras.ts`) decide por score de âncoras batendo;
+  se as âncoras do novo modelo também aparecem nos documentos de outro modelo (ex.: cabeçalho
+  genérico, ou uma âncora curta tipo "CNPJ" que casa por `includes` em quase qualquer documento
+  fiscal), os dois empatam e o pipeline passa a devolver `revisar` sem nenhum campo extraído pra
+  esses documentos — pior do que antes de o modelo existir. É exatamente o cenário que motivou
+  o Plano B (PGDAS-D multi-filial com âncoras batendo e zonas falhando, ver item 6 do
+  `docs/TASKS.md`): um admin modelando a própria versão do PGDAS-D com as mesmas âncoras do
+  cabeçalho repete o problema pros documentos que hoje já são reconhecidos. A "análise de
+  impacto contra documentos já recebidos" já estava fora de escopo do v1 por decisão explícita
+  (ver spec, seção "Fora de escopo") — o gap é não avisar nem documentar esse failure mode
+  específico até agora. Mitigação futura mínima: em `POST /document-reader/modelos/analisar` ou
+  no momento de salvar, rodar `pontuarModelos` contra os modelos ativos da org e avisar/bloquear
+  se a amostra também bate com score alto em outro modelo existente.
