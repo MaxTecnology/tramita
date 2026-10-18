@@ -34,6 +34,7 @@ import Requests from '@/pages/app/Requests'
 import Tasks from '@/pages/app/Tasks'
 import DocumentReaderQueue from '@/pages/app/document-reader/ReviewQueue'
 import DocumentModels from '@/pages/app/settings/DocumentModels'
+import DocumentModelForm from '@/pages/app/settings/DocumentModelForm'
 
 const PortalLayout = lazy(() => import('@/pages/portal/Layout'))
 const PortalBoards = lazy(() => import('@/pages/portal/Boards'))
@@ -194,6 +195,22 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <DocumentModels />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/document-models/new',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <DocumentModelForm />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/document-models/:id/edit',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <DocumentModelForm />
           </ProtectedRoute>
         ),
       },
