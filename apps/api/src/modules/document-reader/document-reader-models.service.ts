@@ -2,7 +2,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
-import type { CreateObligationTypeBody } from './document-reader-models.schema'
+import type { CreateObligationTypeBody, CriarModeloBody } from './document-reader-models.schema'
 import { extrairDocumento } from './engine/extrair-texto'
 import type { DocumentoExtraido } from './engine/types'
 
@@ -53,4 +53,66 @@ export async function analisarPdfParaModelagem(buffer: Buffer): Promise<Document
     throw new AppError(422, 'PDF sem camada de texto (provavelmente escaneado) — OCR ainda não é suportado')
   }
   return resultado
+}
+
+// O motor (engine/pipeline.ts:62-63) lê o período pelo NOME literal do campo — `campos['pa']` ou
+// `campos['competencia']` — não pelo `tipo`. Um campo chamado "trimestre" do tipo
+// periodo_apuracao nunca seria lido, porque o motor nunca olha uma chave chamada "trimestre".
+// Por isso a validação exige nome E tipo juntos, não só o tipo sozinho.
+function validarCamposObrigatorios(zonas: CriarModeloBody['zonas']) {
+  const nomes = new Set<string>()
+  for (const z of zonas) {
+    if (nomes.has(z.campo)) throw new AppError(400, `Campo "${z.campo}" repetido`)
+    nomes.add(z.campo)
+  }
+
+  const cnpjValido = zonas.some((z) => z.campo === 'cnpj' && z.tipo === 'cnpj')
+  if (!cnpjValido) {
+    throw new AppError(400, 'Marque o campo "cnpj" (tipo CNPJ) — sem ele não há como achar o cliente')
+  }
+
+  const temCompetencia = zonas.some((z) => z.campo === 'competencia' && z.tipo === 'competencia')
+  const temPeriodoApuracao = zonas.some((z) => z.campo === 'pa' && z.tipo === 'periodo_apuracao')
+  if (!temCompetencia && !temPeriodoApuracao) {
+    throw new AppError(400, 'Marque o campo "competencia" (tipo Competência) ou "pa" (tipo Período de apuração) — o motor só reconhece esses dois nomes pra achar o período do documento')
+  }
+}
+
+async function obterObligationTypeOuFalhar(organizationId: string, obligationTypeId: string) {
+  const obrigacao = await prisma.obligationType.findFirst({
+    where: { id: obligationTypeId, isActive: true, OR: [{ organizationId: null }, { organizationId }] },
+  })
+  if (!obrigacao) throw new AppError(404, 'Obrigação não encontrada')
+  return obrigacao
+}
+
+export async function listarModelos(organizationId: string) {
+  const modelos = await prisma.documentModel.findMany({
+    where: { isActive: true, OR: [{ organizationId: null }, { organizationId }] },
+    include: { obligationType: { select: { id: true, name: true } } },
+    orderBy: { name: 'asc' },
+  })
+  return modelos.map((m) => ({
+    id: m.id,
+    nome: m.name,
+    version: m.version,
+    createdAt: m.createdAt,
+    isGlobal: m.organizationId === null,
+    obligationType: m.obligationType,
+  }))
+}
+
+export async function criarModelo(organizationId: string, actor: { id: string }, data: CriarModeloBody) {
+  validarCamposObrigatorios(data.zonas)
+  const obrigacao = await obterObligationTypeOuFalhar(organizationId, data.obligationTypeId)
+
+  return prisma.documentModel.create({
+    data: {
+      organizationId,
+      obligationTypeId: obrigacao.id,
+      name: data.nome,
+      createdById: actor.id,
+      definicao: { nome: data.nome, tipoImposto: obrigacao.code, ancoras: data.ancoras, zonas: data.zonas },
+    },
+  })
 }
