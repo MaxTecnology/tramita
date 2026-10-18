@@ -1,7 +1,7 @@
 // apps/api/src/modules/document-reader/document-reader-models.service.test.ts
 import { describe, it, expect } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { criarObligationType, analisarPdfParaModelagem, listarModelos, criarModelo } from './document-reader-models.service'
+import { criarObligationType, analisarPdfParaModelagem, listarModelos, criarModelo, atualizarModelo, arquivarModelo } from './document-reader-models.service'
 import { createTestPlan, createTestOrg, createTestUser } from '@/test/helpers'
 import { gerarPdfComDocumentoArrecadacao } from '@/test/pdf-helpers'
 
@@ -268,5 +268,112 @@ describe('listarModelos', () => {
     expect(idsListados).not.toContain(deOutraOrg.id)
     const meuNaLista = modelos.find((m) => m.id === meu.id)!
     expect(meuNaLista.isGlobal).toBe(false)
+  })
+})
+
+describe('atualizarModelo', () => {
+  async function setupModeloPrivado(orgId: string, adminId: string) {
+    const obrigacao = await prisma.obligationType.create({ data: { code: 'TESTE-EDIT', name: 'Teste', organizationId: orgId } })
+    return criarModelo(orgId, { id: adminId }, {
+      nome: 'Original', obligationTypeId: obrigacao.id,
+      ancoras: [{ texto: 'Fixo', pagina: 1, x: 0.1, y: 0.05 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+        { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+      ],
+    })
+  }
+
+  it('edita um modelo privado da org e incrementa version', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const modelo = await setupModeloPrivado(org.id, admin.id)
+
+    const editado = await atualizarModelo(modelo.id, org.id, {
+      nome: 'Editado', obligationTypeId: modelo.obligationTypeId,
+      ancoras: [{ texto: 'Fixo novo', pagina: 1, x: 0.2, y: 0.05 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+        { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+      ],
+    })
+
+    expect(editado.name).toBe('Editado')
+    expect(editado.version).toBe(2)
+  })
+
+  it('lança 404 ao tentar editar um modelo global', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const obrigacaoGlobal = await prisma.obligationType.create({ data: { code: 'GLOBAL-EDIT-TESTE', name: 'Global', organizationId: null } })
+    const modeloGlobal = await prisma.documentModel.create({
+      data: {
+        organizationId: null, obligationTypeId: obrigacaoGlobal.id, name: 'Global',
+        definicao: { nome: 'Global', tipoImposto: 'GLOBAL-EDIT-TESTE', ancoras: [], zonas: [] },
+      },
+    })
+
+    await expect(atualizarModelo(modeloGlobal.id, org.id, {
+      nome: 'Tentativa', obligationTypeId: obrigacaoGlobal.id,
+      ancoras: [{ texto: 'Fixo', pagina: 1, x: 0.1, y: 0.05 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+        { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+      ],
+    })).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  it('lança 404 ao tentar editar um modelo de outra organização', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const outraOrg = await createTestOrg(plan.id, { slug: 'outra-org-editar-modelo' })
+    const outroAdmin = await createTestUser(outraOrg.id, { role: 'ORG_ADMIN' })
+    const modeloDeOutraOrg = await setupModeloPrivado(outraOrg.id, outroAdmin.id)
+
+    await expect(atualizarModelo(modeloDeOutraOrg.id, org.id, {
+      nome: 'Tentativa', obligationTypeId: modeloDeOutraOrg.obligationTypeId,
+      ancoras: [{ texto: 'Fixo', pagina: 1, x: 0.1, y: 0.05 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+        { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+      ],
+    })).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
+describe('arquivarModelo', () => {
+  it('marca isActive false e some de listarModelos', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const obrigacao = await prisma.obligationType.create({ data: { code: 'TESTE-ARQUIVAR', name: 'Teste', organizationId: org.id } })
+    const modelo = await criarModelo(org.id, { id: admin.id }, {
+      nome: 'Pra arquivar', obligationTypeId: obrigacao.id,
+      ancoras: [{ texto: 'Fixo', pagina: 1, x: 0.1, y: 0.05 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+        { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+      ],
+    })
+
+    await arquivarModelo(modelo.id, org.id)
+
+    const lista = await listarModelos(org.id)
+    expect(lista.map((m) => m.id)).not.toContain(modelo.id)
+  })
+
+  it('lança 404 ao tentar arquivar um modelo global', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const obrigacaoGlobal = await prisma.obligationType.create({ data: { code: 'GLOBAL-ARQUIVAR-TESTE', name: 'Global', organizationId: null } })
+    const modeloGlobal = await prisma.documentModel.create({
+      data: {
+        organizationId: null, obligationTypeId: obrigacaoGlobal.id, name: 'Global',
+        definicao: { nome: 'Global', tipoImposto: 'GLOBAL-ARQUIVAR-TESTE', ancoras: [], zonas: [] },
+      },
+    })
+
+    await expect(arquivarModelo(modeloGlobal.id, org.id)).rejects.toMatchObject({ statusCode: 404 })
   })
 })

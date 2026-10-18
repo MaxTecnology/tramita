@@ -2,7 +2,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
-import type { CreateObligationTypeBody, CriarModeloBody } from './document-reader-models.schema'
+import type { CreateObligationTypeBody, CriarModeloBody, AtualizarModeloBody } from './document-reader-models.schema'
 import { extrairDocumento } from './engine/extrair-texto'
 import type { DocumentoExtraido } from './engine/types'
 
@@ -115,4 +115,28 @@ export async function criarModelo(organizationId: string, actor: { id: string },
       definicao: { nome: data.nome, tipoImposto: obrigacao.code, ancoras: data.ancoras, zonas: data.zonas },
     },
   })
+}
+
+export async function atualizarModelo(id: string, organizationId: string, data: AtualizarModeloBody) {
+  const modelo = await prisma.documentModel.findFirst({ where: { id, organizationId } })
+  if (!modelo) throw new AppError(404, 'Modelo não encontrado')
+
+  validarCamposObrigatorios(data.zonas)
+  const obrigacao = await obterObligationTypeOuFalhar(organizationId, data.obligationTypeId)
+
+  return prisma.documentModel.update({
+    where: { id },
+    data: {
+      obligationTypeId: obrigacao.id,
+      name: data.nome,
+      version: { increment: 1 },
+      definicao: { nome: data.nome, tipoImposto: obrigacao.code, ancoras: data.ancoras, zonas: data.zonas },
+    },
+  })
+}
+
+export async function arquivarModelo(id: string, organizationId: string) {
+  const modelo = await prisma.documentModel.findFirst({ where: { id, organizationId } })
+  if (!modelo) throw new AppError(404, 'Modelo não encontrado')
+  return prisma.documentModel.update({ where: { id }, data: { isActive: false } })
 }
