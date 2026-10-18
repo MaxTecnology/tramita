@@ -83,8 +83,9 @@ Response 200:
 }
 ```
 
-Erros: 400 (não é PDF / PDF sem texto — reusa a mesma mensagem de `temTexto=false` do motor),
-413 (excede 20MB).
+Erros: 400 (nenhum arquivo enviado), 422 (não é PDF / PDF sem texto — reusa a mesma mensagem de
+`temTexto=false` do motor), 413 (excede 20MB) — mesma convenção de status já usada em
+`document-reader.routes.ts::POST /document-reader/upload` pro Plano A.
 
 ### `GET /document-reader/modelos`
 
@@ -127,7 +128,9 @@ Grava com `organizationId = org do actor`, `createdById = actor.id`, `version = 
 ### `PATCH /document-reader/modelos/:id`
 
 Mesmo body do POST. Só aceita editar um `DocumentModel` cujo `organizationId` é da própria org
-(nunca um global — 403 se tentar). Incrementa `version` a cada salvamento bem-sucedido.
+(nunca um global — 404 se tentar, mesmo padrão de `os-templates.service.ts`: um `findFirst({ id,
+organizationId })` que não bate não revela se o recurso existe pra outra org). Incrementa
+`version` a cada salvamento bem-sucedido.
 
 ### `DELETE /document-reader/modelos/:id`
 
@@ -151,8 +154,11 @@ RH" → "RECIBO-RH") — mesmo princípio dos `code`s globais existentes (`IRPJ`
 
 ### Lista de modelos (`/app/settings/document-models`)
 
-Tabela simples: nome, obrigação, se é global (badge "AutoHubs", somente leitura) ou da org
-(editável/arquivável), versão, data de criação. Botão "Novo modelo" leva pra tela de modelagem.
+Lista de cards (não tabela — mesmo padrão visual mais enxuto já usado em listas simples do
+projeto): nome, obrigação, se é global (badge "AutoHubs", somente leitura) ou da org
+(editável/arquivável), versão. Sem coluna de data de criação — a versão já sinaliza
+atividade/recência o suficiente pro v1, e o card não tem uma linha de metadados secundários
+reservada pra isso. Botão "Novo modelo" leva pra tela de modelagem.
 Link a partir do Settings Hub, junto dos outros cadastros de admin (Departamentos, Templates,
 OS Templates).
 
@@ -167,7 +173,9 @@ OS Templates).
 3. Barra lateral/painel com:
    - Campo nome do modelo
    - Seletor de obrigação (lista `GET /document-reader/obrigacoes`, com opção "+ Nova obrigação"
-     que abre um campo inline de código+nome)
+     que abre um campo inline só de nome — o `code` é derivado automaticamente de `name` via
+     `normalizarCodigo`, mesmo princípio dos codes globais já existentes; não há campo de código
+     separado pro admin preencher)
    - Lista de âncoras marcadas (toggle "Marcar âncoras" — enquanto ativo, clicar num item adiciona/
      remove da lista de âncoras)
    - Lista de campos padrão sugeridos como atalho (CNPJ, Competência, Vencimento, Valor) — clicar

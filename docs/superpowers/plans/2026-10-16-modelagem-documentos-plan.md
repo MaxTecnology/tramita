@@ -108,6 +108,17 @@ describe('criarObligationType', () => {
     await expect(criarObligationType(orgB.id, { id: adminB.id }, { code: 'RECIBO', name: 'Recibo B' }))
       .resolves.toBeDefined()
   })
+
+  it('remove o acento inteiro (letra+marca), não só a marca, ao normalizar o code', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+
+    const obrigacao = await criarObligationType(org.id, { id: admin.id }, { code: 'Férias', name: 'Férias' })
+
+    // Sem NFD antes do replace, "É" inteiro seria removido (fora de [A-Z0-9-]) -> "FRIAS".
+    expect(obrigacao.code).toBe('FERIAS')
+  })
 })
 ```
 
@@ -128,21 +139,30 @@ export const createObligationTypeSchema = z.object({
 })
 export type CreateObligationTypeBody = z.infer<typeof createObligationTypeSchema>
 
+// Coordenadas normalizadas (0..1, fração da página) — mensagem em pt-BR porque o erro do Zod
+// chega direto na resposta da API (ver AppError/validação de schema do Plano A).
+const coordenada = (campo: string) =>
+  z.number({ invalid_type_error: `"${campo}" precisa ser um número` })
+    .min(0, `"${campo}" precisa estar entre 0 e 1`)
+    .max(1, `"${campo}" precisa estar entre 0 e 1`)
+
 const ancoraSchema = z.object({
-  texto: z.string().trim().min(1),
-  pagina: z.number().int().min(1),
-  x: z.number().min(0).max(1),
-  y: z.number().min(0).max(1),
+  texto: z.string().trim().min(1, 'Texto da âncora obrigatório'),
+  pagina: z.number().int().min(1, 'Página precisa ser >= 1'),
+  x: coordenada('x'),
+  y: coordenada('y'),
 })
 
 const zonaSchema = z.object({
-  campo: z.string().trim().min(1),
-  pagina: z.number().int().min(1),
-  x: z.number().min(0).max(1),
-  y: z.number().min(0).max(1),
-  w: z.number().min(0).max(1),
-  h: z.number().min(0).max(1),
-  tipo: z.enum(['cnpj', 'data', 'competencia', 'periodo_apuracao', 'moeda', 'texto']),
+  campo: z.string().trim().min(1, 'Nome do campo obrigatório'),
+  pagina: z.number().int().min(1, 'Página precisa ser >= 1'),
+  x: coordenada('x'),
+  y: coordenada('y'),
+  w: coordenada('w'),
+  h: coordenada('h'),
+  tipo: z.enum(['cnpj', 'data', 'competencia', 'periodo_apuracao', 'moeda', 'texto'], {
+    errorMap: () => ({ message: 'Tipo de campo inválido' }),
+  }),
   opcional: z.boolean().optional(),
 })
 
@@ -166,33 +186,51 @@ mexer neste arquivo de novo — só a Task 1 usa `createObligationTypeSchema` po
 
 ```typescript
 // apps/api/src/modules/document-reader/document-reader-models.service.ts
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { CreateObligationTypeBody } from './document-reader-models.schema'
 
 // Mesmo princípio dos codes globais existentes (IRPJ, DAS, PGDAS-D): maiúsculas, hífen no lugar
 // de espaço, qualquer caractere fora de [A-Z0-9-] removido. "Recibo RH" -> "RECIBO-RH".
+// NFD decompõe "É" em "E" + marca de acento combinante antes do replace, e \p{Diacritic} remove
+// só a marca — sem isso o replace final removeria o "É" inteiro (por não estar em [A-Z0-9-]),
+// virando "FRIAS" em vez de "FERIAS".
 function normalizarCodigo(code: string): string {
-  return code.trim().toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '')
+  return code
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^A-Z0-9-]/g, '')
 }
 
 export async function criarObligationType(organizationId: string, actor: { id: string }, data: CreateObligationTypeBody) {
   const code = normalizarCodigo(data.code)
   if (!code) throw new AppError(400, 'Código inválido')
 
-  const existente = await prisma.obligationType.findFirst({ where: { organizationId, code } })
-  if (existente) throw new AppError(409, `Já existe uma obrigação com o código "${code}" nesta organização`)
-
-  return prisma.obligationType.create({
-    data: { code, name: data.name, organizationId, createdById: actor.id },
-  })
+  // Sem findFirst-antes-do-create: duas requisições concorrentes com o mesmo nome (ex.: duplo
+  // clique em "+ Nova") passariam ambas pelo findFirst antes de qualquer uma criar — a
+  // constraint @@unique([organizationId, code]) do schema é o que garante a unicidade de fato,
+  // o catch aqui só traduz a P2002 que ela lança num 409 com mensagem legível.
+  try {
+    return await prisma.obligationType.create({
+      data: { code, name: data.name, organizationId, createdById: actor.id },
+    })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      throw new AppError(409, `Já existe uma obrigação com o código "${code}" nesta organização`)
+    }
+    throw err
+  }
 }
 ```
 
 - [ ] **Step 5: Rodar pra confirmar que passa**
 
 Run: `pnpm --filter api exec vitest run src/modules/document-reader/document-reader-models.service.test.ts`
-Expected: PASS — 3/3.
+Expected: PASS — 4/4.
 
 - [ ] **Step 6: Commit**
 
@@ -234,8 +272,16 @@ describe('analisarPdfParaModelagem', () => {
   })
 
   it('lança 422 com mensagem clara quando o PDF não tem camada de texto (escaneado)', async () => {
-    await expect(analisarPdfParaModelagem(Buffer.from('%PDF-1.4 sem texto algum')))
-      .rejects.toMatchObject({ statusCode: 422 })
+    // PDF válido mas sem nenhum texto (cnpj/competencia vazios -> gerarPdfComDocumentoArrecadacao
+    // não escreve nada na página) — isso exercita o branch `!resultado.temTexto` de
+    // analisarPdfParaModelagem, não o catch de parsing. Um buffer de bytes arbitrários (como
+    // '%PDF-1.4 sem texto algum') faz o pdf.js falhar o PARSING, caindo no catch de erro genérico
+    // em vez do branch temTexto — os dois retornam 422, então o teste passaria por engano mesmo
+    // se o branch temTexto estivesse quebrado.
+    const pdf = await gerarPdfComDocumentoArrecadacao('', '')
+
+    await expect(analisarPdfParaModelagem(Buffer.from(pdf)))
+      .rejects.toMatchObject({ statusCode: 422, message: expect.stringContaining('camada de texto') })
   })
 })
 ```
@@ -274,7 +320,7 @@ subclasse de `Uint8Array` (`Please provide binary data as Uint8Array, rather tha
 - [ ] **Step 4: Rodar pra confirmar que passa**
 
 Run: `pnpm --filter api exec vitest run src/modules/document-reader/document-reader-models.service.test.ts`
-Expected: PASS — 5/5.
+Expected: PASS — 6/6.
 
 - [ ] **Step 5: Commit**
 
@@ -303,11 +349,14 @@ git commit -m "feat(document-reader): analisa PDF de amostra pra modelagem (sem 
 // adiciona em document-reader-models.service.test.ts
 import { listarModelos, criarModelo } from './document-reader-models.service'
 
-describe('criarModelo', () => {
-  async function setupObrigacao(orgId: string | null) {
-    return prisma.obligationType.create({ data: { code: 'TESTE-MODELO', name: 'Teste', organizationId: orgId } })
-  }
+// Fora dos describe (escopo de módulo) — usado tanto por 'criarModelo' quanto por 'listarModelos'
+// abaixo; declarado dentro de um describe só, ficaria fora de escopo pro outro (ReferenceError).
+let contadorObrigacaoTeste = 0
+async function setupObrigacao(orgId: string | null) {
+  return prisma.obligationType.create({ data: { code: `TESTE-MODELO-${++contadorObrigacaoTeste}`, name: 'Teste', organizationId: orgId } })
+}
 
+describe('criarModelo', () => {
   it('cria um modelo privado da org, com tipoImposto derivado do code da obrigação', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
@@ -323,9 +372,12 @@ describe('criarModelo', () => {
       ],
     })
 
+    // `definicao` é um campo Json do Prisma (Prisma.JsonValue) — sem `any`, mas também sem
+    // conhecer a forma exata em runtime, então o cast é pro shape que o teste de fato verifica.
+    const definicao = modelo.definicao as { tipoImposto: string; id?: unknown }
     expect(modelo.organizationId).toBe(org.id)
-    expect((modelo.definicao as any).tipoImposto).toBe('TESTE-MODELO')
-    expect((modelo.definicao as any).id).toBeUndefined() // nunca grava id próprio (commit e31b5b2)
+    expect(definicao.tipoImposto).toBe('TESTE-MODELO')
+    expect(definicao.id).toBeUndefined() // nunca grava id próprio (commit e31b5b2)
   })
 
   it('lança 400 quando falta o campo cnpj', async () => {
@@ -351,6 +403,54 @@ describe('criarModelo', () => {
       nome: 'Sem competência', obligationTypeId: obrigacao.id,
       ancoras: [{ texto: 'Fixo', pagina: 1, x: 0.1, y: 0.05 }],
       zonas: [{ campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' }],
+    })).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  it('lança 400 quando o campo de período tem o tipo periodo_apuracao mas um nome diferente de "pa" — o motor só lê a chave "pa" literalmente', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const obrigacao = await setupObrigacao(org.id)
+
+    await expect(criarModelo(org.id, { id: admin.id }, {
+      nome: 'Nome de campo errado', obligationTypeId: obrigacao.id,
+      ancoras: [{ texto: 'Fixo', pagina: 1, x: 0.1, y: 0.05 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+        { campo: 'trimestre', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'periodo_apuracao' },
+      ],
+    })).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  it('aceita um campo "pa" do tipo periodo_apuracao no lugar de "competencia" (documentos trimestrais)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const obrigacao = await setupObrigacao(org.id)
+
+    await expect(criarModelo(org.id, { id: admin.id }, {
+      nome: 'Modelo trimestral', obligationTypeId: obrigacao.id,
+      ancoras: [{ texto: 'Fixo', pagina: 1, x: 0.1, y: 0.05 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+        { campo: 'pa', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'periodo_apuracao' },
+      ],
+    })).resolves.toBeDefined()
+  })
+
+  it('lança 400 quando o campo "cnpj" existe mas com tipo diferente de cnpj', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const obrigacao = await setupObrigacao(org.id)
+
+    await expect(criarModelo(org.id, { id: admin.id }, {
+      nome: 'cnpj com tipo errado', obligationTypeId: obrigacao.id,
+      ancoras: [{ texto: 'Fixo', pagina: 1, x: 0.1, y: 0.05 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'texto' },
+        { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+      ],
     })).rejects.toMatchObject({ statusCode: 400 })
   })
 
@@ -454,23 +554,32 @@ Expected: FAIL — `criarModelo`/`listarModelos` não existem.
 // adiciona em document-reader-models.service.ts
 import type { CriarModeloBody } from './document-reader-models.schema'
 
+// O motor (engine/pipeline.ts:62-63) lê o período pelo NOME literal do campo — `campos['pa']` ou
+// `campos['competencia']` — não pelo `tipo`. Um campo chamado "trimestre" do tipo
+// periodo_apuracao nunca seria lido, porque o motor nunca olha uma chave chamada "trimestre".
+// Por isso a validação exige nome E tipo juntos, não só o tipo sozinho.
 function validarCamposObrigatorios(zonas: CriarModeloBody['zonas']) {
   const nomes = new Set<string>()
   for (const z of zonas) {
     if (nomes.has(z.campo)) throw new AppError(400, `Campo "${z.campo}" repetido`)
     nomes.add(z.campo)
   }
-  if (!nomes.has('cnpj')) {
-    throw new AppError(400, 'Marque o campo "cnpj" — sem ele não há como achar o cliente')
+
+  const cnpjValido = zonas.some((z) => z.campo === 'cnpj' && z.tipo === 'cnpj')
+  if (!cnpjValido) {
+    throw new AppError(400, 'Marque o campo "cnpj" (tipo CNPJ) — sem ele não há como achar o cliente')
   }
-  if (!nomes.has('competencia') && !zonas.some((z) => z.tipo === 'periodo_apuracao')) {
-    throw new AppError(400, 'Marque o campo "competencia" ou um campo do tipo período de apuração')
+
+  const temCompetencia = zonas.some((z) => z.campo === 'competencia' && z.tipo === 'competencia')
+  const temPeriodoApuracao = zonas.some((z) => z.campo === 'pa' && z.tipo === 'periodo_apuracao')
+  if (!temCompetencia && !temPeriodoApuracao) {
+    throw new AppError(400, 'Marque o campo "competencia" (tipo Competência) ou "pa" (tipo Período de apuração) — o motor só reconhece esses dois nomes pra achar o período do documento')
   }
 }
 
 async function obterObligationTypeOuFalhar(organizationId: string, obligationTypeId: string) {
   const obrigacao = await prisma.obligationType.findFirst({
-    where: { id: obligationTypeId, OR: [{ organizationId: null }, { organizationId }] },
+    where: { id: obligationTypeId, isActive: true, OR: [{ organizationId: null }, { organizationId }] },
   })
   if (!obrigacao) throw new AppError(404, 'Obrigação não encontrada')
   return obrigacao
@@ -511,7 +620,7 @@ export async function criarModelo(organizationId: string, actor: { id: string },
 - [ ] **Step 4: Rodar pra confirmar que passa**
 
 Run: `pnpm --filter api exec vitest run src/modules/document-reader/document-reader-models.service.test.ts`
-Expected: PASS — 12/12.
+Expected: PASS — 16/16.
 
 - [ ] **Step 5: Commit**
 
@@ -693,7 +802,7 @@ Não precisa de um `if (modelo.organizationId === null)` redundante depois.
 - [ ] **Step 4: Rodar pra confirmar que passa**
 
 Run: `pnpm --filter api exec vitest run src/modules/document-reader/document-reader-models.service.test.ts`
-Expected: PASS — 17/17.
+Expected: PASS — 21/21.
 
 - [ ] **Step 5: Commit**
 
@@ -946,9 +1055,9 @@ git commit -m "feat(document-reader): rotas de modelagem (obrigação, analisar,
 **Interfaces:**
 - Consumes: `GET /document-reader/modelos`, `DELETE /document-reader/modelos/:id` (Task 5).
 - Produces: tipos `DocumentModelListItem`, `DocumentoExtraidoItem`, `DocumentoExtraidoPagina`,
-  `DocumentoExtraido` (usados pela Task 7); rota `/app/settings/document-models` (lista),
-  `/app/settings/document-models/new` e `/app/settings/document-models/:id/edit` registradas
-  (ainda sem componente real nas duas últimas — Task 7 cria `DocumentModelForm.tsx`).
+  `DocumentoExtraido` (usados pela Task 7); rota `/app/settings/document-models` (lista) —
+  só essa; `/app/settings/document-models/new` e `/:id/edit` são registradas pela Task 7
+  (ver Step 3 abaixo), não aqui.
 
 - [ ] **Step 1: Adicionar os tipos**
 
@@ -1304,9 +1413,11 @@ git commit -m "feat(document-reader): reconstrução visual do PDF de amostra (u
 - Modify: `apps/web/src/pages/app/settings/DocumentModelForm.tsx`
 
 **Interfaces:**
-- Consumes: `GET /document-reader/obrigacoes`, `POST /document-reader/obrigacoes`,
-  `POST /document-reader/modelos`, `PATCH /document-reader/modelos/:id`,
-  `GET /document-reader/modelos` (pra carregar o modelo ao editar) — todos da Task 5.
+- Consumes: `GET /document-reader/obrigacoes` (já existe desde o Plano A —
+  `document-reader.routes.ts:62`, `listarObrigacoes` em `document-reader.service.ts`),
+  `POST /document-reader/obrigacoes`, `POST /document-reader/modelos`,
+  `PATCH /document-reader/modelos/:id`, `GET /document-reader/modelos` (pra carregar o modelo ao
+  editar) — essas quatro últimas da Task 5.
 - Produces: tela de modelagem completa e funcional.
 
 - [ ] **Step 1: Adicionar estado de marcação e painel lateral**
@@ -1331,20 +1442,22 @@ function mensagemDeErro(err: unknown, padrao: string): string {
 interface Ancora { texto: string; pagina: number; x: number; y: number }
 interface Zona { campo: string; pagina: number; x: number; y: number; w: number; h: number; tipo: string; opcional?: boolean }
 
+// O motor (engine/pipeline.ts) lê o período pelo NOME literal do campo — "pa" ou "competencia" —
+// não pelo tipo. Por isso "Período (trimestral)" é um 5º campo PADRÃO com nome travado em "pa",
+// não um tipo disponível no campo customizado abaixo: um campo customizado chamado "trimestre" do
+// tipo periodo_apuracao nunca seria lido pelo motor, porque ele nunca olha uma chave "trimestre".
 const CAMPOS_PADRAO: { campo: string; label: string; tipo: string }[] = [
   { campo: 'cnpj', label: 'CNPJ', tipo: 'cnpj' },
   { campo: 'competencia', label: 'Competência', tipo: 'competencia' },
+  { campo: 'pa', label: 'Período (trimestral)', tipo: 'periodo_apuracao' },
   { campo: 'vencimento', label: 'Vencimento', tipo: 'data' },
   { campo: 'valor', label: 'Valor', tipo: 'moeda' },
 ]
 
-// Mesmos 6 tipos que o motor aceita (apps/api/.../engine/types.ts::TipoCampo). "periodo_apuracao"
-// não está nos 4 campos padrão de propósito: é só necessário pra documentos trimestrais (ex.: a
-// linha "PA:2º Trimestre/2026" do DARF) — quem precisar marca como campo customizado.
+// Tipos disponíveis pro campo CUSTOMIZADO (nome livre) — sem cnpj/competencia/periodo_apuracao,
+// que só fazem sentido com o nome exato que os campos padrão acima já travam. Campo customizado é
+// só pra informação extra que o motor não precisa casar por nome (ex.: "numero_documento").
 const TIPOS_CAMPO = [
-  { tipo: 'cnpj', label: 'CNPJ' },
-  { tipo: 'competencia', label: 'Competência' },
-  { tipo: 'periodo_apuracao', label: 'Período de apuração (trimestral)' },
   { tipo: 'data', label: 'Data' },
   { tipo: 'moeda', label: 'Valor em dinheiro' },
   { tipo: 'texto', label: 'Texto livre' },
@@ -1379,10 +1492,13 @@ export default function DocumentModelForm() {
 
   useEffect(() => {
     if (!isEditing || !id) return
-    api.get(`/document-reader/modelos`).then((r) => {
-      const modelo = (r.data as { id: string; nome: string; obligationType: { id: string } }[]).find((m) => m.id === id)
-      if (modelo) { setNome(modelo.nome); setObligationTypeId(modelo.obligationType.id) }
-    })
+    api.get(`/document-reader/modelos`)
+      .then((r) => {
+        const modelo = (r.data as { id: string; nome: string; obligationType: { id: string } }[]).find((m) => m.id === id)
+        if (modelo) { setNome(modelo.nome); setObligationTypeId(modelo.obligationType.id) }
+        else toast.error('Modelo não encontrado')
+      })
+      .catch((err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao carregar modelo')))
   }, [isEditing, id])
 
   const analisarMutation = useMutation({
@@ -1426,31 +1542,62 @@ export default function DocumentModelForm() {
 
   const paginaAtual = extraido?.paginas[pagina]
 
+  // O backend rejeita x/y/w/h fora de [0,1] (document-reader-models.schema.ts). O pdf.js já
+  // normaliza nessa faixa, mas arredondamento de ponto flutuante pode passar de 1 por uma
+  // fração mínima — clampar aqui evita um 400 no Salvar por causa de um item legítimo.
+  const clamp01 = (n: number) => Math.min(1, Math.max(0, n))
+
+  // A validação com conjunto separado da Task 15 do Plano A já mostrou o motor perder campos em
+  // variações pequenas de layout (ex.: CNPJ com nome de filial mais longo empurra o texto um
+  // pouco pra fora da zona marcada). O clique do admin marca o tamanho EXATO do item nesse PDF de
+  // amostra — sem folga, qualquer documento real um pouco diferente já cai fora. MARGEM_ZONA
+  // expande w/h em 20% (10% de cada lado) ao redor do item clicado, igual intenção da margem fixa
+  // que `textoDaZona` (engine/zonal.ts) já aplica no motor, mas proporcional ao tamanho do campo
+  // em vez de um valor fixo de página — campos maiores (ex. nome) precisam de mais folga que
+  // campos pequenos (ex. CNPJ).
+  const MARGEM_ZONA = 0.1
+  function expandirZona(item: DocumentoExtraidoItem) {
+    const mx = item.w * MARGEM_ZONA
+    const my = item.h * MARGEM_ZONA
+    return {
+      x: clamp01(item.x - mx),
+      y: clamp01(item.y - my),
+      w: clamp01(item.w + mx * 2),
+      h: clamp01(item.h + my * 2),
+    }
+  }
+
   function aoClicarItem(item: DocumentoExtraidoItem) {
     if (!alvo) return
     if (alvo.modo === 'ancora') {
+      const x = clamp01(item.x)
+      const y = clamp01(item.y)
       const existe = ancoras.some((a) => a.texto === item.str && a.pagina === (paginaAtual?.numero ?? 1))
       if (existe) {
         setAncoras(ancoras.filter((a) => !(a.texto === item.str && a.pagina === (paginaAtual?.numero ?? 1))))
       } else {
-        setAncoras([...ancoras, { texto: item.str, pagina: paginaAtual?.numero ?? 1, x: item.x, y: item.y }])
+        setAncoras([...ancoras, { texto: item.str, pagina: paginaAtual?.numero ?? 1, x, y }])
       }
       return
     }
+    const { x, y, w, h } = expandirZona(item)
     setZonas([
       ...zonas.filter((z) => z.campo !== alvo.campo),
-      { campo: alvo.campo, pagina: paginaAtual?.numero ?? 1, x: item.x, y: item.y, w: item.w, h: item.h, tipo: alvo.tipo },
+      { campo: alvo.campo, pagina: paginaAtual?.numero ?? 1, x, y, w, h, tipo: alvo.tipo },
     ])
     setAlvo(null)
   }
 
   const campoJaMarcado = (campo: string) => zonas.some((z) => z.campo === campo)
   // Mesma regra de validarCamposObrigatorios() no backend (document-reader-models.service.ts,
-  // Task 3): competencia OU qualquer campo do tipo periodo_apuracao serve — nunca exigir só
-  // "competencia" literal, senão um modelo trimestral (campo customizado tipo periodo_apuracao)
-  // nunca habilitaria o botão Salvar apesar de o backend aceitar.
-  const temPeriodo = campoJaMarcado('competencia') || zonas.some((z) => z.tipo === 'periodo_apuracao')
-  const podeSalvar = nome.trim() && obligationTypeId && ancoras.length > 0 && campoJaMarcado('cnpj') && temPeriodo
+  // Task 3, corrigida pra exigir nome E tipo juntos — o motor lê os campos por nome literal, não
+  // por tipo): "cnpj"/tipo cnpj é obrigatório; "competencia"/tipo competencia OU "pa"/tipo
+  // periodo_apuracao serve pro período. Os botões de CAMPOS_PADRAO acima já travam nome+tipo
+  // juntos, então checar só o nome do campo aqui já basta (campo customizado nunca usa esses
+  // nomes — ver TIPOS_CAMPO).
+  const temCnpj = zonas.some((z) => z.campo === 'cnpj' && z.tipo === 'cnpj')
+  const temPeriodo = zonas.some((z) => (z.campo === 'competencia' && z.tipo === 'competencia') || (z.campo === 'pa' && z.tipo === 'periodo_apuracao'))
+  const podeSalvar = nome.trim() && obligationTypeId && ancoras.length > 0 && temCnpj && temPeriodo
 
   return (
     <div className="p-4 md:p-6 max-w-6xl">
@@ -1512,7 +1659,16 @@ export default function DocumentModelForm() {
             >
               {paginaAtual?.itens.map((item, i) => {
                 const ehAncora = ancoras.some((a) => a.texto === item.str && a.pagina === (paginaAtual?.numero ?? 1))
-                const zonaDoItem = zonas.find((z) => z.pagina === (paginaAtual?.numero ?? 1) && Math.abs(z.x - item.x) < 0.005 && Math.abs(z.y - item.y) < 0.005)
+                // zona.x/y/w/h não são mais os mesmos do item clicado (expandirZona adiciona
+                // MARGEM_ZONA) — achar pelo centro do item caindo dentro do retângulo da zona, não
+                // por igualdade de coordenada.
+                const cx = item.x + item.w / 2
+                const cy = item.y + item.h / 2
+                const zonaDoItem = zonas.find((z) =>
+                  z.pagina === (paginaAtual?.numero ?? 1) &&
+                  cx >= z.x && cx <= z.x + z.w &&
+                  cy >= z.y && cy <= z.y + z.h
+                )
                 return (
                   <div
                     key={i}
@@ -1660,9 +1816,10 @@ Com os serviços locais já de pé (Task 7, Step 4):
    existir localmente, ou qualquer PDF com CNPJ e competência visíveis).
 3. Preencha o nome, crie uma obrigação nova pelo botão "+ Nova".
 4. Marque 1 âncora (um texto do cabeçalho) e os campos CNPJ e Competência.
-5. Teste também "+ Campo customizado" com tipo "Período de apuração (trimestral)" — confirme que
-   aparece na lista de campos marcados e que o botão Salvar não exige mais "Competência" quando
-   esse campo substitui ela (ambos nunca precisam coexistir).
+5. Teste também o botão padrão "Período (trimestral)" (campo fixo `pa`/tipo `periodo_apuracao` —
+   não é um campo customizado, ver nota em CAMPOS_PADRAO no Step 1) — confirme que aparece na lista
+   de campos marcados e que o botão Salvar não exige mais "Competência" quando esse campo
+   substitui ela (ambos nunca precisam coexistir, mas um dos dois é obrigatório).
 6. Clique "Salvar modelo" — confirme o toast de sucesso e que o modelo aparece na lista.
 7. Edite o modelo recém-criado — confirme que o form abre com nome/obrigação preenchidos.
 8. Arquive o modelo pela lista — confirme que ele some.
@@ -1680,6 +1837,7 @@ git commit -m "feat(document-reader): marcação de âncoras/campos e salvar mod
 
 **Files:**
 - Modify: `docs/TASKS.md`
+- Modify: `docs/tech-debt.md`
 
 - [ ] **Step 1: Marcar o item 6 do roadmap como concluído (Planos A + B)**
 
@@ -1693,17 +1851,29 @@ Em `docs/TASKS.md`, localize a entrada do item 6 (já marcada `[~]` desde o Plan
   `docs/superpowers/specs/2026-10-16-modelagem-documentos-design.md` e este plano.
 - Atualize a linha "Próximo passo" no fim do arquivo — o Plano B deixa de estar pendente.
 
-- [ ] **Step 2: Suíte completa da API**
+- [ ] **Step 2: Registrar débito técnico do `/analisar` síncrono**
+
+Em `docs/tech-debt.md`, adicione:
+
+```markdown
+- **`POST /document-reader/modelos/analisar`** roda `extrairDocumento` (parsing de PDF via pdf.js)
+  direto no event loop da API, em vez de via fila BullMQ como o Plano A faz pro upload real
+  (`document-reader.worker.ts`). Aceitável pro v1: rota só acessível a `ORG_ADMIN`, PDF de amostra
+  limitado a 20MB, sem persistência. Revisitar se virar vetor de lentidão (muitos admins
+  modelando ao mesmo tempo) ou de negação de serviço.
+```
+
+- [ ] **Step 4: Suíte completa da API**
 
 Run: `pnpm --filter api test`
 Expected: tudo passando, sem regressão nos módulos existentes.
 
-- [ ] **Step 3: Suíte completa do frontend**
+- [ ] **Step 5: Suíte completa do frontend**
 
 Run: `pnpm --filter web test`
 Expected: tudo passando.
 
-- [ ] **Step 4: Typecheck dos dois workspaces**
+- [ ] **Step 6: Typecheck dos dois workspaces**
 
 ```bash
 pnpm --filter api exec tsc --noEmit
@@ -1712,14 +1882,14 @@ pnpm --filter web exec tsc --noEmit
 
 Expected: sem erros.
 
-- [ ] **Step 5: Build de produção do frontend**
+- [ ] **Step 7: Build de produção do frontend**
 
 Run: `pnpm --filter web build`
 Expected: build concluído sem erros.
 
-- [ ] **Step 6: Commit final**
+- [ ] **Step 8: Commit final**
 
 ```bash
-git add docs/TASKS.md
+git add docs/TASKS.md docs/tech-debt.md
 git commit -m "docs: marca modelagem de documentos (Plano B) como concluída"
 ```
