@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Card } from '@/components/ui/card'
-import { Settings, Bell, CreditCard, Building2, UserCog, Repeat, FileStack, Zap } from 'lucide-react'
+import { Settings, Bell, CreditCard, Building2, UserCog, Repeat, FileStack, Zap, FileText } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { FailedGeneration } from '@/types'
 
@@ -36,6 +36,7 @@ export default function SettingsHub() {
     { to: '/app/settings/client-users', icon: <UserCog size={20} />, title: 'Usuários de Cliente', description: 'Acessos do portal do cliente', roles: MANAGER_ROLES },
     { to: '/app/settings/recurring-templates', icon: <Repeat size={20} />, title: 'Tarefas Recorrentes', description: 'Templates de geração automática', roles: ADMIN_ROLES },
     { to: '/app/settings/os-templates', icon: <FileStack size={20} />, title: 'Templates de OS', description: 'Modelos de ordem de serviço', roles: ADMIN_ROLES },
+    { to: '/app/settings/document-models', icon: <FileText size={20} />, title: 'Modelos de Documento', description: 'Ensina o robô a reconhecer o layout dos seus documentos', roles: ADMIN_ROLES },
     { to: '/app/settings/recurring-generation', icon: <Zap size={20} />, title: 'Geração manual', description: 'Rodar geração de tarefas recorrentes fora do ciclo automático', roles: ADMIN_ROLES, badge: failures.length },
   ]
 

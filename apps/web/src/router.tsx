@@ -33,6 +33,7 @@ import Processes from '@/pages/app/Processes'
 import Requests from '@/pages/app/Requests'
 import Tasks from '@/pages/app/Tasks'
 import DocumentReaderQueue from '@/pages/app/document-reader/ReviewQueue'
+import DocumentModels from '@/pages/app/settings/DocumentModels'
 
 const PortalLayout = lazy(() => import('@/pages/portal/Layout'))
 const PortalBoards = lazy(() => import('@/pages/portal/Boards'))
@@ -185,6 +186,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <OSTemplates />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/document-models',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <DocumentModels />
           </ProtectedRoute>
         ),
       },

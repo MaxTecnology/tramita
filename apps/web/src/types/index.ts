@@ -334,3 +334,32 @@ export interface ReceivedDocument {
   task: { id: string; title: string; competence: string | null; client: { name: string } } | null
   createdAt: string
 }
+
+export interface DocumentModelListItem {
+  id: string
+  nome: string
+  version: number
+  createdAt: string
+  isGlobal: boolean
+  obligationType: { id: string; name: string }
+}
+
+export interface DocumentoExtraidoItem {
+  str: string
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface DocumentoExtraidoPagina {
+  numero: number
+  largura?: number
+  altura?: number
+  itens: DocumentoExtraidoItem[]
+}
+
+export interface DocumentoExtraido {
+  paginas: DocumentoExtraidoPagina[]
+  temTexto: boolean
+}
