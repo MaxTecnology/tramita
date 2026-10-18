@@ -313,3 +313,8 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   chamada direta à API.
 - **`purgeRejectedDocuments`** aborta o laço inteiro se um `deleteFile` falhar no meio (documentos
   seguintes da mesma execução não são expurgados), e não loga via Pino.
+- **`POST /document-reader/modelos/analisar`** roda `extrairDocumento` (parsing de PDF via pdf.js)
+  direto no event loop da API, em vez de via fila BullMQ como o Plano A faz pro upload real
+  (`document-reader.worker.ts`). Aceitável pro v1: rota só acessível a `ORG_ADMIN`, PDF de amostra
+  limitado a 20MB, sem persistência. Revisitar se virar vetor de lentidão (muitos admins
+  modelando ao mesmo tempo) ou de negação de serviço.

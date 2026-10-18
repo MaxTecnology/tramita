@@ -298,7 +298,7 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
    templates default, UI de Notificações, UI de Templates). Ver
    `docs/superpowers/specs/2026-10-08-evolucao-solicitacoes-os-design.md` e
    `docs/superpowers/plans/2026-10-08-evolucao-solicitacoes-os-plan.md`.
-6. [~] **Automação de documentos fiscais — Plano A: pipeline central concluído** (concluído em 2026-10-15) —
+6. [x] **Automação de documentos fiscais — Plano A: pipeline central concluído** (concluído em 2026-10-15) —
    motor de leitura portado da POC (`apps/api/src/modules/document-reader/engine/`), determinístico
    (âncoras + zonas + validadores de CNPJ/CPF/data/competência), sem IA no caminho principal.
    Pipeline dividido em extração pura (`extrairEInterpretar`, sem banco) e decisão (`decidir`, recebe
@@ -333,9 +333,35 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
    `DocumentModel` fica como follow-up, não é bug de código. **OCR de imagem** deliberadamente
    fora deste v1 (documentos em imagem ficam `nao_identificado`) — próxima fase imediata depois
    deste plano, não indefinidamente adiada. **Plano B (tela de cadastro/modelagem de
-   `DocumentModel` pelo `ORG_ADMIN`) ainda pendente** — v1 só semeia os modelos globais via script.
+   `DocumentModel` pelo `ORG_ADMIN`) concluído nesta mesma entrada**, ver abaixo.
    Ver `docs/superpowers/specs/2026-10-15-automacao-documentos-fiscais-design.md` e
    `docs/superpowers/plans/2026-10-15-automacao-documentos-fiscais-plan-a.md`.
+
+   **Plano B — tela de modelagem** (concluído em 2026-10-18): `ORG_ADMIN` sobe um PDF de amostra
+   em `/app/settings/document-models/new` (ou `/:id/edit`), a página reconstrói o texto já
+   extraído como elementos clicáveis posicionados em `absolute` — sem renderizar o PDF como
+   imagem/canvas, reusando `extrairDocumento` do Plano A direto no buffer do upload
+   (`POST /document-reader/modelos/analisar`, nada persistido) — e o admin marca âncoras (textos
+   fixos) e campos (CNPJ, Competência, Período/`pa` trimestral, Vencimento, Valor, ou um campo
+   customizado) clicando nos itens. `ObligationType` pode ser criado inline (só o nome; o `code`
+   é derivado automaticamente, com NFD pra não quebrar acento — "Férias" → "FERIAS", não
+   "FRIAS"). O motor (`engine/pipeline.ts`) lê competência/período pelo NOME literal do campo
+   (`"competencia"` ou `"pa"`), não pelo tipo — por isso a validação do modelo exige nome E tipo
+   juntos, não só um campo do tipo certo com qualquer nome. Zonas marcadas ganham 10% de folga
+   por lado (`MARGEM_ZONA`) ao redor do item clicado, mitigando a mesma brittleness que a
+   validação com conjunto separado do Plano A já expôs pra empresas multi-filial. Salvo como
+   `DocumentModel` sempre privado da org (nunca global — `organizationId` vem sempre do actor);
+   `PATCH`/`DELETE` (soft-delete via `isActive`) checam escopo com 404, nunca revelando que um
+   modelo de outra org existe. Durante a preparação deste plano foi encontrado e corrigido um bug
+   de produção do Plano A: `carregarModelosDaOrg` gravava `{ id: r.id, ...definicao }`, deixando
+   um `id` próprio dentro do JSON `definicao` (presente nos 4 seeds globais) sobrescrever o cuid
+   real por ordem de spread — corrigido invertendo a ordem (commit `e31b5b2`). Fora de escopo v1
+   (deferido de propósito, ver spec): sugestão automática de âncoras, teste ao vivo do rascunho,
+   análise de impacto contra documentos já recebidos, clonar modelo global, histórico de versões.
+   `/analisar` roda o parsing síncrono no event loop da API (não via fila BullMQ como o upload
+   real) — registrado como débito técnico aceito pro v1, não redesenho (ver `docs/tech-debt.md`).
+   Ver `docs/superpowers/specs/2026-10-16-modelagem-documentos-design.md` e
+   `docs/superpowers/plans/2026-10-16-modelagem-documentos-plan.md`.
 7. [x] **Protocolo digital com validade jurídica + IP** (concluído em 2026-10-12) —
    `Protocol`/`ProtocolEvent` (log append-only, mesmo padrão de `TaskHistory`/`NotificationLog`)
    pra documentos ou avisos formais com vencimento (ex: guia de imposto). Número sequencial por
@@ -361,7 +387,7 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
 8. [x] **Usuários de cliente com acesso por departamento** (concluído em 2026-09-21) — `ClientUser`/`ClientUserAccess`, login do portal desacoplado de `Client`, `Task.departmentId` obrigatório. Um `ClientUser` (pessoa) pode acessar mais de uma empresa (`Client`), com escopo de departamento por empresa; rotas de portal (`requests`, `tasks`, `documents`) agora exigem `clientId` explícito e validam contra o escopo de acesso do usuário. Tela dedicada de Usuários de Cliente (CRUD + reaproveitamento de usuário existente ao cadastrar empresa), seletor de empresa no portal quando há mais de uma. Ver `docs/superpowers/sdd/2026-09-21-client-users/`.
 9. [x] **Kanban dinâmico, Templates de OS e código do cliente** (concluído em 2026-09-22) — coluna passa a ter `statusEffect` (`NONE`/`OPEN`/`STARTED`/`BLOCKED`/`DISREGARDED`/`DONE`, aplica o status na tarefa ao entrar na coluna) e `notifyClient` (notifica o cliente ao mover pra essa coluna, independente do toggle global da org), substituindo o antigo `isFinal`; `TaskStatus` ganha o valor `STARTED`. `OSTemplate`/`OSTemplateColumn`/`OSTemplateColumnDocument` (CRUD em `/os-templates`, `ORG_ADMIN` pra mutação) definem de uma vez as colunas (com `statusEffect`/`notifyClient`/checklist de documentos) que um board nasce com, usado tanto em `POST /boards` quanto em `POST /requests/:id/approve` (modo `NEW_BOARD`, template escolhido pelo cliente ao abrir a Solicitação via `GET /portal/os-templates`). `Client.codigo` — identificador curto opcional usado na busca e como prefixo do título do board criado a partir de uma Solicitação aprovada. `RecurringTaskAssignment` simplificado (vínculo direto por cliente, sem exigir board/coluna pré-existentes — board/coluna foram removidos do vínculo, não tornados diretos) e board oculto `RECURRING_SYSTEM` como "casa" das Tarefas Recorrentes sem processo. `GET /tasks` — listagem flat e filtrável (cliente, responsável, departamento, status, template recorrente, período, busca textual) atravessando todos os boards da org, inclusive o `RECURRING_SYSTEM`; base da tela unificada Tarefas (alternância Lista/Kanban dinâmico agrupado por status, cruzando tarefas de clientes diferentes). Frontend: telas de gestão de Templates de OS e Lista de OS, `Client.codigo` nos formulários/lista de clientes, seletor de tipo de solicitação (Template de OS) no portal. Ver `docs/superpowers/specs/2026-09-22-kanban-os-recorrente-redesign.md` e `docs/superpowers/plans/2026-09-22-kanban-os-recorrente-redesign.md`.
 
-Próximo passo: item 6 do roadmap (automação de documentos fiscais) com o Plano A (pipeline
-central) concluído — resta o Plano B (tela de modelagem/cadastro de `DocumentModel` pelo
-`ORG_ADMIN`), a planejar depois. Schema-por-tenant também fica como consideração arquitetural
-separada, não agendada (ver `project_schema_per_tenant_consideration.md` na memória).
+Próximo passo: item 6 do roadmap (automação de documentos fiscais) concluído, Plano A e Plano B.
+Nenhum sub-projeto do roadmap de Fase 10 está em aberto no momento — próximo item a decidir com o
+usuário. Schema-por-tenant fica como consideração arquitetural separada, não agendada (ver
+`project_schema_per_tenant_consideration.md` na memória).
