@@ -95,11 +95,15 @@ Lista modelos da própria org + globais, com indicação de qual é qual.
 Response 200:
 [
   { "id": "...", "nome": "DARF Receita Federal", "obligationType": { "id": "...", "name": "IRPJ" },
-    "isGlobal": true, "isActive": true, "version": 1 },
+    "isGlobal": true, "version": 1, "createdAt": "2026-10-15T12:00:00.000Z" },
   { "id": "...", "nome": "Recibo RH", "obligationType": { "id": "...", "name": "Recibo de Pagamento" },
-    "isGlobal": false, "isActive": true, "version": 2 }
+    "isGlobal": false, "version": 2, "createdAt": "2026-10-18T09:30:00.000Z" }
 ]
 ```
+
+Sem `isActive` na resposta — a lista já só traz modelos ativos (`listarModelos` filtra
+`isActive: true` na query), então o campo seria sempre `true` e redundante. `createdAt` entra no
+lugar, já que o backend sempre devolveu esse campo (ver `document-reader-models.service.ts`).
 
 ### `POST /document-reader/modelos`
 

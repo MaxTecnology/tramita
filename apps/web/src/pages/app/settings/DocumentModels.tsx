@@ -6,11 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Plus, Pencil, Trash2, FileText, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import { mensagemDeErro } from '@/lib/utils'
 import type { DocumentModelListItem } from '@/types'
-
-function mensagemDeErro(err: unknown, padrao: string): string {
-  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? padrao
-}
 
 export default function DocumentModels() {
   const qc = useQueryClient()

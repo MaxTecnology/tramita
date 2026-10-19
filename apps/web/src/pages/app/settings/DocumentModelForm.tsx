@@ -8,20 +8,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import { mensagemDeErro } from '@/lib/utils'
 import type { DocumentoExtraido, DocumentoExtraidoItem, ObligationType } from '@/types'
 
-function mensagemDeErro(err: unknown, padrao: string): string {
-  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? padrao
-}
-
 interface Ancora { texto: string; pagina: number; x: number; y: number }
-interface Zona { campo: string; pagina: number; x: number; y: number; w: number; h: number; tipo: string; opcional?: boolean }
+// Mesmo union do backend (zonaSchema.tipo em document-reader-models.schema.ts).
+type TipoCampo = 'cnpj' | 'data' | 'competencia' | 'periodo_apuracao' | 'moeda' | 'texto'
+interface Zona { campo: string; pagina: number; x: number; y: number; w: number; h: number; tipo: TipoCampo; opcional?: boolean }
 
 // O motor (engine/pipeline.ts) lê o período pelo NOME literal do campo — "pa" ou "competencia" —
 // não pelo tipo. Por isso "Período (trimestral)" é um 5º campo PADRÃO com nome travado em "pa",
 // não um tipo disponível no campo customizado abaixo: um campo customizado chamado "trimestre" do
 // tipo periodo_apuracao nunca seria lido pelo motor, porque ele nunca olha uma chave "trimestre".
-const CAMPOS_PADRAO: { campo: string; label: string; tipo: string }[] = [
+const CAMPOS_PADRAO: { campo: string; label: string; tipo: TipoCampo }[] = [
   { campo: 'cnpj', label: 'CNPJ', tipo: 'cnpj' },
   { campo: 'competencia', label: 'Competência', tipo: 'competencia' },
   { campo: 'pa', label: 'Período (trimestral)', tipo: 'periodo_apuracao' },
@@ -32,13 +31,18 @@ const CAMPOS_PADRAO: { campo: string; label: string; tipo: string }[] = [
 // Tipos disponíveis pro campo CUSTOMIZADO (nome livre) — sem cnpj/competencia/periodo_apuracao,
 // que só fazem sentido com o nome exato que os campos padrão acima já travam. Campo customizado é
 // só pra informação extra que o motor não precisa casar por nome (ex.: "numero_documento").
-const TIPOS_CAMPO = [
+const TIPOS_CAMPO: { tipo: TipoCampo; label: string }[] = [
   { tipo: 'data', label: 'Data' },
   { tipo: 'moeda', label: 'Valor em dinheiro' },
   { tipo: 'texto', label: 'Texto livre' },
-] as const
+]
 
-type Alvo = { modo: 'ancora' } | { modo: 'campo'; campo: string; tipo: string } | null
+// Nomes travados pelos campos padrão acima — um campo "customizado" com um desses nomes
+// substituiria silenciosamente a zona padrão (campoJaMarcado só olha o nome), derrubando
+// temCnpj/temPeriodo sem nenhuma explicação pro usuário. Bloqueado no input em vez disso.
+const NOMES_RESERVADOS = new Set(CAMPOS_PADRAO.map((c) => c.campo))
+
+type Alvo = { modo: 'ancora' } | { modo: 'campo'; campo: string; tipo: TipoCampo } | null
 
 export default function DocumentModelForm() {
   const { id } = useParams<{ id: string }>()
@@ -57,7 +61,7 @@ export default function DocumentModelForm() {
   const [zonas, setZonas] = useState<Zona[]>([])
   const [alvo, setAlvo] = useState<Alvo>(null)
   const [novoCampoNome, setNovoCampoNome] = useState('')
-  const [novoCampoTipo, setNovoCampoTipo] = useState<string>('texto')
+  const [novoCampoTipo, setNovoCampoTipo] = useState<TipoCampo>('texto')
   const [mostrarNovoCampo, setMostrarNovoCampo] = useState(false)
 
   const { data: obrigacoes = [], refetch: refetchObrigacoes } = useQuery<ObligationType[]>({
@@ -65,16 +69,24 @@ export default function DocumentModelForm() {
     queryFn: () => api.get('/document-reader/obrigacoes').then((r) => r.data),
   })
 
+  // Busca a lista inteira e filtra pelo id no cliente, em vez de um GET /modelos/:id dedicado —
+  // list já é pequena (modelos de uma org); ver Nota 2 do plano (Task 8) pra justificativa.
+  const { data: modelos, isError: erroAoCarregarModelo } = useQuery<{ id: string; nome: string; obligationType: { id: string } }[]>({
+    queryKey: ['document-models'],
+    queryFn: () => api.get('/document-reader/modelos').then((r) => r.data),
+    enabled: isEditing,
+  })
+
   useEffect(() => {
-    if (!isEditing || !id) return
-    api.get(`/document-reader/modelos`)
-      .then((r) => {
-        const modelo = (r.data as { id: string; nome: string; obligationType: { id: string } }[]).find((m) => m.id === id)
-        if (modelo) { setNome(modelo.nome); setObligationTypeId(modelo.obligationType.id) }
-        else toast.error('Modelo não encontrado')
-      })
-      .catch((err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao carregar modelo')))
-  }, [isEditing, id])
+    if (!modelos) return
+    const modelo = modelos.find((m) => m.id === id)
+    if (modelo) { setNome(modelo.nome); setObligationTypeId(modelo.obligationType.id) }
+    else toast.error('Modelo não encontrado')
+  }, [modelos, id])
+
+  useEffect(() => {
+    if (erroAoCarregarModelo) toast.error('Erro ao carregar modelo')
+  }, [erroAoCarregarModelo])
 
   const analisarMutation = useMutation({
     mutationFn: (file: File) => {
@@ -147,9 +159,12 @@ export default function DocumentModelForm() {
     if (alvo.modo === 'ancora') {
       const x = clamp01(item.x)
       const y = clamp01(item.y)
-      const existe = ancoras.some((a) => a.texto === item.str && a.pagina === (paginaAtual?.numero ?? 1))
+      // texto+pagina sozinhos colidem quando dois itens do PDF têm o mesmo texto na mesma
+      // página (ex.: cabeçalho repetido em tabela) — x/y do item clicado desempatam, já que
+      // dois itens nunca ocupam exatamente a mesma posição.
+      const existe = ancoras.some((a) => a.texto === item.str && a.pagina === (paginaAtual?.numero ?? 1) && a.x === x && a.y === y)
       if (existe) {
-        setAncoras(ancoras.filter((a) => !(a.texto === item.str && a.pagina === (paginaAtual?.numero ?? 1))))
+        setAncoras(ancoras.filter((a) => !(a.texto === item.str && a.pagina === (paginaAtual?.numero ?? 1) && a.x === x && a.y === y)))
       } else {
         setAncoras([...ancoras, { texto: item.str, pagina: paginaAtual?.numero ?? 1, x, y }])
       }
@@ -233,7 +248,7 @@ export default function DocumentModelForm() {
               style={{ aspectRatio: paginaAtual?.largura && paginaAtual?.altura ? `${paginaAtual.largura} / ${paginaAtual.altura}` : '210 / 297' }}
             >
               {paginaAtual?.itens.map((item, i) => {
-                const ehAncora = ancoras.some((a) => a.texto === item.str && a.pagina === (paginaAtual?.numero ?? 1))
+                const ehAncora = ancoras.some((a) => a.texto === item.str && a.pagina === (paginaAtual?.numero ?? 1) && a.x === clamp01(item.x) && a.y === clamp01(item.y))
                 // zona.x/y/w/h não são mais os mesmos do item clicado (expandirZona adiciona
                 // MARGEM_ZONA) — achar pelo centro do item caindo dentro do retângulo da zona, não
                 // por igualdade de coordenada.
@@ -327,9 +342,14 @@ export default function DocumentModelForm() {
               {mostrarNovoCampo ? (
                 <div className="space-y-1 pt-1">
                   <Input value={novoCampoNome} onChange={(e) => setNovoCampoNome(e.target.value)} placeholder="Nome do campo (ex: cota)" />
+                  {NOMES_RESERVADOS.has(novoCampoNome.trim().toLowerCase()) && (
+                    <p className="text-xs text-danger-text">
+                      "{novoCampoNome.trim()}" já é um campo padrão — use o botão "Marcar" dele acima.
+                    </p>
+                  )}
                   <select
                     value={novoCampoTipo}
-                    onChange={(e) => setNovoCampoTipo(e.target.value)}
+                    onChange={(e) => setNovoCampoTipo(e.target.value as TipoCampo)}
                     className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
                   >
                     {TIPOS_CAMPO.map((t) => <option key={t.tipo} value={t.tipo}>{t.label}</option>)}
@@ -337,7 +357,7 @@ export default function DocumentModelForm() {
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      disabled={!novoCampoNome.trim()}
+                      disabled={!novoCampoNome.trim() || NOMES_RESERVADOS.has(novoCampoNome.trim().toLowerCase())}
                       onClick={() => {
                         setAlvo({ modo: 'campo', campo: novoCampoNome.trim(), tipo: novoCampoTipo })
                         setMostrarNovoCampo(false)

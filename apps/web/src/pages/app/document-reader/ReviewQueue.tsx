@@ -4,10 +4,7 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import type { ReceivedDocument } from '@/types'
 import { toast } from 'sonner'
-
-function mensagemDeErro(err: unknown, padrao: string): string {
-  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? padrao
-}
+import { mensagemDeErro } from '@/lib/utils'
 
 interface ClientOption {
   id: string
