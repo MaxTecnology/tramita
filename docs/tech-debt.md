@@ -331,8 +331,10 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   `reabrirDocumento` que já existia (inclusive já recusava reabrir um documento expurgado pelo
   cron LGPD). Confirmado em QA manual: documento some de Rejeitados e reaparece em Processando na
   fila.
-- **`purgeRejectedDocuments`** aborta o laço inteiro se um `deleteFile` falhar no meio (documentos
-  seguintes da mesma execução não são expurgados), e não loga via Pino.
+- **`purgeRejectedDocuments`** aborta o laço inteiro se um `deleteFile` falhar no meio ✅ (resolvido
+  em 2026-10-19). Cada documento agora tem seu próprio try/catch — uma falha (B2 fora do ar) loga
+  via Pino (`logger.error`) e segue pro próximo; o que falhou continua íntegro (storageKey nunca
+  vira `''`) pra tentar de novo na execução seguinte do cron.
 - **`POST /document-reader/modelos/analisar`** roda `extrairDocumento` (parsing de PDF via pdf.js)
   direto no event loop da API, em vez de via fila BullMQ como o Plano A faz pro upload real
   (`document-reader.worker.ts`). Aceitável pro v1: rota só acessível a `ORG_ADMIN`, PDF de amostra

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 import { purgeRejectedDocuments } from './document-reader-purge.cron'
 import { createTestPlan, createTestOrg, createTestUser } from '@/test/helpers'
 
@@ -65,6 +66,38 @@ describe('purgeRejectedDocuments', () => {
     expect(segunda).toBe(0)
     const deleteFileSpy = await import('@/lib/b2')
     expect(deleteFileSpy.deleteFile).toHaveBeenCalledTimes(1)
+  })
+
+  it('não aborta o laço inteiro se um deleteFile falhar no meio — continua pros documentos seguintes', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const falha = await prisma.receivedDocument.create({
+      data: {
+        organizationId: org.id, fileHash: 'h-falha', storageKey: 'k-falha', uploadedById: admin.id,
+        status: 'REJECTED', reviewedAt: new Date(Date.UTC(2026, 8, 1)),
+      },
+    })
+    const sucesso = await prisma.receivedDocument.create({
+      data: {
+        organizationId: org.id, fileHash: 'h-sucesso', storageKey: 'k-sucesso', uploadedById: admin.id,
+        status: 'REJECTED', reviewedAt: new Date(Date.UTC(2026, 8, 2)),
+      },
+    })
+    const b2 = await import('@/lib/b2')
+    vi.mocked(b2.deleteFile).mockImplementation((key: string) =>
+      key === 'k-falha' ? Promise.reject(new Error('B2 fora do ar')) : Promise.resolve(),
+    )
+    const logSpy = vi.spyOn(logger, 'error').mockImplementation(() => {})
+
+    const count = await purgeRejectedDocuments(new Date(Date.UTC(2026, 9, 15)))
+
+    expect(count).toBe(1) // só o que deu certo
+    expect(logSpy).toHaveBeenCalled()
+    const aindaNaoExpurgado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: falha.id } })
+    expect(aindaNaoExpurgado.storageKey).toBe('k-falha') // continua íntegro, pra tentar de novo amanhã
+    const expurgado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: sucesso.id } })
+    expect(expurgado.storageKey).toBe('')
   })
 
   it('não mexe em PENDING/NOT_IDENTIFIED, mesmo antigo — é trabalho em aberto', async () => {

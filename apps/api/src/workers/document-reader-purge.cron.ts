@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { bullmqRedis } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import { deleteFile } from '@/lib/b2'
+import { logger } from '@/lib/logger'
 
 const DIAS_RETENCAO_REJECTED = 30
 
@@ -16,12 +17,21 @@ export async function purgeRejectedDocuments(now: Date = new Date()): Promise<nu
     select: { id: true, storageKey: true },
   })
 
+  let expurgados = 0
   for (const doc of expirados) {
-    await deleteFile(doc.storageKey)
-    await prisma.receivedDocument.update({ where: { id: doc.id }, data: { extractedFields: Prisma.JsonNull, storageKey: '' } })
+    // Um deleteFile que falha (B2 fora do ar, timeout) não pode travar os documentos seguintes da
+    // mesma execução — eles continuam íntegros (storageKey nunca vira '') pra tentar de novo na
+    // próxima execução do cron, amanhã.
+    try {
+      await deleteFile(doc.storageKey)
+      await prisma.receivedDocument.update({ where: { id: doc.id }, data: { extractedFields: Prisma.JsonNull, storageKey: '' } })
+      expurgados++
+    } catch (err) {
+      logger.error({ err, receivedDocumentId: doc.id, storageKey: doc.storageKey }, 'Falha ao expurgar ReceivedDocument REJECTED (LGPD)')
+    }
   }
 
-  return expirados.length
+  return expurgados
 }
 
 export async function startDocumentReaderPurgeCronWorker() {
