@@ -36,6 +36,63 @@ describe('POST /document-reader/obrigacoes', () => {
   })
 })
 
+describe('POST /document-reader/modelos/analisar — validação e role', () => {
+  it('lança 400 quando nenhum arquivo é enviado', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+    const boundary = 'boundary-sem-arquivo'
+    const body = Buffer.from(`--${boundary}--`)
+
+    const res = await app.inject({
+      method: 'POST', url: '/document-reader/modelos/analisar',
+      headers: { authorization: auth, 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: body,
+    })
+
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('lança 422 quando o arquivo não é PDF', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+    const boundary = 'boundary-nao-pdf'
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="foto.png"\r\nContent-Type: image/png\r\n\r\n`),
+      Buffer.from('não é um pdf'),
+      Buffer.from(`\r\n--${boundary}--`),
+    ])
+
+    const res = await app.inject({
+      method: 'POST', url: '/document-reader/modelos/analisar',
+      headers: { authorization: auth, 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: body,
+    })
+
+    expect(res.statusCode).toBe(422)
+  })
+
+  it('ORG_MEMBER não pode analisar PDF de amostra (403)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const auth = await getAuthHeader(member.email, 'Test@1234')
+    const boundary = 'boundary-member-analisar'
+    const body = Buffer.from(`--${boundary}--`)
+
+    const res = await app.inject({
+      method: 'POST', url: '/document-reader/modelos/analisar',
+      headers: { authorization: auth, 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: body,
+    })
+
+    expect(res.statusCode).toBe(403)
+  })
+})
+
 describe('POST /document-reader/modelos/analisar', () => {
   it('devolve os itens de texto extraídos do PDF enviado', async () => {
     const plan = await createTestPlan()
@@ -58,6 +115,29 @@ describe('POST /document-reader/modelos/analisar', () => {
 
     expect(res.statusCode).toBe(200)
     expect(JSON.parse(res.body).temTexto).toBe(true)
+  })
+
+  it('lança 413 com mensagem em pt-BR quando o PDF excede 20MB', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+    const arquivoGrande = Buffer.alloc(21 * 1024 * 1024, 0)
+    const boundary = 'boundary-modelagem-grande'
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="grande.pdf"\r\nContent-Type: application/pdf\r\n\r\n`),
+      arquivoGrande,
+      Buffer.from(`\r\n--${boundary}--`),
+    ])
+
+    const res = await app.inject({
+      method: 'POST', url: '/document-reader/modelos/analisar',
+      headers: { authorization: auth, 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: body,
+    })
+
+    expect(res.statusCode).toBe(413)
+    expect(JSON.parse(res.body).message).toBe('Arquivo excede o limite de 20MB')
   })
 })
 
@@ -98,5 +178,16 @@ describe('GET/POST/PATCH/DELETE /document-reader/modelos', () => {
 
     const listaDepois = await app.inject({ method: 'GET', url: '/document-reader/modelos', headers: { authorization: auth } })
     expect(JSON.parse(listaDepois.body).map((m: { id: string }) => m.id)).not.toContain(modeloId)
+  })
+
+  it('ORG_MEMBER não pode listar modelos (403) — hook global vale pra leitura também', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const auth = await getAuthHeader(member.email, 'Test@1234')
+
+    const res = await app.inject({ method: 'GET', url: '/document-reader/modelos', headers: { authorization: auth } })
+
+    expect(res.statusCode).toBe(403)
   })
 })

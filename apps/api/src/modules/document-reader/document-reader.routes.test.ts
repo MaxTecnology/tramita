@@ -29,6 +29,29 @@ describe('POST /document-reader/upload', () => {
     expect(res.statusCode).toBe(201)
     expect(JSON.parse(res.body).status).toBe('PENDING')
   })
+
+  it('lança 413 com mensagem em pt-BR quando o PDF excede 20MB', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const auth = await getAuthHeader(member.email, 'Test@1234')
+    const arquivoGrande = Buffer.alloc(21 * 1024 * 1024, 0)
+    const boundary = 'boundary-doc-reader-grande'
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="grande.pdf"\r\nContent-Type: application/pdf\r\n\r\n`),
+      arquivoGrande,
+      Buffer.from(`\r\n--${boundary}--`),
+    ])
+
+    const res = await app.inject({
+      method: 'POST', url: '/document-reader/upload',
+      headers: { authorization: auth, 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: body,
+    })
+
+    expect(res.statusCode).toBe(413)
+    expect(JSON.parse(res.body).message).toBe('Arquivo excede o limite de 20MB')
+  })
 })
 
 describe('GET /document-reader/fila', () => {

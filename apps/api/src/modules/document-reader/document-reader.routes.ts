@@ -36,8 +36,21 @@ export async function documentReaderRoutes(app: FastifyInstance) {
       throw new AppError(422, 'Só PDF é aceito')
     }
 
-    const buffer = await file.toBuffer()
-    if (buffer.length > MAX_FILE_SIZE) throw new AppError(413, 'Arquivo excede o limite de 20MB')
+    // file.toBuffer() é onde o @fastify/multipart de fato lança o estouro de limite
+    // (FST_REQ_FILE_TOO_LARGE, lido do stream durante a leitura) — request.file() só abre o
+    // stream, não lê o conteúdo. Por isso o try/catch precisa envolver o toBuffer(), não só o
+    // request.file() acima; sem isso o erro cru do plugin (413, mensagem em inglês) vazava pro
+    // cliente.
+    let buffer: Buffer
+    try {
+      buffer = await file.toBuffer()
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number; code?: string }
+      if (e?.statusCode === 413 || e?.code === 'FST_REQ_FILE_TOO_LARGE') {
+        throw new AppError(413, 'Arquivo excede o limite de 20MB')
+      }
+      throw err
+    }
 
     const doc = await ingerirDocumento(request.user.organizationId!, { id: request.user.sub }, {
       filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer,
