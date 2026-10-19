@@ -57,6 +57,18 @@ describe('criarObligationType', () => {
     // Sem NFD antes do replace, "É" inteiro seria removido (fora de [A-Z0-9-]) -> "FRIAS".
     expect(obrigacao.code).toBe('FERIAS')
   })
+
+  it('colapsa hífens duplos em um só quando o nome tem separador fora de [A-Z0-9-]', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+
+    const obrigacao = await criarObligationType(org.id, { id: admin.id }, { code: 'Folha / Pagamento', name: 'Folha / Pagamento' })
+
+    // "/" vira espaço-replace-hífen dos dois lados ("FOLHA-/-PAGAMENTO"), depois "/" some por
+    // não estar em [A-Z0-9-] -> "FOLHA--PAGAMENTO" sem o colapso.
+    expect(obrigacao.code).toBe('FOLHA-PAGAMENTO')
+  })
 })
 
 describe('analisarPdfParaModelagem', () => {
@@ -333,6 +345,23 @@ describe('atualizarModelo', () => {
 
     await expect(atualizarModelo(modeloDeOutraOrg.id, org.id, {
       nome: 'Tentativa', obligationTypeId: modeloDeOutraOrg.obligationTypeId,
+      ancoras: [{ texto: 'Fixo', pagina: 1, x: 0.1, y: 0.05 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+        { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+      ],
+    })).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  it('lança 404 ao tentar editar um modelo já arquivado', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const modelo = await setupModeloPrivado(org.id, admin.id)
+    await prisma.documentModel.update({ where: { id: modelo.id }, data: { isActive: false } })
+
+    await expect(atualizarModelo(modelo.id, org.id, {
+      nome: 'Tentativa', obligationTypeId: modelo.obligationTypeId,
       ancoras: [{ texto: 'Fixo', pagina: 1, x: 0.1, y: 0.05 }],
       zonas: [
         { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },

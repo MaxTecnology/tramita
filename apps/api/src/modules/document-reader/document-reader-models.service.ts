@@ -19,6 +19,10 @@ function normalizarCodigo(code: string): string {
     .toUpperCase()
     .replace(/\s+/g, '-')
     .replace(/[^A-Z0-9-]/g, '')
+    // Um separador como "/" vira hífen dos dois lados (do \s+ em volta dele) e depois some por
+    // não estar em [A-Z0-9-], deixando "--" — colapsa em um hífen só e tira das pontas.
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
 }
 
 export async function criarObligationType(organizationId: string, actor: { id: string }, data: CreateObligationTypeBody) {
@@ -118,7 +122,7 @@ export async function criarModelo(organizationId: string, actor: { id: string },
 }
 
 export async function atualizarModelo(id: string, organizationId: string, data: AtualizarModeloBody) {
-  const modelo = await prisma.documentModel.findFirst({ where: { id, organizationId } })
+  const modelo = await prisma.documentModel.findFirst({ where: { id, organizationId, isActive: true } })
   if (!modelo) throw new AppError(404, 'Modelo não encontrado')
 
   validarCamposObrigatorios(data.zonas)
