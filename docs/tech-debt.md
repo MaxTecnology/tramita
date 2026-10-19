@@ -300,12 +300,18 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   (não-cuid) não quebra nada: o Prisma `findFirst`/`findUnique` por um `String @id` simplesmente não
   acha nenhum registro e devolve `null`, o service lança 404 normal — nunca um 500. Adicionar Zod só
   aqui criaria uma inconsistência nova com as outras 22 rotas, sem nenhum ganho de comportamento.
-- **`ingerirDocumento`** faz upload ao B2 antes do insert no banco — se o `P2002` de dedupe disparar
-  numa corrida de requisições concorrentes, o objeto já subiu ao B2 fica órfão (nunca é limpo).
+- **`ingerirDocumento`** faz upload ao B2 antes do insert no banco ✅ (resolvido em 2026-10-18).
+  O catch do P2002 de dedupe agora chama `deleteFile(storageKey)` antes do 409, limpando o upload
+  órfão da requisição que perdeu a corrida; falha ao apagar vira log (Pino), nunca esconde o 409
+  real. Testado com uma corrida de verdade (`Promise.all` de duas chamadas concorrentes contra o
+  Postgres real).
 - **Seed de `DocumentModel`** (`apps/api/prisma/seed-document-models.ts`) é idempotente só por
-  `name` — editar o JSON de um modelo global (ex.: o ajuste multi-filial do PGDAS-D identificado na
-  validação com conjunto separado) não cria uma nova versão nem atualiza o registro existente.
-  Precisa de uma estratégia de versionamento no seed antes de ajustar os modelos de produção.
+  `name` ✅ (resolvido em 2026-10-18). Agora casa pelo `id` (slug) de dentro do JSON — o que de
+  fato identifica qual arquivo originou o registro, já que `name` é só rótulo de UI — e compara o
+  conteúdo (deep-equal com números normalizados, pra absorver o drift de precisão do round-trip
+  do Postgres JSONB) contra o existente: sem mudança, idempotente; com mudança, `UPDATE` com
+  `version: { increment: 1 }` em vez de silenciosamente ignorar. Editar o JSON de um modelo global
+  (ex.: o ajuste multi-filial do PGDAS-D) agora atualiza o registro e versiona de verdade.
 - **`@@unique([organizationId, code])`** em `TaxObligationType` não impede `code` duplicado entre
   registros globais, porque o Postgres trata múltiplos `NULL` como distintos por padrão — hoje só o
   próprio seed evita duplicação; avaliar `NULLS NOT DISTINCT` ou índice parcial se o Plano B
