@@ -239,6 +239,19 @@ export async function listarFilaDeRevisao(organizationId: string) {
   })
 }
 
+export async function listarRejeitados(organizationId: string) {
+  const docs = await prisma.receivedDocument.findMany({
+    where: { organizationId, status: 'REJECTED' },
+    orderBy: { reviewedAt: 'desc' },
+    include: { reviewedBy: { select: { id: true, name: true } } },
+  })
+
+  return docs.map((doc) => ({
+    ...doc,
+    filename: filenameDaStorageKey(doc.storageKey),
+  }))
+}
+
 async function buscarDocumentoRevisavel(receivedDocumentId: string, organizationId: string) {
   const doc = await prisma.receivedDocument.findFirst({ where: { id: receivedDocumentId, organizationId } })
   if (!doc) throw new AppError(404, 'Documento não encontrado')

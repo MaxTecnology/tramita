@@ -325,10 +325,12 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   `ReceivedDocument` (migration `20261019021000_received_document_review_queue_indexes`).
 - **`getOrgSlug`** duplicado entre `attachments.service.ts` e `document-reader.service.ts`
   ✅ (resolvido em 2026-10-19). Extraído pra `@/lib/org-slug.ts`, com teste próprio.
-- **Sem tela pra listar documentos `REJECTED` e reabri-los** — o endpoint
-  `reabrirDocumento`/`POST /document-reader/:id/reabrir` já existe e está correto (inclusive recusa
-  reabrir um documento já expurgado pelo cron LGPD), só falta a UI; hoje só é alcançável via
-  chamada direta à API.
+- **Sem tela pra listar documentos `REJECTED` e reabri-los** ✅ (resolvido em 2026-10-19). Nova aba
+  "Rejeitados" em `ReviewQueue.tsx`, novo endpoint `GET /document-reader/rejeitados`
+  (`listarRejeitados`) mostrando arquivo + quem rejeitou + quando, botão "Reabrir" chama o
+  `reabrirDocumento` que já existia (inclusive já recusava reabrir um documento expurgado pelo
+  cron LGPD). Confirmado em QA manual: documento some de Rejeitados e reaparece em Processando na
+  fila.
 - **`purgeRejectedDocuments`** aborta o laço inteiro se um `deleteFile` falhar no meio (documentos
   seguintes da mesma execução não são expurgados), e não loga via Pino.
 - **`POST /document-reader/modelos/analisar`** roda `extrairDocumento` (parsing de PDF via pdf.js)

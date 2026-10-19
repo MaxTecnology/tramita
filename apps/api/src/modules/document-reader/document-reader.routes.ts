@@ -6,7 +6,7 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import {
   ingerirDocumento, listarFilaDeRevisao, confirmarSugestao, trocarTarefa, rejeitarDocumento, reabrirDocumento,
-  obterMetricas, listarObrigacoes, obterUrlVisualizacao,
+  obterMetricas, listarObrigacoes, obterUrlVisualizacao, listarRejeitados,
 } from './document-reader.service'
 import { trocarTarefaBodySchema } from './document-reader.schema'
 
@@ -70,6 +70,12 @@ export async function documentReaderRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const url = await obterUrlVisualizacao(id, request.user.organizationId!)
     return reply.send({ url })
+  })
+
+  app.get('/document-reader/rejeitados', {
+    preHandler: [requireRole(...ORG_ROLES)],
+  }, async (request, reply) => {
+    return reply.send(await listarRejeitados(request.user.organizationId!))
   })
 
   app.get('/document-reader/obrigacoes', {

@@ -2,9 +2,50 @@ import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import type { ReceivedDocument } from '@/types'
+import type { ReceivedDocument, RejectedDocument } from '@/types'
 import { toast } from 'sonner'
 import { mensagemDeErro } from '@/lib/utils'
+
+function AbaRejeitados() {
+  const queryClient = useQueryClient()
+
+  const { data: rejeitados = [], isLoading } = useQuery<RejectedDocument[]>({
+    queryKey: ['document-reader-rejeitados'],
+    queryFn: () => api.get('/document-reader/rejeitados').then((r) => r.data),
+  })
+
+  const reabrirMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/document-reader/${id}/reabrir`),
+    onSuccess: () => {
+      toast.success('Documento reaberto — voltou pra fila de revisão')
+      queryClient.invalidateQueries({ queryKey: ['document-reader-rejeitados'] })
+      queryClient.invalidateQueries({ queryKey: ['document-reader-fila'] })
+    },
+    onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao reabrir')),
+  })
+
+  if (isLoading) return <div className="text-sm text-muted-foreground">Carregando...</div>
+  if (rejeitados.length === 0) return <p className="text-sm text-muted-foreground">Nenhum documento rejeitado.</p>
+
+  return (
+    <div className="space-y-2">
+      {rejeitados.map((doc) => (
+        <div key={doc.id} className="rounded-lg border border-border p-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <span className="text-sm font-medium text-foreground block truncate">{doc.filename}</span>
+            <span className="text-xs text-muted-foreground">
+              {doc.reviewedBy ? `Rejeitado por ${doc.reviewedBy.name}` : 'Rejeitado'}
+              {doc.reviewedAt && ` em ${new Date(doc.reviewedAt).toLocaleString('pt-BR')}`}
+            </span>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => reabrirMutation.mutate(doc.id)} disabled={reabrirMutation.isPending}>
+            Reabrir
+          </Button>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 interface ClientOption {
   id: string
@@ -59,6 +100,7 @@ function SeletorDeTarefa({ onEscolher, onCancelar }: { onEscolher: (taskId: stri
 export default function ReviewQueue() {
   const queryClient = useQueryClient()
   const [trocandoId, setTrocandoId] = useState<string | null>(null)
+  const [aba, setAba] = useState<'fila' | 'rejeitados'>('fila')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: fila = [], isLoading } = useQuery<ReceivedDocument[]>({
@@ -127,7 +169,22 @@ export default function ReviewQueue() {
         />
       </div>
 
-      {fila.length === 0 ? (
+      <div className="flex gap-2 border-b border-border">
+        <button
+          onClick={() => setAba('fila')}
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${aba === 'fila' ? 'border-accent text-foreground' : 'border-transparent text-muted-foreground'}`}
+        >
+          Fila de revisão
+        </button>
+        <button
+          onClick={() => setAba('rejeitados')}
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${aba === 'rejeitados' ? 'border-accent text-foreground' : 'border-transparent text-muted-foreground'}`}
+        >
+          Rejeitados
+        </button>
+      </div>
+
+      {aba === 'rejeitados' ? <AbaRejeitados /> : fila.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhum documento pendente.</p>
       ) : (
         <div className="space-y-2">

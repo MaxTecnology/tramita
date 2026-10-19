@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import {
   processarDocumento, ingerirDocumento,
   confirmarSugestao, trocarTarefa, rejeitarDocumento, reabrirDocumento, listarFilaDeRevisao,
-  obterMetricas,
+  listarRejeitados, obterMetricas,
 } from './document-reader.service'
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClient,
@@ -367,22 +367,24 @@ describe('ingerirDocumento', () => {
   })
 })
 
-describe('ações da fila de revisão', () => {
-  async function docComSugestao() {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-    const dept = await createTestDepartment(org.id)
-    const client = await createTestClient(org.id)
-    const board = await createTestBoard(org.id, client.id)
-    const column = await createTestColumn(board.id)
-    const task = await createTestTask(column.id, admin.id, { departmentId: dept.id })
-    const doc = await prisma.receivedDocument.create({
-      data: { organizationId: org.id, fileHash: 'h', storageKey: 'k', uploadedById: admin.id, status: 'PENDING', taskId: task.id },
-    })
-    return { org, admin, task, doc }
-  }
+// Fora dos describe (escopo de módulo) — usado tanto por 'ações da fila de revisão' quanto por
+// 'listarRejeitados' abaixo; declarado dentro de um describe só, ficaria fora de escopo pro outro.
+async function docComSugestao() {
+  const plan = await createTestPlan()
+  const org = await createTestOrg(plan.id)
+  const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+  const dept = await createTestDepartment(org.id)
+  const client = await createTestClient(org.id)
+  const board = await createTestBoard(org.id, client.id)
+  const column = await createTestColumn(board.id)
+  const task = await createTestTask(column.id, admin.id, { departmentId: dept.id })
+  const doc = await prisma.receivedDocument.create({
+    data: { organizationId: org.id, fileHash: 'h', storageKey: 'k', uploadedById: admin.id, status: 'PENDING', taskId: task.id },
+  })
+  return { org, admin, task, doc }
+}
 
+describe('ações da fila de revisão', () => {
   it('confirmarSugestao anexa via createAttachment e marca ATTACHED', async () => {
     const { org, admin, task, doc } = await docComSugestao()
     vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from('%PDF-1.4'))
@@ -610,6 +612,39 @@ describe('listarObrigacoes', () => {
     const obrigacoes = await listarObrigacoes(org.id)
 
     expect(obrigacoes.map((o: { id: string }) => o.id).sort()).toEqual([global.id, privada.id].sort())
+  })
+})
+
+describe('listarRejeitados', () => {
+  it('lista só os documentos REJECTED da própria org, mais recentes primeiro', async () => {
+    const { org, admin, doc } = await docComSugestao()
+    await rejeitarDocumento(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })
+    const plan = await createTestPlan()
+    const outraOrg = await createTestOrg(plan.id)
+    const outroAdmin = await createTestUser(outraOrg.id, { role: 'ORG_ADMIN' })
+    const docDeOutraOrg = await prisma.receivedDocument.create({
+      data: { organizationId: outraOrg.id, fileHash: 'h-rej-outra-org', storageKey: 'k', uploadedById: outroAdmin.id, status: 'PENDING' },
+    })
+    await rejeitarDocumento(docDeOutraOrg.id, outraOrg.id, { id: outroAdmin.id, role: 'ORG_ADMIN' })
+    // Não aparece: outro documento da MESMA org que não foi rejeitado (ainda PENDING).
+    await prisma.receivedDocument.create({
+      data: { organizationId: org.id, fileHash: 'h-pendente', storageKey: 'k2', uploadedById: admin.id, status: 'PENDING' },
+    })
+
+    const rejeitados = await listarRejeitados(org.id)
+
+    expect(rejeitados.map((d) => d.id)).toEqual([doc.id])
+  })
+
+  it('inclui nome do revisor que rejeitou e o nome do arquivo original', async () => {
+    const { org, admin, doc } = await docComSugestao()
+    await prisma.receivedDocument.update({ where: { id: doc.id }, data: { storageKey: `document-reader/x/${Date.now()}-guia-rejeitada.pdf` } })
+    await rejeitarDocumento(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })
+
+    const [rejeitado] = await listarRejeitados(org.id)
+
+    expect(rejeitado.filename).toBe('guia-rejeitada.pdf')
+    expect(rejeitado.reviewedBy?.id).toBe(admin.id)
   })
 })
 

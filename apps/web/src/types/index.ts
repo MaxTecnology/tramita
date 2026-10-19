@@ -335,6 +335,14 @@ export interface ReceivedDocument {
   createdAt: string
 }
 
+export interface RejectedDocument {
+  id: string
+  filename: string
+  reviewedBy: { id: string; name: string } | null
+  reviewedAt: string | null
+  createdAt: string
+}
+
 export interface DocumentModelListItem {
   id: string
   nome: string

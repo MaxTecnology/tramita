@@ -69,6 +69,24 @@ describe('GET /document-reader/fila', () => {
   })
 })
 
+describe('GET /document-reader/rejeitados', () => {
+  it('lista só os documentos REJECTED da própria org', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+    await prisma.receivedDocument.create({
+      data: { organizationId: org.id, fileHash: 'h-rejeitado', storageKey: 'k', uploadedById: admin.id, status: 'REJECTED', reviewedById: admin.id, reviewedAt: new Date() },
+    })
+    await prisma.receivedDocument.create({ data: { organizationId: org.id, fileHash: 'h-pendente', storageKey: 'k2', uploadedById: admin.id, status: 'PENDING' } })
+
+    const res = await app.inject({ method: 'GET', url: '/document-reader/rejeitados', headers: { authorization: auth } })
+
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toHaveLength(1)
+  })
+})
+
 describe('GET /document-reader/metricas', () => {
   it('devolve porModelo vazio quando não há decisão humana ainda', async () => {
     const plan = await createTestPlan()
