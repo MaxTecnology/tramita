@@ -286,11 +286,12 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   configuráveis (`vi.spyOn` falha com "Cannot redefine property"), e `src/test/setup.ts` já carrega
   o módulo real via `buildApp()` antes do hoisting de `vi.mock` ter chance de interceptar.
 - **`trocarTarefa`** não confere no backend se a tarefa de destino é do mesmo cliente do CNPJ lido
-  no documento — um erro humano na fila de revisão ainda pode publicar a guia do cliente A na
-  tarefa do cliente B (e, se `visibleToClient`, no portal dele). Mitigado em 2026-10-16 (commit
-  2ab126a) na UI: o seletor agora exige escolher o cliente explicitamente antes de listar as
-  tarefas dele (não é mais colar um ID de tarefa às cegas), mas a validação cruzada CNPJ-lido vs.
-  cliente-da-tarefa continua ausente no `document-reader.service.ts`.
+  no documento ✅ (resolvido em 2026-10-18). Mitigado em 2026-10-16 (commit 2ab126a) na UI (seletor
+  cliente→tarefa). Resolvido por completo com `assertCnpjBateComTarefa`
+  (`document-reader.service.ts`): compara o CNPJ extraído (`valido: true`) contra
+  cnpj/cpf/cei/caepf/inscricaoEstadual do cliente da tarefa de destino antes de baixar o arquivo
+  do B2 — 422 com mensagem clara se não bater. Documento sem CNPJ extraído não tem o que validar,
+  segue sem bloquear (upload manual, por exemplo).
 - **Rotas de `document-reader.routes.ts`** não validam `:id` via Zod, ao contrário da convenção do
   resto do projeto.
 - **`ingerirDocumento`** faz upload ao B2 antes do insert no banco — se o `P2002` de dedupe disparar
