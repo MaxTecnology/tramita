@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { downloadFile, uploadFile, deleteFile, getSignedDownloadUrl } from '@/lib/b2'
 import { logger } from '@/lib/logger'
+import { getOrgSlug } from '@/lib/org-slug'
 import { AppError } from '@/errors/AppError'
 import { enqueueDocumentReader } from '@/lib/document-reader-queue'
 import { createAttachment } from '@/modules/attachments/attachments.service'
@@ -152,11 +153,6 @@ export async function processarDocumento(receivedDocumentId: string): Promise<vo
       data: { extractedFields: { ...(resultado.campos as object), _motivo: decisao.motivo, _possivelDuplicataDe: possivelDuplicata.id } },
     })
   }
-}
-
-async function getOrgSlug(organizationId: string): Promise<string> {
-  const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { slug: true } })
-  return org?.slug ?? organizationId
 }
 
 export async function ingerirDocumento(

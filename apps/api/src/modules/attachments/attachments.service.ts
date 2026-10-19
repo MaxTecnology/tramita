@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { uploadFile, getSignedDownloadUrl, deleteFile } from '@/lib/b2'
+import { getOrgSlug } from '@/lib/org-slug'
 import { AppError } from '@/errors/AppError'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 
@@ -37,14 +38,6 @@ async function verifyTaskBelongsToOrg(
     throw new AppError(404, 'Tarefa não encontrada')
   }
   return task // task.column.board.clientId is the resolved company id
-}
-
-async function getOrgSlug(organizationId: string): Promise<string> {
-  const org = await prisma.organization.findUnique({
-    where: { id: organizationId },
-    select: { slug: true },
-  })
-  return org?.slug ?? organizationId
 }
 
 async function resolveActorName(actor: UploaderActor): Promise<string> {

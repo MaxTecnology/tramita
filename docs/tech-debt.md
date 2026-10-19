@@ -323,7 +323,8 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
 - **Sem índices** `(organizationId, status)` pra consulta da fila de revisão nem
   `(status, reviewedAt)` pro cron de expurgo ✅ (resolvido em 2026-10-19). Adicionados em
   `ReceivedDocument` (migration `20261019021000_received_document_review_queue_indexes`).
-- **`getOrgSlug`** duplicado entre `attachments.service.ts` e `document-reader.service.ts`.
+- **`getOrgSlug`** duplicado entre `attachments.service.ts` e `document-reader.service.ts`
+  ✅ (resolvido em 2026-10-19). Extraído pra `@/lib/org-slug.ts`, com teste próprio.
 - **Sem tela pra listar documentos `REJECTED` e reabri-los** — o endpoint
   `reabrirDocumento`/`POST /document-reader/:id/reabrir` já existe e está correto (inclusive recusa
   reabrir um documento já expurgado pelo cron LGPD), só falta a UI; hoje só é alcançável via
