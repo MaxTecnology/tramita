@@ -292,8 +292,14 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   cnpj/cpf/cei/caepf/inscricaoEstadual do cliente da tarefa de destino antes de baixar o arquivo
   do B2 — 422 com mensagem clara se não bater. Documento sem CNPJ extraído não tem o que validar,
   segue sem bloquear (upload manual, por exemplo).
-- **Rotas de `document-reader.routes.ts`** não validam `:id` via Zod, ao contrário da convenção do
-  resto do projeto.
+- **Rotas de `document-reader.routes.ts`** não validam `:id` via Zod ✅ (investigado e fechado em
+  2026-10-18 — não é um bug real). A premissa original estava errada: `grep -rc "request.params as"
+  apps/api/src/modules/*/*.routes.ts` mostra que as 22 outras rotas do projeto (boards, clients,
+  tasks, os-templates, etc.) fazem exatamente o mesmo cast `request.params as { id: string }` sem
+  Zod — é o padrão universal do projeto, não uma exceção do document-reader. Um `id` malformado
+  (não-cuid) não quebra nada: o Prisma `findFirst`/`findUnique` por um `String @id` simplesmente não
+  acha nenhum registro e devolve `null`, o service lança 404 normal — nunca um 500. Adicionar Zod só
+  aqui criaria uma inconsistência nova com as outras 22 rotas, sem nenhum ganho de comportamento.
 - **`ingerirDocumento`** faz upload ao B2 antes do insert no banco — se o `P2002` de dedupe disparar
   numa corrida de requisições concorrentes, o objeto já subiu ao B2 fica órfão (nunca é limpo).
 - **Seed de `DocumentModel`** (`apps/api/prisma/seed-document-models.ts`) é idempotente só por

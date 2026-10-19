@@ -326,6 +326,33 @@ describe('ingerirDocumento', () => {
     await expect(ingerirDocumento(org.id, { id: admin.id }, payload)).rejects.toMatchObject({ statusCode: 409 })
   })
 
+  it('apaga o arquivo órfão do B2 quando duas requisições concorrentes sobem o mesmo arquivo (corrida real, P2002 no create)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    vi.spyOn(await import('@/lib/document-reader-queue'), 'enqueueDocumentReader').mockResolvedValue()
+    const deleteSpy = vi.spyOn(b2Module, 'deleteFile').mockResolvedValue(undefined as never)
+    const uploadSpy = vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined as never)
+    const payload = { filename: 'corrida.pdf', mimeType: 'application/pdf', size: 100, buffer: Buffer.from('conteúdo da corrida real') }
+
+    // Disparadas juntas (Promise.all, não await sequencial): as duas passam pelo findUnique antes
+    // de qualquer create, então nenhuma vê a outra ali — só a constraint @@unique do banco no
+    // create detecta a corrida de verdade, igual aconteceria em produção com duas abas/requisições
+    // simultâneas.
+    const resultados = await Promise.allSettled([
+      ingerirDocumento(org.id, { id: admin.id }, payload),
+      ingerirDocumento(org.id, { id: admin.id }, payload),
+    ])
+
+    const rejeitado = resultados.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined
+    expect(rejeitado).toBeDefined()
+    expect(rejeitado!.reason).toMatchObject({ statusCode: 409 })
+    // As duas tentam subir ao B2 antes do create (upload acontece cedo demais pra saber quem vai
+    // perder a corrida) — a perdedora precisa limpar o próprio upload órfão.
+    expect(uploadSpy).toHaveBeenCalledTimes(2)
+    expect(deleteSpy).toHaveBeenCalledTimes(1)
+  })
+
   it('mesmo arquivo em orgs diferentes não colide (hash é por organização)', async () => {
     const plan = await createTestPlan()
     const orgA = await createTestOrg(plan.id)

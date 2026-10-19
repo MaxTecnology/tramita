@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { downloadFile, uploadFile, getSignedDownloadUrl } from '@/lib/b2'
+import { downloadFile, uploadFile, deleteFile, getSignedDownloadUrl } from '@/lib/b2'
+import { logger } from '@/lib/logger'
 import { AppError } from '@/errors/AppError'
 import { enqueueDocumentReader } from '@/lib/document-reader-queue'
 import { createAttachment } from '@/modules/attachments/attachments.service'
@@ -183,6 +184,10 @@ export async function ingerirDocumento(
     // Janela de corrida: duas requisições concorrentes com o mesmo arquivo passam juntas pelo
     // findUnique acima — mesma classe de proteção já usada em protocols.service.ts::createProtocol.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      // O upload já aconteceu antes do create — sem isso o objeto fica órfão no B2 pra sempre,
+      // já que nenhum ReceivedDocument vai apontar pra ele (a requisição que ganhou a corrida tem
+      // o seu próprio storageKey). Falha ao apagar não deve esconder o 409 real do cliente.
+      await deleteFile(storageKey).catch((delErr) => logger.error({ err: delErr, storageKey }, 'Falha ao limpar upload órfão após P2002 de dedupe'))
       throw new AppError(409, 'Esse arquivo já foi enviado antes')
     }
     throw err
