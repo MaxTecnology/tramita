@@ -402,6 +402,46 @@ describe('ações da fila de revisão', () => {
     expect(attachment.taskId).toBe(outraTask.id)
   })
 
+  it('trocarTarefa lança erro quando o CNPJ extraído do documento não bate com o cliente da tarefa de destino', async () => {
+    const { org, admin, doc } = await docComSugestao()
+    await prisma.receivedDocument.update({
+      where: { id: doc.id },
+      data: { extractedFields: { cnpj: { bruto: '11.222.333/0001-81', valor: '11222333000181', valido: true } } },
+    })
+    const dept = await createTestDepartment(org.id)
+    const outroClient = await createTestClient(org.id, { cnpj: '99.888.777/0001-66' })
+    const outroBoard = await createTestBoard(org.id, outroClient.id)
+    const outraColumn = await createTestColumn(outroBoard.id)
+    const taskDeOutroCliente = await createTestTask(outraColumn.id, admin.id, { departmentId: dept.id })
+
+    await expect(trocarTarefa(doc.id, org.id, taskDeOutroCliente.id, { id: admin.id, role: 'ORG_ADMIN' }))
+      .rejects.toMatchObject({ statusCode: 422 })
+
+    const aindaPendente = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
+    expect(aindaPendente.status).toBe('PENDING')
+    expect(aindaPendente.attachmentId).toBeNull()
+  })
+
+  it('trocarTarefa permite normalmente quando o CNPJ extraído bate com o cliente da tarefa de destino', async () => {
+    const { org, admin, doc } = await docComSugestao()
+    await prisma.receivedDocument.update({
+      where: { id: doc.id },
+      data: { extractedFields: { cnpj: { bruto: '11.222.333/0001-81', valor: '11222333000181', valido: true } } },
+    })
+    const dept = await createTestDepartment(org.id)
+    const clienteCorreto = await createTestClient(org.id, { cnpj: '11.222.333/0001-81' })
+    const boardCorreto = await createTestBoard(org.id, clienteCorreto.id)
+    const columnCorreta = await createTestColumn(boardCorreto.id)
+    const taskDoClienteCorreto = await createTestTask(columnCorreta.id, admin.id, { departmentId: dept.id })
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from('%PDF-1.4'))
+    vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined as never)
+
+    await trocarTarefa(doc.id, org.id, taskDoClienteCorreto.id, { id: admin.id, role: 'ORG_ADMIN' })
+
+    const atualizado = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
+    expect(atualizado.status).toBe('ATTACHED')
+  })
+
   it('rejeitarDocumento marca REJECTED sem criar anexo', async () => {
     const { org, admin, doc } = await docComSugestao()
 

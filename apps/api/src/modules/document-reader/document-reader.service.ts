@@ -247,6 +247,35 @@ async function buscarDocumentoRevisavel(receivedDocumentId: string, organization
   return doc
 }
 
+// Só vale pra 'trocado' (trocarTarefa) — a tarefa de 'confirmado' já veio do casamento automático
+// por CNPJ (resolverClientePorIdentificador), então já está validada; 'trocado' é justamente o
+// caminho onde um humano escolhe a tarefa livremente na fila de revisão, sem nenhuma garantia de
+// que bate com o cliente do documento. Se o documento não tem CNPJ extraído com `valido: true`
+// (upload manual, ou o motor não achou o campo), não há o que validar — segue sem bloquear.
+async function assertCnpjBateComTarefa(doc: { organizationId: string; extractedFields: unknown }, taskId: string) {
+  const campos = doc.extractedFields as Record<string, { bruto: string; valor: string | number | null; valido: boolean }> | null
+  const cnpjExtraido = campos?.cnpj
+  if (!cnpjExtraido?.valido || !cnpjExtraido.valor) return
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { column: { select: { board: { select: { client: { select: { name: true, cnpj: true, cpf: true, cei: true, caepf: true, inscricaoEstadual: true } } } } } } },
+  })
+  if (!task) return // taskId inválido — createAttachment logo abaixo lança o erro certo
+
+  const alvo = soDigitos(String(cnpjExtraido.valor))
+  const cliente = task.column.board.client
+  const bate = (['cnpj', 'cpf', 'cei', 'caepf', 'inscricaoEstadual'] as const).some(
+    (campo) => cliente[campo] && soDigitos(cliente[campo]!) === alvo,
+  )
+  if (!bate) {
+    throw new AppError(
+      422,
+      `O CNPJ lido no documento (${cnpjExtraido.bruto}) não bate com o cliente "${cliente.name}" dessa tarefa — confirme se escolheu a tarefa certa`,
+    )
+  }
+}
+
 async function anexarDocumento(
   receivedDocumentId: string,
   organizationId: string,
@@ -255,6 +284,7 @@ async function anexarDocumento(
   how: 'confirmado' | 'trocado' | 'criado',
 ) {
   const doc = await buscarDocumentoRevisavel(receivedDocumentId, organizationId)
+  if (how === 'trocado') await assertCnpjBateComTarefa(doc, taskId)
 
   const buffer = await downloadFile(doc.storageKey)
   const filename = filenameDaStorageKey(doc.storageKey)
