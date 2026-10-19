@@ -71,6 +71,22 @@ describe('criarObligationType', () => {
   })
 })
 
+describe('constraint de banco: code único entre obrigações globais', () => {
+  // `criarObligationType` nunca cria um registro global (organizationId sempre vem do actor) —
+  // só o seed faz isso. Testa a constraint do Postgres direto via Prisma Client, não o service:
+  // @@unique([organizationId, code]) sozinho não impede dois globais com o mesmo code, porque o
+  // Postgres trata múltiplos NULL como distintos por padrão nesse índice — o índice parcial
+  // adicional (migration apps/api/prisma/migrations/*_obligation_type_global_code_unique) cobre
+  // especificamente esse caso.
+  it('lança erro de constraint única ao tentar criar duas obrigações globais com o mesmo code', async () => {
+    await prisma.obligationType.create({ data: { code: 'TESTE-GLOBAL-UNICO', name: 'Primeira', organizationId: null } })
+
+    await expect(
+      prisma.obligationType.create({ data: { code: 'TESTE-GLOBAL-UNICO', name: 'Segunda', organizationId: null } }),
+    ).rejects.toThrow()
+  })
+})
+
 describe('analisarPdfParaModelagem', () => {
   it('devolve os itens de texto já extraídos, com posição normalizada', async () => {
     const pdf = await gerarPdfComDocumentoArrecadacao('11.222.333/0001-81', 'agosto/2026')

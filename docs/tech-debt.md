@@ -312,10 +312,14 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   do Postgres JSONB) contra o existente: sem mudança, idempotente; com mudança, `UPDATE` com
   `version: { increment: 1 }` em vez de silenciosamente ignorar. Editar o JSON de um modelo global
   (ex.: o ajuste multi-filial do PGDAS-D) agora atualiza o registro e versiona de verdade.
-- **`@@unique([organizationId, code])`** em `TaxObligationType` não impede `code` duplicado entre
-  registros globais, porque o Postgres trata múltiplos `NULL` como distintos por padrão — hoje só o
-  próprio seed evita duplicação; avaliar `NULLS NOT DISTINCT` ou índice parcial se o Plano B
-  (cadastro de obrigações pelo usuário) for implementado.
+- **`@@unique([organizationId, code])`** em `ObligationType` não impede `code` duplicado entre
+  registros globais ✅ (resolvido em 2026-10-19 — o Plano B já estava implementado, cadastro de
+  obrigações pelo usuário é real). Índice único parcial adicional (migration
+  `20261019020000_obligation_type_global_code_unique`):
+  `CREATE UNIQUE INDEX ... ON obligation_types(code) WHERE "organizationId" IS NULL` — escopado só
+  às linhas globais, não interfere na unicidade por organização que o índice original já cobre.
+  Testado contra o Postgres real (não simulação de erro), documentado em `schema.prisma` já que a
+  sintaxe do Prisma schema não expressa índice parcial.
 - **Sem índices** `(organizationId, status)` pra consulta da fila de revisão nem
   `(status, reviewedAt)` pro cron de expurgo — irrelevante no volume atual, vale revisitar se o
   volume de documentos crescer.

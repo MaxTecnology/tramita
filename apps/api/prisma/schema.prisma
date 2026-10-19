@@ -917,6 +917,12 @@ model ObligationType {
   documentModels         DocumentModel[]
   recurringTaskTemplates RecurringTaskTemplate[]
 
+  // Só garante unicidade de code quando organizationId NÃO é null (Postgres trata múltiplos NULL
+  // como distintos nesse tipo de índice) — a unicidade de code entre os GLOBAIS (organizationId
+  // null) vem de um índice único PARCIAL que a sintaxe do Prisma schema não expressa, criado à
+  // mão na migration 20261019020000_obligation_type_global_code_unique:
+  //   CREATE UNIQUE INDEX "obligation_types_code_global_key" ON "obligation_types"("code")
+  //   WHERE "organizationId" IS NULL;
   @@unique([organizationId, code])
   @@map("obligation_types")
 }
