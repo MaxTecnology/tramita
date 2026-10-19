@@ -975,6 +975,10 @@ model ReceivedDocument {
   reviewedBy    User?          @relation("ReceivedDocumentReviewedBy", fields: [reviewedById], references: [id])
 
   @@unique([organizationId, fileHash])
+  // listarFilaDeRevisao filtra por organizationId + status IN (PENDING, NOT_IDENTIFIED).
+  @@index([organizationId, status])
+  // purgeRejectedDocuments (cron LGPD) filtra por status = REJECTED + reviewedAt < cutoff.
+  @@index([status, reviewedAt])
   @@map("received_documents")
 }
 

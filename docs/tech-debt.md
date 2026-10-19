@@ -321,8 +321,8 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   Testado contra o Postgres real (não simulação de erro), documentado em `schema.prisma` já que a
   sintaxe do Prisma schema não expressa índice parcial.
 - **Sem índices** `(organizationId, status)` pra consulta da fila de revisão nem
-  `(status, reviewedAt)` pro cron de expurgo — irrelevante no volume atual, vale revisitar se o
-  volume de documentos crescer.
+  `(status, reviewedAt)` pro cron de expurgo ✅ (resolvido em 2026-10-19). Adicionados em
+  `ReceivedDocument` (migration `20261019021000_received_document_review_queue_indexes`).
 - **`getOrgSlug`** duplicado entre `attachments.service.ts` e `document-reader.service.ts`.
 - **Sem tela pra listar documentos `REJECTED` e reabri-los** — o endpoint
   `reabrirDocumento`/`POST /document-reader/:id/reabrir` já existe e está correto (inclusive recusa
