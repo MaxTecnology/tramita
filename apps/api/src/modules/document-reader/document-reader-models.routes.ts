@@ -7,8 +7,9 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import {
   criarObligationType, analisarPdfParaModelagem, listarModelos, criarModelo, atualizarModelo, arquivarModelo,
+  verificarColisaoModelo,
 } from './document-reader-models.service'
-import { createObligationTypeSchema, criarModeloSchema, atualizarModeloSchema } from './document-reader-models.schema'
+import { createObligationTypeSchema, criarModeloSchema, atualizarModeloSchema, verificarColisaoSchema } from './document-reader-models.schema'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
 
@@ -64,6 +65,15 @@ export async function documentReaderModelsRoutes(app: FastifyInstance) {
 
   app.get('/document-reader/modelos', async (request, reply) => {
     return reply.send(await listarModelos(request.user.organizationId!))
+  })
+
+  app.post('/document-reader/modelos/verificar-colisao', async (request, reply) => {
+    const result = verificarColisaoSchema.safeParse(request.body)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    const modelosColidentes = await verificarColisaoModelo(
+      request.user.organizationId!, result.data.paginas, result.data.ancoras, result.data.excluirModeloId,
+    )
+    return reply.send({ modelosColidentes })
   })
 
   app.post('/document-reader/modelos', { preHandler: [checkSubscription] }, async (request, reply) => {

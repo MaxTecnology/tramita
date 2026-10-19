@@ -45,3 +45,27 @@ export type CriarModeloBody = z.infer<typeof criarModeloSchema>
 // PATCH usa o mesmo formato do POST — edição é sempre substituição completa da definição.
 export const atualizarModeloSchema = criarModeloSchema
 export type AtualizarModeloBody = z.infer<typeof atualizarModeloSchema>
+
+// Mesmo shape de DocumentoExtraidoPagina/Item (apps/web/src/types/index.ts e
+// engine/types.ts) — o frontend reenvia os itens já extraídos por /analisar (em memória, nunca
+// repersistidos) só pra essa checagem de colisão, sem precisar subir o PDF de novo.
+const itemSchema = z.object({
+  str: z.string(),
+  x: coordenada('x'),
+  y: coordenada('y'),
+  w: coordenada('w'),
+  h: coordenada('h'),
+})
+const paginaSchema = z.object({
+  numero: z.number().int().min(1),
+  itens: z.array(itemSchema),
+  largura: z.number().optional(),
+  altura: z.number().optional(),
+})
+
+export const verificarColisaoSchema = z.object({
+  paginas: z.array(paginaSchema).min(1),
+  ancoras: z.array(ancoraSchema).min(1),
+  excluirModeloId: z.string().cuid().optional(),
+})
+export type VerificarColisaoBody = z.infer<typeof verificarColisaoSchema>

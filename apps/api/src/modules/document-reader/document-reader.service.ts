@@ -12,7 +12,7 @@ import { soDigitos } from './engine/validadores'
 // (processarDocumento) ou uma ação da fila de revisão têm permissão de mudar o status.
 const AGUARDANDO_REVISAO: ('PENDING' | 'NOT_IDENTIFIED')[] = ['PENDING', 'NOT_IDENTIFIED']
 
-async function carregarModelosDaOrg(organizationId: string): Promise<Modelo[]> {
+export async function carregarModelosDaOrg(organizationId: string): Promise<Modelo[]> {
   const registros = await prisma.documentModel.findMany({
     where: { isActive: true, OR: [{ organizationId: null }, { organizationId }] },
   })

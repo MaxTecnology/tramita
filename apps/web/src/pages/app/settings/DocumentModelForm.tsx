@@ -113,8 +113,30 @@ export default function DocumentModelForm() {
   })
 
   const salvarMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const payload = { nome, obligationTypeId, ancoras, zonas }
+
+      // Aviso não-bloqueante: se a amostra também bate com outro modelo ativo da org, salvar
+      // mesmo assim pode fazer o motor empatar entre os dois e parar de reconhecer documentos
+      // que hoje já funcionam (ver nota em verificarColisaoModelo, document-reader-models.service.ts).
+      // Falha na própria checagem não deve impedir o salvar — é só um aviso.
+      if (extraido) {
+        try {
+          const { data } = await api.post<{ modelosColidentes: { id: string; nome: string }[] }>(
+            '/document-reader/modelos/verificar-colisao',
+            { paginas: extraido.paginas, ancoras, excluirModeloId: isEditing ? id : undefined },
+          )
+          if (data.modelosColidentes.length > 0) {
+            toast.warning(
+              `Essa amostra também bate com "${data.modelosColidentes.map((m) => m.nome).join('", "')}" — salvar pode fazer o robô parar de reconhecer documentos desse(s) modelo(s) de forma automática.`,
+              { duration: 10000 },
+            )
+          }
+        } catch {
+          // checagem é só um aviso — se falhar, segue pro salvar normal sem travar o fluxo.
+        }
+      }
+
       return isEditing
         ? api.patch(`/document-reader/modelos/${id}`, payload)
         : api.post('/document-reader/modelos', payload)

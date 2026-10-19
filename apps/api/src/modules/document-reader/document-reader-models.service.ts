@@ -4,7 +4,10 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { CreateObligationTypeBody, CriarModeloBody, AtualizarModeloBody } from './document-reader-models.schema'
 import { extrairDocumento } from './engine/extrair-texto'
-import type { DocumentoExtraido } from './engine/types'
+import type { DocumentoExtraido, Pagina } from './engine/types'
+import { pontuarModelos } from './engine/ancoras'
+import { LIMIAR_ANCORAS } from './engine/pipeline'
+import { carregarModelosDaOrg } from './document-reader.service'
 
 // Mesmo princípio dos codes globais existentes (IRPJ, DAS, PGDAS-D): maiúsculas, hífen no lugar
 // de espaço, qualquer caractere fora de [A-Z0-9-] removido. "Recibo RH" -> "RECIBO-RH".
@@ -143,4 +146,31 @@ export async function arquivarModelo(id: string, organizationId: string) {
   const modelo = await prisma.documentModel.findFirst({ where: { id, organizationId } })
   if (!modelo) throw new AppError(404, 'Modelo não encontrado')
   return prisma.documentModel.update({ where: { id }, data: { isActive: false } })
+}
+
+// Salvar um modelo cujas âncoras também aparecem nos documentos de outro modelo ativo da mesma
+// org faz o pipeline (engine/pipeline.ts) empatar e devolver "revisar" sem nenhum campo extraído
+// pra esses documentos — exatamente o cenário que motivou o Plano B (PGDAS-D multi-filial com
+// âncoras batendo e zonas falhando). Roda os mesmos modelos ativos (`carregarModelosDaOrg`, o
+// motor já usa) contra a AMOSTRA que o admin está marcando: se o candidato e outro modelo
+// batem com `scoreAncoras >= LIMIAR_ANCORAS` na mesma amostra, a mesma ambiguidade que
+// `extrairEInterpretar` produziria em produção já está presente aqui — aviso não-bloqueante,
+// não a análise de impacto completa (que cruzaria documentos já recebidos, fora de escopo v1).
+export async function verificarColisaoModelo(
+  organizationId: string,
+  paginas: Pagina[],
+  ancoras: CriarModeloBody['ancoras'],
+  excluirModeloId?: string,
+): Promise<{ id: string; nome: string }[]> {
+  const CANDIDATO_ID = '__candidato__'
+  const modelosAtivos = (await carregarModelosDaOrg(organizationId)).filter((m) => m.id !== excluirModeloId)
+  const candidato = { id: CANDIDATO_ID, nome: 'candidato', tipoImposto: '', ancoras, zonas: [] }
+
+  const resultados = pontuarModelos(paginas, [candidato, ...modelosAtivos])
+  const scoreCandidato = resultados.find((r) => r.modelo.id === CANDIDATO_ID)?.scoreAncoras ?? 0
+  if (scoreCandidato < LIMIAR_ANCORAS) return []
+
+  return resultados
+    .filter((r) => r.modelo.id !== CANDIDATO_ID && r.scoreAncoras >= LIMIAR_ANCORAS)
+    .map((r) => ({ id: r.modelo.id, nome: r.modelo.nome }))
 }

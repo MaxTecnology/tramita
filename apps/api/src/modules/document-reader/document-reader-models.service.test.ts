@@ -1,7 +1,7 @@
 // apps/api/src/modules/document-reader/document-reader-models.service.test.ts
 import { describe, it, expect } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { criarObligationType, analisarPdfParaModelagem, listarModelos, criarModelo, atualizarModelo, arquivarModelo } from './document-reader-models.service'
+import { criarObligationType, analisarPdfParaModelagem, listarModelos, criarModelo, atualizarModelo, arquivarModelo, verificarColisaoModelo } from './document-reader-models.service'
 import { createTestPlan, createTestOrg, createTestUser } from '@/test/helpers'
 import { gerarPdfComDocumentoArrecadacao } from '@/test/pdf-helpers'
 
@@ -404,5 +404,89 @@ describe('arquivarModelo', () => {
     })
 
     await expect(arquivarModelo(modeloGlobal.id, org.id)).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
+describe('verificarColisaoModelo', () => {
+  // Página sintética de amostra: só precisa ter o item de texto que as âncoras dos testes buscam.
+  const paginaAmostra = [
+    { numero: 1, itens: [{ str: 'FIXO', x: 0.1, y: 0.05, w: 0.2, h: 0.02 }] },
+  ]
+
+  it('aponta colisão quando a amostra bate com score 1 em outro modelo ativo da mesma org', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const obrigacao = await prisma.obligationType.create({ data: { code: 'TESTE-COLISAO-1', name: 'Teste', organizationId: org.id } })
+    const existente = await criarModelo(org.id, { id: admin.id }, {
+      nome: 'Modelo existente', obligationTypeId: obrigacao.id,
+      ancoras: [{ texto: 'FIXO', pagina: 1, x: 0.1, y: 0.05 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+        { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+      ],
+    })
+
+    const colisoes = await verificarColisaoModelo(org.id, paginaAmostra, [{ texto: 'FIXO', pagina: 1, x: 0.1, y: 0.05 }])
+
+    expect(colisoes.map((m) => m.id)).toContain(existente.id)
+  })
+
+  it('não aponta colisão com o próprio modelo em edição (excluirModeloId)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const obrigacao = await prisma.obligationType.create({ data: { code: 'TESTE-COLISAO-2', name: 'Teste', organizationId: org.id } })
+    const modelo = await criarModelo(org.id, { id: admin.id }, {
+      nome: 'Em edição', obligationTypeId: obrigacao.id,
+      ancoras: [{ texto: 'FIXO', pagina: 1, x: 0.1, y: 0.05 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+        { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+      ],
+    })
+
+    const colisoes = await verificarColisaoModelo(org.id, paginaAmostra, [{ texto: 'FIXO', pagina: 1, x: 0.1, y: 0.05 }], modelo.id)
+
+    expect(colisoes.map((m) => m.id)).not.toContain(modelo.id)
+  })
+
+  it('não considera modelo privado de outra organização', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const outraOrg = await createTestOrg(plan.id, { slug: 'outra-org-colisao' })
+    const outroAdmin = await createTestUser(outraOrg.id, { role: 'ORG_ADMIN' })
+    const outraObrigacao = await prisma.obligationType.create({ data: { code: 'TESTE-COLISAO-3', name: 'Teste', organizationId: outraOrg.id } })
+    await criarModelo(outraOrg.id, { id: outroAdmin.id }, {
+      nome: 'Modelo de outra org', obligationTypeId: outraObrigacao.id,
+      ancoras: [{ texto: 'FIXO', pagina: 1, x: 0.1, y: 0.05 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+        { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+      ],
+    })
+
+    const colisoes = await verificarColisaoModelo(org.id, paginaAmostra, [{ texto: 'FIXO', pagina: 1, x: 0.1, y: 0.05 }])
+
+    expect(colisoes).toHaveLength(0)
+  })
+
+  it('não aponta colisão quando a âncora da amostra não bate com nenhum outro modelo', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const obrigacao = await prisma.obligationType.create({ data: { code: 'TESTE-COLISAO-4', name: 'Teste', organizationId: org.id } })
+    await criarModelo(org.id, { id: admin.id }, {
+      nome: 'Modelo sem relação', obligationTypeId: obrigacao.id,
+      ancoras: [{ texto: 'OUTRO TEXTO QUALQUER', pagina: 1, x: 0.5, y: 0.5 }],
+      zonas: [
+        { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+        { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+      ],
+    })
+
+    const colisoes = await verificarColisaoModelo(org.id, paginaAmostra, [{ texto: 'FIXO', pagina: 1, x: 0.1, y: 0.05 }])
+
+    expect(colisoes).toHaveLength(0)
   })
 })

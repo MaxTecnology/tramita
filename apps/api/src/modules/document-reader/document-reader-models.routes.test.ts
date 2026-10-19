@@ -191,3 +191,36 @@ describe('GET/POST/PATCH/DELETE /document-reader/modelos', () => {
     expect(res.statusCode).toBe(403)
   })
 })
+
+describe('POST /document-reader/modelos/verificar-colisao', () => {
+  it('aponta o modelo existente quando a amostra bate com ele também', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+    const obrigacao = await prisma.obligationType.create({ data: { code: 'TESTE-ROTA-COLISAO', name: 'Teste', organizationId: org.id } })
+    const existente = await app.inject({
+      method: 'POST', url: '/document-reader/modelos', headers: { authorization: auth },
+      payload: {
+        nome: 'Modelo existente via rota', obligationTypeId: obrigacao.id,
+        ancoras: [{ texto: 'FIXO', pagina: 1, x: 0.1, y: 0.05 }],
+        zonas: [
+          { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+          { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+        ],
+      },
+    })
+    const existenteId = JSON.parse(existente.body).id
+
+    const res = await app.inject({
+      method: 'POST', url: '/document-reader/modelos/verificar-colisao', headers: { authorization: auth },
+      payload: {
+        paginas: [{ numero: 1, itens: [{ str: 'FIXO', x: 0.1, y: 0.05, w: 0.2, h: 0.02 }] }],
+        ancoras: [{ texto: 'FIXO', pagina: 1, x: 0.1, y: 0.05 }],
+      },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body).modelosColidentes.map((m: { id: string }) => m.id)).toContain(existenteId)
+  })
+})

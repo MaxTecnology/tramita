@@ -319,17 +319,12 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   limitado a 20MB, sem persistência. Revisitar se virar vetor de lentidão (muitos admins
   modelando ao mesmo tempo) ou de negação de serviço.
 - **Salvar um `DocumentModel` privado pode desligar o reconhecimento de outro modelo ativo da
-  mesma org (global ou privado) sem nenhum aviso**, achado na revisão final do Plano B
-  (2026-10-18). O motor (`engine/pipeline.ts`/`ancoras.ts`) decide por score de âncoras batendo;
-  se as âncoras do novo modelo também aparecem nos documentos de outro modelo (ex.: cabeçalho
-  genérico, ou uma âncora curta tipo "CNPJ" que casa por `includes` em quase qualquer documento
-  fiscal), os dois empatam e o pipeline passa a devolver `revisar` sem nenhum campo extraído pra
-  esses documentos — pior do que antes de o modelo existir. É exatamente o cenário que motivou
-  o Plano B (PGDAS-D multi-filial com âncoras batendo e zonas falhando, ver item 6 do
-  `docs/TASKS.md`): um admin modelando a própria versão do PGDAS-D com as mesmas âncoras do
-  cabeçalho repete o problema pros documentos que hoje já são reconhecidos. A "análise de
-  impacto contra documentos já recebidos" já estava fora de escopo do v1 por decisão explícita
-  (ver spec, seção "Fora de escopo") — o gap é não avisar nem documentar esse failure mode
-  específico até agora. Mitigação futura mínima: em `POST /document-reader/modelos/analisar` ou
-  no momento de salvar, rodar `pontuarModelos` contra os modelos ativos da org e avisar/bloquear
-  se a amostra também bate com score alto em outro modelo existente.
+  mesma org sem nenhum aviso** ✅ (resolvido em 2026-10-18). Mitigado com
+  `verificarColisaoModelo` (`document-reader-models.service.ts`): no momento de salvar
+  (`POST /document-reader/modelos/verificar-colisao`), roda `pontuarModelos` da amostra contra
+  os modelos ativos da org (excluindo o próprio, em edição) e avisa — não bloqueia — se outro
+  modelo também bate com `scoreAncoras >= LIMIAR_ANCORAS` na mesma amostra. Confirmado em QA
+  manual: criar um segundo modelo com a mesma âncora de um já existente dispara o toast de aviso
+  e ainda assim salva. Continua não sendo a "análise de impacto contra documentos já recebidos"
+  completa (fora de escopo v1 por decisão explícita da spec) — só avisa sobre a amostra atual,
+  não re-varre documentos já processados.
