@@ -41,6 +41,15 @@ export function Comments({ entityType, entityId, currentUserId, role }: Props) {
     onSuccess: () => {
       toast.success('Comentário adicionado')
       queryClient.invalidateQueries({ queryKey })
+      // Um comentário de 'request' pode reverter NEEDS_INFO -> PENDING no backend (ver
+      // createRequestComment) — a lista de onde este componente é usado precisa refletir isso na
+      // hora, não só no próximo refetch espontâneo. 'portal-requests' existe só no contexto do
+      // portal e 'requests' só no admin — invalidar os dois aqui é inofensivo no contexto que não
+      // tem a chave em cache (vira um no-op).
+      if (entityType === 'request') {
+        queryClient.invalidateQueries({ queryKey: ['portal-requests'] })
+        queryClient.invalidateQueries({ queryKey: ['requests'] })
+      }
       setContent('')
     },
     onError: () => toast.error('Erro ao adicionar comentário'),

@@ -247,11 +247,14 @@ mesma sessão (race no auto-revert de NEEDS_INFO, `TaskHistory`/`publishBoardEve
   incluem `client.name` na query (`task.column.board.client`/`request.client`) e passam
   `clientName` no metadata da notificação USER quando o cliente comenta — a equipe deixa de
   receber "Olá, ! Novo comentário...".
-- **UI não reflete o auto-revert em tempo real**: no portal, o `onSuccess` de criar comentário só
-  invalida `['request-comments', id]`, não `['portal-requests']` — o badge "Aguardando resposta"
-  só atualiza no próximo refetch. No admin, o handler SSE de `request:changed`
-  (`useRequestsBadgeStream.ts`) só invalida a contagem de pendentes, não a lista `['requests']` nem
-  comentários — com o filtro NEEDS_INFO aberto, a lista não se atualiza sozinha.
+- **UI não reflete o auto-revert em tempo real** ✅ (resolvido em 2026-10-19). `Comments.tsx`
+  (compartilhado entre portal e admin) agora invalida `['portal-requests']` e `['requests']` junto
+  com sua própria query ao criar um comentário de `entityType: 'request'` — inofensivo no
+  contexto que não tem a chave em cache. `useRequestsBadgeStream.ts` agora invalida `['requests']`
+  e `['request-comments']` (sem id — por prefixo, cobre qualquer painel de comentários aberto) no
+  `request:changed`, além da contagem de pendentes que já invalidava. Confirmado em QA manual real
+  (API como cliente comentando numa request NEEDS_INFO + navegador aberto como admin na aba
+  "Precisa de informação"): a lista perde o item e o badge do menu atualiza sozinho, sem refresh.
 - **Aprovar/rejeitar a partir de NEEDS_INFO** deixa a resposta do cliente (se vier depois) perdida
   na thread de uma Request já fechada, sem refletir na Task. Decisão de produto, não bug — considerar
   exibir a thread da Request no `TaskDrawer` quando `task.sourceRequestId` existir.
