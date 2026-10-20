@@ -22,7 +22,11 @@ export async function listRequestComments(
   role: string,
   clientUserId?: string,
 ) {
-  const scope = role === 'CLIENT' && clientUserId ? await getClientAccessScope(clientUserId) : null
+  // Falha fechado: CLIENT sem clientUserId nunca pode cair no `scope = null` abaixo e pular a
+  // checagem de escopo mais adiante — hoje a rota sempre passa clientUserId quando role é
+  // CLIENT, mas o service não deve depender disso pra se manter seguro.
+  if (role === 'CLIENT' && !clientUserId) throw new AppError(404, 'Solicitação não encontrada')
+  const scope = role === 'CLIENT' ? await getClientAccessScope(clientUserId!) : null
 
   const request = await prisma.request.findFirst({ where: { id: requestId, organizationId } })
   if (!request) throw new AppError(404, 'Solicitação não encontrada')
@@ -151,9 +155,13 @@ export async function deleteRequestComment(id: string, actor: CommentActor) {
     where: { id },
     include: { request: { select: { organizationId: true, clientId: true } } },
   })
-  if (!comment) throw new AppError(404, 'Comentário não encontrado')
+  // 404, não 403 — mesmo padrão de findFirst-escopado-por-organizationId usado no resto do
+  // projeto (os-templates.service.ts, document-reader-models.service.ts): nunca revela pra um
+  // actor de outra org que um comentário com esse id existe.
+  if (!comment || comment.request.organizationId !== actor.organizationId) {
+    throw new AppError(404, 'Comentário não encontrado')
+  }
   if (comment.deletedAt) throw new AppError(410, 'Comentário já foi removido')
-  if (comment.request.organizationId !== actor.organizationId) throw new AppError(403, 'Acesso negado')
 
   if (actor.role === 'CLIENT') {
     const scope = await getClientAccessScope(actor.id)

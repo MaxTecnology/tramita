@@ -129,7 +129,9 @@ export default function PortalRequests() {
                       Cancelar
                     </Button>
                   )}
-                  {r.boardId && (
+                  {/* CANCELLED pode ter boardId (foi aprovada antes de cancelar) — a tarefa virou
+                      DISREGARDED, não é mais um processo ativo pra "ver". */}
+                  {r.boardId && r.status !== 'CANCELLED' && (
                     <Link
                       to={`/portal/board/${r.boardId}`}
                       className="text-xs text-[#185FA5] hover:underline inline-flex items-center gap-1"

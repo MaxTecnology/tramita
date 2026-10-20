@@ -168,14 +168,14 @@ export async function deleteComment(id: string, actor: CommentActor) {
       },
     },
   })
-  if (!comment) throw new AppError(404, 'Comentário não encontrado')
+  // 404, não 403 — mesmo padrão de findFirst-escopado-por-organizationId usado no resto do
+  // projeto: nunca revela pra um actor de outra org que um comentário com esse id existe.
+  if (!comment || comment.task.column.board.organizationId !== actor.organizationId) {
+    throw new AppError(404, 'Comentário não encontrado')
+  }
 
   // Guard against double soft-delete
   if (comment.deletedAt) throw new AppError(410, 'Comentário já foi removido')
-
-  if (comment.task.column.board.organizationId !== actor.organizationId) {
-    throw new AppError(403, 'Acesso negado')
-  }
 
   // For CLIENT role, also validate that this ClientUser has access to the board's client AND
   // to the task's department. 404, not 403: a ClientUser outside the scope must never learn

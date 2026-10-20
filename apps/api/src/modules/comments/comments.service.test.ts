@@ -61,6 +61,27 @@ describe('deleteComment - soft delete', () => {
     expect(found!.content).toBe('Texto importante')
   })
 
+  it('lança 404 (não 403) ao tentar remover um comentário de outra organização — não revela que existe', async () => {
+    const plan = await createPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id, { slug: 'org-b-delete-comment' })
+    const adminA = await createTestUser(orgA.id, { role: 'ORG_ADMIN' })
+    const adminB = await createTestUser(orgB.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(orgA.id)
+    const board = await createTestBoard(orgA.id, client.id)
+    const column = await createTestColumn(board.id, { position: 0 })
+    const department = await createTestDepartment(orgA.id)
+    const task = await prisma.task.create({
+      data: { title: 'T', position: 0, columnId: column.id, creatorId: adminA.id, departmentId: department.id },
+    })
+    const comment = await prisma.comment.create({
+      data: { content: 'Da org A', taskId: task.id, authorType: 'USER', userId: adminA.id },
+    })
+
+    await expect(deleteComment(comment.id, { id: adminB.id, role: 'ORG_ADMIN', organizationId: orgB.id }))
+      .rejects.toMatchObject({ statusCode: 404 })
+  })
+
   it('cliente sem acesso à empresa recebe 404 (nunca revela que o comentário existe)', async () => {
     const plan = await createPlan()
     const org = await prisma.organization.create({

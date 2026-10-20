@@ -266,11 +266,16 @@ mesma sessão (race no auto-revert de NEEDS_INFO, `TaskHistory`/`publishBoardEve
 - **`RequestComment` sem índice** `@@index([requestId, createdAt])` ✅ (resolvido em 2026-10-19).
   `Comment` ganhou o mesmo `@@index([taskId, createdAt])` junto (débito pré-existente ao Plano de
   Solicitações→OS, mesmo padrão). Migration `20261020010000_comment_request_comment_indexes`.
-- **Inconsistências menores**: `cancelRequest` (cliente) não grava `cancelledByType: 'CLIENT'`;
-  `listRequestComments` falha aberto se `role==='CLIENT'` sem `clientUserId` (hoje a rota sempre
-  passa, mas o ideal é falhar fechado); `deleteRequestComment` responde 403 pra tenant cruzado em
-  vez de 404 (mesmo padrão do `comments.service.ts` original); link "Ver processo"/"Abrir processo"
-  continua aparecendo numa Request `CANCELLED` com `boardId`.
+- **Inconsistências menores** ✅ (todas resolvidas em 2026-10-19):
+  - `cancelRequest` (cliente) agora grava `cancelledByType: 'CLIENT'` + `cancelledById`.
+  - `listRequestComments` falha fechado (404) se `role==='CLIENT'` sem `clientUserId`, em vez de
+    pular a checagem de escopo silenciosamente.
+  - `deleteRequestComment` e `deleteComment` (o "original" que tinha o mesmo gap — corrigido
+    junto) respondem 404 pra tenant cruzado, não mais 403 — nunca revelam que o comentário existe
+    pra quem está fora da org.
+  - Link "Ver processo"/"Abrir processo" (portal e admin) não aparece mais numa Request
+    `CANCELLED` mesmo com `boardId` presente — a tarefa associada virou `DISREGARDED`, não é mais
+    um processo ativo.
 
 ## Automação de documentos fiscais (Plano A) — débitos da revisão final (2026-10-16)
 

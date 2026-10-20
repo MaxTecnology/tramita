@@ -120,7 +120,10 @@ export async function cancelRequest(id: string, organizationId: string, clientId
   if (!CANCELLABLE_BY_CLIENT.includes(request.status)) {
     throw new AppError(422, 'Essa solicitação não pode mais ser cancelada por aqui — fale com o escritório')
   }
-  const updated = await prisma.request.update({ where: { id }, data: { status: 'CANCELLED' } })
+  const updated = await prisma.request.update({
+    where: { id },
+    data: { status: 'CANCELLED', cancelledByType: 'CLIENT', cancelledById: clientId },
+  })
   await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
   return updated
 }

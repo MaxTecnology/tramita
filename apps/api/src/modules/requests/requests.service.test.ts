@@ -124,6 +124,18 @@ describe('cancelRequest', () => {
     expect(cancelled.status).toBe('CANCELLED')
   })
 
+  it('grava cancelledByType CLIENT e cancelledById do cliente que cancelou', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+
+    const cancelled = await cancelRequest(request.id, org.id, client.id)
+
+    expect(cancelled.cancelledByType).toBe('CLIENT')
+    expect(cancelled.cancelledById).toBe(client.id)
+  })
+
   it('lança 422 ao tentar cancelar uma request já cancelada', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

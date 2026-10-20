@@ -174,4 +174,29 @@ describe('listRequestComments / deleteRequestComment', () => {
     expect(asAdmin[0].content).toBeNull()
     expect((asAdmin[0] as unknown as { deletedContent: string }).deletedContent).toBe('Primeiro')
   })
+
+  it('falha fechado (404) se role é CLIENT sem clientUserId — nunca deve devolver comentários sem checar escopo', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    await createRequestComment(request.id, { content: 'Confidencial' }, { id: admin.id, role: 'ORG_ADMIN', organizationId: org.id })
+
+    await expect(listRequestComments(request.id, org.id, 'CLIENT', undefined)).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  it('lança 404 (não 403) ao tentar remover um comentário de outra organização — não revela que existe', async () => {
+    const plan = await createTestPlan()
+    const orgA = await createTestOrg(plan.id)
+    const orgB = await createTestOrg(plan.id, { slug: 'org-b-delete-request-comment' })
+    const adminA = await createTestUser(orgA.id, { role: 'ORG_ADMIN' })
+    const adminB = await createTestUser(orgB.id, { role: 'ORG_ADMIN' })
+    const clientA = await createTestClient(orgA.id)
+    const request = await createRequest(orgA.id, clientA.id, { title: 'Pedido' })
+    const comment = await createRequestComment(request.id, { content: 'Da org A' }, { id: adminA.id, role: 'ORG_ADMIN', organizationId: orgA.id })
+
+    await expect(deleteRequestComment(comment.id, { id: adminB.id, role: 'ORG_ADMIN', organizationId: orgB.id }))
+      .rejects.toMatchObject({ statusCode: 404 })
+  })
 })
