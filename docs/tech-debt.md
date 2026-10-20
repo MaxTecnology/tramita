@@ -242,13 +242,11 @@ mesma sessão (race no auto-revert de NEEDS_INFO, `TaskHistory`/`publishBoardEve
 `cancelApprovedRequest`, e o gate de zero-atividade não contava `TaskDocumentRequirement`/
 `TaskDeliverable`). Os demais, deferidos:
 
-- **Notificação pro staff sem `clientName`** (`request-comments.service.ts`, mesmo padrão
-  pré-existente em `comments.service.ts` `TASK_COMMENT_ADDED`): quando um cliente comenta, a
-  notificação USER usa o template voltado ao cliente, sem passar `clientName` no metadata — o
-  worker lê `metadata.clientName ?? ''` (`notification.worker.ts:218`), então a equipe recebe
-  "Olá, ! Novo comentário...". Não é uma regressão desta feature — já existia em `TASK_COMMENT_ADDED`,
-  só ficou mais visível por mirroring. Corrigir os dois juntos (criar metadata/template dedicado
-  pro destinatário USER) é mais consistente do que corrigir só o caminho novo.
+- **Notificação pro staff sem `clientName`** ✅ (resolvido em 2026-10-19, nos dois lugares juntos
+  como a nota original pedia). `comments.service.ts` e `request-comments.service.ts` agora
+  incluem `client.name` na query (`task.column.board.client`/`request.client`) e passam
+  `clientName` no metadata da notificação USER quando o cliente comenta — a equipe deixa de
+  receber "Olá, ! Novo comentário...".
 - **UI não reflete o auto-revert em tempo real**: no portal, o `onSuccess` de criar comentário só
   invalida `['request-comments', id]`, não `['portal-requests']` — o badge "Aguardando resposta"
   só atualiza no próximo refetch. No admin, o handler SSE de `request:changed`

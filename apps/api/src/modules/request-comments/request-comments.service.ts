@@ -59,7 +59,10 @@ export async function createRequestComment(
   const isClient = actor.role === 'CLIENT'
   const scope = isClient ? await getClientAccessScope(actor.id) : null
 
-  const request = await prisma.request.findFirst({ where: { id: requestId, organizationId: actor.organizationId } })
+  const request = await prisma.request.findFirst({
+    where: { id: requestId, organizationId: actor.organizationId },
+    include: { client: { select: { name: true } } },
+  })
   if (!request) throw new AppError(404, 'Solicitação não encontrada')
   if (isClient && !scope!.clientIds.includes(request.clientId)) {
     throw new AppError(404, 'Solicitação não encontrada')
@@ -121,6 +124,7 @@ export async function createRequestComment(
             requestTitle: request.title,
             commentText: data.content,
             commentAuthorName: authorName,
+            clientName: request.client.name,
           },
         }),
       ),

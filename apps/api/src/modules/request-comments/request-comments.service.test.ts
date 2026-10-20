@@ -129,6 +129,32 @@ describe('createRequestComment', () => {
       expect.objectContaining({ event: 'REQUEST_COMMENT_ADDED', userId: admin.id }),
     )
   })
+
+  it('inclui o clientName no metadata quando o cliente comenta (notificação pra equipe)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id, { name: 'Empresa Teste LTDA' })
+    const { clientUser } = await createTestClientUser(org.id)
+    const department = await createTestDepartment(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+
+    await createRequestComment(request.id, { content: 'Oi' }, {
+      id: clientUser.id, role: 'CLIENT', organizationId: org.id,
+    })
+
+    // createRequest (setup) já dispara seu próprio REQUEST_CREATED com clientName correto —
+    // precisa travar no event certo, senão o matcher acha aquela chamada e passa por engano sem
+    // testar nada do REQUEST_COMMENT_ADDED que é o alvo real deste teste.
+    expect(queue.enqueueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'REQUEST_COMMENT_ADDED',
+        userId: admin.id,
+        metadata: expect.objectContaining({ clientName: 'Empresa Teste LTDA' }),
+      }),
+    )
+  })
 })
 
 describe('listRequestComments / deleteRequestComment', () => {

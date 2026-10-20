@@ -278,4 +278,26 @@ describe('createComment - roteamento de notificação por departamento', () => {
   // 20260921210100_task_department_required), então esse cenário não é mais produzível — o
   // fallback "notifica todos os responsáveis" em comments.service.ts também deixou de ser
   // alcançável e foi simplificado junto.
+
+  it('inclui o clientName no metadata quando o cliente comenta (notificação pra equipe)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id, { name: 'Empresa Teste LTDA' })
+    const department = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id, { position: 0 })
+    const user = await createTestUser(org.id)
+    await prisma.clientAssignment.create({ data: { clientId: client.id, departmentId: department.id, userId: user.id } })
+    const task = await prisma.task.create({
+      data: { title: 'Tarefa', position: 0, columnId: column.id, creatorId: user.id, departmentId: department.id },
+    })
+
+    await createComment(task.id, { content: 'Olá' }, { id: clientUser.id, role: 'CLIENT', organizationId: org.id })
+
+    expect(queue.enqueueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: expect.objectContaining({ clientName: 'Empresa Teste LTDA' }) }),
+    )
+  })
 })

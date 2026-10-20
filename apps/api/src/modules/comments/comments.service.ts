@@ -74,7 +74,7 @@ export async function createComment(
 
   const task = await prisma.task.findFirst({
     where: { id: taskId, column: { board: boardWhere } },
-    include: { column: { include: { board: { select: { id: true, clientId: true } } } } },
+    include: { column: { include: { board: { select: { id: true, clientId: true, client: { select: { name: true } } } } } } },
   })
   if (!task) throw new AppError(404, 'Tarefa não encontrada')
   const clientId = task.column.board.clientId
@@ -132,6 +132,7 @@ export async function createComment(
             taskTitle: task.title,
             commentText: data.content,
             commentAuthorName: authorName,
+            clientName: task.column.board.client.name,
           },
         }),
       ),
