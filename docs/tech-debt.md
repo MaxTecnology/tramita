@@ -263,8 +263,9 @@ mesma sessão (race no auto-revert de NEEDS_INFO, `TaskHistory`/`publishBoardEve
   — texto só com espaços é rejeitado (400), limite de 4000 caracteres (WhatsApp tem limite
   documentado de ~4096). `createCommentSchema` (comentário de Task, mesmo gap, não citado na nota
   original mas idêntico) corrigido junto por consistência.
-- **`RequestComment` sem índice** `@@index([requestId, createdAt])` (o `Comment` original também
-  não tem — débito pré-existente, vale corrigir os dois juntos).
+- **`RequestComment` sem índice** `@@index([requestId, createdAt])` ✅ (resolvido em 2026-10-19).
+  `Comment` ganhou o mesmo `@@index([taskId, createdAt])` junto (débito pré-existente ao Plano de
+  Solicitações→OS, mesmo padrão). Migration `20261020010000_comment_request_comment_indexes`.
 - **Inconsistências menores**: `cancelRequest` (cliente) não grava `cancelledByType: 'CLIENT'`;
   `listRequestComments` falha aberto se `role==='CLIENT'` sem `clientUserId` (hoje a rota sempre
   passa, mas o ideal é falhar fechado); `deleteRequestComment` responde 403 pra tenant cruzado em

@@ -343,6 +343,8 @@ model RequestComment {
   user    User?   @relation(fields: [userId], references: [id])
   client  Client? @relation(fields: [clientId], references: [id])
 
+  // listRequestComments ordena por requestId + createdAt.
+  @@index([requestId, createdAt])
   @@map("request_comments")
 }
 
@@ -739,6 +741,9 @@ model Comment {
   user   User?   @relation(fields: [userId], references: [id])
   client Client? @relation(fields: [clientId], references: [id])
 
+  // listComments ordena por taskId + createdAt — débito pré-existente ao Plano de
+  // Solicitações->OS, corrigido junto com RequestComment por serem o mesmo padrão.
+  @@index([taskId, createdAt])
   @@map("comments")
 }
 
