@@ -36,6 +36,42 @@ describe('POST /requests/:requestId/comments', () => {
     expect(list.statusCode).toBe(200)
     expect(JSON.parse(list.body)).toHaveLength(1)
   })
+
+  it('lança 400 quando o content é só espaços em branco', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const authStaff = await getAuthHeader(member.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/requests/${request.id}/comments`,
+      headers: { authorization: authStaff },
+      payload: { content: '   ' },
+    })
+
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('lança 400 quando o content excede o limite de tamanho', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const client = await createTestClient(org.id)
+    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const authStaff = await getAuthHeader(member.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/requests/${request.id}/comments`,
+      headers: { authorization: authStaff },
+      payload: { content: 'x'.repeat(4001) },
+    })
+
+    expect(res.statusCode).toBe(400)
+  })
 })
 
 describe('DELETE /request-comments/:id', () => {

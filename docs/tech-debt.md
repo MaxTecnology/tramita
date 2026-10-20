@@ -258,9 +258,11 @@ mesma sessão (race no auto-revert de NEEDS_INFO, `TaskHistory`/`publishBoardEve
 - **Aprovar/rejeitar a partir de NEEDS_INFO** deixa a resposta do cliente (se vier depois) perdida
   na thread de uma Request já fechada, sem refletir na Task. Decisão de produto, não bug — considerar
   exibir a thread da Request no `TaskDrawer` quando `task.sourceRequestId` existir.
-- **Validação de entrada frouxa**: `createRequestCommentSchema`/`needsInfoRequestSchema`/
-  `cancelApprovedRequestSchema` usam `z.string().min(1)` sem `.trim()` nem `.max()` — texto só com
-  espaços passa, e não há limite de tamanho pro que vai pro WhatsApp/email.
+- **Validação de entrada frouxa** ✅ (resolvido em 2026-10-19). `createRequestCommentSchema`,
+  `needsInfoRequestSchema` e `cancelApprovedRequestSchema` agora usam `.trim().min(1, ...).max(4000, ...)`
+  — texto só com espaços é rejeitado (400), limite de 4000 caracteres (WhatsApp tem limite
+  documentado de ~4096). `createCommentSchema` (comentário de Task, mesmo gap, não citado na nota
+  original mas idêntico) corrigido junto por consistência.
 - **`RequestComment` sem índice** `@@index([requestId, createdAt])` (o `Comment` original também
   não tem — débito pré-existente, vale corrigir os dois juntos).
 - **Inconsistências menores**: `cancelRequest` (cliente) não grava `cancelledByType: 'CLIENT'`;

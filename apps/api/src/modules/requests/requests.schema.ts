@@ -24,11 +24,11 @@ export const rejectRequestSchema = z.object({
 })
 
 export const needsInfoRequestSchema = z.object({
-  comment: z.string().min(1),
+  comment: z.string().trim().min(1, 'Comentário obrigatório').max(4000, 'Comentário excede o limite de 4000 caracteres'),
 })
 
 export const cancelApprovedRequestSchema = z.object({
-  reason: z.string().min(1),
+  reason: z.string().trim().min(1, 'Motivo obrigatório').max(4000, 'Motivo excede o limite de 4000 caracteres'),
 })
 
 export const listRequestsQuerySchema = z.object({

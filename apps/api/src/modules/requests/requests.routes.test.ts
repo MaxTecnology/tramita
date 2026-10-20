@@ -192,6 +192,25 @@ describe('POST /requests/:id/needs-info', () => {
     })
     expect(res.statusCode).toBe(400)
   })
+
+  it('rejeita comment só com espaços em branco (400)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
+    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const created = await app.inject({
+      method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
+      payload: { clientId: client.id, title: 'Pedido' },
+    })
+    const request = JSON.parse(created.body)
+    const auth = await getAuthHeader(manager.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'POST', url: `/requests/${request.id}/needs-info`, headers: { authorization: auth },
+      payload: { comment: '   ' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
 })
 
 describe('POST /requests/:id/cancel', () => {
@@ -263,6 +282,29 @@ describe('POST /requests/:id/cancel', () => {
     const res = await app.inject({
       method: 'POST', url: `/requests/${request.id}/cancel`, headers: { authorization: auth },
       payload: {},
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('rejeita reason só com espaços em branco (400)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const created = await app.inject({
+      method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
+      payload: { clientId: client.id, title: 'Pedido' },
+    })
+    const request = JSON.parse(created.body)
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+    await app.inject({
+      method: 'POST', url: `/requests/${request.id}/approve`, headers: { authorization: auth },
+      payload: { mode: 'NEW_BOARD' },
+    })
+
+    const res = await app.inject({
+      method: 'POST', url: `/requests/${request.id}/cancel`, headers: { authorization: auth },
+      payload: { reason: '   ' },
     })
     expect(res.statusCode).toBe(400)
   })

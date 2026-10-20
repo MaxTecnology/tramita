@@ -117,4 +117,44 @@ describe('POST /tasks/:taskId/comments', () => {
     const comment = await prisma.comment.findFirst({ where: { taskId: task.id } })
     expect(comment).toBeNull()
   })
+
+  it('lança 400 quando o content é só espaços em branco', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    const auth = await getAuthHeader(user.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/tasks/${task.id}/comments`,
+      headers: { authorization: auth },
+      payload: { content: '   ' },
+    })
+
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('lança 400 quando o content excede o limite de tamanho', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    const auth = await getAuthHeader(user.email, 'Test@1234')
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/tasks/${task.id}/comments`,
+      headers: { authorization: auth },
+      payload: { content: 'x'.repeat(4001) },
+    })
+
+    expect(res.statusCode).toBe(400)
+  })
 })
