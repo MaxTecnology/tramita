@@ -388,3 +388,50 @@ describe('notificação ao cliente por departamento (e-mail e WhatsApp)', () => 
     expect(vi.mocked(mailer.sendEmail).mock.calls).toHaveLength(2)
   })
 })
+
+describe('destinatários: evento sem departamento e telefone repetido', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.spyOn(encryption, 'decrypt').mockImplementation((encoded) => encoded)
+    vi.spyOn(maximizebot, 'sendWhatsApp').mockResolvedValue(undefined)
+    vi.spyOn(mailer, 'sendEmail').mockResolvedValue(undefined)
+  })
+
+  async function setup() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const staff = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const dept = await createTestDepartment(org.id)
+    for (const email of [`a-${Date.now()}@t.com`, `b-${Date.now()}@t.com`]) {
+      const { clientUser } = await createTestClientUser(org.id, { email })
+      await prisma.clientUser.update({ where: { id: clientUser.id }, data: { phone: '5582933333333' } })
+      await grantClientAccess(clientUser.id, client.id, dept.id)
+    }
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, staff.id, { departmentId: dept.id })
+    await prisma.notificationConfig.create({
+      data: { organizationId: org.id, whatsappEnabled: true, emailEnabled: true, taskMoved: true, maximizebotToken: 'Bearer t' },
+    })
+    return { org, client, task }
+  }
+
+  it('dois usuários com o mesmo telefone recebem um WhatsApp só', async () => {
+    const { org, client, task } = await setup()
+
+    await processNotificationJob({ data: { event: 'TASK_MOVED', organizationId: org.id, clientId: client.id, taskId: task.id, metadata: {} } })
+
+    expect(maximizebot.sendWhatsApp).toHaveBeenCalledTimes(1)
+    expect(mailer.sendEmail).toHaveBeenCalledTimes(2)
+  })
+
+  it('evento ao cliente sem tarefa nem solicitação não envia nada (não sabe o departamento)', async () => {
+    const { org, client } = await setup()
+
+    await processNotificationJob({ data: { event: 'TASK_MOVED', organizationId: org.id, clientId: client.id, metadata: {}, forceChannels: ['WHATSAPP', 'EMAIL'] } })
+
+    expect(maximizebot.sendWhatsApp).not.toHaveBeenCalled()
+    expect(mailer.sendEmail).not.toHaveBeenCalled()
+  })
+})

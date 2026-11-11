@@ -2,6 +2,7 @@
 import { Worker } from 'bullmq'
 import { bullmqRedis } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 import { renderTemplate, getTemplate, type TemplateVars } from '@/lib/template'
 import { sendWhatsApp } from '@/lib/maximizebot'
 import { sendEmail } from '@/lib/mailer'
@@ -113,16 +114,14 @@ async function processClientNotification(
 
   // Destinatário por departamento do assunto (tarefa ou solicitação), nos dois canais. O número da
   // empresa (client.whatsapp) não é destino: um assunto da Folha não pode cair no WhatsApp de quem só
-  // cuida do Fiscal. Evento sem tarefa nem solicitação não é de nenhum departamento: vai pra todos os
-  // usuários ativos da empresa.
+  // cuida do Fiscal. Evento sem tarefa nem solicitação não tem departamento: não envia nada (padrão
+  // seguro) e avisa no log — um evento novo desse tipo precisa declarar o departamento.
   const departmentId = task?.departmentId ?? request?.departmentId ?? null
-  const recipients: ClientRecipient[] = departmentId
-    ? await resolveClientRecipients(clientId, departmentId)
-    : await prisma.clientUser.findMany({
-        where: { isActive: true, accesses: { some: { clientId } } },
-        select: { id: true, name: true, email: true, phone: true },
-        orderBy: { name: 'asc' },
-      })
+  if (!departmentId) {
+    logger.warn({ event, organizationId, clientId }, 'Notificação ao cliente sem tarefa nem solicitação — sem departamento, nada enviado')
+    return
+  }
+  const recipients: ClientRecipient[] = await resolveClientRecipients(clientId, departmentId)
 
   const channels: MessageChannel[] = []
   if (config.whatsappEnabled && config.maximizebotToken) channels.push('WHATSAPP')
@@ -135,9 +134,12 @@ async function processClientNotification(
     const rendered = renderTemplate(template.body, vars)
     const subject = renderTemplate(template.subject ?? '', vars)
 
+    const sentTo = new Set<string>()
     for (const recipient of recipients) {
       const address = channel === 'EMAIL' ? recipient.email : recipient.phone
-      if (!address) continue
+      // Dois usuários com o mesmo telefone (ex.: número do escritório do cliente) recebem uma vez só.
+      if (!address || sentTo.has(address)) continue
+      sentTo.add(address)
 
       // Declarados por destinatário pra que a falha de um nunca vaze pro log do próximo.
       let status: 'SENT' | 'FAILED' = 'SENT'
