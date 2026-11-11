@@ -25,7 +25,7 @@ describe('createRequestComment', () => {
     const { clientUser } = await createTestClientUser(org.id)
     const department = await createTestDepartment(org.id)
     await grantClientAccess(clientUser.id, client.id, department.id)
-    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido', departmentId: department.id })
     await markNeedsInfo(request.id, org.id, admin.id, 'Qual o CNPJ da empresa?')
 
     await createRequestComment(request.id, { content: 'É 00.000.000/0001-00' }, {
@@ -60,7 +60,7 @@ describe('createRequestComment', () => {
     const { clientUser } = await createTestClientUser(org.id)
     const department = await createTestDepartment(org.id)
     await grantClientAccess(clientUser.id, client.id, department.id)
-    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido', departmentId: department.id })
     await prisma.request.update({ where: { id: request.id }, data: { status: 'APPROVED', reviewedById: admin.id } })
 
     await createRequestComment(request.id, { content: 'Obrigado!' }, {
@@ -91,7 +91,7 @@ describe('createRequestComment', () => {
     const { clientUser } = await createTestClientUser(org.id)
     const department = await createTestDepartment(org.id)
     await grantClientAccess(clientUser.id, client.id, department.id)
-    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido', departmentId: department.id })
     await markNeedsInfo(request.id, org.id, admin.id, 'Qual o CNPJ?')
 
     // Dispara approveRequest e o comentário do cliente concorrentemente — ambos fazem várias
@@ -112,25 +112,6 @@ describe('createRequestComment', () => {
     }
   })
 
-  it('departmentId nulo na request cai no fallback ORG_ADMIN/ORG_MANAGER sem erro', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-    const client = await createTestClient(org.id)
-    const { clientUser } = await createTestClientUser(org.id)
-    const department = await createTestDepartment(org.id)
-    await grantClientAccess(clientUser.id, client.id, department.id)
-    const request = await createTestRequest(org.id, client.id, { title: 'Pedido sem depto' }) // departmentId undefined
-
-    await createRequestComment(request.id, { content: 'Oi' }, {
-      id: clientUser.id, role: 'CLIENT', organizationId: org.id,
-    })
-
-    expect(queue.enqueueNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ event: 'REQUEST_COMMENT_ADDED', userId: admin.id }),
-    )
-  })
-
   it('inclui o clientName no metadata quando o cliente comenta (notificação pra equipe)', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
@@ -139,7 +120,7 @@ describe('createRequestComment', () => {
     const { clientUser } = await createTestClientUser(org.id)
     const department = await createTestDepartment(org.id)
     await grantClientAccess(clientUser.id, client.id, department.id)
-    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido', departmentId: department.id })
 
     await createRequestComment(request.id, { content: 'Oi' }, {
       id: clientUser.id, role: 'CLIENT', organizationId: org.id,

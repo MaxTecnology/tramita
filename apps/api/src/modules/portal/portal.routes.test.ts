@@ -499,3 +499,46 @@ describe('Portal — departamentos e solicitações (só departamento acessível
     expect(res.json().departmentId).toBe(fiscal.id)
   })
 })
+
+describe('Portal — solicitações isoladas por departamento', () => {
+  async function setup() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const staff = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const fiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
+    const folha = await createTestDepartment(org.id, { name: 'Folha' })
+    await prisma.clientAssignment.createMany({
+      data: [
+        { clientId: client.id, departmentId: fiscal.id, userId: staff.id },
+        { clientId: client.id, departmentId: folha.id, userId: staff.id },
+      ],
+    })
+    const { clientUser: fiscalUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(fiscalUser.id, client.id, fiscal.id)
+    const folhaRequest = await prisma.request.create({
+      data: { organizationId: org.id, clientId: client.id, title: 'Rescisão', departmentId: folha.id },
+    })
+    const fiscalRequest = await prisma.request.create({
+      data: { organizationId: org.id, clientId: client.id, title: 'DAS', departmentId: fiscal.id },
+    })
+    return { client, folhaRequest, fiscalRequest, auth: await getAuthHeader(fiscalUser.email, password) }
+  }
+
+  it('a lista só traz solicitações dos departamentos com acesso', async () => {
+    const { client, auth } = await setup()
+    const res = await app.inject({ method: 'GET', url: `/portal/requests?clientId=${client.id}`, headers: { authorization: auth } })
+    expect(res.json().map((r: { title: string }) => r.title)).toEqual(['DAS'])
+  })
+
+  it('detalhe, cancelamento e comentários de solicitação de outro departamento → 404', async () => {
+    const { folhaRequest, auth } = await setup()
+    const detail = await app.inject({ method: 'GET', url: `/portal/requests/${folhaRequest.id}`, headers: { authorization: auth } })
+    const cancel = await app.inject({ method: 'PATCH', url: `/portal/requests/${folhaRequest.id}/cancel`, headers: { authorization: auth } })
+    const comments = await app.inject({ method: 'GET', url: `/requests/${folhaRequest.id}/comments`, headers: { authorization: auth } })
+    const comment = await app.inject({
+      method: 'POST', url: `/requests/${folhaRequest.id}/comments`, headers: { authorization: auth }, payload: { content: 'oi' },
+    })
+    expect([detail.statusCode, cancel.statusCode, comments.statusCode, comment.statusCode]).toEqual([404, 404, 404, 404])
+  })
+})

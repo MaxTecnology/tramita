@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { publishOrgEvent } from '@/lib/sse'
 import { enqueueNotification } from '@/lib/queue'
-import { getClientAccessScope } from '@/modules/client-users/client-access'
+import { canSeeTask, getClientAccessScope } from '@/modules/client-users/client-access'
 import type { CreateRequestCommentBody } from './request-comments.schema'
 
 interface CommentActor {
@@ -30,7 +30,8 @@ export async function listRequestComments(
 
   const request = await prisma.request.findFirst({ where: { id: requestId, organizationId } })
   if (!request) throw new AppError(404, 'Solicitação não encontrada')
-  if (scope && !scope.clientIds.includes(request.clientId)) {
+  // Usuário do cliente só vê solicitação de departamento a que tem acesso naquela empresa.
+  if (scope && !canSeeTask(scope, request.clientId, request.departmentId)) {
     throw new AppError(404, 'Solicitação não encontrada')
   }
 
@@ -68,7 +69,7 @@ export async function createRequestComment(
     include: { client: { select: { name: true } } },
   })
   if (!request) throw new AppError(404, 'Solicitação não encontrada')
-  if (isClient && !scope!.clientIds.includes(request.clientId)) {
+  if (isClient && !canSeeTask(scope!, request.clientId, request.departmentId)) {
     throw new AppError(404, 'Solicitação não encontrada')
   }
 
@@ -147,7 +148,7 @@ export async function createRequestComment(
 export async function deleteRequestComment(id: string, actor: CommentActor) {
   const comment = await prisma.requestComment.findFirst({
     where: { id },
-    include: { request: { select: { organizationId: true, clientId: true } } },
+    include: { request: { select: { organizationId: true, clientId: true, departmentId: true } } },
   })
   // 404, não 403 — mesmo padrão de findFirst-escopado-por-organizationId usado no resto do
   // projeto (os-templates.service.ts, document-reader-models.service.ts): nunca revela pra um
@@ -159,7 +160,7 @@ export async function deleteRequestComment(id: string, actor: CommentActor) {
 
   if (actor.role === 'CLIENT') {
     const scope = await getClientAccessScope(actor.id)
-    if (!scope.clientIds.includes(comment.request.clientId)) {
+    if (!canSeeTask(scope, comment.request.clientId, comment.request.departmentId)) {
       throw new AppError(404, 'Comentário não encontrado')
     }
   }

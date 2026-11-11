@@ -5,7 +5,7 @@ import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { prisma } from '@/lib/prisma'
-import { getClientAccessScope } from '@/modules/client-users/client-access'
+import { canSeeTask, getClientAccessScope } from '@/modules/client-users/client-access'
 import { getTaskHistory, listAccessibleClients, listPortalTasks } from './portal.service'
 import { createRequestSchema } from '@/modules/requests/requests.schema'
 import {
@@ -124,14 +124,16 @@ export async function portalRoutes(app: FastifyInstance) {
     if (!clientId) throw new AppError(400, 'clientId é obrigatório')
     const scope = await getClientAccessScope(request.user.sub)
     if (!scope.clientIds.includes(clientId)) throw new AppError(404, 'Empresa não encontrada')
-    return reply.send(await listRequestsForClient(request.user.organizationId!, clientId))
+    // Só solicitações dos departamentos a que este usuário tem acesso nesta empresa.
+    const departmentIds = [...(scope.departmentIdsByClient.get(clientId) ?? [])]
+    return reply.send(await listRequestsForClient(request.user.organizationId!, clientId, departmentIds))
   })
 
   app.get('/requests/:id', async (request, reply) => {
     const { id } = request.params as { id: string }
     const scope = await getClientAccessScope(request.user.sub)
     const found = await getRequestById(id, request.user.organizationId!)
-    if (!scope.clientIds.includes(found.clientId)) throw new AppError(404, 'Solicitação não encontrada')
+    if (!canSeeTask(scope, found.clientId, found.departmentId)) throw new AppError(404, 'Solicitação não encontrada')
     return reply.send(found)
   })
 
@@ -139,7 +141,7 @@ export async function portalRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const scope = await getClientAccessScope(request.user.sub)
     const found = await getRequestById(id, request.user.organizationId!)
-    if (!scope.clientIds.includes(found.clientId)) throw new AppError(404, 'Solicitação não encontrada')
+    if (!canSeeTask(scope, found.clientId, found.departmentId)) throw new AppError(404, 'Solicitação não encontrada')
     return reply.send(await cancelRequest(id, request.user.organizationId!, found.clientId))
   })
 
@@ -163,7 +165,7 @@ export async function portalRoutes(app: FastifyInstance) {
 
     const scope = await getClientAccessScope(request.user.sub)
     const found = await getRequestById(requestId, request.user.organizationId!)
-    if (!scope.clientIds.includes(found.clientId)) throw new AppError(404, 'Solicitação não encontrada')
+    if (!canSeeTask(scope, found.clientId, found.departmentId)) throw new AppError(404, 'Solicitação não encontrada')
     const attachment = await createRequestAttachment(
       requestId,
       request.user.organizationId!,

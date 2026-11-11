@@ -17,7 +17,7 @@ describe('POST /requests/:requestId/comments', () => {
     const { clientUser, password } = await createTestClientUser(org.id)
     const department = await createTestDepartment(org.id)
     await grantClientAccess(clientUser.id, client.id, department.id)
-    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido', departmentId: department.id })
 
     const authStaff = await getAuthHeader(member.email, 'Test@1234')
     const created = await app.inject({

@@ -87,9 +87,9 @@ export async function listRequestsForOrg(organizationId: string, status?: Reques
   return requests.map(withBoardId)
 }
 
-export async function listRequestsForClient(organizationId: string, clientId: string) {
+export async function listRequestsForClient(organizationId: string, clientId: string, departmentIds?: string[]) {
   const requests = await prisma.request.findMany({
-    where: { organizationId, clientId },
+    where: { organizationId, clientId, ...(departmentIds ? { departmentId: { in: departmentIds } } : {}) },
     include: { task: { select: { column: { select: { boardId: true } } } } },
     orderBy: { createdAt: 'desc' },
   })
