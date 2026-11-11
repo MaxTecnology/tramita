@@ -96,14 +96,10 @@ export async function assertCanUnserveDepartments(db: Db, clientId: string, depa
 type AccessPair = { clientId: string; departmentId: string }
 
 export async function assertAccessesServed(db: Db, accesses: AccessPair[]): Promise<void> {
+  // Mesma mensagem de assertDepartmentServesClient, que cita o cliente — a tela de Usuários de
+  // Cliente mexe em várias empresas ao mesmo tempo.
   for (const { clientId, departmentId } of accesses) {
-    const served = await db.clientAssignment.findUnique({
-      where: { clientId_departmentId: { clientId, departmentId } },
-      select: { id: true },
-    })
-    if (served) continue
-    const department = await db.department.findUnique({ where: { id: departmentId }, select: { name: true } })
-    throw new AppError(400, `O departamento ${department?.name ?? ''} não atende este cliente.`)
+    await assertDepartmentServesClient(db, clientId, departmentId)
   }
 }
 

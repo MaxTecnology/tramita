@@ -478,3 +478,14 @@ describe('cobertura ignora usuário do portal inativo', () => {
     expect(link.isActive).toBe(false)
   })
 })
+
+describe('mesmo CNPJ com e sem máscara', () => {
+  it('é tratado como o mesmo cliente → 409 no segundo cadastro', async () => {
+    const { org, admin, fiscal } = await setupOrg()
+    const deps = [{ departmentId: fiscal.id, responsibleUserId: admin.id }]
+    await createClient(org.id, clientBodySchema.parse(body({ cnpj: '11.222.333/0001-81', departments: deps, clientUsers: [newUser([fiscal.id])] })))
+
+    await expect(createClient(org.id, clientBodySchema.parse(body({ cnpj: '11222333000181', departments: deps, clientUsers: [newUser([fiscal.id])] }))))
+      .rejects.toMatchObject({ statusCode: 409, message: 'Já existe um cliente ativo com este CNPJ nesta organização' })
+  })
+})

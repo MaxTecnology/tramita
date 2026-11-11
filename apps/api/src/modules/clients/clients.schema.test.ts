@@ -58,4 +58,11 @@ describe('companyFieldsSchema', () => {
     const r = companyFieldsSchema.safeParse(validPf)
     expect(r.success && r.data.cpf).toBe('52998224725')
   })
+
+  it('descarta o documento que não corresponde ao tipo (troca PJ↔PF não deixa CNPJ/CPF antigo gravado)', () => {
+    const pf = companyFieldsSchema.parse({ ...validPf, cnpj: '11.222.333/0001-81' })
+    expect(pf.cnpj).toBeNull()
+    const pjFromPf = companyFieldsSchema.parse({ ...validPj, cpf: '529.982.247-25' })
+    expect(pjFromPf.cpf).toBeNull()
+  })
 })

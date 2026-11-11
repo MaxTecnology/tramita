@@ -51,8 +51,14 @@ function refineCompanyFields(data: CompanyFieldsInput, ctx: z.RefinementCtx) {
   }
 }
 
-function normalizeDocuments<T extends { cnpj: string | null; cpf: string | null }>(data: T): T {
-  return { ...data, cnpj: data.cnpj ? soDigitos(data.cnpj) : null, cpf: data.cpf ? soDigitos(data.cpf) : null }
+// Só dígitos, e só o documento do tipo do cliente: um CNPJ que sobrou de quando o cliente era PJ
+// ocuparia o índice único e poderia casar documento errado no robô de leitura.
+function normalizeDocuments<T extends { clientType: 'PF' | 'PJ'; cnpj: string | null; cpf: string | null }>(data: T): T {
+  return {
+    ...data,
+    cnpj: data.clientType === 'PJ' && data.cnpj ? soDigitos(data.cnpj) : null,
+    cpf: data.clientType === 'PF' && data.cpf ? soDigitos(data.cpf) : null,
+  }
 }
 
 export const companyFieldsSchema = companyFieldsObject.superRefine(refineCompanyFields).transform(normalizeDocuments)

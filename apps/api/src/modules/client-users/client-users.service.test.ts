@@ -76,7 +76,7 @@ describe('createClientUser', () => {
         name: 'X', email: email('x'), password: 'Senha@1234', isActive: true,
         accesses: [{ clientId: client.id, departmentId: folha.id }],
       }),
-    ).rejects.toMatchObject({ statusCode: 400, message: 'O departamento Folha não atende este cliente.' })
+    ).rejects.toMatchObject({ statusCode: 400, message: 'O departamento Folha não atende o cliente ACME.' })
   })
 })
 
@@ -126,7 +126,7 @@ describe('updateClientUser', () => {
       updateClientUser(created.id, org.id, {
         accesses: [{ clientId: client.id, departmentId: department.id }, { clientId: client.id, departmentId: folha.id }],
       }),
-    ).rejects.toMatchObject({ statusCode: 400, message: 'O departamento Folha não atende este cliente.' })
+    ).rejects.toMatchObject({ statusCode: 400, message: 'O departamento Folha não atende o cliente ACME.' })
   })
 
   it('recusa remover o único acesso de um departamento atendido de cliente ativo', async () => {
