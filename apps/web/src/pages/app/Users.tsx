@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { cn } from '@/lib/utils'
+import { cn, mensagemDeErro } from '@/lib/utils'
 import type { User, OrgRole } from '@/types'
 import { toast } from 'sonner'
 
@@ -37,6 +38,7 @@ const ROLE_BADGE: Record<string, string> = {
 
 export default function Users() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState<CreateForm>(EMPTY_CREATE)
@@ -111,7 +113,14 @@ export default function Users() {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setDeletingId(null)
     },
-    onError: () => toast.error('Erro ao desativar usuário'),
+    onError: (err, id) => {
+      setDeletingId(null)
+      // 409 = ainda é responsável por cliente/departamento: oferece a tela de transferência.
+      const status = (err as { response?: { status?: number } })?.response?.status
+      toast.error(mensagemDeErro(err, 'Erro ao desativar usuário'), status === 409
+        ? { action: { label: 'Transferir responsabilidades', onClick: () => navigate(`/app/users/${id}/transfer`) } }
+        : undefined)
+    },
   })
 
   const [resetPassword, setResetPassword] = useState<string | null>(null)
@@ -263,6 +272,9 @@ export default function Users() {
               <div className="flex items-center gap-1 flex-shrink-0">
                 <Button variant="ghost" size="sm" onClick={() => openEdit(user)} className="text-muted-foreground hover:text-foreground">
                   Editar
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate(`/app/users/${user.id}/transfer`)} className="text-muted-foreground hover:text-foreground">
+                  Transferir
                 </Button>
                 <Button
                   variant="ghost"

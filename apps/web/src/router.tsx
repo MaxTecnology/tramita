@@ -13,6 +13,7 @@ import OrgSubscription from '@/pages/org/Subscription'
 import Board from '@/pages/app/Board'
 import Clients from '@/pages/app/Clients'
 import Users from '@/pages/app/Users'
+import UserTransfer from '@/pages/app/UserTransfer'
 import SettingsHub from '@/pages/app/settings/SettingsHub'
 import Templates from '@/pages/app/settings/Templates'
 import Notifications from '@/pages/app/settings/Notifications'
@@ -99,6 +100,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <Users />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'users/:id/transfer',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <UserTransfer />
           </ProtectedRoute>
         ),
       },
