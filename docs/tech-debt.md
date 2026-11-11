@@ -374,3 +374,25 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   e ainda assim salva. Continua não sendo a "análise de impacto contra documentos já recebidos"
   completa (fora de escopo v1 por decisão explícita da spec) — só avisa sobre a amostra atual,
   não re-varre documentos já processados.
+
+## Worker (e API) carregam o `.env` depois dos imports — worker não sobe localmente (encontrado em 2026-11-11)
+
+**Sintoma:** `pnpm --filter api worker` quebra na inicialização com `Missing API key` do Resend,
+mesmo com `RESEND_API_KEY` no `.env`. Derruba o worker inteiro — notificações de WhatsApp/e-mail,
+leitura de documentos e os crons — não só o e-mail.
+
+**Causa:** `src/worker.ts` e `src/app.ts` chamam `config()` do `dotenv` no corpo do módulo, mas em
+ESM todos os `import` estáticos são avaliados **antes** do corpo. Qualquer módulo que lê
+`process.env` no topo do arquivo (ex.: `src/lib/mailer.ts`, que faz
+`new Resend(process.env.RESEND_API_KEY)` no import) enxerga o ambiente vazio. Em produção não
+aparece porque o Dokploy injeta as variáveis no processo antes de qualquer código rodar. A API
+só não quebra hoje porque não importa o `mailer` na inicialização.
+
+**Contorno usado no teste local:** `npx tsx --env-file=../../.env src/worker.ts` e um
+`RESEND_API_KEY=re_local_placeholder` no `.env` local (fora do git).
+
+**Correção sugerida:** carregar o `.env` num módulo próprio importado como **primeiro** import
+(`import './load-env'`), ou passar `--env-file` nos scripts `dev`/`worker` do `package.json`; e
+criar o cliente do Resend sob demanda (dentro de `sendEmail`), pra que a falta da chave de e-mail
+falhe só o envio de e-mail, nunca a subida do worker. Teste: subir o worker sem `RESEND_API_KEY`
+e confirmar que os outros workers iniciam.
