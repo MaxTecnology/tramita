@@ -387,21 +387,29 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
 8. [x] **Usuários de cliente com acesso por departamento** (concluído em 2026-09-21) — `ClientUser`/`ClientUserAccess`, login do portal desacoplado de `Client`, `Task.departmentId` obrigatório. Um `ClientUser` (pessoa) pode acessar mais de uma empresa (`Client`), com escopo de departamento por empresa; rotas de portal (`requests`, `tasks`, `documents`) agora exigem `clientId` explícito e validam contra o escopo de acesso do usuário. Tela dedicada de Usuários de Cliente (CRUD + reaproveitamento de usuário existente ao cadastrar empresa), seletor de empresa no portal quando há mais de uma. Ver `docs/superpowers/sdd/2026-09-21-client-users/`.
 9. [x] **Kanban dinâmico, Templates de OS e código do cliente** (concluído em 2026-09-22) — coluna passa a ter `statusEffect` (`NONE`/`OPEN`/`STARTED`/`BLOCKED`/`DISREGARDED`/`DONE`, aplica o status na tarefa ao entrar na coluna) e `notifyClient` (notifica o cliente ao mover pra essa coluna, independente do toggle global da org), substituindo o antigo `isFinal`; `TaskStatus` ganha o valor `STARTED`. `OSTemplate`/`OSTemplateColumn`/`OSTemplateColumnDocument` (CRUD em `/os-templates`, `ORG_ADMIN` pra mutação) definem de uma vez as colunas (com `statusEffect`/`notifyClient`/checklist de documentos) que um board nasce com, usado tanto em `POST /boards` quanto em `POST /requests/:id/approve` (modo `NEW_BOARD`, template escolhido pelo cliente ao abrir a Solicitação via `GET /portal/os-templates`). `Client.codigo` — identificador curto opcional usado na busca e como prefixo do título do board criado a partir de uma Solicitação aprovada. `RecurringTaskAssignment` simplificado (vínculo direto por cliente, sem exigir board/coluna pré-existentes — board/coluna foram removidos do vínculo, não tornados diretos) e board oculto `RECURRING_SYSTEM` como "casa" das Tarefas Recorrentes sem processo. `GET /tasks` — listagem flat e filtrável (cliente, responsável, departamento, status, template recorrente, período, busca textual) atravessando todos os boards da org, inclusive o `RECURRING_SYSTEM`; base da tela unificada Tarefas (alternância Lista/Kanban dinâmico agrupado por status, cruzando tarefas de clientes diferentes). Frontend: telas de gestão de Templates de OS e Lista de OS, `Client.codigo` nos formulários/lista de clientes, seletor de tipo de solicitação (Template de OS) no portal. Ver `docs/superpowers/specs/2026-09-22-kanban-os-recorrente-redesign.md` e `docs/superpowers/plans/2026-09-22-kanban-os-recorrente-redesign.md`.
 
-10. [ ] **Cobertura de departamentos por cliente** (spec revisada em 2026-11-11, próximo:
-    plano de implementação) — "departamento atendido" (= `ClientAssignment` com responsável),
-    6 invariantes garantidas no backend (todo departamento atendido tem responsável e ≥1 usuário
-    do cliente; tarefa e solicitação só em departamento atendido/acessível; mover tarefa só no
-    mesmo board), cadastro de cliente em 3 abas com painel de cobertura, dados obrigatórios
-    (código do ERP, CNPJ/CPF validado e único entre ativos, endereço PJ), notificação de
-    WhatsApp/e-mail por departamento (WhatsApp vai pro telefone de cada usuário, não mais pro
-    número da empresa), tela "Transferir responsabilidades" e falhas de geração de recorrentes
-    visíveis no Dashboard e no resumo diário. Ver
-    `docs/superpowers/specs/2026-11-11-cobertura-departamentos-cliente-design.md`.
+10. [x] **Cobertura de departamentos por cliente** (concluído em 2026-11-11) — "departamento
+    atendido" = `ClientAssignment` com responsável do escritório. Invariantes garantidas no backend
+    (`src/modules/clients/client-coverage.ts`): todo cliente tem ≥1 departamento atendido, todo
+    atendido tem responsável e ≥1 usuário do cliente ativo, acesso do usuário só a departamento
+    atendido, tarefa só em departamento atendido (criar, trocar departamento, gerar recorrente,
+    aprovar solicitação) e mover tarefa só dentro do mesmo processo (antes dava pra mover pro
+    processo de outro cliente), solicitação só em departamento a que o usuário tem acesso
+    (`Request.departmentId` NOT NULL). Cliente: código do ERP obrigatório, CNPJ/CPF com dígito
+    verificador e únicos entre ativos (índices parciais), endereço obrigatório pra PJ. Cadastro em
+    3 abas (Empresa, Departamentos, Acesso ao portal) com painel de cobertura (vermelho bloqueia,
+    amarelo avisa "ninguém recebe por WhatsApp"). Notificação ao cliente por departamento nos dois
+    canais — WhatsApp vai pro telefone de cada usuário, não mais pro número da empresa; sai o
+    fallback "notifica todos os admins". Tela "Transferir responsabilidades" (carteira por cliente,
+    filtro por departamento, transferência em lotes, desativar ao zerar) e desativação de quem é
+    responsável bloqueada. Falhas de geração de recorrentes com mensagem acionável, no topo do
+    Dashboard (admin/gerente, com "Gerar novamente") e no resumo diário. Ver
+    `docs/superpowers/specs/2026-11-11-cobertura-departamentos-cliente-design.md` e
+    `docs/superpowers/plans/2026-11-11-cobertura-departamentos-cliente.md`.
 
 ### Próximos passos a discutir (anotados em 2026-11-11, não esquecer)
 
-Ordem combinada com o Max: implementar o item 10 → solicitações internas → retomar a rodada de
-testes manuais validando os dois. Os demais itens entram conforme o que os testes revelarem.
+Ordem combinada com o Max: item 10 (feito) → solicitações internas → retomar a rodada de testes
+manuais validando os dois. Os demais itens entram conforme o que os testes revelarem.
 
 1. **Solicitações internas** (próximo projeto, precisa de brainstorm + spec) — colaborador
    pedindo coisas a outro colaborador/departamento, referenciando ou não um cliente;
@@ -425,7 +433,7 @@ testes manuais validando os dois. Os demais itens entram conforme o que os teste
    com "não se aplica" por campo e teste obrigatório antes de salvar; matriz de documentos
    pedidos ao cliente (empresa × período, 3 cores).
 7. **Worker não sobe no ambiente local** — ver `docs/tech-debt.md` (carregamento do `.env`
-   depois dos imports ESM). Correção pequena, fazer junto do item 10 ou logo depois.
+   depois dos imports ESM). Correção pequena, ainda pendente.
 
 Schema-por-tenant segue como consideração arquitetural separada, não agendada (ver
 `project_schema_per_tenant_consideration.md` na memória).

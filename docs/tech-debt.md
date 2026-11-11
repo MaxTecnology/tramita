@@ -396,3 +396,12 @@ só não quebra hoje porque não importa o `mailer` na inicialização.
 criar o cliente do Resend sob demanda (dentro de `sendEmail`), pra que a falta da chave de e-mail
 falhe só o envio de e-mail, nunca a subida do worker. Teste: subir o worker sem `RESEND_API_KEY`
 e confirmar que os outros workers iniciam.
+
+## E2E não cobre os fluxos novos da cobertura de departamentos (encontrado em 2026-11-11)
+
+O cadastro de cliente em abas (painel de cobertura, bloqueio do salvar), a tela "Transferir
+responsabilidades" e o alerta de recorrentes não geradas no Dashboard foram validados com testes de
+unidade/integração (API e lógica pura do formulário) e QA manual no navegador, mas não têm spec
+Playwright. Os 8 specs E2E existentes continuam passando com o seed atualizado. Vale escrever ao
+menos um spec por fluxo (cadastro completo de cliente; transferência em dois lotes até desativar)
+quando a próxima rodada de E2E for mexida.
