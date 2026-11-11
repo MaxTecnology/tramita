@@ -806,6 +806,7 @@ describe('updateTask — completedAt', () => {
     const board = await createTestBoard(org.id, client.id)
     const column = await createTestColumn(board.id)
     const task = await createTestTask(column.id, user.id)
+    await serveClientDepartment(client.id, task.departmentId, user.id)
     await updateTask(task.id, org.id, { status: 'DONE' }, { id: user.id, type: 'user' })
 
     const reopened = await updateTask(task.id, org.id, { status: 'OPEN' }, { id: user.id, type: 'user' })
@@ -948,5 +949,33 @@ describe('reorderTasks — isolamento entre processos e organizações', () => {
     await reorderTasks([{ id: task.id, columnId: col2.id, position: 0 }], org.id)
 
     expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).columnId).toBe(col2.id)
+  })
+})
+
+describe('reabrir tarefa em departamento que não atende mais o cliente', () => {
+  async function setup() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id, { name: 'ACME' })
+    const board = await createTestBoard(org.id, client.id)
+    const doneCol = await createTestColumn(board.id, { statusEffect: 'DONE' })
+    const openCol = await createTestColumn(board.id, { statusEffect: 'OPEN', position: 1 })
+    const folha = await createTestDepartment(org.id, { name: 'Folha' })
+    const task = await createTestTask(doneCol.id, user.id, { departmentId: folha.id })
+    await prisma.task.update({ where: { id: task.id }, data: { status: 'DONE' } })
+    return { org, user, task, openCol }
+  }
+
+  it('updateTask recusa reabrir pelo status', async () => {
+    const { org, user, task } = await setup()
+    await expect(updateTask(task.id, org.id, { status: 'OPEN' }, { id: user.id, type: 'user' }))
+      .rejects.toMatchObject({ statusCode: 400, message: 'O departamento Folha não atende o cliente ACME.' })
+  })
+
+  it('moveTask recusa reabrir levando pra coluna de status aberto', async () => {
+    const { org, user, task, openCol } = await setup()
+    await expect(moveTask(task.id, org.id, { columnId: openCol.id, position: 0 }, { id: user.id, type: 'user' }))
+      .rejects.toMatchObject({ statusCode: 400 })
   })
 })

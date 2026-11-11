@@ -27,6 +27,12 @@ async function resolveActorName(actorId: string, actorType: 'user' | 'client'): 
   return c?.name ?? 'Unknown'
 }
 
+const CLOSED_STATUSES = ['DONE', 'DISREGARDED']
+
+function isReopening(from: string, to: string): boolean {
+  return CLOSED_STATUSES.includes(from) && !CLOSED_STATUSES.includes(to)
+}
+
 async function verifyColumnBelongsToOrg(columnId: string, organizationId: string) {
   const column = await prisma.column.findFirst({
     where: { id: columnId },
@@ -128,6 +134,11 @@ export async function moveTask(
   const actorName = await resolveActorName(actor.id, actor.type)
 
   const nextStatus = toColumn.statusEffect !== 'NONE' ? toColumn.statusEffect : task.status
+  // Tarefa concluída pode ter ficado num departamento que deixou de atender o cliente — reabrir ali
+  // criaria uma tarefa aberta invisível pro cliente (I5).
+  if (isReopening(task.status, nextStatus)) {
+    await assertDepartmentServesClient(prisma, task.column.board.clientId, task.departmentId)
+  }
   const completedAt = resolveCompletedAt(task.status, nextStatus, new Date())
 
   const updatedTask = await prisma.$transaction(async (tx) => {
@@ -260,6 +271,8 @@ export async function updateTask(
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
   if (data.departmentId && data.departmentId !== task.departmentId) {
     await assertDepartmentServesClient(prisma, task.column.board.clientId, data.departmentId)
+  } else if (data.status && isReopening(task.status, data.status)) {
+    await assertDepartmentServesClient(prisma, task.column.board.clientId, task.departmentId)
   }
 
   // Tarefa recorrente: vencimento e meta são o prazo legal/interno que o motor de recorrência
