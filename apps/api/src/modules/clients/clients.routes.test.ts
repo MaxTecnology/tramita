@@ -89,6 +89,61 @@ describe('POST /clients', () => {
 
     expect(res.statusCode).toBe(400)
   })
+
+  it('returns 400 with the first validation message when departments is missing', async () => {
+    const { auth } = await setup()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/clients',
+      headers: { authorization: auth },
+      payload: {
+        name: 'ACME LTDA', codigo: '1', clientType: 'PJ', cnpj: '11222333000181',
+        cep: '57312675', estado: 'AL', cidade: 'Arapiraca', bairro: 'Centro', logradouro: 'Rua A', numero: '10',
+        clientUsers: [],
+      },
+    })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.json().message).toMatch(/departamento|usuário/)
+  })
+
+  it('creates the client with served departments and portal users (201)', async () => {
+    const { org, user, auth } = await setup()
+    const dept = await createTestDepartment(org.id, { name: 'Fiscal' })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/clients',
+      headers: { authorization: auth },
+      payload: {
+        name: 'ACME LTDA', codigo: '1', clientType: 'PJ', cnpj: '11.222.333/0001-81',
+        cep: '57312675', estado: 'AL', cidade: 'Arapiraca', bairro: 'Centro', logradouro: 'Rua A', numero: '10',
+        departments: [{ departmentId: dept.id, responsibleUserId: user.id }],
+        clientUsers: [{ name: 'Contato', email: `c-${Date.now()}@x.com`, password: 'Senha@1234', departmentIds: [dept.id] }],
+      },
+    })
+
+    expect(res.statusCode).toBe(201)
+    expect(res.json().cnpj).toBe('11222333000181')
+  })
+})
+
+describe('PUT /clients/:id/assignments', () => {
+  it('no longer exists — responsibles are written only through the client form', async () => {
+    const { org, user, auth } = await setup()
+    const client = await createTestClient(org.id)
+    const dept = await createTestDepartment(org.id)
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/clients/${client.id}/assignments`,
+      headers: { authorization: auth },
+      payload: { departmentId: dept.id, userId: user.id },
+    })
+
+    expect(res.statusCode).toBe(404)
+  })
 })
 
 describe('GET /clients/:id/users', () => {

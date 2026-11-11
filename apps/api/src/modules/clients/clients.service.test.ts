@@ -6,7 +6,6 @@ import {
   updateClient,
   deleteClient,
   listAssignments,
-  setAssignment,
   lookupClientByCnpj,
   listClientUserLinks,
 } from '@/modules/clients/clients.service'
@@ -18,234 +17,270 @@ import {
   createTestClientUser,
   createTestDepartment,
   grantClientAccess,
+  generateValidCnpj,
+  createTestBoard,
+  createTestColumn,
+  createTestTask,
+  serveClientDepartment,
 } from '@/test/helpers'
+import { clientBodySchema, type ClientBody } from '@/modules/clients/clients.schema'
+
+
+async function setupOrg() {
+  const plan = await createTestPlan()
+  const org = await createTestOrg(plan.id)
+  const admin = await createTestUser(org.id)
+  const fiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
+  const folha = await createTestDepartment(org.id, { name: 'Folha' })
+  return { org, admin, fiscal, folha }
+}
+
+let bodyCounter = 0
+
+function body(overrides: Partial<ClientBody> & Pick<ClientBody, 'departments' | 'clientUsers'>): ClientBody {
+  const n = ++bodyCounter
+  return {
+    name: 'ACME LTDA',
+    codigo: `COD-${Date.now()}-${n}`,
+    clientType: 'PJ',
+    cnpj: generateCnpj(n),
+    cpf: null,
+    cei: null, caepf: null, inscricaoEstadual: null,
+    whatsapp: null, phone: null, notes: null,
+    cep: '57312675', estado: 'AL', cidade: 'Arapiraca', bairro: 'Centro', logradouro: 'Rua A', numero: '10',
+    complemento: null,
+    ...overrides,
+  }
+}
+
+function generateCnpj(n: number): string {
+  return generateValidCnpj(Date.now() * 1000 + n)
+}
+
+function newUser(departmentIds: string[], email = `cu-${Date.now()}-${++bodyCounter}@test.com`) {
+  return { name: 'Contato', email, password: 'Senha@1234', departmentIds }
+}
 
 describe('createClient', () => {
-  it('persiste cei/caepf/inscricaoEstadual — identificadores alternativos usados pelo robô de documentos fiscais', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const department = await createTestDepartment(org.id)
+  it('cria cliente, departamentos atendidos, responsáveis e usuário com acesso numa transação', async () => {
+    const { org, admin, fiscal, folha } = await setupOrg()
 
-    const result = await createClient(org.id, {
-      name: 'Cliente com Identificadores Alternativos',
-      clientType: 'PJ',
-      cei: '12.345.67890/12',
-      caepf: '123.456.789-00/001',
-      inscricaoEstadual: '123.456.789.112',
-      clientUsers: [{ name: 'Portal User', email: `portal-${Date.now()}@test.com`, password: 'Test@1234', departmentIds: [department.id] }],
-    })
+    const client = await createClient(org.id, body({
+      departments: [
+        { departmentId: fiscal.id, responsibleUserId: admin.id },
+        { departmentId: folha.id, responsibleUserId: admin.id },
+      ],
+      clientUsers: [newUser([fiscal.id, folha.id])],
+    }))
 
-    expect(result.cei).toBe('12.345.67890/12')
-    expect(result.caepf).toBe('123.456.789-00/001')
-    expect(result.inscricaoEstadual).toBe('123.456.789.112')
+    expect(await prisma.clientAssignment.count({ where: { clientId: client.id } })).toBe(2)
+    expect(await prisma.clientUserAccess.count({ where: { clientId: client.id } })).toBe(2)
+    expect(await prisma.clientUser.count({ where: { organizationId: org.id } })).toBe(1)
   })
 
-  it('creates a client scoped to the organization', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const department = await createTestDepartment(org.id)
+  it('normaliza o CNPJ para dígitos e persiste cei/caepf/inscricaoEstadual', async () => {
+    const { org, admin, fiscal } = await setupOrg()
 
-    const result = await createClient(org.id, {
-      name: 'Cliente Novo',
-      clientType: 'PJ',
-      clientUsers: [{ name: 'Portal User', email: `portal-${Date.now()}@test.com`, password: 'Test@1234', departmentIds: [department.id] }],
-    })
+    const client = await createClient(org.id, clientBodySchema.parse(body({
+      cnpj: '11.222.333/0001-81',
+      cei: '123', caepf: '456', inscricaoEstadual: '789',
+      departments: [{ departmentId: fiscal.id, responsibleUserId: admin.id }],
+      clientUsers: [newUser([fiscal.id])],
+    })))
 
-    expect(result.clientType).toBe('PJ')
-    const stored = await prisma.client.findUnique({ where: { id: result.id } })
-    expect(stored?.organizationId).toBe(org.id)
+    const saved = await prisma.client.findUniqueOrThrow({ where: { id: client.id } })
+    expect(saved).toMatchObject({ cnpj: '11222333000181', cei: '123', caepf: '456', inscricaoEstadual: '789' })
   })
 
-  it('links an existing ClientUser via existingId without creating a duplicate', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const department = await createTestDepartment(org.id)
+  it('vincula usuário existente via existingId sem duplicar', async () => {
+    const { org, admin, fiscal } = await setupOrg()
     const { clientUser } = await createTestClientUser(org.id)
 
-    const result = await createClient(org.id, {
-      name: 'Cliente Novo',
-      clientType: 'PJ',
-      clientUsers: [{ existingId: clientUser.id, departmentIds: [department.id] }],
+    const client = await createClient(org.id, body({
+      departments: [{ departmentId: fiscal.id, responsibleUserId: admin.id }],
+      clientUsers: [{ existingId: clientUser.id, departmentIds: [fiscal.id] }],
+    }))
+
+    expect(await prisma.clientUser.count({ where: { organizationId: org.id } })).toBe(1)
+    expect(await prisma.clientUserAccess.count({ where: { clientId: client.id, clientUserId: clientUser.id } })).toBe(1)
+  })
+
+  it('recusa responsável de outra organização ou inativo', async () => {
+    const { org, fiscal } = await setupOrg()
+    const plan = await createTestPlan()
+    const otherOrg = await createTestOrg(plan.id)
+    const outsider = await createTestUser(otherOrg.id)
+    const inactive = await createTestUser(org.id, { isActive: false })
+
+    for (const responsible of [outsider, inactive]) {
+      await expect(createClient(org.id, body({
+        departments: [{ departmentId: fiscal.id, responsibleUserId: responsible.id }],
+        clientUsers: [newUser([fiscal.id])],
+      }))).rejects.toMatchObject({ statusCode: 400, message: 'Responsável inválido para o departamento Fiscal' })
+    }
+  })
+
+  it('recusa departamento de outra organização com 404', async () => {
+    const { org, admin } = await setupOrg()
+    const plan = await createTestPlan()
+    const otherOrg = await createTestOrg(plan.id)
+    const foreign = await createTestDepartment(otherOrg.id)
+
+    await expect(createClient(org.id, body({
+      departments: [{ departmentId: foreign.id, responsibleUserId: admin.id }],
+      clientUsers: [newUser([foreign.id])],
+    }))).rejects.toMatchObject({ statusCode: 404, message: 'Departamento não encontrado' })
+  })
+
+  it('recusa departamento atendido sem usuário e não grava nada', async () => {
+    const { org, admin, fiscal, folha } = await setupOrg()
+
+    await expect(createClient(org.id, body({
+      departments: [
+        { departmentId: fiscal.id, responsibleUserId: admin.id },
+        { departmentId: folha.id, responsibleUserId: admin.id },
+      ],
+      clientUsers: [newUser([fiscal.id])],
+    }))).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'O departamento Folha precisa de pelo menos um usuário do cliente com acesso.',
     })
 
-    const count = await prisma.clientUser.count({ where: { organizationId: org.id } })
-    expect(count).toBe(1)
-    const access = await prisma.clientUserAccess.findFirst({
-      where: { clientUserId: clientUser.id, clientId: result.id, departmentId: department.id },
-    })
-    expect(access).not.toBeNull()
+    expect(await prisma.client.count({ where: { organizationId: org.id } })).toBe(0)
+    expect(await prisma.clientUser.count({ where: { organizationId: org.id } })).toBe(0)
   })
 
-  it('creates a client with codigo', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const department = await createTestDepartment(org.id)
+  it('recusa CNPJ, CPF e código já usados por cliente ativo com 409', async () => {
+    const { org, admin, fiscal } = await setupOrg()
+    const deps = [{ departmentId: fiscal.id, responsibleUserId: admin.id }]
+    await createClient(org.id, body({ codigo: 'X1', cnpj: '11222333000181', departments: deps, clientUsers: [newUser([fiscal.id])] }))
+    await createClient(org.id, body({
+      codigo: 'X2', clientType: 'PF', cnpj: null, cpf: '52998224725', departments: deps, clientUsers: [newUser([fiscal.id])],
+    }))
 
-    const result = await createClient(org.id, {
-      name: 'Cliente Com Código',
-      codigo: '0123',
-      clientType: 'PJ',
-      clientUsers: [{ name: 'Portal User', email: `portal-${Date.now()}@test.com`, password: 'Test@1234', departmentIds: [department.id] }],
-    })
-
-    expect(result.codigo).toBe('0123')
-    const stored = await prisma.client.findUnique({ where: { id: result.id } })
-    expect(stored?.codigo).toBe('0123')
+    await expect(createClient(org.id, body({ cnpj: '11222333000181', departments: deps, clientUsers: [newUser([fiscal.id])] })))
+      .rejects.toMatchObject({ statusCode: 409, message: 'Já existe um cliente ativo com este CNPJ nesta organização' })
+    await expect(createClient(org.id, body({
+      clientType: 'PF', cnpj: null, cpf: '52998224725', departments: deps, clientUsers: [newUser([fiscal.id])],
+    }))).rejects.toMatchObject({ statusCode: 409, message: 'Já existe um cliente ativo com este CPF nesta organização' })
+    await expect(createClient(org.id, body({ codigo: 'X1', departments: deps, clientUsers: [newUser([fiscal.id])] })))
+      .rejects.toMatchObject({ statusCode: 409, message: 'Já existe um cliente com este código nesta organização' })
   })
 
-  it('throws 409 when codigo is already used by another client in the same organization', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    await createTestClient(org.id, { codigo: 'DUP1' })
+  it('permite o mesmo código em organizações diferentes', async () => {
+    const a = await setupOrg()
+    const b = await setupOrg()
 
-    await expect(
-      createClient(org.id, { name: 'Outro Cliente', clientType: 'PJ', codigo: 'DUP1', clientUsers: [] }),
-    ).rejects.toMatchObject({ statusCode: 409 })
+    await createClient(a.org.id, body({
+      codigo: 'MESMO', departments: [{ departmentId: a.fiscal.id, responsibleUserId: a.admin.id }], clientUsers: [newUser([a.fiscal.id])],
+    }))
+    await expect(createClient(b.org.id, body({
+      codigo: 'MESMO', departments: [{ departmentId: b.fiscal.id, responsibleUserId: b.admin.id }], clientUsers: [newUser([b.fiscal.id])],
+    }))).resolves.toBeTruthy()
   })
 
-  it('allows the same codigo in two different organizations', async () => {
+  it('recusa existingId de usuário de outra organização com 404', async () => {
+    const { org, admin, fiscal } = await setupOrg()
     const plan = await createTestPlan()
-    const orgA = await createTestOrg(plan.id)
-    const orgB = await createTestOrg(plan.id)
-    await createTestClient(orgA.id, { codigo: 'SAME' })
+    const otherOrg = await createTestOrg(plan.id)
+    const { clientUser } = await createTestClientUser(otherOrg.id)
 
-    const result = await createClient(orgB.id, { name: 'Cliente Org B', clientType: 'PJ', codigo: 'SAME', clientUsers: [] })
-
-    expect(result.codigo).toBe('SAME')
-  })
-
-  it('throws 404 when existingId belongs to a ClientUser from another organization', async () => {
-    const plan = await createTestPlan()
-    const orgA = await createTestOrg(plan.id)
-    const orgB = await createTestOrg(plan.id)
-    const department = await createTestDepartment(orgA.id)
-    const { clientUser: foreignClientUser } = await createTestClientUser(orgB.id)
-
-    await expect(
-      createClient(orgA.id, {
-        name: 'Cliente Novo',
-        clientType: 'PJ',
-        clientUsers: [{ existingId: foreignClientUser.id, departmentIds: [department.id] }],
-      }),
-    ).rejects.toMatchObject({ statusCode: 404 })
+    await expect(createClient(org.id, body({
+      departments: [{ departmentId: fiscal.id, responsibleUserId: admin.id }],
+      clientUsers: [{ existingId: clientUser.id, departmentIds: [fiscal.id] }],
+    }))).rejects.toMatchObject({ statusCode: 404 })
   })
 })
 
 describe('updateClient', () => {
-  it('updates notes for a client in the same organization', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const client = await createTestClient(org.id)
+  async function createServedClient() {
+    const ctx = await setupOrg()
+    const client = await createClient(ctx.org.id, body({
+      departments: [
+        { departmentId: ctx.fiscal.id, responsibleUserId: ctx.admin.id },
+        { departmentId: ctx.folha.id, responsibleUserId: ctx.admin.id },
+      ],
+      clientUsers: [newUser([ctx.fiscal.id, ctx.folha.id])],
+    }))
+    const [link] = await listClientUserLinks(client.id, ctx.org.id)
+    return { ...ctx, client, clientUserId: link.existingId }
+  }
 
-    const result = await updateClient(client.id, org.id, { notes: 'Observação atualizada' })
+  it('atualiza os dados da empresa e troca o responsável de um departamento', async () => {
+    const { org, admin, fiscal, folha, client, clientUserId } = await createServedClient()
+    const other = await createTestUser(org.id, { role: 'ORG_MEMBER' })
 
-    expect(result.notes).toBe('Observação atualizada')
+    await updateClient(client.id, org.id, body({
+      codigo: client.codigo, cnpj: client.cnpj, notes: 'nova nota',
+      departments: [
+        { departmentId: fiscal.id, responsibleUserId: other.id },
+        { departmentId: folha.id, responsibleUserId: admin.id },
+      ],
+      clientUsers: [{ existingId: clientUserId, departmentIds: [fiscal.id, folha.id] }],
+    }))
+
+    const saved = await prisma.client.findUniqueOrThrow({ where: { id: client.id } })
+    expect(saved.notes).toBe('nova nota')
+    const fiscalAssignment = await prisma.clientAssignment.findUniqueOrThrow({
+      where: { clientId_departmentId: { clientId: client.id, departmentId: fiscal.id } },
+    })
+    expect(fiscalAssignment.userId).toBe(other.id)
   })
 
-  it('updates codigo for a client in the same organization', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const client = await createTestClient(org.id)
+  it('desmarca departamento sem pendências removendo responsável e acessos dele', async () => {
+    const { org, admin, fiscal, folha, client, clientUserId } = await createServedClient()
 
-    const result = await updateClient(client.id, org.id, { codigo: '0456' })
+    await updateClient(client.id, org.id, body({
+      codigo: client.codigo, cnpj: client.cnpj,
+      departments: [{ departmentId: fiscal.id, responsibleUserId: admin.id }],
+      clientUsers: [{ existingId: clientUserId, departmentIds: [fiscal.id] }],
+    }))
 
-    expect(result.codigo).toBe('0456')
+    expect(await prisma.clientAssignment.count({ where: { clientId: client.id, departmentId: folha.id } })).toBe(0)
+    expect(await prisma.clientUserAccess.count({ where: { clientId: client.id, departmentId: folha.id } })).toBe(0)
+    expect(await prisma.clientUserAccess.count({ where: { clientId: client.id, departmentId: fiscal.id } })).toBe(1)
   })
 
-  it('throws 409 when updating codigo to one already used by another client in the same organization', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    await createTestClient(org.id, { codigo: 'DUP2' })
-    const clientB = await createTestClient(org.id, { codigo: 'DUP3' })
+  it('recusa desmarcar departamento com tarefa aberta e não altera nada', async () => {
+    const { org, admin, fiscal, folha, client, clientUserId } = await createServedClient()
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    await createTestTask(column.id, admin.id, { departmentId: folha.id })
 
-    await expect(updateClient(clientB.id, org.id, { codigo: 'DUP2' })).rejects.toMatchObject({ statusCode: 409 })
+    await expect(updateClient(client.id, org.id, body({
+      codigo: client.codigo, cnpj: client.cnpj, notes: 'não deve gravar',
+      departments: [{ departmentId: fiscal.id, responsibleUserId: admin.id }],
+      clientUsers: [{ existingId: clientUserId, departmentIds: [fiscal.id] }],
+    }))).rejects.toMatchObject({ statusCode: 409 })
+
+    expect(await prisma.clientAssignment.count({ where: { clientId: client.id } })).toBe(2)
+    expect((await prisma.client.findUniqueOrThrow({ where: { id: client.id } })).notes).toBeNull()
   })
 
-  it('throws 404 when client belongs to a different organization', async () => {
-    const plan = await createTestPlan()
-    const orgA = await createTestOrg(plan.id)
-    const orgB = await createTestOrg(plan.id)
-    const client = await createTestClient(orgA.id)
+  it('remove os acessos de um usuário omitido do payload', async () => {
+    const { org, admin, fiscal, folha, client, clientUserId } = await createServedClient()
 
-    await expect(updateClient(client.id, orgB.id, { notes: 'X' })).rejects.toMatchObject({ statusCode: 404 })
+    await updateClient(client.id, org.id, body({
+      codigo: client.codigo, cnpj: client.cnpj,
+      departments: [
+        { departmentId: fiscal.id, responsibleUserId: admin.id },
+        { departmentId: folha.id, responsibleUserId: admin.id },
+      ],
+      clientUsers: [newUser([fiscal.id, folha.id])],
+    }))
+
+    expect(await prisma.clientUserAccess.count({ where: { clientId: client.id, clientUserId } })).toBe(0)
   })
 
-  it('clears codigo/notes back to null when sent explicitly as null (not just omitted)', async () => {
+  it('retorna 404 para cliente de outra organização', async () => {
+    const { fiscal, admin, client } = await createServedClient()
     const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const client = await createTestClient(org.id, { codigo: '0789' })
-    await updateClient(client.id, org.id, { notes: 'algo' })
+    const otherOrg = await createTestOrg(plan.id)
 
-    const result = await updateClient(client.id, org.id, { codigo: null, notes: null })
-
-    expect(result.codigo).toBeNull()
-    expect(result.notes).toBeNull()
-  })
-
-  it('removes ClientUserAccess for a portal user omitted from the submitted clientUsers list', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const department = await createTestDepartment(org.id)
-    const client = await createTestClient(org.id)
-    const { clientUser: keptUser } = await createTestClientUser(org.id)
-    const { clientUser: removedUser } = await createTestClientUser(org.id)
-    await grantClientAccess(keptUser.id, client.id, department.id)
-    await grantClientAccess(removedUser.id, client.id, department.id)
-
-    await updateClient(client.id, org.id, {
-      clientUsers: [{ existingId: keptUser.id, departmentIds: [department.id] }],
-    })
-
-    const keptAccess = await prisma.clientUserAccess.findFirst({
-      where: { clientUserId: keptUser.id, clientId: client.id },
-    })
-    expect(keptAccess).not.toBeNull()
-
-    const removedAccess = await prisma.clientUserAccess.findFirst({
-      where: { clientUserId: removedUser.id, clientId: client.id },
-    })
-    expect(removedAccess).toBeNull()
-  })
-
-  it('removes a single department from a user who keeps access to another department on the same client', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const deptFiscal = await createTestDepartment(org.id, { name: `Fiscal ${Date.now()}` })
-    const deptPessoal = await createTestDepartment(org.id, { name: `Pessoal ${Date.now()}` })
-    const client = await createTestClient(org.id)
-    const { clientUser } = await createTestClientUser(org.id)
-    await grantClientAccess(clientUser.id, client.id, deptFiscal.id)
-    await grantClientAccess(clientUser.id, client.id, deptPessoal.id)
-
-    await updateClient(client.id, org.id, {
-      clientUsers: [{ existingId: clientUser.id, departmentIds: [deptFiscal.id] }],
-    })
-
-    const fiscalAccess = await prisma.clientUserAccess.findFirst({
-      where: { clientUserId: clientUser.id, clientId: client.id, departmentId: deptFiscal.id },
-    })
-    expect(fiscalAccess).not.toBeNull()
-
-    const pessoalAccess = await prisma.clientUserAccess.findFirst({
-      where: { clientUserId: clientUser.id, clientId: client.id, departmentId: deptPessoal.id },
-    })
-    expect(pessoalAccess).toBeNull()
-  })
-
-  it('does not touch existing ClientUserAccess when clientUsers is omitted from the update payload', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const department = await createTestDepartment(org.id)
-    const client = await createTestClient(org.id)
-    const { clientUser } = await createTestClientUser(org.id)
-    await grantClientAccess(clientUser.id, client.id, department.id)
-
-    await updateClient(client.id, org.id, { notes: 'Sem alterar vínculos' })
-
-    const access = await prisma.clientUserAccess.findFirst({
-      where: { clientUserId: clientUser.id, clientId: client.id },
-    })
-    expect(access).not.toBeNull()
+    await expect(updateClient(client.id, otherOrg.id, body({
+      departments: [{ departmentId: fiscal.id, responsibleUserId: admin.id }],
+      clientUsers: [newUser([fiscal.id])],
+    }))).rejects.toMatchObject({ statusCode: 404 })
   })
 })
 
@@ -257,9 +292,8 @@ describe('deleteClient', () => {
 
     await deleteClient(client.id, org.id)
 
-    const stored = await prisma.client.findUnique({ where: { id: client.id } })
-    expect(stored).not.toBeNull()
-    expect(stored?.isActive).toBe(false)
+    const saved = await prisma.client.findUniqueOrThrow({ where: { id: client.id } })
+    expect(saved.isActive).toBe(false)
   })
 
   it('throws 404 when client belongs to a different organization', async () => {
@@ -272,100 +306,16 @@ describe('deleteClient', () => {
   })
 })
 
-describe('setAssignment / listAssignments', () => {
-  it('assigns a user to a client department and lists it back', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
+describe('listAssignments', () => {
+  it('lista os departamentos atendidos com o responsável', async () => {
+    const { org, admin, fiscal } = await setupOrg()
     const client = await createTestClient(org.id)
-    const department = await createTestDepartment(org.id)
-    const user = await createTestUser(org.id)
+    await serveClientDepartment(client.id, fiscal.id, admin.id)
 
-    const result = await setAssignment(client.id, org.id, department.id, user.id)
+    const result = await listAssignments(client.id, org.id)
 
     expect(result).toHaveLength(1)
-    expect(result[0].userId).toBe(user.id)
-    expect(result[0].departmentId).toBe(department.id)
-
-    const listed = await listAssignments(client.id, org.id)
-    expect(listed).toHaveLength(1)
-  })
-
-  it('replaces the previous assignment for the same department instead of appending', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const client = await createTestClient(org.id)
-    const department = await createTestDepartment(org.id)
-    const userA = await createTestUser(org.id, { email: `a-${Date.now()}@test.com` })
-    const userB = await createTestUser(org.id, { email: `b-${Date.now()}@test.com` })
-
-    await setAssignment(client.id, org.id, department.id, userA.id)
-    const result = await setAssignment(client.id, org.id, department.id, userB.id)
-
-    expect(result).toHaveLength(1)
-    expect(result[0].userId).toBe(userB.id)
-  })
-
-  it('keeps assignments across different departments independent', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const client = await createTestClient(org.id)
-    const departmentA = await createTestDepartment(org.id, { name: `Dept A ${Date.now()}` })
-    const departmentB = await createTestDepartment(org.id, { name: `Dept B ${Date.now()}` })
-    const userA = await createTestUser(org.id, { email: `a-${Date.now()}@test.com` })
-    const userB = await createTestUser(org.id, { email: `b-${Date.now()}@test.com` })
-
-    await setAssignment(client.id, org.id, departmentA.id, userA.id)
-    const result = await setAssignment(client.id, org.id, departmentB.id, userB.id)
-
-    expect(result).toHaveLength(2)
-  })
-
-  it('clears the assignment for a department when userId is null', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const client = await createTestClient(org.id)
-    const department = await createTestDepartment(org.id)
-    const user = await createTestUser(org.id)
-    await setAssignment(client.id, org.id, department.id, user.id)
-
-    const result = await setAssignment(client.id, org.id, department.id, null)
-
-    expect(result).toHaveLength(0)
-  })
-
-  it('throws 400 when userId does not belong to the organization', async () => {
-    const plan = await createTestPlan()
-    const orgA = await createTestOrg(plan.id)
-    const orgB = await createTestOrg(plan.id)
-    const client = await createTestClient(orgA.id)
-    const department = await createTestDepartment(orgA.id)
-    const foreignUser = await createTestUser(orgB.id)
-
-    await expect(
-      setAssignment(client.id, orgA.id, department.id, foreignUser.id),
-    ).rejects.toMatchObject({ statusCode: 400 })
-  })
-
-  it('throws 404 when departmentId does not belong to the organization', async () => {
-    const plan = await createTestPlan()
-    const orgA = await createTestOrg(plan.id)
-    const orgB = await createTestOrg(plan.id)
-    const client = await createTestClient(orgA.id)
-    const user = await createTestUser(orgA.id)
-    const foreignDepartment = await createTestDepartment(orgB.id)
-
-    await expect(
-      setAssignment(client.id, orgA.id, foreignDepartment.id, user.id),
-    ).rejects.toMatchObject({ statusCode: 404 })
-  })
-
-  it('throws 404 when client belongs to a different organization', async () => {
-    const plan = await createTestPlan()
-    const orgA = await createTestOrg(plan.id)
-    const orgB = await createTestOrg(plan.id)
-    const client = await createTestClient(orgA.id)
-
-    await expect(listAssignments(client.id, orgB.id)).rejects.toMatchObject({ statusCode: 404 })
+    expect(result[0]).toMatchObject({ departmentId: fiscal.id, userId: admin.id })
   })
 })
 

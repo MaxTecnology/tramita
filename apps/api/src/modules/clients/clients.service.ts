@@ -4,7 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { lookupCnpj, type CnpjLookupResult } from '@/lib/cnpjws'
 import { hashPassword } from '@/modules/auth/auth.service'
-import type { CreateClientBody, UpdateClientBody } from './clients.schema'
+import type { ClientBody } from './clients.schema'
+import { assertCanUnserveDepartments, assertPayloadCoverage } from './client-coverage'
 
 const SELECT = {
   id: true, name: true, codigo: true, clientType: true, cnpj: true, cpf: true,
@@ -34,7 +35,7 @@ async function upsertClientUserLinks(
   tx: Prisma.TransactionClient,
   clientId: string,
   organizationId: string,
-  links: NonNullable<CreateClientBody['clientUsers']>,
+  links: ClientBody['clientUsers'],
 ): Promise<ClientUserAccessPair[]> {
   const resolvedPairs: ClientUserAccessPair[] = []
 
@@ -69,84 +70,132 @@ async function upsertClientUserLinks(
   return resolvedPairs
 }
 
-// Client.codigo é único por organização (constraint clients_codigo_organizationId_key). Duas
-// pessoas digitando o mesmo código, ou um typo, é uma colisão genuína e esperada — não pode
-// virar 500 genérico.
-function isDuplicateCodigoError(err: unknown): boolean {
-  return (
-    err instanceof Prisma.PrismaClientKnownRequestError &&
-    err.code === 'P2002' &&
-    Array.isArray(err.meta?.target) &&
-    (err.meta!.target as string[]).includes('codigo')
-  )
+const ORG_STAFF_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'] as const
+
+// Índices únicos parciais entre clientes ativos (migration 20261111120000_client_required_fields).
+// Colisão é esperada (duplo cadastro, typo) — nunca pode virar 500.
+const DUPLICATE_MESSAGES: Record<string, string> = {
+  clients_codigo_active_key: 'Já existe um cliente com este código nesta organização',
+  clients_cnpj_active_key: 'Já existe um cliente ativo com este CNPJ nesta organização',
+  clients_cpf_active_key: 'Já existe um cliente ativo com este CPF nesta organização',
 }
 
-export async function createClient(organizationId: string, data: CreateClientBody) {
+function duplicateMessage(err: unknown): string | null {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return null
+  const target = err.meta?.target
+  const names = Array.isArray(target) ? (target as string[]) : [String(target ?? '')]
+  const text = `${names.join(',')} ${err.message}`
+  for (const [index, message] of Object.entries(DUPLICATE_MESSAGES)) {
+    if (text.includes(index)) return message
+  }
+  if (names.includes('codigo')) return DUPLICATE_MESSAGES.clients_codigo_active_key
+  if (names.includes('cnpj')) return DUPLICATE_MESSAGES.clients_cnpj_active_key
+  if (names.includes('cpf')) return DUPLICATE_MESSAGES.clients_cpf_active_key
+  return null
+}
+
+async function resolveDepartmentNames(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  data: ClientBody,
+): Promise<Map<string, string>> {
+  const ids = [...new Set([
+    ...data.departments.map((d) => d.departmentId),
+    ...data.clientUsers.flatMap((u) => u.departmentIds),
+  ])]
+  const departments = await tx.department.findMany({ where: { id: { in: ids }, organizationId }, select: { id: true, name: true } })
+  if (departments.length !== ids.length) throw new AppError(404, 'Departamento não encontrado')
+  return new Map(departments.map((d) => [d.id, d.name]))
+}
+
+async function assertResponsiblesValid(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  departments: ClientBody['departments'],
+  departmentNames: Map<string, string>,
+) {
+  const userIds = [...new Set(departments.map((d) => d.responsibleUserId))]
+  const valid = await tx.user.findMany({
+    where: { id: { in: userIds }, organizationId, isActive: true, role: { in: [...ORG_STAFF_ROLES] } },
+    select: { id: true },
+  })
+  const validIds = new Set(valid.map((u) => u.id))
+  for (const d of departments) {
+    if (!validIds.has(d.responsibleUserId)) {
+      throw new AppError(400, `Responsável inválido para o departamento ${departmentNames.get(d.departmentId) ?? ''}`)
+    }
+  }
+}
+
+async function syncServedDepartments(tx: Prisma.TransactionClient, clientId: string, departments: ClientBody['departments']) {
+  await tx.clientAssignment.deleteMany({
+    where: { clientId, departmentId: { notIn: departments.map((d) => d.departmentId) } },
+  })
+  for (const d of departments) {
+    await tx.clientAssignment.upsert({
+      where: { clientId_departmentId: { clientId, departmentId: d.departmentId } },
+      update: { userId: d.responsibleUserId },
+      create: { clientId, departmentId: d.departmentId, userId: d.responsibleUserId },
+    })
+  }
+}
+
+function companyData(data: ClientBody) {
+  const { departments: _departments, clientUsers: _clientUsers, ...company } = data
+  return company
+}
+
+export async function createClient(organizationId: string, data: ClientBody) {
   try {
     return await prisma.$transaction(async (tx) => {
-      const client = await tx.client.create({
-        data: {
-          name: data.name,
-          codigo: data.codigo,
-          clientType: data.clientType ?? 'PJ',
-          cnpj: data.cnpj,
-          cpf: data.cpf,
-          cei: data.cei,
-          caepf: data.caepf,
-          inscricaoEstadual: data.inscricaoEstadual,
-          whatsapp: data.whatsapp,
-          phone: data.phone,
-          notes: data.notes,
-          cep: data.cep,
-          estado: data.estado,
-          cidade: data.cidade,
-          bairro: data.bairro,
-          logradouro: data.logradouro,
-          numero: data.numero,
-          complemento: data.complemento,
-          organizationId,
-        },
-      })
+      const departmentNames = await resolveDepartmentNames(tx, organizationId, data)
+      await assertResponsiblesValid(tx, organizationId, data.departments, departmentNames)
+      assertPayloadCoverage(data.departments, data.clientUsers, departmentNames)
 
+      const client = await tx.client.create({ data: { ...companyData(data), organizationId } })
+      await syncServedDepartments(tx, client.id, data.departments)
       await upsertClientUserLinks(tx, client.id, organizationId, data.clientUsers)
 
       return tx.client.findUniqueOrThrow({ where: { id: client.id }, select: SELECT })
     })
   } catch (err) {
-    if (isDuplicateCodigoError(err)) {
-      throw new AppError(409, 'Já existe um cliente com este código nesta organização')
-    }
+    const message = duplicateMessage(err)
+    if (message) throw new AppError(409, message)
     throw err
   }
 }
 
-export async function updateClient(id: string, organizationId: string, data: UpdateClientBody) {
+export async function updateClient(id: string, organizationId: string, data: ClientBody) {
   try {
     return await prisma.$transaction(async (tx) => {
       const client = await tx.client.findFirst({ where: { id, organizationId, isActive: true } })
       if (!client) throw new AppError(404, 'Cliente não encontrado')
 
-      const { clientUsers, ...clientData } = data
-      const updated = await tx.client.update({ where: { id }, data: clientData, select: SELECT })
+      const departmentNames = await resolveDepartmentNames(tx, organizationId, data)
+      await assertResponsiblesValid(tx, organizationId, data.departments, departmentNames)
+      assertPayloadCoverage(data.departments, data.clientUsers, departmentNames)
 
-      if (clientUsers) {
-        const resolvedPairs = await upsertClientUserLinks(tx, id, organizationId, clientUsers)
-        await tx.clientUserAccess.deleteMany({
-          where: {
-            clientId: id,
-            ...(resolvedPairs.length > 0
-              ? { NOT: { OR: resolvedPairs.map((p) => ({ clientUserId: p.clientUserId, departmentId: p.departmentId })) } }
-              : {}),
-          },
-        })
-      }
+      const keep = new Set(data.departments.map((d) => d.departmentId))
+      const current = await tx.clientAssignment.findMany({ where: { clientId: id }, select: { departmentId: true } })
+      const removed = current.map((a) => a.departmentId).filter((departmentId) => !keep.has(departmentId))
+      await assertCanUnserveDepartments(tx, id, removed)
+
+      const updated = await tx.client.update({ where: { id }, data: companyData(data), select: SELECT })
+      await syncServedDepartments(tx, id, data.departments)
+
+      const resolvedPairs = await upsertClientUserLinks(tx, id, organizationId, data.clientUsers)
+      await tx.clientUserAccess.deleteMany({
+        where: {
+          clientId: id,
+          NOT: { OR: resolvedPairs.map((p) => ({ clientUserId: p.clientUserId, departmentId: p.departmentId })) },
+        },
+      })
 
       return updated
     })
   } catch (err) {
-    if (isDuplicateCodigoError(err)) {
-      throw new AppError(409, 'Já existe um cliente com este código nesta organização')
-    }
+    const message = duplicateMessage(err)
+    if (message) throw new AppError(409, message)
     throw err
   }
 }
@@ -230,36 +279,4 @@ export async function listAssignments(clientId: string, organizationId: string) 
       user: { select: { id: true, name: true, email: true, role: true } },
     },
   })
-}
-
-export async function setAssignment(
-  clientId: string,
-  organizationId: string,
-  departmentId: string,
-  userId: string | null,
-) {
-  const client = await prisma.client.findFirst({ where: { id: clientId, organizationId } })
-  if (!client) throw new AppError(404, 'Cliente não encontrado')
-
-  const department = await prisma.department.findFirst({ where: { id: departmentId, organizationId } })
-  if (!department) throw new AppError(404, 'Departamento não encontrado')
-
-  if (userId === null) {
-    await prisma.clientAssignment.deleteMany({ where: { clientId, departmentId } })
-    return listAssignments(clientId, organizationId)
-  }
-
-  const validUser = await prisma.user.findFirst({
-    where: { id: userId, organizationId, isActive: true },
-    select: { id: true },
-  })
-  if (!validUser) throw new AppError(400, 'Usuário inválido')
-
-  await prisma.clientAssignment.upsert({
-    where: { clientId_departmentId: { clientId, departmentId } },
-    update: { userId },
-    create: { clientId, departmentId, userId },
-  })
-
-  return listAssignments(clientId, organizationId)
 }

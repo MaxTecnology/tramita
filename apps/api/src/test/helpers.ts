@@ -113,6 +113,11 @@ export async function createTestClientUser(
   return { clientUser, password }
 }
 
+// Declara que o departamento atende o cliente, com o responsável do escritório (ClientAssignment).
+export async function serveClientDepartment(clientId: string, departmentId: string, responsibleUserId: string) {
+  return prisma.clientAssignment.create({ data: { clientId, departmentId, userId: responsibleUserId } })
+}
+
 export async function grantClientAccess(clientUserId: string, clientId: string, departmentId: string) {
   return prisma.clientUserAccess.create({ data: { clientUserId, clientId, departmentId } })
 }

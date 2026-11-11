@@ -4,14 +4,13 @@ import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { checkPlanLimit } from '@/middlewares/checkPlanLimit'
 import { AppError } from '@/errors/AppError'
-import { createClientSchema, updateClientSchema, listClientsQuerySchema, setAssignmentSchema } from './clients.schema'
+import { clientBodySchema, listClientsQuerySchema } from './clients.schema'
 import {
   listClients,
   createClient,
   updateClient,
   deleteClient,
   listAssignments,
-  setAssignment,
   lookupClientByCnpj,
   searchClientUsers,
   listClientUserLinks,
@@ -47,7 +46,7 @@ export async function clientsRoutes(app: FastifyInstance) {
   app.post('/', {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription, checkPlanLimit],
   }, async (request, reply) => {
-    const result = createClientSchema.safeParse(request.body)
+    const result = clientBodySchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     return reply.status(201).send(await createClient(request.user.organizationId!, result.data))
   })
@@ -56,7 +55,7 @@ export async function clientsRoutes(app: FastifyInstance) {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    const result = updateClientSchema.safeParse(request.body)
+    const result = clientBodySchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     return reply.send(await updateClient(id, request.user.organizationId!, result.data))
   })
@@ -80,16 +79,5 @@ export async function clientsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(await listAssignments(id, request.user.organizationId!))
-  })
-
-  app.put('/:id/assignments', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription],
-  }, async (request, reply) => {
-    const { id } = request.params as { id: string }
-    const result = setAssignmentSchema.safeParse(request.body)
-    if (!result.success) throw new AppError(400, result.error.errors[0].message)
-    return reply.send(
-      await setAssignment(id, request.user.organizationId!, result.data.departmentId, result.data.userId),
-    )
   })
 }
