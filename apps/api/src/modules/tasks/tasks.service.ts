@@ -7,6 +7,7 @@ import { recalculateTaskStatus, notifyIfBlocked } from '@/modules/task-documents
 import { Prisma } from '@prisma/client'
 import { resolveCompletedAt } from '@/lib/task-completion'
 import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, ListTasksQuery } from './tasks.schema'
+import { assertDepartmentServesClient } from '@/modules/clients/client-coverage'
 
 export interface Actor {
   id: string
@@ -87,6 +88,7 @@ export async function createTask(
 ) {
   const column = await verifyColumnBelongsToOrg(columnId, organizationId)
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
+  await assertDepartmentServesClient(prisma, column.board.clientId, data.departmentId)
   const departmentId = data.departmentId
   const actorName = await resolveActorName(actor.id, actor.type)
 
@@ -147,6 +149,9 @@ export async function moveTask(
   const task = await verifyTaskBelongsToOrg(taskId, organizationId)
   const fromColumn = task.column
   const toColumn = await verifyColumnBelongsToOrg(data.columnId, organizationId)
+  if (toColumn.board.id !== task.column.board.id) {
+    throw new AppError(400, 'A tarefa só pode ser movida dentro do mesmo processo')
+  }
   const actorName = await resolveActorName(actor.id, actor.type)
 
   const nextStatus = toColumn.statusEffect !== 'NONE' ? toColumn.statusEffect : task.status
@@ -280,6 +285,9 @@ export async function updateTask(
 ) {
   const task = await verifyTaskBelongsToOrg(id, organizationId)
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
+  if (data.departmentId && data.departmentId !== task.departmentId) {
+    await assertDepartmentServesClient(prisma, task.column.board.clientId, data.departmentId)
+  }
 
   // Tarefa recorrente: vencimento e meta são o prazo legal/interno que o motor de recorrência
   // calculou — editar aqui corromperia o controle que a tarefa existe pra garantir. Travado pra

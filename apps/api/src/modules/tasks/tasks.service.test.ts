@@ -19,6 +19,7 @@ import {
   createTestColumn,
   createTestTask,
   createTestDepartment,
+  serveClientDepartment,
 } from '@/test/helpers'
 import { createTemplate } from '@/modules/recurring-templates/recurring-templates.service'
 
@@ -216,6 +217,7 @@ describe('createTask', () => {
     const col = await createTestColumn(board.id, { position: 0 })
     await createTestTask(col.id, user.id, { position: 0 })
     const department = await createTestDepartment(org.id)
+    await serveClientDepartment(client.id, department.id, user.id)
 
     const task = await createTask(col.id, org.id, {
       title: 'Nova tarefa', priority: 'HIGH', tags: [], departmentId: department.id,
@@ -387,6 +389,7 @@ describe('updateTask', () => {
     const col = await createTestColumn(board.id, { position: 0 })
     const deptA = await createTestDepartment(org.id)
     const deptB = await createTestDepartment(org.id)
+    await serveClientDepartment(client.id, deptB.id, user.id)
     const task = await createTestTask(col.id, user.id, { departmentId: deptA.id })
 
     await updateTask(task.id, org.id, { departmentId: deptB.id }, { id: user.id, type: 'user' })
@@ -846,5 +849,60 @@ describe('moveTask — completedAt e status_changed', () => {
 
     const history = await prisma.taskHistory.findMany({ where: { taskId: task.id, action: 'status_changed' } })
     expect(history).toHaveLength(0)
+  })
+})
+
+describe('departamento atendido e isolamento entre processos', () => {
+  async function setup() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id, { name: 'ACME' })
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id, { position: 0 })
+    const fiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
+    const folha = await createTestDepartment(org.id, { name: 'Folha' })
+    await serveClientDepartment(client.id, fiscal.id, user.id)
+    return { org, user, client, board, col, fiscal, folha }
+  }
+
+  it('createTask recusa departamento que não atende o cliente do processo', async () => {
+    const { org, user, col, folha } = await setup()
+
+    await expect(
+      createTask(col.id, org.id, { title: 'X', priority: 'MEDIUM', tags: [], departmentId: folha.id }, { id: user.id, type: 'user' }),
+    ).rejects.toMatchObject({ statusCode: 400, message: 'O departamento Folha não atende o cliente ACME.' })
+  })
+
+  it('updateTask recusa trocar para departamento que não atende o cliente', async () => {
+    const { org, user, col, fiscal, folha } = await setup()
+    const task = await createTestTask(col.id, user.id, { departmentId: fiscal.id })
+
+    await expect(
+      updateTask(task.id, org.id, { departmentId: folha.id }, { id: user.id, type: 'user' }),
+    ).rejects.toMatchObject({ statusCode: 400, message: 'O departamento Folha não atende o cliente ACME.' })
+  })
+
+  it('moveTask recusa coluna de outro processo, mesmo do mesmo cliente', async () => {
+    const { org, user, client, col, fiscal } = await setup()
+    const task = await createTestTask(col.id, user.id, { departmentId: fiscal.id })
+    const otherBoard = await createTestBoard(org.id, client.id)
+    const otherCol = await createTestColumn(otherBoard.id)
+
+    await expect(
+      moveTask(task.id, org.id, { columnId: otherCol.id, position: 0 }, { id: user.id, type: 'user' }),
+    ).rejects.toMatchObject({ statusCode: 400, message: 'A tarefa só pode ser movida dentro do mesmo processo' })
+  })
+
+  it('moveTask recusa coluna do processo de outro cliente', async () => {
+    const { org, user, col, fiscal } = await setup()
+    const task = await createTestTask(col.id, user.id, { departmentId: fiscal.id })
+    const otherClient = await createTestClient(org.id)
+    const otherBoard = await createTestBoard(org.id, otherClient.id)
+    const otherCol = await createTestColumn(otherBoard.id)
+
+    await expect(
+      moveTask(task.id, org.id, { columnId: otherCol.id, position: 0 }, { id: user.id, type: 'user' }),
+    ).rejects.toMatchObject({ statusCode: 400 })
   })
 })
