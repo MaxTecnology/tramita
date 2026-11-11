@@ -90,7 +90,7 @@ export default function AppLayout() {
 
           <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
             {ORG_ROLES.includes(role) && (
-              <SidebarSectionLabel>Geral</SidebarSectionLabel>
+              <SidebarSectionLabel>Trabalho</SidebarSectionLabel>
             )}
             {ORG_ROLES.includes(role) && (
               <SidebarLink to="/app/dashboard" icon={<LayoutDashboard size={16} />} label="Dashboard" onClick={handleNavClick} />
@@ -116,13 +116,16 @@ export default function AppLayout() {
             {ORG_ROLES.includes(role) && (
               <SidebarLink to="/app/document-reader" icon={<FileSearch size={16} />} label="Leitura de Documentos" onClick={handleNavClick} />
             )}
+
+            {(MANAGER_ROLES.includes(role) || ADMIN_ROLES.includes(role)) && (
+              <SidebarSectionLabel>Administração</SidebarSectionLabel>
+            )}
             {MANAGER_ROLES.includes(role) && (
               <SidebarLink to="/app/clients" icon={<UserCheck size={16} />} label="Clientes" onClick={handleNavClick} />
             )}
             {ADMIN_ROLES.includes(role) && (
               <SidebarLink to="/app/users" icon={<Users size={16} />} label="Usuários" onClick={handleNavClick} />
             )}
-
             {MANAGER_ROLES.includes(role) && (
               <SidebarLink
                 to="/app/settings"
