@@ -23,6 +23,7 @@ import type {
   CreateAssignmentBody,
   UpdateAssignmentBody,
 } from './recurring-templates.schema'
+import { assertDepartmentServesClient } from '@/modules/clients/client-coverage'
 
 // Antes do Plano B (modelagem de documentos) só existia ObligationType global, então vincular
 // qualquer id aqui era seguro por construção. Desde que orgs passaram a criar ObligationType
@@ -86,6 +87,22 @@ export async function updateTemplate(id: string, organizationId: string, data: U
   const existing = await getTemplateById(id, organizationId)
 
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
+  if (data.departmentId && data.departmentId !== existing.departmentId) {
+    const notServed = await prisma.recurringTaskAssignment.count({
+      where: {
+        templateId: id,
+        isActive: true,
+        client: { isActive: true, clientAssignments: { none: { departmentId: data.departmentId } } },
+      },
+    })
+    if (notServed > 0) {
+      const department = await prisma.department.findUnique({ where: { id: data.departmentId }, select: { name: true } })
+      throw new AppError(
+        409,
+        `Não é possível trocar o departamento: ${notServed} cliente(s) vinculado(s) não são atendidos pelo departamento ${department?.name ?? ''}.`,
+      )
+    }
+  }
   if (data.obligationTypeId) await assertObligationTypeAccessible(data.obligationTypeId, organizationId)
   assertDayOfPeriodValid(
     data.periodicity ?? existing.periodicity,
@@ -144,6 +161,8 @@ export async function createAssignment(templateId: string, organizationId: strin
   await getTemplateById(templateId, organizationId)
   const client = await prisma.client.findFirst({ where: { id: data.clientId, organizationId } })
   if (!client) throw new AppError(404, 'Cliente não encontrado')
+  const template = await prisma.recurringTaskTemplate.findUniqueOrThrow({ where: { id: templateId }, select: { departmentId: true } })
+  await assertDepartmentServesClient(prisma, client.id, template.departmentId)
 
   const existing = await prisma.recurringTaskAssignment.findFirst({
     where: { templateId, clientId: data.clientId },
@@ -199,6 +218,14 @@ function isDuplicateGenerationLogError(err: unknown): boolean {
 // nunca cai no branch de "falha genuína" (que reescreveria o log SUCCESS do vencedor pra FAILED).
 class ConcurrentGenerationLossError extends Error {}
 
+export function departmentNotServedFailureMessage(departmentName: string, clientName: string): string {
+  return `O departamento ${departmentName} não atende mais o cliente ${clientName}. Marque o departamento no cadastro do cliente ou remova o vínculo do template.`
+}
+
+// Falha esperada e já explicada ao usuário — a mensagem vai crua pro log, sem o embrulho de
+// "erro inesperado".
+class GenerationUserFacingError extends Error {}
+
 export async function generateTaskForAssignment(
   templateId: string,
   assignmentId: string,
@@ -228,6 +255,18 @@ export async function generateTaskForAssignment(
   if (existingLog?.status === 'SUCCESS') return { status: 'ALREADY_EXISTS' }
 
   try {
+    const served = await prisma.clientAssignment.findUnique({
+      where: { clientId_departmentId: { clientId: assignment.clientId, departmentId: template.departmentId } },
+      select: { id: true },
+    })
+    if (!served) {
+      const [department, client] = await Promise.all([
+        prisma.department.findUnique({ where: { id: template.departmentId }, select: { name: true } }),
+        prisma.client.findUnique({ where: { id: assignment.clientId }, select: { name: true } }),
+      ])
+      throw new GenerationUserFacingError(departmentNotServedFailureMessage(department?.name ?? '', client?.name ?? ''))
+    }
+
     const systemBoard = await ensureRecurringSystemBoard(assignment.clientId, template.organizationId)
     const columnId = systemBoard.columns[0].id
 
@@ -370,7 +409,9 @@ export async function generateTaskForAssignment(
       return { status: 'ALREADY_EXISTS' }
     }
 
-    const errorMessage = err instanceof Error ? err.message : String(err)
+    const errorMessage = err instanceof GenerationUserFacingError
+      ? err.message
+      : `Erro inesperado ao gerar a tarefa: ${err instanceof Error ? err.message : String(err)}. Tente gerar novamente; se persistir, avise o suporte.`
 
     await prisma.recurringGenerationLog.upsert({
       where: logKey,

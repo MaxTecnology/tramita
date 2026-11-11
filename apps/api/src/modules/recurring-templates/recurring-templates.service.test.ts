@@ -15,13 +15,17 @@ import {
   getFailedGenerations,
   regenerateTask,
   regenerateBulkForTemplate,
+  departmentNotServedFailureMessage,
 } from './recurring-templates.service'
+import * as tasksService from '@/modules/tasks/tasks.service'
 import {
   createTestOrg,
   createTestPlan,
   createTestDepartment,
   createTestClient,
   createTestUser,
+  serveClientDepartment,
+  createTestRecurringAssignment,
 } from '@/test/helpers'
 
 describe('createTemplate', () => {
@@ -258,7 +262,7 @@ describe('createAssignment', () => {
       documentDeliveries: [],
     })
 
-    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    const assignment = await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
 
     expect(assignment.clientId).toBe(client.id)
   })
@@ -287,10 +291,10 @@ describe('createAssignment', () => {
       documentRequests: [],
       documentDeliveries: [],
     })
-    await createAssignment(template.id, org.id, { clientId: client.id })
+    await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
 
     await expect(
-      createAssignment(template.id, org.id, { clientId: client.id }),
+      createTestRecurringAssignment(template.id, org.id, { clientId: client.id }),
     ).rejects.toMatchObject({ statusCode: 409 })
   })
 
@@ -321,7 +325,7 @@ describe('createAssignment', () => {
     })
 
     await expect(
-      createAssignment(template.id, org.id, { clientId: clientOfB.id }),
+      createTestRecurringAssignment(template.id, org.id, { clientId: clientOfB.id }),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 })
@@ -351,7 +355,7 @@ describe('deleteTemplate (com assignment vinculado)', () => {
       documentRequests: [],
       documentDeliveries: [],
     })
-    await createAssignment(template.id, org.id, { clientId: client.id })
+    await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
 
     await expect(deleteTemplate(template.id, org.id)).rejects.toMatchObject({ statusCode: 409 })
   })
@@ -372,7 +376,7 @@ describe('generateTaskForAssignment', () => {
       visibleToClient: true, isActive: true,
       documentRequests: [{ name: 'Ponto' }], documentDeliveries: [{ name: 'Resumo' }],
     })
-    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    const assignment = await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
     return { org, dept, client, template, assignment }
   }
 
@@ -435,7 +439,7 @@ describe('generateTaskForAssignment', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    const dasAssignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    const dasAssignment = await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
 
     const dueMonth = new Date(Date.UTC(2026, 9, 1)) // outubro
     const outcome = await generateTaskForAssignment(template.id, dasAssignment.id, dueMonth)
@@ -474,7 +478,7 @@ describe('generateTaskForAssignment', () => {
       visibleToClient: true, isActive: true,
       documentRequests: [], documentDeliveries: [],
     })
-    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    const assignment = await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
     const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
 
     const dueMonth = new Date(Date.UTC(2026, 2, 1))
@@ -640,7 +644,7 @@ describe('generateManually', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    const assignment = await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
     return { template, assignment }
   }
 
@@ -695,8 +699,8 @@ describe('generateBulkForTemplate', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    const assignmentA = await createAssignment(template.id, org.id, { clientId: clientA.id })
-    const assignmentB = await createAssignment(template.id, org.id, { clientId: clientB.id })
+    const assignmentA = await createTestRecurringAssignment(template.id, org.id, { clientId: clientA.id })
+    const assignmentB = await createTestRecurringAssignment(template.id, org.id, { clientId: clientB.id })
 
     const dueMonth = new Date(Date.UTC(2026, 9, 1)).toISOString()
 
@@ -734,8 +738,8 @@ describe('generateBulkForTemplate', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    const assignmentA = await createAssignment(template.id, org.id, { clientId: clientA.id })
-    const assignmentB = await createAssignment(template.id, org.id, { clientId: clientB.id })
+    const assignmentA = await createTestRecurringAssignment(template.id, org.id, { clientId: clientA.id })
+    const assignmentB = await createTestRecurringAssignment(template.id, org.id, { clientId: clientB.id })
 
     // Força generateTaskForAssignment a lançar sincronicamente pro assignmentB — simula um blip
     // de banco no trecho de generateTaskForAssignment que fica FORA do try/catch interno (a
@@ -783,7 +787,7 @@ describe('generateBulkForTemplate', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    const assignment = await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
 
     // outubro/2026 tem 4 segundas-feiras: 05, 12, 19, 26
     const dueMonth = new Date(Date.UTC(2026, 9, 15)).toISOString()
@@ -816,7 +820,7 @@ describe('generateBulkForAllTemplates', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    await createAssignment(withAssignment.id, org.id, { clientId: client.id })
+    await createTestRecurringAssignment(withAssignment.id, org.id, { clientId: client.id })
 
     await createTemplate(org.id, {
       departmentId: dept.id, title: 'Sem vínculo', periodicity: 'MONTHLY', priority: 'MEDIUM',
@@ -904,7 +908,7 @@ describe('getFailedGenerations', () => {
     })
 
     // Cliente ainda vinculado (ativo) ao template -> retryable: true
-    await createAssignment(template.id, org.id, { clientId: clientWithAssignment.id })
+    await createTestRecurringAssignment(template.id, org.id, { clientId: clientWithAssignment.id })
 
     // competência logada = setembro/2026; com competenceMonthOffset=1, dueMonth esperado é
     // outubro/2026 (setembro + 1 mês) — NUNCA agosto/2026 (setembro - 1 mês), que seria o bug
@@ -955,7 +959,7 @@ describe('regenerateTask', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    const assignment = await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
 
     // competência setembro/2026, dueMonth = competência + offset (outubro, se offset=1)
     const competence = new Date(Date.UTC(2026, 8, 1))
@@ -1054,8 +1058,8 @@ describe('regenerateBulkForTemplate', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    const assignmentA = await createAssignment(template.id, org.id, { clientId: clientA.id })
-    const assignmentB = await createAssignment(template.id, org.id, { clientId: clientB.id })
+    const assignmentA = await createTestRecurringAssignment(template.id, org.id, { clientId: clientA.id })
+    const assignmentB = await createTestRecurringAssignment(template.id, org.id, { clientId: clientB.id })
 
     // Só gera pra clientA — clientB fica sem tarefa pra essa competência de propósito
     const outcome = await generateTaskForAssignment(template.id, assignmentA.id, new Date(Date.UTC(2026, 9, 1)))
@@ -1076,6 +1080,81 @@ describe('regenerateBulkForTemplate', () => {
     const newTask = await prisma.task.findFirst({ where: { recurringTemplateId: template.id } })
     expect(newTask?.id).not.toBe(outcome.taskId)
 
+    vi.restoreAllMocks()
+  })
+})
+
+describe('departamento atendido nos recorrentes', () => {
+  async function setup() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id)
+    const fiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
+    const folha = await createTestDepartment(org.id, { name: 'Folha' })
+    const client = await createTestClient(org.id, { name: 'ACME' })
+    await serveClientDepartment(client.id, fiscal.id, admin.id)
+    const template = await prisma.recurringTaskTemplate.create({
+      data: {
+        organizationId: org.id, departmentId: fiscal.id, title: 'DAS', periodicity: 'MONTHLY',
+        dueDayOfPeriod: 10, generationDayOfPeriod: 1,
+      },
+    })
+    return { org, admin, fiscal, folha, client, template }
+  }
+
+  it('createAssignment recusa cliente não atendido pelo departamento do template', async () => {
+    const { org, folha, client } = await setup()
+    const folhaTemplate = await prisma.recurringTaskTemplate.create({
+      data: {
+        organizationId: org.id, departmentId: folha.id, title: 'Folha', periodicity: 'MONTHLY',
+        dueDayOfPeriod: 5, generationDayOfPeriod: 1,
+      },
+    })
+
+    await expect(createAssignment(folhaTemplate.id, org.id, { clientId: client.id })).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'O departamento Folha não atende o cliente ACME.',
+    })
+  })
+
+  it('updateTemplate recusa trocar para departamento que não atende clientes vinculados', async () => {
+    const { org, folha, client, template } = await setup()
+    await createAssignment(template.id, org.id, { clientId: client.id })
+
+    await expect(updateTemplate(template.id, org.id, { departmentId: folha.id })).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'Não é possível trocar o departamento: 1 cliente(s) vinculado(s) não são atendidos pelo departamento Folha.',
+    })
+  })
+
+  it('geração registra FAILED acionável e não cria tarefa quando o departamento deixou de atender o cliente', async () => {
+    const { org, fiscal, client, template } = await setup()
+    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    await prisma.clientAssignment.deleteMany({ where: { clientId: client.id, departmentId: fiscal.id } })
+
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, new Date(Date.UTC(2026, 10, 1)))
+
+    const expected = departmentNotServedFailureMessage('Fiscal', 'ACME')
+    expect(expected).toBe('O departamento Fiscal não atende mais o cliente ACME. Marque o departamento no cadastro do cliente ou remova o vínculo do template.')
+    expect(outcome).toEqual({ status: 'FAILED', errorMessage: expected })
+    expect(await prisma.task.count({ where: { recurringTemplateId: template.id } })).toBe(0)
+    const log = await prisma.recurringGenerationLog.findFirstOrThrow({ where: { templateId: template.id } })
+    expect(log).toMatchObject({ status: 'FAILED', errorMessage: expected })
+  })
+
+  it('falha inesperada vira mensagem amigável pedindo para tentar de novo', async () => {
+    const { org, client, template } = await setup()
+    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    vi.spyOn(tasksService, 'ensureRecurringSystemBoard').mockRejectedValueOnce(new Error('conexão perdida'))
+
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, new Date(Date.UTC(2026, 10, 1)))
+
+    expect(outcome.status).toBe('FAILED')
+    if (outcome.status === 'FAILED') {
+      expect(outcome.errorMessage).toBe(
+        'Erro inesperado ao gerar a tarefa: conexão perdida. Tente gerar novamente; se persistir, avise o suporte.',
+      )
+    }
     vi.restoreAllMocks()
   })
 })

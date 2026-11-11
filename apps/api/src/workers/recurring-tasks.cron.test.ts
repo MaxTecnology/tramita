@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import {
   createTestPlan, createTestOrg, createTestDepartment,
   createTestClient, createTestBoard, createTestColumn,
+  createTestRecurringAssignment,
 } from '@/test/helpers'
 import { createTemplate } from '@/modules/recurring-templates/recurring-templates.service'
 import { createAssignment } from '@/modules/recurring-templates/recurring-templates.service'
@@ -27,7 +28,7 @@ describe('runRecurringTasksGeneration', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    await createAssignment(templateTriggersToday.id, org.id, { clientId: client.id })
+    await createTestRecurringAssignment(templateTriggersToday.id, org.id, { clientId: client.id })
 
     const templateDoesNotTrigger = await createTemplate(org.id, {
       departmentId: dept.id, title: 'Não dispara hoje', periodicity: 'MONTHLY', priority: 'MEDIUM',
@@ -37,7 +38,7 @@ describe('runRecurringTasksGeneration', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    await createAssignment(templateDoesNotTrigger.id, org.id, { clientId: client.id })
+    await createTestRecurringAssignment(templateDoesNotTrigger.id, org.id, { clientId: client.id })
 
     const today = new Date(Date.UTC(2026, 0, 20)) // dia 20
     await runRecurringTasksGeneration(today)
@@ -67,7 +68,7 @@ describe('runRecurringTasksGeneration', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    await createAssignment(template.id, org.id, { clientId: client.id })
+    await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
 
     // 2026-01-20T01:00:00Z = 2026-01-19T22:00 BRT — dia 19 em BRT, mas já dia 20 em UTC. Sem a
     // correção, o default `new Date()` leria dia 20 (UTC) e não disparado o gatilho do dia 19.
@@ -101,7 +102,7 @@ describe('runRecurringTasksGeneration', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: false, documentRequests: [], documentDeliveries: [],
     })
-    await createAssignment(template.id, org.id, { clientId: client.id })
+    await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
 
     await runRecurringTasksGeneration(new Date(Date.UTC(2026, 0, 20)))
 
@@ -128,7 +129,7 @@ describe('runRecurringTasksGeneration', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    const assignment = await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
     await prisma.recurringTaskAssignment.update({ where: { id: assignment.id }, data: { isActive: false } })
 
     await runRecurringTasksGeneration(new Date(Date.UTC(2026, 0, 20)))
@@ -157,7 +158,7 @@ describe('runRecurringTasksGeneration', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: false, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    await createAssignment(template.id, org.id, { clientId: client.id })
+    await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
 
     const trigger = new Date(Date.UTC(2026, 8, 20)) // 20 de setembro
     await runRecurringTasksGeneration(trigger)

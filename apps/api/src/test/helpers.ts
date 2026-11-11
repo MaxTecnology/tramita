@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { app } from '@/test/setup'
 import type { LoginResponse } from '@/modules/auth/auth.types'
 import { createRequest } from '@/modules/requests/requests.service'
+import { createAssignment } from '@/modules/recurring-templates/recurring-templates.service'
 
 export async function createTestPlan(overrides?: Partial<{ name: string; maxClients: number }>) {
   return prisma.plan.create({
@@ -234,6 +235,28 @@ export async function loginAs(email: string, password: string): Promise<LoginRes
   return JSON.parse(response.body) as LoginResponse
 }
 
+// Garante que o departamento atenda o cliente (ClientAssignment), usando o primeiro colaborador
+// ativo da organização como responsável (ou criando um ORG_MEMBER, que não recebe notificações de
+// fallback de admin).
+export async function ensureServed(organizationId: string, clientId: string, departmentId: string) {
+  const served = await prisma.clientAssignment.findUnique({
+    where: { clientId_departmentId: { clientId, departmentId } },
+  })
+  if (served) return served
+  const staff = await prisma.user.findFirst({
+    where: { organizationId, isActive: true, role: { in: ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'] } },
+    orderBy: { createdAt: 'asc' },
+  })
+  const responsible = staff ?? (await createTestUser(organizationId, { role: 'ORG_MEMBER' }))
+  return serveClientDepartment(clientId, departmentId, responsible.id)
+}
+
+export async function createTestRecurringAssignment(templateId: string, organizationId: string, data: { clientId: string }) {
+  const template = await prisma.recurringTaskTemplate.findUniqueOrThrow({ where: { id: templateId } })
+  await ensureServed(organizationId, data.clientId, template.departmentId)
+  return createAssignment(templateId, organizationId, data)
+}
+
 // Garante que o cliente tenha um departamento atendido (com responsável) e um usuário do portal com
 // acesso a ele — pré-requisito de toda solicitação (I6). Reaproveita o que já existir.
 export async function ensurePortalAccess(organizationId: string, clientId: string, departmentId?: string) {
@@ -243,17 +266,7 @@ export async function ensurePortalAccess(organizationId: string, clientId: strin
     resolvedDepartmentId = existing?.departmentId ?? (await createTestDepartment(organizationId)).id
   }
 
-  const served = await prisma.clientAssignment.findUnique({
-    where: { clientId_departmentId: { clientId, departmentId: resolvedDepartmentId } },
-  })
-  if (!served) {
-    const staff = await prisma.user.findFirst({
-      where: { organizationId, isActive: true, role: { in: ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'] } },
-      orderBy: { createdAt: 'asc' },
-    })
-    const responsible = staff ?? (await createTestUser(organizationId, { role: 'ORG_MEMBER' }))
-    await serveClientDepartment(clientId, resolvedDepartmentId, responsible.id)
-  }
+  await ensureServed(organizationId, clientId, resolvedDepartmentId)
 
   let access = await prisma.clientUserAccess.findFirst({
     where: { clientId, departmentId: resolvedDepartmentId, clientUser: { isActive: true } },

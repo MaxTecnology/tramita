@@ -12,6 +12,7 @@ import {
   createTestTask,
   createTestDepartment,
   getAuthHeader,
+  createTestRecurringAssignment,
 } from '@/test/helpers'
 import { createTemplate, createAssignment } from '@/modules/recurring-templates/recurring-templates.service'
 import { runRecurringTasksGeneration } from '@/workers/recurring-tasks.cron'
@@ -150,8 +151,8 @@ describe('GET /tasks', () => {
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
     })
-    await createAssignment(template.id, org.id, { clientId: clientA.id })
-    await createAssignment(template.id, org.id, { clientId: clientB.id })
+    await createTestRecurringAssignment(template.id, org.id, { clientId: clientA.id })
+    await createTestRecurringAssignment(template.id, org.id, { clientId: clientB.id })
 
     const today = new Date(Date.UTC(2026, 0, 20))
     await runRecurringTasksGeneration(today)

@@ -13,6 +13,7 @@ import {
   createTestPlan, createTestOrg, createTestUser, createTestClient,
   createTestBoard, createTestColumn, createTestTask, createTestDepartment,
   createTestClientUser, grantClientAccess,
+  createTestRecurringAssignment,
 } from '@/test/helpers'
 
 beforeEach(() => {
@@ -126,7 +127,7 @@ describe('checklist de documento — impedimento automático', () => {
       visibleToClient: true, isActive: true,
       documentRequests: [{ name: 'Ponto' }], documentDeliveries: [],
     })
-    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    const assignment = await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
     const outcome = await generateTaskForAssignment(template.id, assignment.id, new Date(Date.UTC(2026, 1, 1)))
     if (outcome.status !== 'SUCCESS') throw new Error('geração falhou no setup do teste')
 
