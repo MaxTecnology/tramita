@@ -7,6 +7,7 @@ import {
   deleteTemplate,
   getTemplateById,
   createAssignment,
+  updateAssignment,
   deleteAssignment,
   generateTaskForAssignment,
   generateManually,
@@ -1142,6 +1143,18 @@ describe('departamento atendido nos recorrentes', () => {
     expect(log).toMatchObject({ status: 'FAILED', errorMessage: expected })
   })
 
+  it('reativar vínculo recusa cliente que deixou de ser atendido pelo departamento', async () => {
+    const { org, fiscal, client, template } = await setup()
+    const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
+    await updateAssignment(template.id, assignment.id, org.id, { isActive: false })
+    await prisma.clientAssignment.deleteMany({ where: { clientId: client.id, departmentId: fiscal.id } })
+
+    await expect(updateAssignment(template.id, assignment.id, org.id, { isActive: true })).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'O departamento Fiscal não atende o cliente ACME.',
+    })
+  })
+
   it('falha inesperada vira mensagem amigável pedindo para tentar de novo', async () => {
     const { org, client, template } = await setup()
     const assignment = await createAssignment(template.id, org.id, { clientId: client.id })
@@ -1151,9 +1164,9 @@ describe('departamento atendido nos recorrentes', () => {
 
     expect(outcome.status).toBe('FAILED')
     if (outcome.status === 'FAILED') {
-      expect(outcome.errorMessage).toBe(
-        'Erro inesperado ao gerar a tarefa: conexão perdida. Tente gerar novamente; se persistir, avise o suporte.',
-      )
+      // Detalhe técnico vai só pro log — a mensagem aparece no Dashboard e no resumo diário.
+      expect(outcome.errorMessage).toBe('Erro inesperado ao gerar a tarefa. Tente gerar novamente; se persistir, avise o suporte.')
+      expect(outcome.errorMessage).not.toContain('conexão perdida')
     }
     vi.restoreAllMocks()
   })

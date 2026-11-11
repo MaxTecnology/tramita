@@ -187,7 +187,13 @@ export async function updateAssignment(
   organizationId: string,
   data: UpdateAssignmentBody,
 ) {
-  await getAssignmentOrThrow(templateId, assignmentId, organizationId)
+  const assignment = await getAssignmentOrThrow(templateId, assignmentId, organizationId)
+
+  // Reativar equivale a vincular de novo: o departamento do template precisa atender o cliente.
+  if (data.isActive === true && !assignment.isActive) {
+    const template = await prisma.recurringTaskTemplate.findUniqueOrThrow({ where: { id: templateId }, select: { departmentId: true } })
+    await assertDepartmentServesClient(prisma, assignment.clientId, template.departmentId)
+  }
 
   return prisma.recurringTaskAssignment.update({ where: { id: assignmentId }, data })
 }
@@ -409,9 +415,15 @@ export async function generateTaskForAssignment(
       return { status: 'ALREADY_EXISTS' }
     }
 
-    const errorMessage = err instanceof GenerationUserFacingError
-      ? err.message
-      : `Erro inesperado ao gerar a tarefa: ${err instanceof Error ? err.message : String(err)}. Tente gerar novamente; se persistir, avise o suporte.`
+    let errorMessage: string
+    if (err instanceof GenerationUserFacingError) {
+      errorMessage = err.message
+    } else {
+      // O detalhe técnico (pode ser texto interno do Prisma) fica só no log; a mensagem gravada vai
+      // pro Dashboard e pro resumo diário.
+      logger.error({ err, templateId, clientId: assignment.clientId }, 'Falha inesperada na geração de tarefa recorrente')
+      errorMessage = 'Erro inesperado ao gerar a tarefa. Tente gerar novamente; se persistir, avise o suporte.'
+    }
 
     await prisma.recurringGenerationLog.upsert({
       where: logKey,
