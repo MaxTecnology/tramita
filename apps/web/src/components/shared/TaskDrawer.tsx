@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, Paperclip, MessageSquare, Clock, Trash2, FileCheck, Stamp } from 'lucide-react'
+import { X, Paperclip, MessageSquare, Clock, Trash2, FileCheck, Stamp, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { Comments } from '@/components/shared/Comments'
-import type { Task, Attachment, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable, Protocol } from '@/types'
+import { hasUnseenClientReply } from '@/lib/request-comments'
+import type { Task, Attachment, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable, Protocol, Comment } from '@/types'
 import { toast } from 'sonner'
 
 interface Props {
@@ -181,6 +182,14 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
       toast.error('Erro ao abrir comprovante')
     }
   }
+
+  const [sourceRequestOpen, setSourceRequestOpen] = useState(true)
+
+  const { data: sourceRequestComments = [] } = useQuery<Comment[]>({
+    queryKey: ['request-comments', task.sourceRequestId],
+    queryFn: () => api.get(`/requests/${task.sourceRequestId}/comments`).then((r) => r.data),
+    enabled: tab === 'comments' && !!task.sourceRequestId && isOrgRole(role),
+  })
 
   const { data: history = [] } = useQuery<TaskHistory[]>({
     queryKey: ['task-history', task.id],
@@ -515,7 +524,34 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
         <div className="flex-1 overflow-y-auto p-5">
 
           {tab === 'comments' && (
-            <Comments entityType="task" entityId={task.id} currentUserId={currentUserId} role={role} />
+            <div className="space-y-4">
+              {task.sourceRequestId && isOrgRole(role) && (
+                <div className="rounded-lg border border-border">
+                  <button
+                    type="button"
+                    onClick={() => setSourceRequestOpen((v) => !v)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-left"
+                  >
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                      {sourceRequestOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      Solicitação de origem
+                      {hasUnseenClientReply(sourceRequestComments) && (
+                        <span className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-100 rounded-full px-2 py-0.5 ml-1">
+                          <AlertCircle size={12} />
+                          Resposta não vista
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                  {sourceRequestOpen && (
+                    <div className="px-3 pb-3">
+                      <Comments entityType="request" entityId={task.sourceRequestId} currentUserId={currentUserId} role={role} />
+                    </div>
+                  )}
+                </div>
+              )}
+              <Comments entityType="task" entityId={task.id} currentUserId={currentUserId} role={role} />
+            </div>
           )}
 
           {tab === 'documents' && documents && (

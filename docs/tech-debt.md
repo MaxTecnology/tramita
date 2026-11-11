@@ -256,8 +256,15 @@ mesma sessão (race no auto-revert de NEEDS_INFO, `TaskHistory`/`publishBoardEve
   (API como cliente comentando numa request NEEDS_INFO + navegador aberto como admin na aba
   "Precisa de informação"): a lista perde o item e o badge do menu atualiza sozinho, sem refresh.
 - **Aprovar/rejeitar a partir de NEEDS_INFO** deixa a resposta do cliente (se vier depois) perdida
-  na thread de uma Request já fechada, sem refletir na Task. Decisão de produto, não bug — considerar
-  exibir a thread da Request no `TaskDrawer` quando `task.sourceRequestId` existir.
+  na thread de uma Request já fechada, sem refletir na Task ✅ (resolvido em 2026-11-10). `TaskDrawer.tsx`
+  agora mostra, na aba Comentários, uma seção colapsável "Solicitação de origem" quando
+  `task.sourceRequestId` existir, reaproveitando `Comments` com `entityType="request"` (só pra
+  `ORG_ADMIN`/`ORG_MANAGER`/`ORG_MEMBER`, nunca pro `CLIENT`). Um badge "Resposta não vista" aparece
+  (mesmo com a seção colapsada) quando o último `RequestComment` do cliente é mais recente que o
+  último do staff — `hasUnseenClientReply` em `apps/web/src/lib/request-comments.ts`, 5 testes
+  unitários. Confirmado em QA manual real no navegador (dados de teste criados e removidos em
+  seguida): badge aparece com a thread terminando em comentário do cliente, some assim que o staff
+  responde.
 - **Validação de entrada frouxa** ✅ (resolvido em 2026-10-19). `createRequestCommentSchema`,
   `needsInfoRequestSchema` e `cancelApprovedRequestSchema` agora usam `.trim().min(1, ...).max(4000, ...)`
   — texto só com espaços é rejeitado (400), limite de 4000 caracteres (WhatsApp tem limite
