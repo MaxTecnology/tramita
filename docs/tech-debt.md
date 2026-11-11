@@ -290,17 +290,25 @@ Achados da revisão final (fresh reviewer, Opus) que não bloqueiam uso real e f
 Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fiscais-design.md` e
 `docs/superpowers/plans/2026-10-15-automacao-documentos-fiscais-plan-a.md`.
 
-- **Isolamento de processo incompleto no parser de PDF**: a spec original pedia processo/
-  `worker_thread` separado pra extração de texto (PDF é entrada não confiável). O que existe hoje
-  (`apps/api/src/modules/document-reader/engine/extrair-texto.ts`) é um timeout de 15s que chama
-  `destroy()` na loading task do pdf.js quando estoura — mitiga vazamento de CPU/memória no caso
-  comum, mas um laço **síncrono** dentro do pdf.js ainda bloqueia o event loop antes do timeout
-  conseguir disparar. Como o worker de document-reader roda no mesmo processo que o worker de
-  notificações, um PDF verdadeiramente patológico (fora dos limites de página/tamanho já
-  existentes) pode degradar as notificações de WhatsApp/email até o timeout estourar. Não consegui
-  escrever um teste TDD genuíno pra essa trilha: as exportações ESM do `pdfjs-dist@6.4.299` não são
-  configuráveis (`vi.spyOn` falha com "Cannot redefine property"), e `src/test/setup.ts` já carrega
-  o módulo real via `buildApp()` antes do hoisting de `vi.mock` ter chance de interceptar.
+- **Isolamento de processo incompleto no parser de PDF** ✅ (resolvido em 2026-11-11). A extração
+  de texto do pdf.js agora roda numa `worker_thread` dedicada (`extrair-texto-worker.ts`), isolada
+  do processo principal — `Worker.terminate()` consegue interromper até um laço síncrono travado
+  em JS puro, ao contrário do antigo `loadingTask.destroy()` que só funcionava se o pdf.js cedesse
+  o event loop a tempo de checar o timeout. `extrair-texto.ts` virou um wrapper fino sobre o
+  executor genérico `src/lib/isolated-worker.ts` (`executarIsolado`), reaproveitável por qualquer
+  parser futuro de entrada não confiável. Resolvido também o impasse do teste: em vez de tentar
+  mockar o `pdfjs-dist` (continua impossível, exports ESM congelados), o mecanismo de isolamento é
+  testado genericamente com um worker de teste dedicado que roda um `while(true){}` de propósito —
+  prova real, sem mock, de que `terminate()` interrompe o laço e a thread principal nunca trava
+  esperando (`isolated-worker.test.ts`, 4 testes). `extrair-texto.test.ts` prova com PDFs reais
+  (gerados via `pdfkit`, mesmo padrão de `pipeline.test.ts`) que o resultado não mudou. Log de erro
+  com marcador `event: 'pdf_extraction_timeout'` quando o timeout disparar — sem Sentry/Datadog
+  integrado, o escopo decidido foi só isolamento + log estruturado, não alerta/paging novo.
+  Complicador técnico: o arquivo da worker precisa resolver diferente em dev/teste (`.ts` via
+  `tsx`, registrado via `execArgv: ['--import', 'tsx']`) e produção (`.js` já compilado em
+  `dist/`, sem `tsx` — é devDependency) — resolvido checando a extensão do próprio
+  `import.meta.url` em runtime. Validado com um smoke test real contra o build compilado
+  (`pnpm build` + `node` puro, sem `tsx`), não só contra os testes.
 - **`trocarTarefa`** não confere no backend se a tarefa de destino é do mesmo cliente do CNPJ lido
   no documento ✅ (resolvido em 2026-10-18). Mitigado em 2026-10-16 (commit 2ab126a) na UI (seletor
   cliente→tarefa). Resolvido por completo com `assertCnpjBateComTarefa`

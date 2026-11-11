@@ -1,78 +1,40 @@
 import { readFile } from 'node:fs/promises'
-// @ts-ignore - build legacy roda em Node sem polyfills
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import type { DocumentoExtraido, Item, Pagina } from './types'
+import type { DocumentoExtraido } from './types'
+import { executarIsolado } from '@/lib/isolated-worker'
+import { logger } from '@/lib/logger'
 
-const MAX_PAGINAS = 10
 const TIMEOUT_MS = 15_000
+
+// `import.meta.url` termina em `.ts` rodando via tsx (dev/teste) e em `.js` no build de produção
+// (tsc + tsc-alias) — só no primeiro caso a worker_thread precisa registrar o loader do tsx pra
+// conseguir carregar um módulo TypeScript puro; em produção o arquivo já é JS compilado.
+const RODANDO_COMO_TS = import.meta.url.endsWith('.ts')
+const WORKER_PATH = new URL(`./extrair-texto-worker${RODANDO_COMO_TS ? '.ts' : '.js'}`, import.meta.url)
+const WORKER_OPTIONS = RODANDO_COMO_TS ? { execArgv: ['--import', 'tsx'] } : {}
 
 /**
  * Lê o PDF e devolve cada trecho de texto com posição normalizada (0..1).
  * Se o PDF quase não tem texto, `temTexto` = false (candidato a OCR).
- * PDF é entrada não confiável: isEvalSupported desligado, limite de páginas e timeout.
+ * PDF é entrada não confiável: roda isolado numa worker_thread própria, com timeout — um laço
+ * síncrono travado dentro do pdf.js (PDF patológico) é interrompido via `worker.terminate()`
+ * (ver `isolated-worker.ts`) em vez de bloquear o processo inteiro (compartilhado com o worker de
+ * notificações de WhatsApp/email).
  */
 export async function extrairDocumento(entrada: string | Uint8Array): Promise<DocumentoExtraido> {
   const data = typeof entrada === 'string' ? new Uint8Array(await readFile(entrada)) : entrada
 
-  // isEvalSupported é uma opção real do pdf.js (desliga otimizações baseadas em eval — importante
-  // porque o PDF é entrada não confiável), mas falta no .d.ts desta versão — daí o `as any`.
-  const loadingTask = getDocument({ data, useSystemFonts: true, verbosity: 0, isEvalSupported: false } as any)
-
-  // Se o timeout estourar (ou qualquer outro erro acontecer), destroy() na loading task aborta o
-  // worker interno do pdf.js em vez de deixar o parse rodando em segundo plano (CPU/memória) pelo
-  // resto da vida do worker do document-reader. Não é isolamento de processo de verdade (a spec
-  // original pedia processo/worker_thread separado — não implementado aqui, ver ledger) — um laço
-  // síncrono dentro do pdf.js ainda bloqueia o event loop antes de ceder pro timeout disparar. É
-  // uma rede de segurança parcial, não total.
-  let timeoutId: ReturnType<typeof setTimeout> | undefined
   try {
-    return await Promise.race([
-      extrairSemLimite(loadingTask),
-      new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Timeout ao extrair texto do PDF')), TIMEOUT_MS)
-      }),
-    ])
+    return await executarIsolado<DocumentoExtraido>(WORKER_PATH, data, TIMEOUT_MS, WORKER_OPTIONS)
   } catch (err) {
-    await loadingTask.destroy().catch(() => {})
+    registrarTimeoutSeAplicavel(err)
     throw err
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId)
   }
 }
 
-async function extrairSemLimite(loadingTask: { promise: Promise<any> }): Promise<DocumentoExtraido> {
-  const pdf = await loadingTask.promise
-
-  if (pdf.numPages > MAX_PAGINAS) {
-    throw new Error(`PDF com ${pdf.numPages} páginas excede o limite de ${MAX_PAGINAS}`)
+/** Log destacado pra monitoramento — sem Sentry/Datadog integrado, o marcador de evento nos logs
+ *  estruturados do Pino é o jeito de notar esse caso em produção. */
+export function registrarTimeoutSeAplicavel(err: unknown): void {
+  if (err instanceof Error && err.message.startsWith('Timeout de')) {
+    logger.error({ event: 'pdf_extraction_timeout', message: err.message }, 'Extração de PDF interrompida por timeout — worker isolado encerrado')
   }
-
-  const paginas: Pagina[] = []
-  let totalChars = 0
-
-  for (let n = 1; n <= pdf.numPages; n++) {
-    const page = await pdf.getPage(n)
-    const vp = page.getViewport({ scale: 1 })
-    const W = vp.width
-    const H = vp.height
-    const content = await page.getTextContent()
-
-    const itens: Item[] = []
-    for (const it of content.items as any[]) {
-      if (typeof it.str !== 'string' || !it.str.trim()) continue
-      const [, , , d, e, f] = it.transform as number[]
-      const h = it.height || Math.abs(d)
-      itens.push({
-        str: it.str,
-        x: e / W,
-        y: (H - f - h) / H, // topo do trecho, origem no topo
-        w: it.width / W,
-        h: h / H,
-      })
-      totalChars += it.str.trim().length
-    }
-    paginas.push({ numero: n, itens, largura: W, altura: H })
-  }
-
-  return { paginas, temTexto: totalChars >= 20 }
 }
