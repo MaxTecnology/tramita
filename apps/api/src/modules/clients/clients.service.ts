@@ -236,7 +236,7 @@ export async function searchClientUsers(organizationId: string, q: string) {
       isActive: true,
       OR: [{ name: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } }],
     },
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, email: true, phone: true },
     orderBy: { name: 'asc' },
     take: 20,
   })
@@ -250,11 +250,11 @@ export async function listClientUserLinks(clientId: string, organizationId: stri
     where: { clientId },
     select: {
       departmentId: true,
-      clientUser: { select: { id: true, name: true, email: true } },
+      clientUser: { select: { id: true, name: true, email: true, phone: true } },
     },
   })
 
-  const byClientUserId = new Map<string, { existingId: string; name: string; email: string; departmentIds: string[] }>()
+  const byClientUserId = new Map<string, { existingId: string; name: string; email: string; phone: string | null; departmentIds: string[] }>()
   for (const row of rows) {
     const existing = byClientUserId.get(row.clientUser.id)
     if (existing) {
@@ -264,6 +264,7 @@ export async function listClientUserLinks(clientId: string, organizationId: stri
         existingId: row.clientUser.id,
         name: row.clientUser.name,
         email: row.clientUser.email,
+        phone: row.clientUser.phone,
         departmentIds: [row.departmentId],
       })
     }

@@ -8,6 +8,7 @@ import {
   listAssignments,
   lookupClientByCnpj,
   listClientUserLinks,
+  searchClientUsers,
 } from '@/modules/clients/clients.service'
 import {
   createTestPlan,
@@ -429,5 +430,23 @@ describe('unicidade de CNPJ entre clientes ativos (índice parcial no banco)', (
     await createTestClient(org.id, { cnpj: '11222333000181', isActive: false })
 
     await expect(createTestClient(org.id, { cnpj: '11222333000181' })).resolves.toBeTruthy()
+  })
+})
+
+describe('telefone dos usuários do cliente nas listagens do formulário', () => {
+  it('listClientUserLinks e searchClientUsers devolvem o telefone (pro aviso de WhatsApp no painel de cobertura)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const dept = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id, { name: 'Com Telefone' })
+    await prisma.clientUser.update({ where: { id: clientUser.id }, data: { phone: '5582999991234' } })
+    await grantClientAccess(clientUser.id, client.id, dept.id)
+
+    const [link] = await listClientUserLinks(client.id, org.id)
+    const [found] = await searchClientUsers(org.id, 'Com Telefone')
+
+    expect(link.phone).toBe('5582999991234')
+    expect(found.phone).toBe('5582999991234')
   })
 })
