@@ -405,3 +405,18 @@ unidade/integração (API e lógica pura do formulário) e QA manual no navegado
 Playwright. Os 8 specs E2E existentes continuam passando com o seed atualizado. Vale escrever ao
 menos um spec por fluxo (cadastro completo de cliente; transferência em dois lotes até desativar)
 quando a próxima rodada de E2E for mexida.
+
+## Cobertura de departamentos: checagem e escrita sem lock (encontrado na revisão final, 2026-11-11)
+
+As invariantes de cobertura (`src/modules/clients/client-coverage.ts`) são checadas e gravadas na
+mesma transação, mas sem lock de linha (Postgres em READ COMMITTED). Duas edições simultâneas podem
+passar cada uma na sua checagem e juntas violar a regra. Exemplos: um admin tira o usuário B do
+Fiscal no cadastro do cliente enquanto outro desativa o usuário A (o Fiscal fica sem usuário);
+`createTask`/`approveRequest` checam o departamento fora da transação enquanto outro admin desmarca
+esse departamento; `deleteUser` enquanto outra tela define a pessoa como responsável.
+
+Exige dois administradores agindo no mesmo instante sobre o mesmo cliente — raro, e o próprio
+cadastro do cliente mostra e corrige a cobertura quebrada. Correção sugerida: helper
+`lockClients(tx, clientIds)` (`SELECT … FOR UPDATE` via `tx.$queryRaw`) no início de toda transação
+que mexe em cobertura (cliente, usuário do cliente, tarefa, solicitação, desativação de usuário), e
+levar a checagem de I5 do `createTask` pra dentro da transação.

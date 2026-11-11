@@ -591,11 +591,14 @@ export async function getFailedGenerations(organizationId: string): Promise<Fail
   // Um log só é "retryable" se o cliente ainda está vinculado (ativo) a esse template —
   // senão o retry não teria pra qual assignmentId mandar, e travaria o banner pra sempre
   // (ver finding 4 da revisão final). Uma query batched pra todos os pares, não N+1.
+  // Cliente desativado também não tem como ser gerado de novo — sem isso a falha ficaria pra
+  // sempre no alerta do Dashboard e no resumo diário.
   const activeAssignments = await prisma.recurringTaskAssignment.findMany({
     where: {
       templateId: { in: [...new Set(logs.map((l) => l.templateId))] },
       clientId: { in: clientIds },
       isActive: true,
+      client: { isActive: true },
     },
     select: { templateId: true, clientId: true },
   })

@@ -19,14 +19,21 @@ function competenceLabel(iso: string): string {
 export function FailedGenerationsAlert() {
   const { user } = useAuth()
   const canView = VIEWER_ROLES.includes(user?.role ?? '')
+  // Geração e tela de vínculos do template são só de admin (rotas adminOnly) — o gerente vê a falha
+  // e pode corrigir o cliente, mas não as ações que dariam 403.
+  const isAdmin = user?.role === 'ORG_ADMIN'
   const retry = useRetryFailedGeneration()
 
-  const { data: failures = [] } = useQuery<FailedGeneration[]>({
+  const { data: allFailures = [] } = useQuery<FailedGeneration[]>({
     queryKey: ['recurring-failed-generations'],
     queryFn: () => api.get('/recurring-templates/failed-generations').then((r) => r.data),
     enabled: canView,
     refetchInterval: 60_000,
   })
+
+  // Falha sem como reprocessar (vínculo removido, cliente desativado) não fica presa no topo do
+  // Dashboard — o console de geração em Configurações continua mostrando todas.
+  const failures = allFailures.filter((f) => f.retryable)
 
   if (!canView || failures.length === 0) return null
 
@@ -45,8 +52,10 @@ export function FailedGenerationsAlert() {
             <p className="text-xs text-red-700">{f.errorMessage}</p>
             <div className="flex flex-wrap items-center gap-3 text-xs">
               <Link to={`/app/clients?edit=${f.clientId}`} className="text-accent hover:underline">Abrir cliente</Link>
-              <Link to={`/app/settings/recurring-templates/${f.templateId}/manage`} className="text-accent hover:underline">Abrir template</Link>
-              {f.retryable && (
+              {isAdmin && (
+                <Link to={`/app/settings/recurring-templates/${f.templateId}/manage`} className="text-accent hover:underline">Abrir template</Link>
+              )}
+              {isAdmin && f.retryable && (
                 <Button size="sm" variant="outline" className="h-7 text-xs" disabled={retry.isPending} onClick={() => retry.mutate(f)}>
                   Gerar novamente
                 </Button>

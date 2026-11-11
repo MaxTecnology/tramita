@@ -173,7 +173,8 @@ async function runSlaDigestForOrg(
     }
   }
 
-  const failures = await getFailedGenerations(org.id)
+  // Só falhas que ainda dá pra resolver (vínculo ativo, cliente ativo) — as demais repetiriam todo dia.
+  const failures = (await getFailedGenerations(org.id)).filter((f) => f.retryable)
   for (const failure of failures) {
     const competence = new Date(failure.competence)
     const entry: DigestEntry = {

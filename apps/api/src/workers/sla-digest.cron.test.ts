@@ -380,3 +380,30 @@ describe('runSlaDigest — recorrentes não geradas', () => {
     expect(enqueueNotification).not.toHaveBeenCalled()
   })
 })
+
+describe('runSlaDigest — falha sem como reprocessar', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('não entra no resumo quando o cliente foi desativado', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id, { name: 'Antiga', isActive: false })
+    const template = await prisma.recurringTaskTemplate.create({
+      data: { organizationId: org.id, departmentId: dept.id, title: 'DAS', periodicity: 'MONTHLY', dueDayOfPeriod: 10, generationDayOfPeriod: 1 },
+    })
+    await prisma.recurringTaskAssignment.create({ data: { templateId: template.id, clientId: client.id } })
+    await prisma.recurringGenerationLog.create({
+      data: { templateId: template.id, clientId: client.id, competence: new Date(Date.UTC(2026, 9, 1)), status: 'FAILED', errorMessage: 'x' },
+    })
+    await prisma.notificationConfig.create({ data: { organizationId: org.id, slaDigestEnabled: true } })
+
+    await runSlaDigest(new Date(Date.UTC(2026, 9, 19, 15, 0, 0)))
+
+    expect(enqueueNotification).not.toHaveBeenCalled()
+  })
+})
