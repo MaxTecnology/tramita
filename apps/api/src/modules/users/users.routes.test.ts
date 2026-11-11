@@ -112,3 +112,40 @@ describe('POST /users/:id/reset-password', () => {
     expect(res.statusCode).toBe(404)
   })
 })
+
+describe('carteira e transferência de responsabilidades', () => {
+  async function setup() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    return {
+      admin, member,
+      adminAuth: await getAuthHeader(admin.email, 'Test@1234'),
+      memberAuth: await getAuthHeader(member.email, 'Test@1234'),
+    }
+  }
+
+  it('GET /users/:id/portfolio é só pra ORG_ADMIN', async () => {
+    const { member, adminAuth, memberAuth } = await setup()
+
+    const asMember = await app.inject({ method: 'GET', url: `/users/${member.id}/portfolio`, headers: { authorization: memberAuth } })
+    const asAdmin = await app.inject({ method: 'GET', url: `/users/${member.id}/portfolio`, headers: { authorization: adminAuth } })
+
+    expect(asMember.statusCode).toBe(403)
+    expect(asAdmin.statusCode).toBe(200)
+    expect(asAdmin.json()).toEqual([])
+  })
+
+  it('POST /users/:id/transfer valida o corpo', async () => {
+    const { member, adminAuth } = await setup()
+
+    const res = await app.inject({
+      method: 'POST', url: `/users/${member.id}/transfer`, headers: { authorization: adminAuth },
+      payload: { clientIds: [] },
+    })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.json().message).toBe('Escolha o colaborador de destino')
+  })
+})

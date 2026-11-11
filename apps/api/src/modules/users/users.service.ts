@@ -43,6 +43,15 @@ export async function deleteUser(id: string, organizationId: string) {
   const user = await prisma.user.findFirst({ where: { id, organizationId, isActive: true } })
   if (!user) throw new AppError(404, 'Usuário não encontrado')
 
+  // I2: todo departamento que atende um cliente ativo precisa ter responsável ativo.
+  const responsibilities = await prisma.clientAssignment.count({ where: { userId: id, client: { isActive: true } } })
+  if (responsibilities > 0) {
+    throw new AppError(
+      409,
+      `${user.name} é responsável por ${responsibilities} cliente(s)/departamento(s). Defina outro responsável antes de desativar.`,
+    )
+  }
+
   return prisma.user.update({ where: { id }, data: { isActive: false }, select: SELECT })
 }
 

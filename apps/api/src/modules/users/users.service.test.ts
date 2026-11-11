@@ -8,7 +8,7 @@ import {
   getMyProfile,
   updateMyProfile,
 } from '@/modules/users/users.service'
-import { createTestPlan, createTestOrg, createTestUser } from '@/test/helpers'
+import { createTestPlan, createTestOrg, createTestUser, createTestDepartment, createTestClient, serveClientDepartment } from '@/test/helpers'
 import { AppError } from '@/errors/AppError'
 
 describe('resetUserPassword', () => {
@@ -164,5 +164,33 @@ describe('updateMyProfile', () => {
 
   it('throws 404 when user does not exist', async () => {
     await expect(updateMyProfile('nonexistent-id', { name: 'X' })).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
+describe('deleteUser — responsável por cliente', () => {
+  it('recusa desativar quem é responsável por cliente ativo', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    await prisma.user.update({ where: { id: user.id }, data: { name: 'Fulano' } })
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id)
+    await serveClientDepartment(client.id, dept.id, user.id)
+
+    await expect(deleteUser(user.id, org.id)).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'Fulano é responsável por 1 cliente(s)/departamento(s). Defina outro responsável antes de desativar.',
+    })
+  })
+
+  it('permite desativar quando só é responsável em cliente desativado', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id, { isActive: false })
+    await serveClientDepartment(client.id, dept.id, user.id)
+
+    await expect(deleteUser(user.id, org.id)).resolves.toMatchObject({ isActive: false })
   })
 })

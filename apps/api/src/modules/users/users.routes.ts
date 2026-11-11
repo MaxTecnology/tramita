@@ -5,6 +5,8 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createUserSchema, updateUserSchema, updateMyProfileSchema } from './users.schema'
 import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, getMyProfile, updateMyProfile } from './users.service'
+import { getPortfolio, transferResponsibilities } from './responsibility-transfer.service'
+import { portfolioQuerySchema, transferSchema } from './responsibility-transfer.schema'
 
 export async function usersRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
@@ -54,5 +56,19 @@ export async function usersRoutes(app: FastifyInstance) {
   app.post('/:id/reset-password', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(await resetUserPassword(id, request.user.organizationId!))
+  })
+
+  app.get('/:id/portfolio', { preHandler: adminOnly }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const result = portfolioQuerySchema.safeParse(request.query)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(await getPortfolio(id, request.user.organizationId!, result.data.departmentId))
+  })
+
+  app.post('/:id/transfer', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const result = transferSchema.safeParse(request.body)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(await transferResponsibilities(id, request.user.organizationId!, result.data, request.user.sub))
   })
 }
