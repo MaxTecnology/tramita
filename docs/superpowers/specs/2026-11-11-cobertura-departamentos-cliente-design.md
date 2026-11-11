@@ -319,6 +319,43 @@ Validados na tela **e** no backend (Zod + service), no criar e no editar:
     registro do que foi entregue (protocolo com IP/visualização) e as
     mensagens de WhatsApp já levam o link do portal.
 
+## Achados da varredura final no código (2026-11-11)
+
+1. **Seletores de departamento que precisam respeitar I3/I5 na tela** (a API
+   já recusa, mas a tela não pode oferecer opção inválida). A fonte é
+   `GET /clients/:id/assignments` (departamentos atendidos + responsáveis),
+   que já existe:
+   - `pages/app/Board.tsx` — departamento da nova tarefa: só os atendidos
+     pelo cliente do board;
+   - `components/shared/TaskDrawer.tsx` — trocar departamento da tarefa: só
+     os atendidos pelo cliente da tarefa;
+   - `pages/app/settings/ClientUserForm.tsx` — acessos do usuário do cliente:
+     para cada empresa, só os departamentos atendidos por ela;
+   - `pages/app/settings/RecurringTemplateManage.tsx` — vincular clientes:
+     clientes não atendidos pelo departamento do template aparecem
+     desabilitados com o motivo ("{cliente} não é atendido pelo
+     departamento {nome}").
+   - Filtros (Tarefas, Dashboard) continuam listando todos os departamentos.
+2. **Organização sem departamento:** com I1, não dá para cadastrar cliente.
+   O formulário mostra, no lugar da aba Departamentos vazia: "Cadastre ao
+   menos um departamento em Configurações › Departamentos antes de cadastrar
+   clientes", com link.
+3. **Garantias também no banco** (pré-produção: fazer do jeito certo):
+   `Client.codigo` passa a `NOT NULL`; `CHECK` exigindo `cnpj` quando
+   `clientType = 'PJ'` e `cpf` quando `'PF'`; os índices únicos parciais
+   entre ativos já descritos. Migration escrita à mão onde o Prisma não
+   expressa (CHECK e índices parciais), documentada em comentário no
+   `schema.prisma`.
+4. **Infraestrutura de teste:** cerca de 20 arquivos de teste da API passam
+   por caminhos que vão aplicar I5/I6 (criar/mover tarefa, aprovar e criar
+   solicitação, geração recorrente, cadastro de cliente/usuário). O plano
+   precisa de um helper de teste para declarar "departamento X atende o
+   cliente Y com responsável Z" e de ajustar `createTestClient` (código e
+   CNPJ válido por padrão). O `prisma/e2e-seed.ts` (Playwright) precisa
+   criar o `ClientAssignment` do departamento "Geral" com o admin como
+   responsável, código e CNPJ válido no "Cliente E2E", para os specs E2E
+   rodarem sobre dados que respeitam as invariantes.
+
 ## Interações com projetos seguintes
 
 - **Solicitações internas:** I5 impede, por ora, tarefa de departamento não
