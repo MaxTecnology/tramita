@@ -450,3 +450,31 @@ describe('telefone dos usuários do cliente nas listagens do formulário', () =>
     expect(found.phone).toBe('5582999991234')
   })
 })
+
+describe('cobertura ignora usuário do portal inativo', () => {
+  it('recusa salvar quando o único usuário de um departamento está inativo', async () => {
+    const { org, admin, fiscal } = await setupOrg()
+    const { clientUser: inactive } = await createTestClientUser(org.id, { isActive: false })
+
+    await expect(createClient(org.id, body({
+      departments: [{ departmentId: fiscal.id, responsibleUserId: admin.id }],
+      clientUsers: [{ existingId: inactive.id, departmentIds: [fiscal.id] }],
+    }))).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'O departamento Fiscal precisa de pelo menos um usuário do cliente com acesso.',
+    })
+  })
+
+  it('listClientUserLinks devolve isActive pra tela não contar o inativo', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const client = await createTestClient(org.id)
+    const dept = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id, { isActive: false })
+    await grantClientAccess(clientUser.id, client.id, dept.id)
+
+    const [link] = await listClientUserLinks(client.id, org.id)
+
+    expect(link.isActive).toBe(false)
+  })
+})

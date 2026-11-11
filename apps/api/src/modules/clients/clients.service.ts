@@ -121,6 +121,20 @@ async function resolveDepartmentNames(
   return new Map(departments.map((d) => [d.id, d.name]))
 }
 
+async function findInactiveExistingUserIds(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  clientUsers: ClientBody['clientUsers'],
+): Promise<Set<string>> {
+  const ids = clientUsers.flatMap((u) => ('existingId' in u ? [u.existingId] : []))
+  if (ids.length === 0) return new Set()
+  const inactive = await tx.clientUser.findMany({
+    where: { id: { in: ids }, organizationId, isActive: false },
+    select: { id: true },
+  })
+  return new Set(inactive.map((u) => u.id))
+}
+
 async function assertResponsiblesValid(
   tx: Prisma.TransactionClient,
   organizationId: string,
@@ -163,7 +177,10 @@ export async function createClient(organizationId: string, data: ClientBody) {
     return await prisma.$transaction(async (tx) => {
       const departmentNames = await resolveDepartmentNames(tx, organizationId, data)
       await assertResponsiblesValid(tx, organizationId, data.departments, departmentNames)
-      assertPayloadCoverage(data.departments, data.clientUsers, departmentNames)
+      assertPayloadCoverage(
+        data.departments, data.clientUsers, departmentNames,
+        await findInactiveExistingUserIds(tx, organizationId, data.clientUsers),
+      )
 
       const client = await tx.client.create({ data: { ...companyData(data), organizationId } })
       await syncServedDepartments(tx, client.id, data.departments)
@@ -186,7 +203,10 @@ export async function updateClient(id: string, organizationId: string, data: Cli
 
       const departmentNames = await resolveDepartmentNames(tx, organizationId, data)
       await assertResponsiblesValid(tx, organizationId, data.departments, departmentNames)
-      assertPayloadCoverage(data.departments, data.clientUsers, departmentNames)
+      assertPayloadCoverage(
+        data.departments, data.clientUsers, departmentNames,
+        await findInactiveExistingUserIds(tx, organizationId, data.clientUsers),
+      )
 
       const keep = new Set(data.departments.map((d) => d.departmentId))
       const current = await tx.clientAssignment.findMany({ where: { clientId: id }, select: { departmentId: true } })
@@ -256,11 +276,11 @@ export async function listClientUserLinks(clientId: string, organizationId: stri
     where: { clientId },
     select: {
       departmentId: true,
-      clientUser: { select: { id: true, name: true, email: true, phone: true } },
+      clientUser: { select: { id: true, name: true, email: true, phone: true, isActive: true } },
     },
   })
 
-  const byClientUserId = new Map<string, { existingId: string; name: string; email: string; phone: string | null; departmentIds: string[] }>()
+  const byClientUserId = new Map<string, { existingId: string; name: string; email: string; phone: string | null; isActive: boolean; departmentIds: string[] }>()
   for (const row of rows) {
     const existing = byClientUserId.get(row.clientUser.id)
     if (existing) {
@@ -271,6 +291,7 @@ export async function listClientUserLinks(clientId: string, organizationId: stri
         name: row.clientUser.name,
         email: row.clientUser.email,
         phone: row.clientUser.phone,
+        isActive: row.clientUser.isActive,
         departmentIds: [row.departmentId],
       })
     }

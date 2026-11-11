@@ -62,4 +62,13 @@ describe('computeClientFormStatus', () => {
     expect(status.acesso).toBe(true)
     expect(status.canSave).toBe(true)
   })
+
+  it('usuário inativo não cobre o departamento', () => {
+    const status = computeClientFormStatus(
+      form({ clientUsers: [{ existingId: 'cu1', name: 'Ana', email: 'a@a.com', phone: '82999991234', isActive: false, departmentIds: ['fiscal'] }] }),
+      names,
+    )
+    expect(status.coverage[0].status).toBe('sem_usuario')
+    expect(status.canSave).toBe(false)
+  })
 })

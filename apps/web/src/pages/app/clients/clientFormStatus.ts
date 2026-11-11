@@ -40,6 +40,8 @@ export interface ClientUserLinkForm {
   email?: string
   password?: string
   phone?: string | null
+  /** usuário existente desativado: continua vinculado, mas não cobre departamento */
+  isActive?: boolean
   departmentIds: string[]
 }
 
@@ -79,7 +81,7 @@ export function computeClientFormStatus(form: ClientFormState, departmentNames: 
   const served = new Set(form.departments.map((d) => d.departmentId))
 
   const coverage: CoverageRow[] = form.departments.map(({ departmentId }) => {
-    const users = form.clientUsers.filter((u) => u.departmentIds.includes(departmentId))
+    const users = form.clientUsers.filter((u) => u.isActive !== false && u.departmentIds.includes(departmentId))
     const withPhoneCount = users.filter((u) => !!u.phone?.trim()).length
     return {
       departmentId,

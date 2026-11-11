@@ -906,3 +906,47 @@ describe('departamento atendido e isolamento entre processos', () => {
     ).rejects.toMatchObject({ statusCode: 400 })
   })
 })
+
+describe('reorderTasks — isolamento entre processos e organizações', () => {
+  async function setup() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const col = await createTestColumn(board.id)
+    const task = await createTestTask(col.id, user.id)
+    return { org, user, client, board, col, task }
+  }
+
+  it('recusa mover via reorder para coluna de outro processo', async () => {
+    const { org, client, task } = await setup()
+    const otherBoard = await createTestBoard(org.id, client.id)
+    const otherCol = await createTestColumn(otherBoard.id)
+
+    await expect(reorderTasks([{ id: task.id, columnId: otherCol.id, position: 0 }], org.id))
+      .rejects.toMatchObject({ statusCode: 400, message: 'A tarefa só pode ser movida dentro do mesmo processo' })
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).columnId).not.toBe(otherCol.id)
+  })
+
+  it('recusa mover via reorder para coluna de outra organização', async () => {
+    const { org, task } = await setup()
+    const plan = await createTestPlan()
+    const otherOrg = await createTestOrg(plan.id)
+    const otherClient = await createTestClient(otherOrg.id)
+    const foreignBoard = await createTestBoard(otherOrg.id, otherClient.id)
+    const foreignCol = await createTestColumn(foreignBoard.id)
+
+    await expect(reorderTasks([{ id: task.id, columnId: foreignCol.id, position: 0 }], org.id))
+      .rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  it('reordena dentro do mesmo processo', async () => {
+    const { org, board, task } = await setup()
+    const col2 = await createTestColumn(board.id, { position: 1 })
+
+    await reorderTasks([{ id: task.id, columnId: col2.id, position: 0 }], org.id)
+
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).columnId).toBe(col2.id)
+  })
+})

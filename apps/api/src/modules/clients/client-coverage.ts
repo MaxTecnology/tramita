@@ -34,16 +34,19 @@ export function assertPayloadCoverage(
   departments: ClientBody['departments'],
   clientUsers: ClientBody['clientUsers'],
   departmentNames: Map<string, string>,
+  inactiveUserIds: Set<string> = new Set(),
 ): void {
   const served = new Set(departments.map((d) => d.departmentId))
   const covered = new Set<string>()
 
   for (const link of clientUsers) {
+    // Usuário existente inativo pode continuar vinculado, mas não cobre departamento (I4 exige ativo).
+    const countsForCoverage = !('existingId' in link) || !inactiveUserIds.has(link.existingId)
     for (const departmentId of link.departmentIds) {
       if (!served.has(departmentId)) {
         throw new AppError(400, `O departamento ${departmentNames.get(departmentId) ?? ''} não atende este cliente.`)
       }
-      covered.add(departmentId)
+      if (countsForCoverage) covered.add(departmentId)
     }
   }
 

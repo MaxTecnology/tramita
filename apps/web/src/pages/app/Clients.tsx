@@ -13,7 +13,7 @@ import { EMPTY_COMPANY, type ClientFormState, type CompanyForm } from './clients
 const EMPTY_FORM: ClientFormState = { company: EMPTY_COMPANY, departments: [], clientUsers: [] }
 
 interface AssignmentRow { departmentId: string; userId: string }
-interface ClientUserLinkRow { existingId: string; name: string; email: string; phone: string | null; departmentIds: string[] }
+interface ClientUserLinkRow { existingId: string; name: string; email: string; phone: string | null; isActive: boolean; departmentIds: string[] }
 
 function toPayload(state: ClientFormState) {
   return {

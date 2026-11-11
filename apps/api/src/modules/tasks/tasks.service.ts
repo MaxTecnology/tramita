@@ -369,8 +369,21 @@ export async function reorderTasks(items: ReorderTasksBody, organizationId: stri
       id: { in: items.map((i) => i.id) },
       column: { board: { organizationId } },
     },
+    select: { id: true, column: { select: { boardId: true } } },
   })
   if (tasks.length !== items.length) throw new AppError(403, 'Acesso negado')
+
+  // Reordenar nunca pode tirar a tarefa do processo dela (outro cliente, outra organização) — mesma
+  // regra do moveTask.
+  const boardByTask = new Map(tasks.map((t) => [t.id, t.column.boardId]))
+  const targetColumns = await prisma.column.findMany({
+    where: { id: { in: [...new Set(items.map((i) => i.columnId))] } },
+    select: { id: true, boardId: true },
+  })
+  const boardByColumn = new Map(targetColumns.map((c) => [c.id, c.boardId]))
+  if (items.some((i) => boardByColumn.get(i.columnId) !== boardByTask.get(i.id))) {
+    throw new AppError(400, 'A tarefa só pode ser movida dentro do mesmo processo')
+  }
 
   await prisma.$transaction(
     items.map((i) =>
