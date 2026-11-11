@@ -63,16 +63,36 @@ async function main() {
   // Login do cliente final acontece via ClientUser (não mais via Client.email/passwordHash,
   // removidos pela migration 20260921210000_client_users) — o portal autentica contra
   // ClientUser e escopa o acesso via ClientUserAccess (cliente + departamento).
+  // Cadastro completo (código do ERP, CNPJ válido, endereço de PJ) e o departamento "Geral"
+  // atendendo o cliente com o admin como responsável — as invariantes de cobertura de
+  // departamentos valem pros dados do E2E também.
   const client = await prisma.client.create({
-    data: { name: 'Cliente E2E', organizationId: org.id },
+    data: {
+      name: 'Cliente E2E',
+      organizationId: org.id,
+      codigo: 'E2E-001',
+      clientType: 'PJ',
+      cnpj: '11222333000181',
+      cep: '57312675',
+      estado: 'AL',
+      cidade: 'Arapiraca',
+      bairro: 'Centro',
+      logradouro: 'Rua E2E',
+      numero: '100',
+    },
+  })
+
+  await prisma.clientAssignment.create({
+    data: { clientId: client.id, departmentId: department.id, userId: admin.id },
   })
 
   const clientUser = await prisma.clientUser.upsert({
     where: { email_organizationId: { email: 'cliente@g2a.com.br', organizationId: org.id } },
-    update: {},
+    update: { phone: '5582999990000' },
     create: {
       name: 'Cliente E2E',
       email: 'cliente@g2a.com.br',
+      phone: '5582999990000',
       passwordHash: await bcrypt.hash('Cliente@2025', 10),
       organizationId: org.id,
     },
