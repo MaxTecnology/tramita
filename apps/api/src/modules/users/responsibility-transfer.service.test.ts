@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import * as sse from '@/lib/sse'
 import { prisma } from '@/lib/prisma'
 import { getPortfolio, transferResponsibilities } from './responsibility-transfer.service'
 import {
@@ -124,5 +125,21 @@ describe('transferResponsibilities', () => {
       .rejects.toMatchObject({ statusCode: 400, message: 'Escolha um colaborador diferente do atual' })
     await expect(transferResponsibilities(ctx.from.id, ctx.org.id, { ...base, clientIds: [notMine.id], toUserId: ctx.to.id }, ctx.admin.id))
       .rejects.toMatchObject({ statusCode: 400, message: 'Cliente fora da carteira deste colaborador' })
+  })
+
+  it('avisa em tempo real os processos cujas tarefas mudaram de responsável', async () => {
+    const ctx = await setup()
+    const spy = vi.spyOn(sse, 'publishBoardEvent').mockResolvedValue(undefined)
+
+    await transferResponsibilities(ctx.from.id, ctx.org.id, {
+      toUserId: ctx.to.id, clientIds: [ctx.acme.id], includeBoards: true, includeTasks: true,
+    }, ctx.admin.id)
+
+    const calls = spy.mock.calls.map(([boardId, payload]) => ({ boardId, event: payload.event, taskId: (payload.data as { taskId?: string }).taskId }))
+    expect(calls).toEqual(expect.arrayContaining([
+      { boardId: ctx.acmeBoard.id, event: 'task:updated', taskId: ctx.fiscalTask.id },
+      { boardId: ctx.acmeBoard.id, event: 'task:updated', taskId: ctx.folhaTask.id },
+    ]))
+    spy.mockRestore()
   })
 })

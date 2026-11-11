@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
+import { publishBoardEvent } from '@/lib/sse'
 import type { TransferBody } from './responsibility-transfer.schema'
 
 // Uma pessoa "é dona" de três coisas na carteira de um cliente: responsável por departamento
@@ -91,7 +92,9 @@ export async function transferResponsibilities(
   const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { name: true } })
   const departmentFilter = body.departmentId ? { departmentId: body.departmentId } : {}
 
-  return prisma.$transaction(async (tx) => {
+  const moved: { taskId: string; boardId: string }[] = []
+
+  const result = await prisma.$transaction(async (tx) => {
     const assignments = await tx.clientAssignment.updateMany({
       where: { userId: fromUserId, clientId: { in: body.clientIds }, ...departmentFilter },
       data: { userId: body.toUserId },
@@ -114,9 +117,10 @@ export async function transferResponsibilities(
           column: { board: { clientId: { in: body.clientIds } } },
           ...departmentFilter,
         },
-        select: { id: true },
+        select: { id: true, column: { select: { boardId: true } } },
       })
       const taskIds = tasks.map((t) => t.id)
+      moved.push(...tasks.map((t) => ({ taskId: t.id, boardId: t.column.boardId })))
       if (taskIds.length > 0) {
         await tx.task.updateMany({ where: { id: { in: taskIds } }, data: { assigneeId: body.toUserId } })
         await tx.taskHistory.createMany({
@@ -136,4 +140,9 @@ export async function transferResponsibilities(
 
     return { assignments: assignments.count, boards: boards.count, tasks: tasksMoved }
   })
+
+  // Boards abertos refletem o novo responsável na hora (mesmo evento da edição de tarefa).
+  await Promise.all(moved.map(({ taskId, boardId }) => publishBoardEvent(boardId, { event: 'task:updated', data: { taskId } })))
+
+  return result
 }
