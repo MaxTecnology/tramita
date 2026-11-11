@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { ArrowLeft, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ClientUser, Client, Department } from '@/types'
+import { useServedDepartments } from '@/hooks/useServedDepartments'
 
 interface AccessRow { clientId: string; departmentId: string }
 
@@ -46,6 +47,8 @@ export default function ClientUserForm() {
     queryKey: ['departments'],
     queryFn: () => api.get('/departments').then((r) => r.data),
   })
+  // Acesso só a departamento que atende o cliente escolhido (a API recusa os demais).
+  const { departments: servedDepartments } = useServedDepartments(draftClientId || undefined)
 
   useEffect(() => {
     if (!clientUser) return
@@ -118,7 +121,7 @@ export default function ClientUserForm() {
             <Input id="cu-password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!isEditing} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="cu-phone">Telefone</Label>
+            <Label htmlFor="cu-phone">WhatsApp</Label>
             <Input id="cu-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(82) 99999-9999" />
           </div>
         </div>
@@ -131,13 +134,13 @@ export default function ClientUserForm() {
         <div className="pt-2 border-t border-border space-y-2">
           <Label>Clientes e departamentos com acesso</Label>
           <div className="flex gap-2">
-            <select value={draftClientId} onChange={(e) => setDraftClientId(e.target.value)} className="h-9 flex-1 rounded-md border border-border bg-surface text-foreground px-2 text-sm">
+            <select value={draftClientId} onChange={(e) => { setDraftClientId(e.target.value); setDraftDepartmentId('') }} className="h-9 flex-1 rounded-md border border-border bg-surface text-foreground px-2 text-sm">
               <option value="">Cliente</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <select value={draftDepartmentId} onChange={(e) => setDraftDepartmentId(e.target.value)} className="h-9 flex-1 rounded-md border border-border bg-surface text-foreground px-2 text-sm">
-              <option value="">Departamento</option>
-              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              <option value="">{draftClientId ? 'Departamento' : 'Escolha o cliente primeiro'}</option>
+              {servedDepartments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
             <Button type="button" variant="outline" onClick={addAccessRow} disabled={!draftClientId || !draftDepartmentId}>Adicionar</Button>
           </div>

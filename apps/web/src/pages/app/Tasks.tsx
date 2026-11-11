@@ -643,6 +643,7 @@ export default function Tasks() {
           task={selectedTask}
           currentUserId={user.id}
           role={user.role as 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'}
+          clientId={selectedTask.column.board.clientId}
           onClose={() => setSelectedTaskId(null)}
         />
       )}

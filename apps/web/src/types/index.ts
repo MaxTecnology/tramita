@@ -61,6 +61,8 @@ export interface Client {
   id: string
   name: string
   codigo: string | null
+  /** departamentos que atendem o cliente (vem em GET /clients) */
+  servedDepartmentIds?: string[]
   clientType: 'PF' | 'PJ'
   cnpj: string | null
   cpf: string | null

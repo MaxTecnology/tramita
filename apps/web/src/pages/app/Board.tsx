@@ -14,7 +14,8 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ArrowLeft, Plus } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, mensagemDeErro } from '@/lib/utils'
+import { useServedDepartments } from '@/hooks/useServedDepartments'
 import { useBoard } from '@/hooks/useBoard'
 import { useBoardStream } from '@/hooks/useBoardStream'
 import { api } from '@/lib/api'
@@ -71,10 +72,7 @@ export default function Board() {
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDepartmentId, setNewTaskDepartmentId] = useState('')
 
-  const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
-    queryKey: ['departments'],
-    queryFn: () => api.get('/departments').then((r) => r.data),
-  })
+  const { departments } = useServedDepartments(board?.clientId)
 
   // Computed values for board due date
   const boardDueDate = board?.dueDate ? new Date(board.dueDate) : null
@@ -90,7 +88,7 @@ export default function Board() {
       setNewTaskTitle('')
       setNewTaskDepartmentId('')
     },
-    onError: () => toast.error('Erro ao criar tarefa'),
+    onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao criar tarefa')),
   })
 
   function handleAddTask(columnId: string) {
@@ -317,6 +315,7 @@ export default function Board() {
           currentUserId={user.id}
           role={user.role as 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'}
           boardDueDate={board.dueDate}
+          clientId={board.clientId}
           onClose={() => setSelectedTaskId(null)}
         />
       )}

@@ -17,14 +17,20 @@ const SELECT = {
 }
 
 export async function listClients(organizationId: string, includeInactive = false) {
-  return prisma.client.findMany({
+  const clients = await prisma.client.findMany({
     where: {
       organizationId,
       ...(includeInactive ? {} : { isActive: true }),
     },
-    select: SELECT,
+    select: { ...SELECT, clientAssignments: { select: { departmentId: true } } },
     orderBy: { name: 'asc' },
   })
+  // servedDepartmentIds: departamentos que atendem o cliente — as telas usam pra só oferecer
+  // vínculos/acessos válidos (ex.: vincular cliente a template recorrente).
+  return clients.map(({ clientAssignments, ...client }) => ({
+    ...client,
+    servedDepartmentIds: clientAssignments.map((a) => a.departmentId),
+  }))
 }
 
 interface ClientUserAccessPair {

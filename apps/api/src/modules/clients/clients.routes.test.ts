@@ -9,6 +9,7 @@ import {
   createTestDepartment,
   grantClientAccess,
   getAuthHeader,
+  serveClientDepartment,
 } from '@/test/helpers'
 
 async function setup() {
@@ -20,6 +21,17 @@ async function setup() {
 }
 
 describe('GET /clients', () => {
+  it('devolve servedDepartmentIds (departamentos que atendem cada cliente)', async () => {
+    const { org, user, auth } = await setup()
+    const client = await createTestClient(org.id)
+    const dept = await createTestDepartment(org.id)
+    await serveClientDepartment(client.id, dept.id, user.id)
+
+    const res = await app.inject({ method: 'GET', url: '/clients', headers: { authorization: auth } })
+
+    expect(res.json<{ id: string; servedDepartmentIds: string[] }[]>()[0].servedDepartmentIds).toEqual([dept.id])
+  })
+
   it('returns only active clients by default', async () => {
     const { org, auth } = await setup()
     await createTestClient(org.id, { isActive: true })

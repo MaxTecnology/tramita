@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Paperclip, MessageSquare, Clock, Trash2, FileCheck, Stamp, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react'
 import { api } from '@/lib/api'
-import { cn } from '@/lib/utils'
+import { cn, mensagemDeErro } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { Comments } from '@/components/shared/Comments'
+import { useServedDepartments } from '@/hooks/useServedDepartments'
 import { hasUnseenClientReply } from '@/lib/request-comments'
 import type { Task, Attachment, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable, Protocol, Comment } from '@/types'
 import { toast } from 'sonner'
@@ -15,6 +16,8 @@ interface Props {
   currentUserId: string
   role: DrawerRole
   boardDueDate?: string | null
+  /** cliente do processo — o seletor de departamento só oferece os que atendem esse cliente */
+  clientId?: string
   onClose: () => void
 }
 
@@ -85,7 +88,7 @@ const documentsEndpoint = (taskId: string, role: DrawerRole) =>
     ? `/portal/tasks/${taskId}/documents`
     : `/tasks/${taskId}/documents`
 
-export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }: Props) {
+export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, onClose }: Props) {
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<Tab>('comments')
   const [editingTitle, setEditingTitle] = useState(false)
@@ -94,11 +97,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
 
   const canEdit = isOrgRole(role)
 
-  const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
-    queryKey: ['departments'],
-    queryFn: () => api.get('/departments').then((r) => r.data),
-    enabled: canEdit,
-  })
+  const { departments } = useServedDepartments(canEdit ? clientId : undefined)
 
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Pick<Task, 'title' | 'priority' | 'status' | 'description' | 'dueDate' | 'departmentId' | 'visibleToClient' | 'targetDate' | 'competence'>>) =>
@@ -111,7 +110,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, onClose }:
       queryClient.invalidateQueries({ queryKey: ['board'] })
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
     },
-    onError: () => toast.error('Erro ao salvar tarefa'),
+    onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao salvar tarefa')),
   })
 
   const regenerateMutation = useMutation({

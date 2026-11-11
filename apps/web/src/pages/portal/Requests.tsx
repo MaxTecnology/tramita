@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Comments } from '@/components/shared/Comments'
-import { cn } from '@/lib/utils'
+import { cn, mensagemDeErro } from '@/lib/utils'
 import { Plus, Inbox, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ClientRequest } from '@/types'
 import { toast } from 'sonner'
@@ -42,9 +42,11 @@ export default function PortalRequests() {
     enabled: !!clientId,
   })
 
+  // Só os departamentos a que este usuário tem acesso na empresa selecionada.
   const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
-    queryKey: ['portal-departments'],
-    queryFn: () => api.get('/portal/departments').then((r) => r.data),
+    queryKey: ['portal-departments', clientId],
+    queryFn: () => api.get('/portal/departments', { params: { clientId } }).then((r) => r.data),
+    enabled: !!clientId,
   })
 
   const { data: osTemplates = [] } = useQuery<{ id: string; name: string }[]>({
@@ -57,7 +59,7 @@ export default function PortalRequests() {
       clientId,
       title: form.title,
       description: form.description,
-      departmentId: form.departmentId || undefined,
+      departmentId: form.departmentId,
       osTemplateId: form.osTemplateId || undefined,
     }).then((r) => r.data),
     onSuccess: () => {
@@ -66,7 +68,7 @@ export default function PortalRequests() {
       setOpen(false)
       setForm({ title: '', description: '', departmentId: '', osTemplateId: '' })
     },
-    onError: () => toast.error('Erro ao enviar solicitação'),
+    onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao enviar solicitação')),
   })
 
   const cancelMutation = useMutation({
@@ -204,14 +206,14 @@ export default function PortalRequests() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="req-department">Departamento (opcional)</Label>
+              <Label htmlFor="req-department">Departamento</Label>
               <select
                 id="req-department"
                 value={form.departmentId}
                 onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
                 className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
-                <option value="">Não sei / Geral</option>
+                <option value="" disabled>Selecione o departamento</option>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
@@ -220,7 +222,7 @@ export default function PortalRequests() {
             {createMutation.isError && <p className="text-sm text-red-600">Erro ao enviar. Tente novamente.</p>}
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={createMutation.isPending || !form.title.trim()} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+              <Button type="submit" disabled={createMutation.isPending || !form.title.trim() || !form.departmentId} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
                 {createMutation.isPending ? 'Enviando...' : 'Enviar'}
               </Button>
             </div>
