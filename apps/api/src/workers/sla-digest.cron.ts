@@ -4,12 +4,13 @@ import { prisma } from '@/lib/prisma'
 import { enqueueNotification } from '@/lib/queue'
 import { computeSlaLevel, type SlaLevel } from '@/lib/sla'
 import { expireOverdueProtocols } from '@/modules/protocols/protocols.service'
+import { getFailedGenerations } from '@/modules/recurring-templates/recurring-templates.service'
 
 interface DigestEntry {
-  kind: 'task' | 'protocol'
+  kind: 'task' | 'protocol' | 'recurring_failure'
   title: string
   clientName: string
-  level: SlaLevel | 'EXPIRED'
+  level: SlaLevel | 'EXPIRED' | 'FAILED'
   dateLabel: string
 }
 
@@ -17,15 +18,20 @@ const MAX_DIGEST_LINES = 20
 const DIGEST_TIMEZONE = 'America/Sao_Paulo'
 
 function formatTaskLine(entry: DigestEntry): string {
+  if (entry.kind === 'recurring_failure') {
+    return `- [recorrente não gerada] ${entry.title} (${entry.clientName}) — ${entry.dateLabel}`
+  }
   const tag = entry.level === 'DUE_CRITICAL' ? 'crítico' : entry.level === 'EXPIRED' ? 'vencido sem visualização' : 'atenção'
   const prefix = entry.kind === 'protocol' ? '[protocolo] ' : ''
   return `- ${prefix}${entry.title} (${entry.clientName}) — ${entry.dateLabel} [${tag}]`
 }
 
-// Vencido sem visualização primeiro, depois crítico, depois atenção — o que já falhou precisa
-// de atenção imediata (ligar pro cliente), o resto ainda dá tempo de agir.
+// Recorrente que não nasceu primeiro (é uma obrigação que ninguém vai fazer), depois vencido sem
+// visualização, crítico e atenção — o que já falhou precisa de atenção imediata, o resto ainda dá
+// tempo de agir.
 function formatTaskListText(entries: DigestEntry[]): string {
-  const rank = (level: DigestEntry['level']) => (level === 'EXPIRED' ? 0 : level === 'DUE_CRITICAL' ? 1 : 2)
+  const rank = (level: DigestEntry['level']) =>
+    level === 'FAILED' ? 0 : level === 'EXPIRED' ? 1 : level === 'DUE_CRITICAL' ? 2 : 3
   const sorted = [...entries].sort((a, b) => rank(a.level) - rank(b.level))
   const visible = sorted.slice(0, MAX_DIGEST_LINES)
   const lines = visible.map(formatTaskLine)
@@ -164,6 +170,23 @@ async function runSlaDigestForOrg(
       const bucket = byUserId.get(userId) ?? []
       bucket.push(entry)
       byUserId.set(userId, bucket)
+    }
+  }
+
+  const failures = await getFailedGenerations(org.id)
+  for (const failure of failures) {
+    const competence = new Date(failure.competence)
+    const entry: DigestEntry = {
+      kind: 'recurring_failure',
+      title: failure.templateTitle,
+      clientName: failure.clientName,
+      level: 'FAILED',
+      dateLabel: `competência ${String(competence.getUTCMonth() + 1).padStart(2, '0')}/${competence.getUTCFullYear()}: ${failure.errorMessage}`,
+    }
+    for (const admin of admins) {
+      const bucket = byUserId.get(admin.id) ?? []
+      bucket.push(entry)
+      byUserId.set(admin.id, bucket)
     }
   }
 

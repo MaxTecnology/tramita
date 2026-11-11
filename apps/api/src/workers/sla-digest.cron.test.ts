@@ -327,3 +327,56 @@ describe('runSlaDigest — protocolos', () => {
     expect(enqueueNotification).not.toHaveBeenCalled() // digest desligado, mas expiração aconteceu
   })
 })
+
+describe('runSlaDigest — recorrentes não geradas', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  async function setupFailure(digestEnabled: boolean) {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const dept = await createTestDepartment(org.id)
+    const client = await createTestClient(org.id, { name: 'ACME' })
+    const template = await prisma.recurringTaskTemplate.create({
+      data: { organizationId: org.id, departmentId: dept.id, title: 'DAS mensal', periodicity: 'MONTHLY', dueDayOfPeriod: 10, generationDayOfPeriod: 1 },
+    })
+    await prisma.recurringTaskAssignment.create({ data: { templateId: template.id, clientId: client.id } })
+    await prisma.recurringGenerationLog.create({
+      data: {
+        templateId: template.id, clientId: client.id, competence: new Date(Date.UTC(2026, 9, 1)),
+        status: 'FAILED', errorMessage: 'O departamento X não atende mais o cliente ACME.',
+      },
+    })
+    await prisma.notificationConfig.create({ data: { organizationId: org.id, slaDigestEnabled: digestEnabled } })
+    return { org, admin, manager, member }
+  }
+
+  it('lista a falha no topo do resumo de admins e gerentes', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const { admin, manager, member } = await setupFailure(true)
+
+    await runSlaDigest(new Date(Date.UTC(2026, 9, 19, 15, 0, 0)))
+
+    const calls = vi.mocked(enqueueNotification).mock.calls.map((c) => c[0])
+    const recipients = calls.map((c) => c.userId)
+    expect(recipients).toEqual(expect.arrayContaining([admin.id, manager.id]))
+    expect(recipients).not.toContain(member.id)
+    const adminCall = calls.find((c) => c.userId === admin.id)!
+    expect((adminCall.metadata.taskListText ?? '').split('\n')[0]).toBe(
+      '- [recorrente não gerada] DAS mensal (ACME) — competência 10/2026: O departamento X não atende mais o cliente ACME.',
+    )
+  })
+
+  it('não envia nada com o resumo desligado', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    await setupFailure(false)
+
+    await runSlaDigest(new Date(Date.UTC(2026, 9, 19, 15, 0, 0)))
+
+    expect(enqueueNotification).not.toHaveBeenCalled()
+  })
+})
