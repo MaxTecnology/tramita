@@ -103,18 +103,12 @@ export async function createRequestComment(
     : (comment.user?.name ?? 'Colaborador')
 
   if (isClient) {
-    const assignments = await prisma.clientAssignment.findMany({
-      where: request.departmentId
-        ? { clientId: request.clientId, departmentId: request.departmentId }
-        : { clientId: request.clientId },
+    // Notifica o responsável do departamento da solicitação. Sem fallback pra admins/gerentes:
+    // todo departamento que atende o cliente tem responsável (I2).
+    const recipientIds = (await prisma.clientAssignment.findMany({
+      where: { clientId: request.clientId, departmentId: request.departmentId },
       select: { userId: true },
-    })
-    const recipientIds = assignments.length > 0
-      ? assignments.map((a) => a.userId)
-      : await prisma.user.findMany({
-          where: { organizationId: actor.organizationId, role: { in: ['ORG_ADMIN', 'ORG_MANAGER'] }, isActive: true },
-          select: { id: true },
-        }).then((users) => users.map((u) => u.id))
+    })).map((a) => a.userId)
 
     await Promise.all(
       recipientIds.map((userId) =>

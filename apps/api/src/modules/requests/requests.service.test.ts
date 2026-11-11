@@ -569,3 +569,21 @@ describe('departamento atendido na solicitação', () => {
     ).rejects.toMatchObject({ statusCode: 403, message: 'Você não tem acesso a este departamento' })
   })
 })
+
+describe('sem fallback para admins/gerentes', () => {
+  it('solicitação num departamento sem responsável não notifica admins nem gerentes', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    await createTestUser(org.id, { role: 'ORG_MANAGER' })
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+
+    await createRequest(org.id, client.id, clientUser.id, { title: 'X', departmentId: department.id })
+
+    const created = vi.mocked(queue.enqueueNotification).mock.calls.filter((c) => c[0].event === 'REQUEST_CREATED')
+    expect(created).toHaveLength(0)
+  })
+})

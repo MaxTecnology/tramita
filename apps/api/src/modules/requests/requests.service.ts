@@ -50,20 +50,12 @@ export async function createRequest(
     },
   })
 
-  // Notifica responsáveis atribuídos ao cliente; fallback para ORG_ADMIN + ORG_MANAGER
-  const assignments = await prisma.clientAssignment.findMany({
-    where: request.departmentId
-      ? { clientId, departmentId: request.departmentId }
-      : { clientId },
+  // Notifica o responsável do departamento da solicitação (ClientAssignment). Sem fallback pra
+  // admins/gerentes: todo departamento que atende o cliente tem responsável (I2).
+  const recipientIds = (await prisma.clientAssignment.findMany({
+    where: { clientId, departmentId: request.departmentId },
     select: { userId: true },
-  })
-
-  const recipientIds = assignments.length > 0
-    ? assignments.map((a) => a.userId)
-    : await prisma.user.findMany({
-        where: { organizationId, role: { in: ['ORG_ADMIN', 'ORG_MANAGER'] }, isActive: true },
-        select: { id: true },
-      }).then((users) => users.map((u) => u.id))
+  })).map((a) => a.userId)
 
   await Promise.all(
     recipientIds.map((userId) =>

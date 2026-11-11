@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { lookupCnpj, type CnpjLookupResult } from '@/lib/cnpjws'
 import { hashPassword } from '@/modules/auth/auth.service'
+import { normalizarTelefoneBr } from '@/lib/phone'
 import type { ClientBody } from './clients.schema'
 import { assertCanUnserveDepartments, assertPayloadCoverage } from './client-coverage'
 
@@ -49,7 +50,13 @@ async function upsertClientUserLinks(
       const dup = await tx.clientUser.findFirst({ where: { email: link.email, organizationId } })
       if (dup) throw new AppError(409, `E-mail ${link.email} já cadastrado nesta organização`)
       const created = await tx.clientUser.create({
-        data: { name: link.name, email: link.email, passwordHash: await hashPassword(link.password), organizationId },
+        data: {
+          name: link.name,
+          email: link.email,
+          phone: link.phone ? normalizarTelefoneBr(link.phone) : null,
+          passwordHash: await hashPassword(link.password),
+          organizationId,
+        },
       })
       clientUserId = created.id
     }

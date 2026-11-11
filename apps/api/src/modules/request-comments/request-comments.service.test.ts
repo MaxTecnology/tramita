@@ -201,3 +201,21 @@ describe('listRequestComments / deleteRequestComment', () => {
       .rejects.toMatchObject({ statusCode: 404 })
   })
 })
+
+describe('sem fallback para admins/gerentes', () => {
+  it('comentário do cliente numa solicitação de departamento sem responsável não notifica ninguém da equipe', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
+    const access = await prisma.clientUserAccess.findFirstOrThrow({ where: { clientId: client.id } })
+    await prisma.clientAssignment.deleteMany({ where: { clientId: client.id } })
+    vi.mocked(queue.enqueueNotification).mockClear()
+
+    await createRequestComment(request.id, { content: 'Oi' }, { id: access.clientUserId, role: 'CLIENT', organizationId: org.id })
+
+    const userCalls = vi.mocked(queue.enqueueNotification).mock.calls.filter((c) => c[0].recipientType === 'USER')
+    expect(userCalls).toHaveLength(0)
+  })
+})

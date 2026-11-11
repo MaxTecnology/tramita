@@ -287,3 +287,12 @@ export async function createTestRequest(
   const { departmentId, clientUserId } = await ensurePortalAccess(organizationId, clientId, data.departmentId)
   return createRequest(organizationId, clientId, clientUserId, { ...data, departmentId })
 }
+
+// Usuário do portal com acesso ao departamento (e telefone, se informado) — destinatário das
+// notificações ao cliente, que vão por departamento.
+export async function createTestPortalRecipient(organizationId: string, clientId: string, departmentId: string, phone?: string) {
+  const { clientUser } = await createTestClientUser(organizationId)
+  if (phone) await prisma.clientUser.update({ where: { id: clientUser.id }, data: { phone } })
+  await grantClientAccess(clientUser.id, clientId, departmentId)
+  return clientUser
+}

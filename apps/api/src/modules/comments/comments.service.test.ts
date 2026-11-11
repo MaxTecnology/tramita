@@ -316,3 +316,28 @@ describe('createComment - roteamento de notificação por departamento', () => {
     )
   })
 })
+
+describe('sem fallback para admins/gerentes', () => {
+  it('comentário do cliente numa tarefa de departamento sem responsável não notifica ninguém da equipe', async () => {
+    const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue(undefined)
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    await createTestUser(org.id, { role: 'ORG_MANAGER' })
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await prisma.column.create({ data: { title: 'C', position: 0, boardId: board.id } })
+    const task = await prisma.task.create({
+      data: { title: 'T', position: 0, columnId: column.id, creatorId: admin.id, departmentId: department.id },
+    })
+
+    await createComment(task.id, { content: 'Olá' }, { id: clientUser.id, role: 'CLIENT', organizationId: org.id })
+
+    const userCalls = spy.mock.calls.filter((c) => c[0].recipientType === 'USER')
+    expect(userCalls).toHaveLength(0)
+    spy.mockRestore()
+  })
+})

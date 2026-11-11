@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { hashPassword } from '@/modules/auth/auth.service'
+import { normalizarTelefoneBr } from '@/lib/phone'
 import type { CreateClientUserBody, UpdateClientUserBody } from './client-users.schema'
 import { assertAccessesServed, assertClientUserChangeKeepsCoverage } from '@/modules/clients/client-coverage'
 
@@ -56,7 +57,7 @@ export async function createClientUser(organizationId: string, data: CreateClien
       name: data.name,
       email: data.email,
       passwordHash: await hashPassword(data.password),
-      phone: data.phone,
+      phone: data.phone ? normalizarTelefoneBr(data.phone) : null,
       isActive: data.isActive,
       organizationId,
       accesses: { create: data.accesses },
@@ -90,7 +91,7 @@ export async function updateClientUser(id: string, organizationId: string, data:
       data: {
         name: data.name,
         email: data.email,
-        phone: data.phone,
+        phone: data.phone === undefined ? undefined : data.phone ? normalizarTelefoneBr(data.phone) : null,
         isActive: data.isActive,
         ...(data.password ? { passwordHash: await hashPassword(data.password) } : {}),
       },

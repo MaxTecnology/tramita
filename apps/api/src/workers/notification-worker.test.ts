@@ -16,6 +16,7 @@ import {
   createTestBoard,
   createTestColumn,
   createTestTask,
+  createTestPortalRecipient,
 } from '@/test/helpers'
 import type { NotificationJob } from '@/lib/queue'
 
@@ -73,6 +74,7 @@ describe('processNotificationJob', () => {
     const board = await createTestBoard(org.id, client.id)
     const col = await createTestColumn(board.id, { position: 0 })
     const task = await createTestTask(col.id, user.id)
+    await createTestPortalRecipient(org.id, client.id, task.departmentId, '5582999990002')
 
     await prisma.notificationConfig.create({
       data: {
@@ -292,5 +294,97 @@ describe('processNotificationJob', () => {
     await processNotificationJob(job)
 
     expect(mailer.sendEmail).not.toHaveBeenCalled()
+  })
+})
+
+describe('notificação ao cliente por departamento (e-mail e WhatsApp)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.spyOn(encryption, 'decrypt').mockImplementation((encoded) => encoded)
+    vi.spyOn(maximizebot, 'sendWhatsApp').mockResolvedValue(undefined)
+    vi.spyOn(mailer, 'sendEmail').mockResolvedValue(undefined)
+  })
+
+  async function setup(visibleToClient = true) {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const staff = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    await prisma.client.update({ where: { id: client.id }, data: { whatsapp: '5511900000000' } })
+    const folha = await createTestDepartment(org.id)
+    const fiscal = await createTestDepartment(org.id)
+
+    const { clientUser: folhaComTelefone } = await createTestClientUser(org.id, { email: `folha1-${Date.now()}@t.com` })
+    await prisma.clientUser.update({ where: { id: folhaComTelefone.id }, data: { phone: '5582911111111' } })
+    await grantClientAccess(folhaComTelefone.id, client.id, folha.id)
+    const { clientUser: folhaSemTelefone } = await createTestClientUser(org.id, { email: `folha2-${Date.now()}@t.com` })
+    await grantClientAccess(folhaSemTelefone.id, client.id, folha.id)
+    const { clientUser: fiscalUser } = await createTestClientUser(org.id, { email: `fiscal-${Date.now()}@t.com` })
+    await prisma.clientUser.update({ where: { id: fiscalUser.id }, data: { phone: '5582922222222' } })
+    await grantClientAccess(fiscalUser.id, client.id, fiscal.id)
+
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, staff.id, { departmentId: folha.id })
+    await prisma.task.update({ where: { id: task.id }, data: { visibleToClient } })
+
+    await prisma.notificationConfig.create({
+      data: { organizationId: org.id, whatsappEnabled: true, emailEnabled: true, taskMoved: true, requestApproved: true, maximizebotToken: 'Bearer t' },
+    })
+    return { org, client, task, folha, folhaComTelefone, folhaSemTelefone }
+  }
+
+  it('envia WhatsApp só pro telefone dos usuários do departamento e e-mail pra todos eles', async () => {
+    const { org, client, task, folhaComTelefone, folhaSemTelefone } = await setup()
+
+    await processNotificationJob({
+      data: { event: 'TASK_MOVED', organizationId: org.id, clientId: client.id, taskId: task.id, metadata: {} },
+    })
+
+    const whatsappNumbers = vi.mocked(maximizebot.sendWhatsApp).mock.calls.map((c) => c[1].number)
+    expect(whatsappNumbers).toEqual(['5582911111111'])
+    const emails = vi.mocked(mailer.sendEmail).mock.calls.map((c) => c[0]).sort()
+    expect(emails).toEqual([folhaComTelefone.email, folhaSemTelefone.email].sort())
+    const logs = await prisma.notificationLog.findMany({ where: { taskId: task.id }, orderBy: { recipient: 'asc' } })
+    expect(logs.map((l) => `${l.channel}:${l.recipient}`).sort()).toEqual(
+      [`WHATSAPP:5582911111111`, `EMAIL:${folhaComTelefone.email}`, `EMAIL:${folhaSemTelefone.email}`].sort(),
+    )
+  })
+
+  it('o número da empresa (client.whatsapp) não recebe nada', async () => {
+    const { org, client, task } = await setup()
+
+    await processNotificationJob({
+      data: { event: 'TASK_MOVED', organizationId: org.id, clientId: client.id, taskId: task.id, metadata: {} },
+    })
+
+    const numbers = vi.mocked(maximizebot.sendWhatsApp).mock.calls.map((c) => c[1].number)
+    expect(numbers).not.toContain('5511900000000')
+  })
+
+  it('tarefa interna (visibleToClient=false) não notifica ninguém', async () => {
+    const { org, client, task } = await setup(false)
+
+    await processNotificationJob({
+      data: { event: 'TASK_MOVED', organizationId: org.id, clientId: client.id, taskId: task.id, metadata: {} },
+    })
+
+    expect(maximizebot.sendWhatsApp).not.toHaveBeenCalled()
+    expect(mailer.sendEmail).not.toHaveBeenCalled()
+  })
+
+  it('evento de solicitação usa o departamento da solicitação', async () => {
+    const { org, client, folha, folhaComTelefone } = await setup()
+    const request = await prisma.request.create({
+      data: { organizationId: org.id, clientId: client.id, title: 'Pedido', departmentId: folha.id },
+    })
+
+    await processNotificationJob({
+      data: { event: 'REQUEST_APPROVED', organizationId: org.id, clientId: client.id, requestId: request.id, metadata: { requestTitle: 'Pedido' } },
+    })
+
+    expect(vi.mocked(maximizebot.sendWhatsApp).mock.calls.map((c) => c[1].number)).toEqual(['5582911111111'])
+    expect(vi.mocked(mailer.sendEmail).mock.calls.map((c) => c[0])).toContain(folhaComTelefone.email)
+    expect(vi.mocked(mailer.sendEmail).mock.calls).toHaveLength(2)
   })
 })

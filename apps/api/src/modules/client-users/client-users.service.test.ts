@@ -210,3 +210,26 @@ describe('deleteClientUser', () => {
     await expect(deleteClientUser(created.id, org.id)).rejects.toMatchObject({ statusCode: 409 })
   })
 })
+
+describe('telefone do usuário do cliente', () => {
+  it('normaliza o telefone para o formato do WhatsApp ao criar', async () => {
+    const { org, client, department } = await setup()
+
+    const created = await createClientUser(org.id, {
+      name: 'Tel', email: email('tel'), password: 'Senha@1234', phone: '(82) 99999-1234', isActive: true,
+      accesses: [{ clientId: client.id, departmentId: department.id }],
+    })
+
+    const stored = await prisma.clientUser.findUniqueOrThrow({ where: { id: created.id } })
+    expect(stored.phone).toBe('5582999991234')
+  })
+
+  it('recusa telefone inválido', async () => {
+    const { org, client, department } = await setup()
+
+    await expect(createClientUser(org.id, {
+      name: 'Tel', email: email('tel'), password: 'Senha@1234', phone: '1234', isActive: true,
+      accesses: [{ clientId: client.id, departmentId: department.id }],
+    })).rejects.toMatchObject({ statusCode: 400, message: 'Telefone inválido: 1234' })
+  })
+})

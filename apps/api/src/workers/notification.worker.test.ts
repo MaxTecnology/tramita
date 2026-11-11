@@ -12,6 +12,7 @@ import {
   createTestBoard,
   createTestColumn,
   createTestTask,
+  createTestPortalRecipient,
 } from '@/test/helpers'
 
 vi.mock('@/lib/maximizebot', () => ({ sendWhatsApp: vi.fn().mockResolvedValue(undefined) }))
@@ -26,6 +27,7 @@ async function setup(taskMoved: boolean) {
   const board = await createTestBoard(org.id, client.id)
   const column = await createTestColumn(board.id)
   const task = await createTestTask(column.id, user.id)
+  await createTestPortalRecipient(org.id, client.id, task.departmentId, '5511999999999')
 
   await prisma.notificationConfig.create({
     data: {
@@ -140,6 +142,7 @@ describe('processNotificationJob — TASK_BLOCKED respeita config.taskBlocked', 
     const board = await createTestBoard(org.id, client.id)
     const column = await createTestColumn(board.id)
     const task = await createTestTask(column.id, user.id)
+    await createTestPortalRecipient(org.id, client.id, task.departmentId, '5511999999999')
 
     await prisma.notificationConfig.create({
       data: {

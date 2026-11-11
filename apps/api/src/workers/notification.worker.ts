@@ -8,6 +8,7 @@ import { sendEmail } from '@/lib/mailer'
 import { wrapEmailHtml } from '@/lib/email-template'
 import type { NotificationConfig, NotificationEvent, MessageChannel } from '@prisma/client'
 import type { NotificationJob } from '@/lib/queue'
+import { resolveClientRecipients, type ClientRecipient } from '@/modules/notifications/client-recipients'
 
 const EVENT_FLAG_MAP: Record<string, keyof NotificationConfig> = {
   TASK_CREATED: 'taskCreated',
@@ -73,7 +74,7 @@ async function processClientNotification(
 ): Promise<void> {
   const { event, organizationId, clientId, taskId, requestId, metadata, channels: channelOverride } = params
 
-  const [client, org, task] = await Promise.all([
+  const [client, org, task, request] = await Promise.all([
     prisma.client.findUnique({ where: { id: clientId } }),
     prisma.organization.findUnique({ where: { id: organizationId } }),
     taskId
@@ -82,10 +83,18 @@ async function processClientNotification(
           include: { column: { include: { board: { select: { organizationId: true } } } } },
         })
       : Promise.resolve(null),
+    requestId
+      ? prisma.request.findUnique({ where: { id: requestId }, select: { organizationId: true, departmentId: true } })
+      : Promise.resolve(null),
   ])
   if (!client || !org) return
   if (client.organizationId !== organizationId) return
   if (taskId && (!task || task.column.board.organizationId !== organizationId)) return
+  if (requestId && (!request || request.organizationId !== organizationId)) return
+
+  // Uma notificação ligada a uma tarefa marcada como controle interno (visibleToClient=false) nunca
+  // pode chegar ao cliente por nenhum canal — ele seria mandado ao portal por algo que não consegue ver.
+  if (task && !task.visibleToClient) return
 
   const vars: TemplateVars = {
     clientName: client.name,
@@ -102,8 +111,21 @@ async function processClientNotification(
     protocolTitle: metadata.protocolTitle,
   }
 
+  // Destinatário por departamento do assunto (tarefa ou solicitação), nos dois canais. O número da
+  // empresa (client.whatsapp) não é destino: um assunto da Folha não pode cair no WhatsApp de quem só
+  // cuida do Fiscal. Evento sem tarefa nem solicitação não é de nenhum departamento: vai pra todos os
+  // usuários ativos da empresa.
+  const departmentId = task?.departmentId ?? request?.departmentId ?? null
+  const recipients: ClientRecipient[] = departmentId
+    ? await resolveClientRecipients(clientId, departmentId)
+    : await prisma.clientUser.findMany({
+        where: { isActive: true, accesses: { some: { clientId } } },
+        select: { id: true, name: true, email: true, phone: true },
+        orderBy: { name: 'asc' },
+      })
+
   const channels: MessageChannel[] = []
-  if (config.whatsappEnabled && client.whatsapp && config.maximizebotToken) channels.push('WHATSAPP')
+  if (config.whatsappEnabled && config.maximizebotToken) channels.push('WHATSAPP')
   if (config.emailEnabled) channels.push('EMAIL')
 
   const effectiveChannels = channelOverride ? channels.filter((c) => channelOverride.includes(c)) : channels
@@ -111,84 +133,40 @@ async function processClientNotification(
   for (const channel of effectiveChannels) {
     const template = await getTemplate(organizationId, event as NotificationEvent, channel)
     const rendered = renderTemplate(template.body, vars)
+    const subject = renderTemplate(template.subject ?? '', vars)
 
-    if (channel === 'EMAIL') {
-      // A task-scoped notification for a task hidden from clients must never be emailed.
-      if (task && !task.visibleToClient) continue
+    for (const recipient of recipients) {
+      const address = channel === 'EMAIL' ? recipient.email : recipient.phone
+      if (!address) continue
 
-      const recipients = await prisma.clientUser.findMany({
-        where: {
-          isActive: true,
-          accesses: { some: task ? { clientId, departmentId: task.departmentId } : { clientId } },
-        },
-        select: { id: true, name: true, email: true },
-        distinct: ['id'],
-      })
-      for (const recipient of recipients) {
-        // Declared per-recipient so one recipient's failure/error never leaks onto the
-        // next recipient's log entry.
-        let status: 'SENT' | 'FAILED' = 'SENT'
-        let error: string | undefined
-        const subject = renderTemplate(template.subject ?? '', vars)
-        try {
-          await sendEmail(
-            recipient.email,
-            subject,
-            rendered,
-            wrapEmailHtml(subject, rendered, vars.portalUrl, 'Acessar portal'),
-          )
-          status = 'SENT'
-        } catch (err) {
-          status = 'FAILED'
-          error = err instanceof Error ? err.message : String(err)
+      // Declarados por destinatário pra que a falha de um nunca vaze pro log do próximo.
+      let status: 'SENT' | 'FAILED' = 'SENT'
+      let error: string | undefined
+      try {
+        if (channel === 'EMAIL') {
+          await sendEmail(address, subject, rendered, wrapEmailHtml(subject, rendered, vars.portalUrl, 'Acessar portal'))
+        } else {
+          await sendWhatsApp(config.maximizebotToken!, {
+            number: address,
+            body: rendered,
+            saveOnTicket: config.saveOnTicket,
+            startChatbot: config.startChatbot,
+            linkPreview: true,
+          })
         }
-        await prisma.notificationLog.create({
-          data: {
-            organizationId, clientId, event: event as NotificationEvent, channel, taskId, requestId,
-            recipient: recipient.email, message: rendered, status, error,
-            sentAt: status === 'SENT' ? new Date() : undefined,
-          },
-        })
+      } catch (err) {
+        status = 'FAILED'
+        error = err instanceof Error ? err.message : String(err)
       }
-      continue // já logou por destinatário acima — pula o log único do fim do loop
-    }
 
-    // Mesma regra do branch de EMAIL acima: uma notificação ligada a uma tarefa marcada como
-    // controle interno (visibleToClient=false) nunca pode chegar ao cliente por nenhum canal —
-    // o WhatsApp mandaria o cliente checar o portal por uma tarefa que ele não consegue ver lá.
-    if (task && !task.visibleToClient) continue
-
-    let status: 'SENT' | 'FAILED' = 'SENT'
-    let error: string | undefined
-
-    try {
-      await sendWhatsApp(config.maximizebotToken!, {
-        number: client.whatsapp!,
-        body: rendered,
-        saveOnTicket: config.saveOnTicket,
-        startChatbot: config.startChatbot,
-        linkPreview: true,
+      await prisma.notificationLog.create({
+        data: {
+          organizationId, clientId, event: event as NotificationEvent, channel, taskId, requestId,
+          recipient: address, message: rendered, status, error,
+          sentAt: status === 'SENT' ? new Date() : undefined,
+        },
       })
-    } catch (err) {
-      status = 'FAILED'
-      error = err instanceof Error ? err.message : String(err)
     }
-
-    await prisma.notificationLog.create({
-      data: {
-        organizationId,
-        clientId,
-        event: event as NotificationEvent,
-        channel,
-        taskId,
-        requestId,
-        recipient: client.whatsapp!,
-        message: rendered,
-        status,
-        error,
-        sentAt: status === 'SENT' ? new Date() : undefined,
-      },
-    })
   }
 }
 
