@@ -142,7 +142,7 @@ model Client {
   id                String  @id @default(cuid())
   name              String
   clientType        String  @default("PJ")
-  codigo            String?
+  codigo            String
   cnpj              String?
   cpf               String?
   cei               String?
@@ -176,7 +176,11 @@ model Client {
   recurringTaskAssignments RecurringTaskAssignment[]
   clientUserAccesses       ClientUserAccess[]
 
-  @@unique([codigo, organizationId])
+  // Garantias escritas à mão na migration 20261111120000_client_required_fields (o Prisma não
+  // expressa CHECK nem índice parcial — `prisma migrate diff` não detecta drift neles):
+  // - CHECK clients_document_by_type_check: PJ exige cnpj, PF exige cpf;
+  // - índices únicos parciais (só clientes ativos): clients_codigo_active_key,
+  //   clients_cnpj_active_key, clients_cpf_active_key — cliente desativado não trava recadastro.
   @@map("clients")
 }
 

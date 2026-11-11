@@ -34,9 +34,7 @@ describe('deleteComment - soft delete', () => {
     const user = await prisma.user.create({
       data: { name: 'João', email: 'j@j.com', passwordHash: 'x', role: 'ORG_ADMIN', organizationId: org.id },
     })
-    const client = await prisma.client.create({
-      data: { name: 'Empresa X', organizationId: org.id },
-    })
+    const client = await createTestClient(org.id, { name: 'Empresa X' })
     const board = await prisma.board.create({
       data: { title: 'B', organizationId: org.id, clientId: client.id },
     })
@@ -90,9 +88,7 @@ describe('deleteComment - soft delete', () => {
     const user = await prisma.user.create({
       data: { name: 'J', email: 'j2@j.com', passwordHash: 'x', role: 'ORG_ADMIN', organizationId: org.id },
     })
-    const client = await prisma.client.create({
-      data: { name: 'EmpY', organizationId: org.id },
-    })
+    const client = await createTestClient(org.id, { name: 'EmpY' })
     const board = await prisma.board.create({
       data: { title: 'B', organizationId: org.id, clientId: client.id },
     })
@@ -149,9 +145,7 @@ describe('listComments - soft delete visibility', () => {
     const admin = await prisma.user.create({
       data: { name: 'Admin', email: 'a3@a.com', passwordHash: 'x', role: 'ORG_ADMIN', organizationId: org.id },
     })
-    const client = await prisma.client.create({
-      data: { name: 'EmpW', organizationId: org.id },
-    })
+    const client = await createTestClient(org.id, { name: 'EmpW' })
     const board = await prisma.board.create({
       data: { title: 'B', organizationId: org.id, clientId: client.id },
     })

@@ -60,17 +60,36 @@ export async function createTestUser(
   })
 }
 
+// CNPJ com dígitos verificadores válidos derivado de um seed — cada seed gera um CNPJ diferente,
+// pra que clientes de teste não colidam no índice único de CNPJ entre ativos.
+export function generateValidCnpj(seed: number): string {
+  const base = String(seed % 1e12).padStart(12, '0').replace(/^0/, '1')
+  const dv = (digits: string) => {
+    const weights = digits.length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    const sum = digits.split('').reduce((acc, d, i) => acc + Number(d) * weights[i], 0)
+    const r = sum % 11
+    return r < 2 ? 0 : 11 - r
+  }
+  const d1 = dv(base)
+  const d2 = dv(base + d1)
+  return `${base}${d1}${d2}`
+}
+
+let testClientCounter = 0
+
 export async function createTestClient(
   organizationId: string,
   overrides: Partial<{ isActive: boolean; name: string; codigo: string; cnpj: string }> = {},
 ) {
+  const n = ++testClientCounter
   return prisma.client.create({
     data: {
       name: overrides.name ?? 'Test Client',
       organizationId,
       isActive: overrides.isActive ?? true,
-      codigo: overrides.codigo,
-      cnpj: overrides.cnpj,
+      clientType: 'PJ',
+      codigo: overrides.codigo ?? `C-${Date.now()}-${n}`,
+      cnpj: overrides.cnpj ?? generateValidCnpj(Date.now() * 1000 + n),
     },
   })
 }

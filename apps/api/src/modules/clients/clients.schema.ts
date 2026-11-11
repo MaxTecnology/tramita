@@ -1,4 +1,58 @@
 import { z } from 'zod'
+import { cnpjValido, cpfValido, soDigitos } from '@/lib/documento'
+
+const optionalText = z
+  .string()
+  .nullish()
+  .transform((v) => (v && v.trim() ? v.trim() : null))
+
+const PJ_ADDRESS_FIELDS = ['cep', 'estado', 'cidade', 'bairro', 'logradouro', 'numero'] as const
+
+export const companyFieldsSchema = z
+  .object({
+    name: z.string({ required_error: 'Informe o nome do cliente' }).trim().min(2, 'Informe o nome do cliente'),
+    codigo: z
+      .string({ required_error: 'Informe o código do cliente' })
+      .trim()
+      .min(1, 'Informe o código do cliente'),
+    clientType: z.enum(['PF', 'PJ']).default('PJ'),
+    cnpj: optionalText,
+    cpf: optionalText,
+    // Identificadores alternativos usados pelo robô de leitura de documentos fiscais (document-reader)
+    // pra casar CNPJ de filial/produtor rural/contribuinte estadual quando o CNPJ principal não bate.
+    cei: optionalText,
+    caepf: optionalText,
+    inscricaoEstadual: optionalText,
+    whatsapp: optionalText,
+    phone: optionalText,
+    notes: optionalText,
+    cep: optionalText,
+    estado: optionalText,
+    cidade: optionalText,
+    bairro: optionalText,
+    logradouro: optionalText,
+    numero: optionalText,
+    complemento: optionalText,
+  })
+  .superRefine((data, ctx) => {
+    if (data.clientType === 'PJ') {
+      if (!data.cnpj) ctx.addIssue({ code: 'custom', path: ['cnpj'], message: 'Informe o CNPJ' })
+      else if (!cnpjValido(data.cnpj)) ctx.addIssue({ code: 'custom', path: ['cnpj'], message: 'CNPJ inválido' })
+      if (PJ_ADDRESS_FIELDS.some((f) => !data[f])) {
+        ctx.addIssue({ code: 'custom', path: ['endereco'], message: 'Endereço completo é obrigatório para pessoa jurídica' })
+      }
+    } else {
+      if (!data.cpf) ctx.addIssue({ code: 'custom', path: ['cpf'], message: 'Informe o CPF' })
+      else if (!cpfValido(data.cpf)) ctx.addIssue({ code: 'custom', path: ['cpf'], message: 'CPF inválido' })
+    }
+  })
+  .transform((data) => ({
+    ...data,
+    cnpj: data.cnpj ? soDigitos(data.cnpj) : null,
+    cpf: data.cpf ? soDigitos(data.cpf) : null,
+  }))
+
+export type CompanyFields = z.infer<typeof companyFieldsSchema>
 
 const addressFields = {
   cep: z.string().optional(),

@@ -461,3 +461,23 @@ describe('lookupClientByCnpj', () => {
     await expect(lookupClientByCnpj('11222333000181')).rejects.toMatchObject({ statusCode: 429 })
   })
 })
+
+describe('unicidade de CNPJ entre clientes ativos (índice parcial no banco)', () => {
+  it('recusa o mesmo CNPJ em dois clientes ativos da mesma organização', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await createTestClient(org.id, { cnpj: '11222333000181' })
+
+    await expect(createTestClient(org.id, { cnpj: '11222333000181' })).rejects.toMatchObject({
+      code: 'P2002',
+    })
+  })
+
+  it('permite reaproveitar o CNPJ de um cliente desativado', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await createTestClient(org.id, { cnpj: '11222333000181', isActive: false })
+
+    await expect(createTestClient(org.id, { cnpj: '11222333000181' })).resolves.toBeTruthy()
+  })
+})
