@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { FailedGenerationsAlert } from '@/components/FailedGenerationsAlert'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { Protocol, ProtocolSummary } from '@/types'
@@ -497,6 +498,8 @@ export default function DashboardMetrics() {
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <h1 className="text-lg md:text-xl font-bold text-foreground">Dashboard</h1>
+
+      <FailedGenerationsAlert />
 
       <div className="flex border-b border-border">
         {(['overview', 'productivity', 'protocols'] as const).map((t) => (
