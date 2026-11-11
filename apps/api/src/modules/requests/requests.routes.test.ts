@@ -9,14 +9,17 @@ import {
   createTestDepartment,
   grantClientAccess,
   getAuthHeader,
+  serveClientDepartment,
 } from '@/test/helpers'
 
 async function createTestClientLogin(orgId: string) {
   const client = await createTestClient(orgId)
   const department = await createTestDepartment(orgId)
+  const responsible = await createTestUser(orgId, { role: 'ORG_MEMBER' })
+  await serveClientDepartment(client.id, department.id, responsible.id)
   const { clientUser, password } = await createTestClientUser(orgId)
   await grantClientAccess(clientUser.id, client.id, department.id)
-  return { client, auth: await getAuthHeader(clientUser.email, password) }
+  return { client, department, auth: await getAuthHeader(clientUser.email, password) }
 }
 
 describe('GET /requests', () => {
@@ -24,14 +27,14 @@ describe('GET /requests', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
-    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
     const auth = await getAuthHeader(member.email, 'Test@1234')
 
     await app.inject({
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido via portal' },
+      payload: { clientId: client.id, title: 'Pedido via portal', departmentId: department.id },
     })
 
     const res = await app.inject({ method: 'GET', url: '/requests', headers: { authorization: auth } })
@@ -45,12 +48,12 @@ describe('POST /requests/:id/approve', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
-    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
     const created = await app.inject({
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido' },
+      payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
     })
     const request = JSON.parse(created.body)
 
@@ -68,12 +71,12 @@ describe('POST /requests/:id/approve', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
     const created = await app.inject({
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido' },
+      payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
     })
     const request = JSON.parse(created.body)
 
@@ -96,12 +99,12 @@ describe('POST /requests/:id/reject', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
-    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
     const created = await app.inject({
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido' },
+      payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
     })
     const request = JSON.parse(created.body)
 
@@ -122,20 +125,20 @@ describe('GET /requests/pending-count', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
     const auth = await getAuthHeader(admin.email, 'Test@1234')
 
     await app.inject({
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido 1' },
+      payload: { clientId: client.id, title: 'Pedido 1', departmentId: department.id },
     })
     await app.inject({
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido 2' },
+      payload: { clientId: client.id, title: 'Pedido 2', departmentId: department.id },
     })
 
     const res = await app.inject({ method: 'GET', url: '/requests/pending-count', headers: { authorization: auth } })
@@ -158,10 +161,10 @@ describe('POST /requests/:id/needs-info', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
-    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
     const created = await app.inject({
       method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido' },
+      payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
     })
     const request = JSON.parse(created.body)
 
@@ -178,10 +181,10 @@ describe('POST /requests/:id/needs-info', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
-    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
     const created = await app.inject({
       method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido' },
+      payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
     })
     const request = JSON.parse(created.body)
 
@@ -197,10 +200,10 @@ describe('POST /requests/:id/needs-info', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
-    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
     const created = await app.inject({
       method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido' },
+      payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
     })
     const request = JSON.parse(created.body)
     const auth = await getAuthHeader(manager.email, 'Test@1234')
@@ -218,10 +221,10 @@ describe('POST /requests/:id/cancel', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
     const created = await app.inject({
       method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido' },
+      payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
     })
     const request = JSON.parse(created.body)
     const auth = await getAuthHeader(admin.email, 'Test@1234')
@@ -243,10 +246,10 @@ describe('POST /requests/:id/cancel', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
-    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
     const created = await app.inject({
       method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido' },
+      payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
     })
     const request = JSON.parse(created.body)
     const authAdmin = await getAuthHeader(admin.email, 'Test@1234')
@@ -267,10 +270,10 @@ describe('POST /requests/:id/cancel', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
     const created = await app.inject({
       method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido' },
+      payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
     })
     const request = JSON.parse(created.body)
     const auth = await getAuthHeader(admin.email, 'Test@1234')
@@ -290,10 +293,10 @@ describe('POST /requests/:id/cancel', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-    const { client, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
     const created = await app.inject({
       method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
-      payload: { clientId: client.id, title: 'Pedido' },
+      payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
     })
     const request = JSON.parse(created.body)
     const auth = await getAuthHeader(admin.email, 'Test@1234')

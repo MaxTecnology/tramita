@@ -7,6 +7,10 @@ import {
   createTestUser,
   createTestClient,
   createTestDepartment,
+  createTestClientUser,
+  grantClientAccess,
+  serveClientDepartment,
+  createTestRequest,
 } from '@/test/helpers'
 import * as queue from '@/lib/queue'
 import {
@@ -31,23 +35,22 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('createRequest', () => {
-  it('cria a request como PENDING e enfileira REQUEST_CREATED para cada ORG_ADMIN/ORG_MANAGER', async () => {
+  it('cria a request como PENDING e notifica só o responsável do departamento', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-    const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
-    await createTestUser(org.id, { role: 'ORG_MEMBER' }) // não deve ser notificado
+    const responsible = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    await createTestUser(org.id, { role: 'ORG_ADMIN' }) // não é responsável → não recebe
+    await createTestUser(org.id, { role: 'ORG_MANAGER' }) // idem
     const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    await serveClientDepartment(client.id, department.id, responsible.id)
 
-    const request = await createRequest(org.id, client.id, { title: 'Abertura de LTDA' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Abertura de LTDA', departmentId: department.id })
 
     expect(request.status).toBe('PENDING')
     expect(request.clientId).toBe(client.id)
-
-    expect(queue.enqueueNotification).toHaveBeenCalledTimes(2)
-    const calledUserIds = vi.mocked(queue.enqueueNotification).mock.calls.map((c) => c[0].userId)
-    expect(calledUserIds).toContain(admin.id)
-    expect(calledUserIds).toContain(manager.id)
+    const created = vi.mocked(queue.enqueueNotification).mock.calls.filter((c) => c[0].event === 'REQUEST_CREATED')
+    expect(created.map((c) => c[0].userId)).toEqual([responsible.id])
   })
 
   it('lança 404 se o cliente não pertence à org', async () => {
@@ -56,7 +59,7 @@ describe('createRequest', () => {
     const otherOrg = await createTestOrg(plan.id, { slug: 'other-org' })
     const client = await createTestClient(otherOrg.id)
 
-    await expect(createRequest(org.id, client.id, { title: 'X' })).rejects.toMatchObject({ statusCode: 404 })
+    await expect(createTestRequest(org.id, client.id, { title: 'X' })).rejects.toMatchObject({ statusCode: 404 })
   })
 
   it('lança 404 se o departmentId pertence a outra organização', async () => {
@@ -67,7 +70,7 @@ describe('createRequest', () => {
     const departmentOfOther = await createTestDepartment(otherOrg.id)
 
     await expect(
-      createRequest(org.id, client.id, { title: 'X', departmentId: departmentOfOther.id }),
+      createTestRequest(org.id, client.id, { title: 'X', departmentId: departmentOfOther.id }),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 })
@@ -77,8 +80,8 @@ describe('listRequestsForOrg / listRequestsForClient / getRequestById', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
-    await createRequest(org.id, client.id, { title: 'Pedido 1' })
-    const r2 = await createRequest(org.id, client.id, { title: 'Pedido 2' })
+    await createTestRequest(org.id, client.id, { title: 'Pedido 1' })
+    const r2 = await createTestRequest(org.id, client.id, { title: 'Pedido 2' })
     await cancelRequest(r2.id, org.id, client.id)
 
     const all = await listRequestsForOrg(org.id)
@@ -94,8 +97,8 @@ describe('listRequestsForOrg / listRequestsForClient / getRequestById', () => {
     const org = await createTestOrg(plan.id)
     const clientA = await createTestClient(org.id, { name: 'a@test.com' })
     const clientB = await createTestClient(org.id, { name: 'b@test.com' })
-    await createRequest(org.id, clientA.id, { title: 'Da A' })
-    await createRequest(org.id, clientB.id, { title: 'Da B' })
+    await createTestRequest(org.id, clientA.id, { title: 'Da A' })
+    await createTestRequest(org.id, clientB.id, { title: 'Da B' })
 
     const result = await listRequestsForClient(org.id, clientA.id)
     expect(result).toHaveLength(1)
@@ -107,7 +110,7 @@ describe('listRequestsForOrg / listRequestsForClient / getRequestById', () => {
     const org = await createTestOrg(plan.id)
     const clientA = await createTestClient(org.id, { name: 'a2@test.com' })
     const clientB = await createTestClient(org.id, { name: 'b2@test.com' })
-    const request = await createRequest(org.id, clientA.id, { title: 'Da A' })
+    const request = await createTestRequest(org.id, clientA.id, { title: 'Da A' })
 
     await expect(getRequestById(request.id, org.id, clientB.id)).rejects.toMatchObject({ statusCode: 404 })
   })
@@ -118,7 +121,7 @@ describe('cancelRequest', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
 
     const cancelled = await cancelRequest(request.id, org.id, client.id)
     expect(cancelled.status).toBe('CANCELLED')
@@ -128,7 +131,7 @@ describe('cancelRequest', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
 
     const cancelled = await cancelRequest(request.id, org.id, client.id)
 
@@ -140,7 +143,7 @@ describe('cancelRequest', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     await cancelRequest(request.id, org.id, client.id)
 
     await expect(cancelRequest(request.id, org.id, client.id)).rejects.toMatchObject({ statusCode: 422 })
@@ -153,7 +156,7 @@ describe('approveRequest', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Abertura de LTDA', description: 'Detalhes' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Abertura de LTDA', description: 'Detalhes' })
 
     const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
 
@@ -182,7 +185,7 @@ describe('approveRequest', () => {
         { title: 'Concluído', statusEffect: 'DONE', notifyClient: true, documents: [] },
       ],
     })
-    const request = await createRequest(org.id, client.id, {
+    const request = await createTestRequest(org.id, client.id, {
       title: 'Abertura de LTDA',
       osTemplateId: template.id,
     })
@@ -208,7 +211,7 @@ describe('approveRequest', () => {
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
     const existingBoard = await createBoard(org.id, admin.id, 'ORG_ADMIN', { title: 'Processo já aberto', clientId: client.id })
-    const request = await createRequest(org.id, client.id, { title: 'Documento extra' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Documento extra' })
 
     const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', {
       mode: 'EXISTING_BOARD',
@@ -227,7 +230,7 @@ describe('approveRequest', () => {
     const clientA = await createTestClient(org.id, { name: 'a3@test.com' })
     const clientB = await createTestClient(org.id, { name: 'b3@test.com' })
     const boardOfB = await createBoard(org.id, admin.id, 'ORG_ADMIN', { title: 'Board de B', clientId: clientB.id })
-    const request = await createRequest(org.id, clientA.id, { title: 'Pedido de A' })
+    const request = await createTestRequest(org.id, clientA.id, { title: 'Pedido de A' })
 
     await expect(
       approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', {
@@ -243,7 +246,7 @@ describe('approveRequest', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
 
     await expect(
@@ -257,7 +260,7 @@ describe('approveRequest', () => {
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
     const department = await createTestDepartment(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Abertura de LTDA', departmentId: department.id })
+    const request = await createTestRequest(org.id, client.id, { title: 'Abertura de LTDA', departmentId: department.id })
 
     const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
 
@@ -272,7 +275,7 @@ describe('approveRequest', () => {
     const client = await createTestClient(org.id)
     const department = await createTestDepartment(org.id)
     const existingBoard = await createBoard(org.id, admin.id, 'ORG_ADMIN', { title: 'Processo já aberto', clientId: client.id })
-    const request = await createRequest(org.id, client.id, { title: 'Documento extra', departmentId: department.id })
+    const request = await createTestRequest(org.id, client.id, { title: 'Documento extra', departmentId: department.id })
 
     const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', {
       mode: 'EXISTING_BOARD',
@@ -291,7 +294,7 @@ describe('rejectRequest', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
 
     const rejected = await rejectRequest(request.id, org.id, admin.id, { reason: 'Fora de escopo' })
 
@@ -308,7 +311,7 @@ describe('publishOrgEvent ao mudar status da request', () => {
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
 
-    await createRequest(org.id, client.id, { title: 'Pedido com evento' })
+    await createTestRequest(org.id, client.id, { title: 'Pedido com evento' })
 
     expect(publishSpy).toHaveBeenCalledWith(
       `org:${org.id}:requests`,
@@ -324,10 +327,10 @@ describe('publishOrgEvent ao mudar status da request', () => {
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
 
-    const r1 = await createRequest(org.id, client.id, { title: 'Pedido 1' })
+    const r1 = await createTestRequest(org.id, client.id, { title: 'Pedido 1' })
     await approveRequest(r1.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
 
-    const r2 = await createRequest(org.id, client.id, { title: 'Pedido 2' })
+    const r2 = await createTestRequest(org.id, client.id, { title: 'Pedido 2' })
     await rejectRequest(r2.id, org.id, admin.id, { reason: 'Teste' })
 
     const orgChannelCalls = publishSpy.mock.calls.filter(([channel]) => channel === `org:${org.id}:requests`)
@@ -340,7 +343,7 @@ describe('publishOrgEvent ao mudar status da request', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido a cancelar' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido a cancelar' })
     publishSpy.mockClear() // ignora o publish do createRequest, foca no do cancelRequest
 
     await cancelRequest(request.id, org.id, client.id)
@@ -359,7 +362,7 @@ describe('markNeedsInfo', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
 
     const updated = await markNeedsInfo(request.id, org.id, admin.id, 'Qual o CNPJ?')
 
@@ -374,7 +377,7 @@ describe('markNeedsInfo', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     await rejectRequest(request.id, org.id, admin.id, {})
 
     await expect(markNeedsInfo(request.id, org.id, admin.id, 'x')).rejects.toMatchObject({ statusCode: 422 })
@@ -387,7 +390,7 @@ describe('cancelApprovedRequest', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
 
     const cancelled = await cancelApprovedRequest(request.id, org.id, admin.id, 'Cliente desistiu')
@@ -405,7 +408,7 @@ describe('cancelApprovedRequest', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
     const taskBefore = await prisma.task.findUniqueOrThrow({ where: { id: approved.taskId! } })
     const publishSpy = vi.spyOn(redis, 'publish').mockResolvedValue(0 as unknown as number)
@@ -434,7 +437,7 @@ describe('cancelApprovedRequest', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
     await prisma.taskHistory.create({
       data: { taskId: approved.taskId!, action: 'moved', actorType: 'user', actorId: admin.id, actorName: 'Admin' },
@@ -448,7 +451,7 @@ describe('cancelApprovedRequest', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
     await prisma.comment.create({ data: { taskId: approved.taskId!, content: 'x', authorType: 'USER', userId: admin.id } })
 
@@ -460,7 +463,7 @@ describe('cancelApprovedRequest', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
     await prisma.taskDocumentRequirement.create({ data: { taskId: approved.taskId!, name: 'Contrato', position: 0 } })
 
@@ -472,7 +475,7 @@ describe('cancelApprovedRequest', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
 
     await expect(cancelApprovedRequest(request.id, org.id, admin.id, 'Motivo')).rejects.toMatchObject({ statusCode: 422 })
   })
@@ -484,8 +487,8 @@ describe('getRequestById / listRequestsForOrg — boardId', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const pending = await createRequest(org.id, client.id, { title: 'Ainda pendente' })
-    const toApprove = await createRequest(org.id, client.id, { title: 'Vai ser aprovada' })
+    const pending = await createTestRequest(org.id, client.id, { title: 'Ainda pendente' })
+    const toApprove = await createTestRequest(org.id, client.id, { title: 'Vai ser aprovada' })
     const approved = await approveRequest(toApprove.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
 
     const pendingFetched = await getRequestById(pending.id, org.id)
@@ -507,9 +510,9 @@ describe('countPendingRequests', () => {
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
 
-    await createRequest(org.id, client.id, { title: 'Pendente 1' })
-    const r2 = await createRequest(org.id, client.id, { title: 'Pendente 2' })
-    const r3 = await createRequest(org.id, client.id, { title: 'Vai ser rejeitada' })
+    await createTestRequest(org.id, client.id, { title: 'Pendente 1' })
+    const r2 = await createTestRequest(org.id, client.id, { title: 'Pendente 2' })
+    const r3 = await createTestRequest(org.id, client.id, { title: 'Vai ser rejeitada' })
     await rejectRequest(r3.id, org.id, admin.id, {})
 
     expect(await countPendingRequests(org.id)).toBe(2)
@@ -525,8 +528,44 @@ describe('countPendingRequests', () => {
     const clientA = await createTestClient(orgA.id)
     await createTestClient(orgB.id)
 
-    await createRequest(orgA.id, clientA.id, { title: 'Da A' })
+    await createTestRequest(orgA.id, clientA.id, { title: 'Da A' })
 
     expect(await countPendingRequests(orgB.id)).toBe(0)
+  })
+})
+
+describe('departamento atendido na solicitação', () => {
+  it('approveRequest recusa quando o departamento deixou de atender o cliente desde a abertura', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id, { name: 'ACME' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
+    const dept = await prisma.department.findUniqueOrThrow({ where: { id: request.departmentId! } })
+    await prisma.clientAssignment.deleteMany({ where: { clientId: client.id, departmentId: dept.id } })
+
+    await expect(
+      approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: `O departamento ${dept.name} não atende mais o cliente ACME. Ajuste o cadastro do cliente antes de aprovar.`,
+    })
+  })
+
+  it('createRequest recusa departamento sem acesso do usuário do cliente', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const staff = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const fiscal = await createTestDepartment(org.id)
+    const folha = await createTestDepartment(org.id)
+    await serveClientDepartment(client.id, fiscal.id, staff.id)
+    await serveClientDepartment(client.id, folha.id, staff.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, fiscal.id)
+
+    await expect(
+      createRequest(org.id, client.id, clientUser.id, { title: 'X', departmentId: folha.id }),
+    ).rejects.toMatchObject({ statusCode: 403, message: 'Você não tem acesso a este departamento' })
   })
 })

@@ -251,7 +251,7 @@ describe('POST /portal/requests', () => {
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: auth },
-      payload: { clientId: client.id, title: 'Abertura de empresa', description: 'Quero abrir uma LTDA' },
+      payload: { clientId: client.id, title: 'Abertura de empresa', description: 'Quero abrir uma LTDA', departmentId: department.id },
     })
 
     expect(res.statusCode).toBe(201)
@@ -293,7 +293,7 @@ describe('POST /portal/requests', () => {
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: auth },
-      payload: { clientId: otherClient.id, title: 'Fora do escopo' },
+      payload: { clientId: otherClient.id, title: 'Fora do escopo', departmentId: department.id },
     })
 
     expect(res.statusCode).toBe(404)
@@ -315,8 +315,8 @@ describe('GET /portal/requests', () => {
     const authA = await getAuthHeader(clientUserA.email, passwordA)
     const authB = await getAuthHeader(clientUserB.email, passwordB)
 
-    await app.inject({ method: 'POST', url: '/portal/requests', headers: { authorization: authA }, payload: { clientId: clientA.id, title: 'Da A' } })
-    await app.inject({ method: 'POST', url: '/portal/requests', headers: { authorization: authB }, payload: { clientId: clientB.id, title: 'Da B' } })
+    await app.inject({ method: 'POST', url: '/portal/requests', headers: { authorization: authA }, payload: { clientId: clientA.id, title: 'Da A', departmentId: departmentA.id } })
+    await app.inject({ method: 'POST', url: '/portal/requests', headers: { authorization: authB }, payload: { clientId: clientB.id, title: 'Da B', departmentId: departmentB.id } })
 
     const res = await app.inject({ method: 'GET', url: `/portal/requests?clientId=${clientA.id}`, headers: { authorization: authA } })
     const list = JSON.parse(res.body)
@@ -353,7 +353,7 @@ describe('PATCH /portal/requests/:id/cancel', () => {
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: auth },
-      payload: { clientId: client.id, title: 'Pedido a cancelar' },
+      payload: { clientId: client.id, title: 'Pedido a cancelar', departmentId: department.id },
     })
     const request = JSON.parse(created.body)
 
@@ -384,7 +384,7 @@ describe('PATCH /portal/requests/:id/cancel', () => {
       method: 'POST',
       url: '/portal/requests',
       headers: { authorization: authA },
-      payload: { clientId: clientA.id, title: 'Da A' },
+      payload: { clientId: clientA.id, title: 'Da A', departmentId: departmentA.id },
     })
     const request = JSON.parse(created.body)
 
@@ -421,5 +421,81 @@ describe('GET /portal/os-templates', () => {
     expect(res.statusCode).toBe(200)
     const body = res.json<{ id: string; name: string }[]>()
     expect(body.map((t) => t.name)).toEqual(['Ativo'])
+  })
+})
+
+describe('Portal — departamentos e solicitações (só departamento acessível)', () => {
+  async function setup() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const staff = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const fiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
+    const folha = await createTestDepartment(org.id, { name: 'Folha' })
+    await prisma.clientAssignment.createMany({
+      data: [
+        { clientId: client.id, departmentId: fiscal.id, userId: staff.id },
+        { clientId: client.id, departmentId: folha.id, userId: staff.id },
+      ],
+    })
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, fiscal.id)
+    const auth = await getAuthHeader(clientUser.email, password)
+    return { org, client, fiscal, folha, auth }
+  }
+
+  it('GET /portal/departments exige clientId', async () => {
+    const { auth } = await setup()
+    const res = await app.inject({ method: 'GET', url: '/portal/departments', headers: { authorization: auth } })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().message).toBe('clientId é obrigatório')
+  })
+
+  it('GET /portal/departments devolve 404 para empresa sem acesso', async () => {
+    const { org, auth } = await setup()
+    const other = await createTestClient(org.id)
+    const res = await app.inject({
+      method: 'GET', url: `/portal/departments?clientId=${other.id}`, headers: { authorization: auth },
+    })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('GET /portal/departments lista só os departamentos com acesso do usuário naquela empresa', async () => {
+    const { client, fiscal, auth } = await setup()
+    const res = await app.inject({
+      method: 'GET', url: `/portal/departments?clientId=${client.id}`, headers: { authorization: auth },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual([{ id: fiscal.id, name: 'Fiscal' }])
+  })
+
+  it('POST /portal/requests sem departmentId → 400', async () => {
+    const { client, auth } = await setup()
+    const res = await app.inject({
+      method: 'POST', url: '/portal/requests', headers: { authorization: auth },
+      payload: { clientId: client.id, title: 'Pedido' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().message).toBe('Selecione o departamento')
+  })
+
+  it('POST /portal/requests em departamento sem acesso → 403', async () => {
+    const { client, folha, auth } = await setup()
+    const res = await app.inject({
+      method: 'POST', url: '/portal/requests', headers: { authorization: auth },
+      payload: { clientId: client.id, title: 'Pedido', departmentId: folha.id },
+    })
+    expect(res.statusCode).toBe(403)
+    expect(res.json().message).toBe('Você não tem acesso a este departamento')
+  })
+
+  it('POST /portal/requests em departamento com acesso → 201', async () => {
+    const { client, fiscal, auth } = await setup()
+    const res = await app.inject({
+      method: 'POST', url: '/portal/requests', headers: { authorization: auth },
+      payload: { clientId: client.id, title: 'Pedido', departmentId: fiscal.id },
+    })
+    expect(res.statusCode).toBe(201)
+    expect(res.json().departmentId).toBe(fiscal.id)
   })
 })

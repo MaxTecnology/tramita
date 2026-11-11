@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { app } from '@/test/setup'
 import type { LoginResponse } from '@/modules/auth/auth.types'
+import { createRequest } from '@/modules/requests/requests.service'
 
 export async function createTestPlan(overrides?: Partial<{ name: string; maxClients: number }>) {
   return prisma.plan.create({
@@ -231,4 +232,45 @@ export async function loginAs(email: string, password: string): Promise<LoginRes
     payload: { email, password },
   })
   return JSON.parse(response.body) as LoginResponse
+}
+
+// Garante que o cliente tenha um departamento atendido (com responsável) e um usuário do portal com
+// acesso a ele — pré-requisito de toda solicitação (I6). Reaproveita o que já existir.
+export async function ensurePortalAccess(organizationId: string, clientId: string, departmentId?: string) {
+  let resolvedDepartmentId = departmentId
+  if (!resolvedDepartmentId) {
+    const existing = await prisma.clientAssignment.findFirst({ where: { clientId }, orderBy: { createdAt: 'asc' } })
+    resolvedDepartmentId = existing?.departmentId ?? (await createTestDepartment(organizationId)).id
+  }
+
+  const served = await prisma.clientAssignment.findUnique({
+    where: { clientId_departmentId: { clientId, departmentId: resolvedDepartmentId } },
+  })
+  if (!served) {
+    const staff = await prisma.user.findFirst({
+      where: { organizationId, isActive: true, role: { in: ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'] } },
+      orderBy: { createdAt: 'asc' },
+    })
+    const responsible = staff ?? (await createTestUser(organizationId, { role: 'ORG_MEMBER' }))
+    await serveClientDepartment(clientId, resolvedDepartmentId, responsible.id)
+  }
+
+  let access = await prisma.clientUserAccess.findFirst({
+    where: { clientId, departmentId: resolvedDepartmentId, clientUser: { isActive: true } },
+  })
+  if (!access) {
+    const { clientUser } = await createTestClientUser(organizationId)
+    access = await grantClientAccess(clientUser.id, clientId, resolvedDepartmentId)
+  }
+
+  return { departmentId: resolvedDepartmentId, clientUserId: access.clientUserId }
+}
+
+export async function createTestRequest(
+  organizationId: string,
+  clientId: string,
+  data: { title: string; description?: string; departmentId?: string; osTemplateId?: string },
+) {
+  const { departmentId, clientUserId } = await ensurePortalAccess(organizationId, clientId, data.departmentId)
+  return createRequest(organizationId, clientId, clientUserId, { ...data, departmentId })
 }

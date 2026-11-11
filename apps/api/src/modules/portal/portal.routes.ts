@@ -7,7 +7,6 @@ import { AppError } from '@/errors/AppError'
 import { prisma } from '@/lib/prisma'
 import { getClientAccessScope } from '@/modules/client-users/client-access'
 import { getTaskHistory, listAccessibleClients, listPortalTasks } from './portal.service'
-import { listDepartments } from '@/modules/departments/departments.service'
 import { createRequestSchema } from '@/modules/requests/requests.schema'
 import {
   createRequest,
@@ -83,8 +82,21 @@ export async function portalRoutes(app: FastifyInstance) {
     )
   })
 
+  // Só os departamentos aos quais o usuário logado tem acesso na empresa escolhida — é a lista do
+  // formulário de nova solicitação (I6 da spec de cobertura de departamentos).
   app.get('/departments', async (request, reply) => {
-    return reply.send(await listDepartments(request.user.organizationId!))
+    const { clientId } = request.query as { clientId?: string }
+    if (!clientId) throw new AppError(400, 'clientId é obrigatório')
+    const scope = await getClientAccessScope(request.user.sub)
+    const departmentIds = scope.departmentIdsByClient.get(clientId)
+    if (!departmentIds) throw new AppError(404, 'Empresa não encontrada')
+    return reply.send(
+      await prisma.department.findMany({
+        where: { id: { in: [...departmentIds] }, organizationId: request.user.organizationId! },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+    )
   })
 
   app.get('/os-templates', async (request, reply) => {
@@ -103,7 +115,7 @@ export async function portalRoutes(app: FastifyInstance) {
     const scope = await getClientAccessScope(request.user.sub)
     if (!scope.clientIds.includes(result.data.clientId)) throw new AppError(404, 'Empresa não encontrada')
     return reply.status(201).send(
-      await createRequest(request.user.organizationId!, result.data.clientId, result.data),
+      await createRequest(request.user.organizationId!, result.data.clientId, request.user.sub, result.data),
     )
   })
 

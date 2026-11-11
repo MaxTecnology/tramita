@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { createTestPlan, createTestOrg, createTestClient } from '@/test/helpers'
-import { createRequest, cancelRequest } from './requests.service'
+import { createTestPlan, createTestOrg, createTestClient, createTestRequest } from '@/test/helpers'
+import { cancelRequest } from './requests.service'
 import { createRequestAttachment } from './request-attachments.service'
 import * as b2 from '@/lib/b2'
 
@@ -18,7 +18,7 @@ describe('createRequestAttachment', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido com anexo' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido com anexo' })
 
     const attachment = await createRequestAttachment(request.id, org.id, client.id, {
       filename: 'documento.pdf',
@@ -40,7 +40,7 @@ describe('createRequestAttachment', () => {
     const org = await createTestOrg(plan.id)
     const clientA = await createTestClient(org.id, { name: 'anexo-a@test.com' })
     const clientB = await createTestClient(org.id, { name: 'anexo-b@test.com' })
-    const request = await createRequest(org.id, clientA.id, { title: 'Da A' })
+    const request = await createTestRequest(org.id, clientA.id, { title: 'Da A' })
 
     await expect(
       createRequestAttachment(request.id, org.id, clientB.id, {
@@ -56,7 +56,7 @@ describe('createRequestAttachment', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido cancelado' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido cancelado' })
     await cancelRequest(request.id, org.id, client.id)
 
     await expect(

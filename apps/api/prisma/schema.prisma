@@ -282,7 +282,7 @@ model Request {
   description        String?
   status             RequestStatus      @default(PENDING)
   taskId             String?            @unique
-  departmentId       String?
+  departmentId       String
   rejectionReason    String?
   reviewedById       String?
   reviewedAt         DateTime?
@@ -296,7 +296,7 @@ model Request {
   organization Organization        @relation(fields: [organizationId], references: [id])
   client       Client              @relation(fields: [clientId], references: [id])
   task         Task?               @relation(fields: [taskId], references: [id])
-  department   Department?         @relation(fields: [departmentId], references: [id])
+  department   Department          @relation(fields: [departmentId], references: [id])
   reviewedBy   User?               @relation("RequestReviewer", fields: [reviewedById], references: [id])
   osTemplate   OSTemplate?         @relation(fields: [osTemplateId], references: [id])
   attachments  RequestAttachment[]

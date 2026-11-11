@@ -4,6 +4,7 @@ import { app } from '@/test/setup'
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClient,
   createTestClientUser, createTestDepartment, grantClientAccess, getAuthHeader,
+  createTestRequest,
 } from '@/test/helpers'
 import { createRequest } from '@/modules/requests/requests.service'
 
@@ -16,7 +17,7 @@ describe('POST /requests/:requestId/comments', () => {
     const { clientUser, password } = await createTestClientUser(org.id)
     const department = await createTestDepartment(org.id)
     await grantClientAccess(clientUser.id, client.id, department.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
 
     const authStaff = await getAuthHeader(member.email, 'Test@1234')
     const created = await app.inject({
@@ -42,7 +43,7 @@ describe('POST /requests/:requestId/comments', () => {
     const org = await createTestOrg(plan.id)
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     const authStaff = await getAuthHeader(member.email, 'Test@1234')
 
     const res = await app.inject({
@@ -60,7 +61,7 @@ describe('POST /requests/:requestId/comments', () => {
     const org = await createTestOrg(plan.id)
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     const authStaff = await getAuthHeader(member.email, 'Test@1234')
 
     const res = await app.inject({
@@ -80,7 +81,7 @@ describe('DELETE /request-comments/:id', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     const auth = await getAuthHeader(admin.email, 'Test@1234')
 
     const created = await app.inject({

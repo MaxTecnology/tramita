@@ -3,7 +3,8 @@ import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
 import { publishOrgEvent, publishBoardEvent } from '@/lib/sse'
 import { createBoard } from '@/modules/boards/boards.service'
-import { createTask, defaultDepartmentForOrg } from '@/modules/tasks/tasks.service'
+import { createTask } from '@/modules/tasks/tasks.service'
+import { assertDepartmentServesClient } from '@/modules/clients/client-coverage'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
 import type { CreateRequestBody, ApproveRequestBody, RejectRequestBody } from './requests.schema'
 import type { RequestStatus } from '@prisma/client'
@@ -21,13 +22,22 @@ function withBoardId<T extends { task: { column: { boardId: string } } | null }>
 export async function createRequest(
   organizationId: string,
   clientId: string,
+  clientUserId: string,
   data: Omit<CreateRequestBody, 'clientId'>,
 ) {
   const client = await prisma.client.findFirst({
     where: { id: clientId, organizationId, isActive: true },
   })
   if (!client) throw new AppError(404, 'Cliente não encontrado')
-  if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
+  await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
+
+  // I6: solicitação só em departamento ao qual o usuário do cliente tem acesso naquela empresa
+  // (acesso só existe em departamento atendido — I3 —, então o departamento também atende o cliente).
+  const access = await prisma.clientUserAccess.findFirst({
+    where: { clientUserId, clientId, departmentId: data.departmentId, clientUser: { isActive: true } },
+    select: { id: true },
+  })
+  if (!access) throw new AppError(403, 'Você não tem acesso a este departamento')
 
   const request = await prisma.request.create({
     data: {
@@ -268,7 +278,20 @@ export async function approveRequest(
     columnId = column.id
   }
 
-  const departmentId = request.departmentId ?? (await defaultDepartmentForOrg(organizationId))
+  const departmentId = request.departmentId
+  try {
+    await assertDepartmentServesClient(prisma, request.clientId, departmentId)
+  } catch (err) {
+    if (!(err instanceof AppError)) throw err
+    const [department, client] = await Promise.all([
+      prisma.department.findUnique({ where: { id: departmentId }, select: { name: true } }),
+      prisma.client.findUnique({ where: { id: request.clientId }, select: { name: true } }),
+    ])
+    throw new AppError(
+      409,
+      `O departamento ${department?.name ?? ''} não atende mais o cliente ${client?.name ?? ''}. Ajuste o cadastro do cliente antes de aprovar.`,
+    )
+  }
 
   const task = await createTask(
     columnId,

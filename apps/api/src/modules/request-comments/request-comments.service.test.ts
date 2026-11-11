@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClient, createTestDepartment,
   createTestClientUser, grantClientAccess,
+  createTestRequest,
 } from '@/test/helpers'
 import * as queue from '@/lib/queue'
 import { createRequest, markNeedsInfo, approveRequest } from '@/modules/requests/requests.service'
@@ -24,7 +25,7 @@ describe('createRequestComment', () => {
     const { clientUser } = await createTestClientUser(org.id)
     const department = await createTestDepartment(org.id)
     await grantClientAccess(clientUser.id, client.id, department.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     await markNeedsInfo(request.id, org.id, admin.id, 'Qual o CNPJ da empresa?')
 
     await createRequestComment(request.id, { content: 'É 00.000.000/0001-00' }, {
@@ -40,7 +41,7 @@ describe('createRequestComment', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     await markNeedsInfo(request.id, org.id, admin.id, 'Qual o CNPJ da empresa?')
 
     await createRequestComment(request.id, { content: 'Só um follow-up' }, {
@@ -59,7 +60,7 @@ describe('createRequestComment', () => {
     const { clientUser } = await createTestClientUser(org.id)
     const department = await createTestDepartment(org.id)
     await grantClientAccess(clientUser.id, client.id, department.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     await prisma.request.update({ where: { id: request.id }, data: { status: 'APPROVED', reviewedById: admin.id } })
 
     await createRequestComment(request.id, { content: 'Obrigado!' }, {
@@ -75,7 +76,7 @@ describe('createRequestComment', () => {
     const org = await createTestOrg(plan.id)
     const client = await createTestClient(org.id)
     const { clientUser } = await createTestClientUser(org.id) // sem grantClientAccess
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
 
     await expect(
       createRequestComment(request.id, { content: 'x' }, { id: clientUser.id, role: 'CLIENT', organizationId: org.id }),
@@ -90,7 +91,7 @@ describe('createRequestComment', () => {
     const { clientUser } = await createTestClientUser(org.id)
     const department = await createTestDepartment(org.id)
     await grantClientAccess(clientUser.id, client.id, department.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     await markNeedsInfo(request.id, org.id, admin.id, 'Qual o CNPJ?')
 
     // Dispara approveRequest e o comentário do cliente concorrentemente — ambos fazem várias
@@ -119,7 +120,7 @@ describe('createRequestComment', () => {
     const { clientUser } = await createTestClientUser(org.id)
     const department = await createTestDepartment(org.id)
     await grantClientAccess(clientUser.id, client.id, department.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido sem depto' }) // departmentId undefined
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido sem depto' }) // departmentId undefined
 
     await createRequestComment(request.id, { content: 'Oi' }, {
       id: clientUser.id, role: 'CLIENT', organizationId: org.id,
@@ -138,7 +139,7 @@ describe('createRequestComment', () => {
     const { clientUser } = await createTestClientUser(org.id)
     const department = await createTestDepartment(org.id)
     await grantClientAccess(clientUser.id, client.id, department.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
 
     await createRequestComment(request.id, { content: 'Oi' }, {
       id: clientUser.id, role: 'CLIENT', organizationId: org.id,
@@ -163,7 +164,7 @@ describe('listRequestComments / deleteRequestComment', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     const c1 = await createRequestComment(request.id, { content: 'Primeiro' }, { id: admin.id, role: 'ORG_ADMIN', organizationId: org.id })
     await createRequestComment(request.id, { content: 'Segundo' }, { id: admin.id, role: 'ORG_ADMIN', organizationId: org.id })
 
@@ -180,7 +181,7 @@ describe('listRequestComments / deleteRequestComment', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const request = await createRequest(org.id, client.id, { title: 'Pedido' })
+    const request = await createTestRequest(org.id, client.id, { title: 'Pedido' })
     await createRequestComment(request.id, { content: 'Confidencial' }, { id: admin.id, role: 'ORG_ADMIN', organizationId: org.id })
 
     await expect(listRequestComments(request.id, org.id, 'CLIENT', undefined)).rejects.toMatchObject({ statusCode: 404 })
@@ -193,7 +194,7 @@ describe('listRequestComments / deleteRequestComment', () => {
     const adminA = await createTestUser(orgA.id, { role: 'ORG_ADMIN' })
     const adminB = await createTestUser(orgB.id, { role: 'ORG_ADMIN' })
     const clientA = await createTestClient(orgA.id)
-    const request = await createRequest(orgA.id, clientA.id, { title: 'Pedido' })
+    const request = await createTestRequest(orgA.id, clientA.id, { title: 'Pedido' })
     const comment = await createRequestComment(request.id, { content: 'Da org A' }, { id: adminA.id, role: 'ORG_ADMIN', organizationId: orgA.id })
 
     await expect(deleteRequestComment(comment.id, { id: adminB.id, role: 'ORG_ADMIN', organizationId: orgB.id }))
