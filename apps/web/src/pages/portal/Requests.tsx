@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { resolveDepartmentSelection } from './requestDepartment'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -48,6 +49,14 @@ export default function PortalRequests() {
     queryFn: () => api.get('/portal/departments', { params: { clientId } }).then((r) => r.data),
     enabled: !!clientId,
   })
+
+  // Troca de empresa com o formulário aberto não pode carregar o departamento da empresa anterior.
+  useEffect(() => {
+    setForm((f) => {
+      const departmentId = resolveDepartmentSelection(f.departmentId, departments)
+      return departmentId === f.departmentId ? f : { ...f, departmentId }
+    })
+  }, [departments])
 
   const { data: osTemplates = [] } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['portal-os-templates'],

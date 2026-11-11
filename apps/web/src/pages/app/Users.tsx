@@ -268,13 +268,16 @@ export default function Users() {
                 {user.email}{user.phone ? ` · ${user.phone}` : ''}
               </p>
             </div>
-            {user.role !== 'ORG_ADMIN' && (
-              <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {/* Transferir vale pra todos (inclusive admin, que pode redistribuir a própria carteira);
+                  editar/redefinir/desativar continuam só pra não-admin. */}
+              <Button variant="ghost" size="sm" onClick={() => navigate(`/app/users/${user.id}/transfer`)} className="text-muted-foreground hover:text-foreground">
+                Transferir
+              </Button>
+              {user.role !== 'ORG_ADMIN' && (
+              <>
                 <Button variant="ghost" size="sm" onClick={() => openEdit(user)} className="text-muted-foreground hover:text-foreground">
                   Editar
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate(`/app/users/${user.id}/transfer`)} className="text-muted-foreground hover:text-foreground">
-                  Transferir
                 </Button>
                 <Button
                   variant="ghost"
@@ -298,8 +301,9 @@ export default function Users() {
                 >
                   {deleteMutation.isPending && deletingId === user.id ? 'Desativando...' : 'Desativar'}
                 </Button>
-              </div>
-            )}
+              </>
+              )}
+            </div>
           </div>
         ))}
       </div>
