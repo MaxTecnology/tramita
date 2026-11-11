@@ -89,3 +89,60 @@ export async function assertCanUnserveDepartments(db: Db, clientId: string, depa
     )
   }
 }
+
+type AccessPair = { clientId: string; departmentId: string }
+
+export async function assertAccessesServed(db: Db, accesses: AccessPair[]): Promise<void> {
+  for (const { clientId, departmentId } of accesses) {
+    const served = await db.clientAssignment.findUnique({
+      where: { clientId_departmentId: { clientId, departmentId } },
+      select: { id: true },
+    })
+    if (served) continue
+    const department = await db.department.findUnique({ where: { id: departmentId }, select: { name: true } })
+    throw new AppError(400, `O departamento ${department?.name ?? ''} não atende este cliente.`)
+  }
+}
+
+// I4: todo departamento atendido de cliente ativo precisa continuar com pelo menos um usuário do
+// cliente ativo. Recusa a mudança que tiraria o último. Clientes desativados não contam.
+export async function assertClientUserChangeKeepsCoverage(
+  db: Db,
+  clientUserId: string,
+  next: { accesses: AccessPair[]; isActive: boolean },
+): Promise<void> {
+  const clientUser = await db.clientUser.findUnique({
+    where: { id: clientUserId },
+    select: {
+      name: true,
+      isActive: true,
+      accesses: { where: { client: { isActive: true } }, select: { clientId: true, departmentId: true } },
+    },
+  })
+  if (!clientUser || !clientUser.isActive) return
+
+  const kept = new Set(next.isActive ? next.accesses.map((a) => `${a.clientId}:${a.departmentId}`) : [])
+  const lost = clientUser.accesses.filter((a) => !kept.has(`${a.clientId}:${a.departmentId}`))
+
+  for (const { clientId, departmentId } of lost) {
+    const served = await db.clientAssignment.findUnique({
+      where: { clientId_departmentId: { clientId, departmentId } },
+      select: { id: true },
+    })
+    if (!served) continue
+
+    const others = await db.clientUserAccess.count({
+      where: { clientId, departmentId, clientUserId: { not: clientUserId }, clientUser: { isActive: true } },
+    })
+    if (others > 0) continue
+
+    const [department, client] = await Promise.all([
+      db.department.findUnique({ where: { id: departmentId }, select: { name: true } }),
+      db.client.findUnique({ where: { id: clientId }, select: { name: true } }),
+    ])
+    throw new AppError(
+      409,
+      `${clientUser.name} é o único com acesso ao departamento ${department?.name ?? ''} do cliente ${client?.name ?? ''}. Adicione outro usuário antes.`,
+    )
+  }
+}

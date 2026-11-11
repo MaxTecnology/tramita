@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { hashPassword } from '@/modules/auth/auth.service'
 import type { CreateClientUserBody, UpdateClientUserBody } from './client-users.schema'
+import { assertAccessesServed, assertClientUserChangeKeepsCoverage } from '@/modules/clients/client-coverage'
 
 const SELECT = {
   id: true, name: true, email: true, phone: true, isActive: true, createdAt: true,
@@ -48,6 +49,7 @@ export async function createClientUser(organizationId: string, data: CreateClien
   if (existing) throw new AppError(409, 'E-mail já cadastrado nesta organização')
 
   await assertAccessesBelongToOrg(data.accesses, organizationId)
+  await assertAccessesServed(prisma, data.accesses)
 
   return prisma.clientUser.create({
     data: {
@@ -75,6 +77,14 @@ export async function updateClientUser(id: string, organizationId: string, data:
   if (data.accesses) await assertAccessesBelongToOrg(data.accesses, organizationId)
 
   return prisma.$transaction(async (tx) => {
+    if (data.accesses) await assertAccessesServed(tx, data.accesses)
+    const currentAccesses = data.accesses
+      ?? (await tx.clientUserAccess.findMany({ where: { clientUserId: id }, select: { clientId: true, departmentId: true } }))
+    await assertClientUserChangeKeepsCoverage(tx, id, {
+      accesses: currentAccesses,
+      isActive: data.isActive ?? clientUser.isActive,
+    })
+
     await tx.clientUser.update({
       where: { id },
       data: {
@@ -99,5 +109,8 @@ export async function deleteClientUser(id: string, organizationId: string) {
   const clientUser = await prisma.clientUser.findFirst({ where: { id, organizationId } })
   if (!clientUser) throw new AppError(404, 'Usuário de cliente não encontrado')
 
-  return prisma.clientUser.update({ where: { id }, data: { isActive: false }, select: SELECT })
+  return prisma.$transaction(async (tx) => {
+    await assertClientUserChangeKeepsCoverage(tx, id, { accesses: [], isActive: false })
+    return tx.clientUser.update({ where: { id }, data: { isActive: false }, select: SELECT })
+  })
 }

@@ -7,6 +7,7 @@ import {
   createTestClient,
   createTestDepartment,
   getAuthHeader,
+  serveClientDepartment,
 } from '@/test/helpers'
 
 async function setup(role: 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER' = 'ORG_ADMIN') {
@@ -15,6 +16,7 @@ async function setup(role: 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER' = 'ORG_ADM
   const user = await createTestUser(org.id, { role })
   const client = await createTestClient(org.id)
   const department = await createTestDepartment(org.id)
+  await serveClientDepartment(client.id, department.id, user.id)
   const auth = await getAuthHeader(user.email, 'Test@1234')
   return { org, user, client, department, auth }
 }
