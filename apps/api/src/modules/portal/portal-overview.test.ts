@@ -80,6 +80,7 @@ describe('portal — início e enviar documentos', () => {
 
     expect(fiscal.unpaidGuides).toEqual({ count: 1, overdueCount: 0 })
     expect(fiscal.documentsToSend).toBe(2) // Extrato (recorrente) + Contrato social (processo)
+    expect(fiscal.documentsToSendInProcesses).toBe(1) // Contrato social: fica dentro do processo
     expect(fiscal.processesInProgress).toBe(1)
     expect(fiscal.dueThisWeek.map((i: { kind: string; title: string }) => [i.kind, i.title])).toContainEqual(['guide', 'Guia DAS'])
 

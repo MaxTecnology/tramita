@@ -43,8 +43,10 @@ const PortalBoards = lazy(() => import('@/pages/portal/Boards'))
 const PortalBoard = lazy(() => import('@/pages/portal/Board'))
 const PortalProfile = lazy(() => import('@/pages/portal/Profile'))
 const PortalRequests = lazy(() => import('@/pages/portal/Requests'))
-const PortalProtocols = lazy(() => import('@/pages/portal/Protocols'))
-const PortalTasks = lazy(() => import('@/pages/portal/Tasks'))
+const PortalHome = lazy(() => import('@/pages/portal/Home'))
+const PortalReceivedDocuments = lazy(() => import('@/pages/portal/ReceivedDocuments'))
+const PortalReceivedDocumentDetail = lazy(() => import('@/pages/portal/ReceivedDocumentDetail'))
+const PortalSendDocuments = lazy(() => import('@/pages/portal/SendDocuments'))
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER']
 const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
@@ -278,12 +280,17 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/portal/board" replace /> },
+      { index: true, element: <Navigate to="/portal/home" replace /> },
+      { path: 'home', element: <PortalHome /> },
+      { path: 'documents', element: <PortalReceivedDocuments /> },
+      { path: 'documents/:id', element: <PortalReceivedDocumentDetail /> },
+      { path: 'send', element: <PortalSendDocuments /> },
       { path: 'board', element: <PortalBoards /> },
       { path: 'board/:boardId', element: <PortalBoard /> },
-      { path: 'tasks', element: <PortalTasks /> },
       { path: 'requests', element: <PortalRequests /> },
-      { path: 'protocols', element: <PortalProtocols /> },
+      // Old screens: the task list left the portal; protocols became "Documentos recebidos"
+      { path: 'tasks', element: <Navigate to="/portal/documents" replace /> },
+      { path: 'protocols', element: <Navigate to="/portal/documents" replace /> },
       { path: 'profile', element: <PortalProfile /> },
     ],
   },

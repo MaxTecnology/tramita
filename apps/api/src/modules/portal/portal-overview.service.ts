@@ -23,6 +23,7 @@ function openRequestsWhere(
   clientId: string,
   departmentIds: string[],
   taskExtra: Prisma.TaskWhereInput = {},
+  boardExtra: Prisma.BoardWhereInput = {},
 ): Prisma.TaskDocumentRequirementWhereInput {
   return {
     status: { in: [...OPEN_REQUEST] },
@@ -30,7 +31,7 @@ function openRequestsWhere(
       ...taskExtra,
       visibleToClient: true,
       departmentId: { in: departmentIds },
-      column: { board: { organizationId, clientId, isActive: true } },
+      column: { board: { ...boardExtra, organizationId, clientId, isActive: true } },
     },
   }
 }
@@ -40,18 +41,22 @@ const toLabel = (d: Date) => utcDayLabel(d)
 export async function getPortalHome(organizationId: string, clientId: string, clientUserId: string, now: Date = new Date()) {
   const departmentIds = await departmentsInScope(clientId, clientUserId)
   if (departmentIds.length === 0) {
-    return { unpaidGuides: { count: 0, overdueCount: 0 }, documentsToSend: 0, processesInProgress: 0, dueThisWeek: [] }
+    return { unpaidGuides: { count: 0, overdueCount: 0 }, documentsToSend: 0, documentsToSendInProcesses: 0, processesInProgress: 0, dueThisWeek: [] }
   }
   const today = todayInBRT(now)
   const weekEnd = new Date(today + 7 * DAY_MS)
 
-  const [guides, documentsToSend, processesInProgress, requestsDue] = await Promise.all([
+  const [guides, documentsToSend, documentsToSendInProcesses, processesInProgress, requestsDue] = await Promise.all([
     prisma.protocol.findMany({
       where: unpaidGuidesWhere(organizationId, clientId, departmentIds),
       select: { id: true, title: true, dueDate: true, amount: true },
       orderBy: { dueDate: 'asc' },
     }),
     prisma.taskDocumentRequirement.count({ where: openRequestsWhere(organizationId, clientId, departmentIds) }),
+    // Requests of a process (OS) are answered inside the process, not in "Enviar documentos"
+    prisma.taskDocumentRequirement.count({
+      where: openRequestsWhere(organizationId, clientId, departmentIds, {}, { type: 'OS' }),
+    }),
     prisma.board.count({
       where: {
         organizationId, clientId, isActive: true, type: 'OS',
@@ -75,6 +80,7 @@ export async function getPortalHome(organizationId: string, clientId: string, cl
   return {
     unpaidGuides: { count: guides.length, overdueCount },
     documentsToSend,
+    documentsToSendInProcesses,
     processesInProgress,
     dueThisWeek,
   }

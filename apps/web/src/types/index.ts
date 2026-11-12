@@ -280,7 +280,7 @@ export interface TaskDocumentRequirement {
   id: string
   taskId: string
   name: string
-  status: 'PENDING' | 'UPLOADED' | 'APPROVED' | 'REJECTED'
+  status: 'PENDING' | 'UPLOADED' | 'APPROVED' | 'REJECTED' | 'NOT_APPLICABLE'
   rejectionReason: string | null
   signedUrl: string | null
   position: number

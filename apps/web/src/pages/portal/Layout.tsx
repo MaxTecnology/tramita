@@ -4,15 +4,18 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { LayoutGrid, User, LogOut, Inbox, ClipboardList, Stamp } from 'lucide-react'
+import { LayoutGrid, User, LogOut, Inbox, Home, FileText, Send } from 'lucide-react'
 import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 
+// Document-centric portal: what the client received, what they must send, processes in progress.
+// shortLabel fits the 6-tab bottom bar on phones.
 const tabs = [
-  { to: '/portal/board', icon: LayoutGrid, label: 'Processos' },
-  { to: '/portal/tasks', icon: ClipboardList, label: 'Tarefas' },
-  { to: '/portal/requests', icon: Inbox, label: 'Solicitações' },
-  { to: '/portal/protocols', icon: Stamp, label: 'Protocolos' },
-  { to: '/portal/profile', icon: User, label: 'Perfil' },
+  { to: '/portal/home', icon: Home, label: 'Início', shortLabel: 'Início' },
+  { to: '/portal/documents', icon: FileText, label: 'Documentos recebidos', shortLabel: 'Recebidos' },
+  { to: '/portal/send', icon: Send, label: 'Enviar documentos', shortLabel: 'Enviar' },
+  { to: '/portal/board', icon: LayoutGrid, label: 'Processos', shortLabel: 'Processos' },
+  { to: '/portal/requests', icon: Inbox, label: 'Solicitações', shortLabel: 'Pedidos' },
+  { to: '/portal/profile', icon: User, label: 'Perfil', shortLabel: 'Perfil' },
 ] as const
 
 interface PortalClientContextValue {
@@ -135,13 +138,13 @@ export default function PortalLayout() {
 
         {/* Bottom tab bar — mobile only */}
         <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-surface border-t border-border flex h-16">
-          {tabs.map(({ to, icon: Icon, label }) => (
+          {tabs.map(({ to, icon: Icon, shortLabel: label }) => (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
                 cn(
-                  'flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors',
+                  'flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 transition-colors',
                   isActive ? 'text-accent' : 'text-muted-foreground',
                 )
               }

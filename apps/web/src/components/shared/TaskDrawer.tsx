@@ -246,6 +246,15 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
     onError: () => toast.error('Erro ao enviar arquivo'),
   })
 
+  const notApplicableMutation = useMutation({
+    mutationFn: ({ reqId, value }: { reqId: string; value: boolean }) => {
+      const url = `/portal/tasks/${task.id}/documents/requests/${reqId}/not-applicable`
+      return value ? api.post(url) : api.delete(url)
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] }),
+    onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao atualizar documento')),
+  })
+
   const reviewRequirementMutation = useMutation({
     mutationFn: ({ reqId, decision, rejectionReason }: { reqId: string; decision: 'APPROVED' | 'REJECTED'; rejectionReason?: string }) =>
       api.patch(`/tasks/${task.id}/documents/requests/${reqId}`, { decision, rejectionReason }),
@@ -588,15 +597,15 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                         <span className="text-sm text-foreground">{r.name}</span>
                         <span className={cn(
                           'text-xs font-medium px-2 py-0.5 rounded-full',
-                          r.status === 'PENDING' && 'bg-gray-100 text-gray-500',
-                          r.status === 'UPLOADED' && 'bg-blue-100 text-blue-600',
-                          r.status === 'APPROVED' && 'bg-green-100 text-green-600',
-                          r.status === 'REJECTED' && 'bg-red-100 text-red-600',
+                          r.status === 'PENDING' && 'bg-neutral-bg text-neutral-text border border-border',
+                          r.status === 'UPLOADED' && 'bg-blue-500/10 text-accent-hover',
+                          (r.status === 'APPROVED' || r.status === 'NOT_APPLICABLE') && 'bg-success-bg text-success-text',
+                          r.status === 'REJECTED' && 'bg-danger-bg text-danger-text',
                         )}>
-                          {{ PENDING: 'Pendente', UPLOADED: 'Enviado', APPROVED: 'Aprovado', REJECTED: 'Rejeitado' }[r.status]}
+                          {{ PENDING: 'Pendente', UPLOADED: 'Enviado', APPROVED: 'Aprovado', REJECTED: 'Rejeitado', NOT_APPLICABLE: 'Nada a enviar' }[r.status]}
                         </span>
                       </div>
-                      {r.rejectionReason && <p className="text-xs text-red-500 mt-1">Motivo: {r.rejectionReason}</p>}
+                      {r.rejectionReason && <p className="text-xs text-danger-text mt-1">Motivo: {r.rejectionReason}</p>}
                       {r.signedUrl && (
                         <a href={r.signedUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 block">
                           Ver arquivo enviado
@@ -617,6 +626,27 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                             Rejeitar
                           </button>
                         </div>
+                      )}
+                      {canEdit && r.status === 'NOT_APPLICABLE' && (
+                        <button
+                          onClick={() => {
+                            const reason = window.prompt('Por que o cliente precisa enviar este documento?')
+                            if (reason?.trim()) reviewRequirementMutation.mutate({ reqId: r.id, decision: 'REJECTED', rejectionReason: reason.trim() })
+                          }}
+                          className="text-xs text-danger-text hover:underline mt-2"
+                        >
+                          Contestar "Nada a enviar"
+                        </button>
+                      )}
+                      {role === 'CLIENT' && r.status === 'NOT_APPLICABLE' && (
+                        <button onClick={() => notApplicableMutation.mutate({ reqId: r.id, value: false })} className="text-xs text-accent-hover hover:underline mt-2">
+                          Desfazer "Nada a enviar"
+                        </button>
+                      )}
+                      {role === 'CLIENT' && (r.status === 'PENDING' || r.status === 'REJECTED') && (
+                        <button onClick={() => notApplicableMutation.mutate({ reqId: r.id, value: true })} className="text-xs text-muted-foreground hover:underline mt-2 mr-3">
+                          Nada a enviar
+                        </button>
                       )}
                       {(r.status === 'PENDING' || r.status === 'REJECTED') && (
                         <label className="inline-block mt-2 cursor-pointer">
