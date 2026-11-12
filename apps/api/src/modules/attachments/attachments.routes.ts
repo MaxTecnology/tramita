@@ -4,23 +4,10 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
+import { readUpload, DEFAULT_MAX_UPLOAD_BYTES } from '@/lib/read-upload'
 import { createAttachment, listAttachments, deleteAttachment } from './attachments.service'
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024
-
-const ALLOWED_MIME_TYPES = new Set([
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain',
-  'application/zip',
-])
+const MAX_FILE_SIZE = DEFAULT_MAX_UPLOAD_BYTES
 
 export async function attachmentsRoutes(app: FastifyInstance) {
   await app.register(multipart, { limits: { fileSize: MAX_FILE_SIZE } })
@@ -32,32 +19,13 @@ export async function attachmentsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id: taskId } = request.params as { id: string }
 
-    let file: Awaited<ReturnType<typeof request.file>>
-    try {
-      file = await request.file()
-    } catch (err: unknown) {
-      const e = err as { statusCode?: number; code?: string }
-      if (e?.statusCode === 413 || e?.code === 'FST_FILES_LIMIT' || e?.code === 'FST_REQ_FILE_TOO_LARGE') {
-        throw new AppError(413, 'Arquivo excede o limite de 20MB')
-      }
-      throw err
-    }
-
-    if (!file) throw new AppError(400, 'Nenhum arquivo enviado')
-
-    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      await file.toBuffer().catch(() => {})
-      throw new AppError(422, 'Tipo de arquivo não permitido')
-    }
-
-    const buffer = await file.toBuffer()
-    if (buffer.length > MAX_FILE_SIZE) throw new AppError(413, 'Arquivo excede o limite de 20MB')
+    const { upload } = await readUpload(request)
 
     const attachment = await createAttachment(
       taskId,
       request.user.organizationId!,
       { id: request.user.sub, role: request.user.role },
-      { filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer },
+      upload,
     )
 
     return reply.status(201).send(attachment)

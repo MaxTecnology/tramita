@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Send, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
+import { UPLOAD_ACCEPT } from '@/lib/upload'
 import { cn, mensagemDeErro } from '@/lib/utils'
 import { usePortalClient } from './Layout'
 
@@ -153,7 +154,7 @@ export function SendDocumentsView({ clientId }: { clientId: string }) {
                           <Upload size={12} />
                           Anexar
                           <input
-                            type="file" className="hidden"
+                            type="file" accept={UPLOAD_ACCEPT} className="hidden"
                             onChange={(e) => {
                               const file = e.target.files?.[0]
                               e.target.value = ''

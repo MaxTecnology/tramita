@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Paperclip, MessageSquare, Clock, Trash2, FileCheck, Stamp, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react'
 import { api } from '@/lib/api'
+import { UPLOAD_ACCEPT } from '@/lib/upload'
 import { cn, mensagemDeErro } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
@@ -650,7 +651,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                       )}
                       {(r.status === 'PENDING' || r.status === 'REJECTED') && (
                         <label className="inline-block mt-2 cursor-pointer">
-                          <input type="file" className="hidden" onChange={(e) => {
+                          <input type="file" accept={UPLOAD_ACCEPT} className="hidden" onChange={(e) => {
                             const file = e.target.files?.[0]
                             if (file) uploadRequirementMutation.mutate({ reqId: r.id, file })
                             e.target.value = ''
@@ -698,7 +699,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                       )}
                       {canEdit && (
                         <label className="inline-block mt-2 cursor-pointer">
-                          <input type="file" className="hidden" onChange={(e) => {
+                          <input type="file" accept={UPLOAD_ACCEPT} className="hidden" onChange={(e) => {
                             const file = e.target.files?.[0]
                             if (file && d.requiresPayment) setPendingDelivery({ reqId: d.id, file })
                             else if (file) deliverMutation.mutate({ reqId: d.id, file })
@@ -801,6 +802,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                 <label className="flex items-center gap-2 cursor-pointer pt-1">
                   <input
                     type="file"
+                    accept={UPLOAD_ACCEPT}
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0]

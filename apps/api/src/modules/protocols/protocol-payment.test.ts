@@ -69,6 +69,26 @@ describe('marcar guia como paga (portal)', () => {
     expect(paidEvent?.actorName).toBe('Financeiro ACME')
   })
 
+  it('proof with a forbidden type is refused with 422 and the guide stays unpaid', async () => {
+    const { protocol, auth } = await setup()
+    const mp = multipartBody({ amount: '1234.56' }, { filename: 'comprovante.exe' })
+
+    const res = await app.inject({ method: 'POST', url: `/portal/protocols/${protocol.id}/pay`, headers: { authorization: auth, ...mp.headers }, body: mp.body })
+
+    expect(res.statusCode).toBe(422)
+    expect((await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })).paidAt).toBeNull()
+  })
+
+  it('proof over 20MB answers 413 in Portuguese', async () => {
+    const { protocol, auth } = await setup()
+    const mp = multipartBody({ amount: '1234.56' }, { filename: 'comprovante.pdf', content: 'x'.repeat(20 * 1024 * 1024 + 10) })
+
+    const res = await app.inject({ method: 'POST', url: `/portal/protocols/${protocol.id}/pay`, headers: { authorization: auth, ...mp.headers }, body: mp.body })
+
+    expect(res.statusCode).toBe(413)
+    expect(JSON.parse(res.body).message).toBe('Arquivo excede o limite de 20MB')
+  })
+
   it('accepts a JSON body without proof', async () => {
     const { protocol, auth } = await setup()
     const res = await app.inject({ method: 'POST', url: `/portal/protocols/${protocol.id}/pay`, headers: { authorization: auth }, payload: { amount: '1200.00' } })

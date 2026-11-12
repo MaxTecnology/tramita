@@ -10,6 +10,28 @@ vi.mock('@aws-sdk/client-s3', async (importOriginal) => {
   }
 })
 
+describe('uploadFile', () => {
+  beforeEach(() => {
+    sendMock.mockReset()
+    sendMock.mockResolvedValue({})
+    vi.resetModules()
+  })
+
+  it('stores XML with Content-Disposition attachment so the browser never renders it from the bucket', async () => {
+    const { uploadFile } = await import('./b2')
+    await uploadFile('org/nota.xml', Buffer.from('<x/>'), 'application/xml')
+
+    expect(sendMock.mock.calls[0][0].input).toMatchObject({ ContentType: 'application/xml', ContentDisposition: 'attachment' })
+  })
+
+  it('stores PDF inline so it still opens in the browser', async () => {
+    const { uploadFile } = await import('./b2')
+    await uploadFile('org/guia.pdf', Buffer.from('%PDF'), 'application/pdf')
+
+    expect(sendMock.mock.calls[0][0].input).toMatchObject({ ContentType: 'application/pdf', ContentDisposition: 'inline' })
+  })
+})
+
 describe('deleteFile', () => {
   beforeEach(() => {
     sendMock.mockReset()

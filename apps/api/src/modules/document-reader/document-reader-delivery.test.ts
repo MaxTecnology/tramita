@@ -141,7 +141,7 @@ describe('isolamento entre escritórios (revisão final)', () => {
     const column = await createTestColumn(board.id)
     const foreignTask = await createTestTask(column.id, otherAdmin.id, { departmentId: dept.id })
 
-    const err = await trocarTarefa(doc.id, org.id, foreignTask.id, actor).catch((e: unknown) => e as { statusCode: number; message: string })
+    const err = (await trocarTarefa(doc.id, org.id, foreignTask.id, actor).catch((e: unknown) => e)) as { statusCode: number; message: string }
 
     expect(err).toMatchObject({ statusCode: 404 })
     expect(err.message).not.toContain('SIGILOSO')

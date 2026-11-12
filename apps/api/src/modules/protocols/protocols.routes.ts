@@ -5,6 +5,7 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
+import { readUpload, DEFAULT_MAX_UPLOAD_BYTES } from '@/lib/read-upload'
 import { createProtocolSchema, listProtocolsQuerySchema, updateProtocolPaymentSchema, cancelProtocolSchema, unpaidGuidesQuerySchema } from './protocols.schema'
 import { listUnpaidGuides, getUnpaidGuidesSummary } from './unpaid-guides.service'
 import { replaceProtocolFile, updateProtocolPayment, cancelProtocol } from './protocol-office-actions'
@@ -16,7 +17,7 @@ import {
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'] as const
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024
+const MAX_FILE_SIZE = DEFAULT_MAX_UPLOAD_BYTES
 
 export async function protocolsRoutes(app: FastifyInstance) {
   await app.register(multipart, { limits: { fileSize: MAX_FILE_SIZE } })
@@ -89,21 +90,10 @@ export async function protocolsRoutes(app: FastifyInstance) {
     preHandler: [requireRole(...ORG_ROLES), checkSubscription],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    let file: Awaited<ReturnType<typeof request.file>>
-    try {
-      file = await request.file()
-    } catch (err: unknown) {
-      const e = err as { statusCode?: number; code?: string }
-      if (e?.statusCode === 413 || e?.code === 'FST_FILES_LIMIT' || e?.code === 'FST_REQ_FILE_TOO_LARGE') {
-        throw new AppError(413, 'Arquivo excede o limite de 20MB')
-      }
-      throw err
-    }
-    if (!file) throw new AppError(400, 'Nenhum arquivo enviado')
-    const buffer = await file.toBuffer()
+    const { file, upload } = await readUpload(request)
     return reply.send(await replaceProtocolFile(
       id, request.user.organizationId!, { id: request.user.sub, role: request.user.role },
-      { filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer },
+      upload,
       { amount: readMultipartField(file, 'amount'), paymentDueDate: readMultipartField(file, 'paymentDueDate') },
     ))
   })

@@ -75,6 +75,31 @@ describe('ações do escritório no protocolo', () => {
     expect(queue.enqueueNotification).toHaveBeenCalledWith(expect.objectContaining({ event: 'PROTOCOL_CREATED' }))
   })
 
+  it('replace and delivery refuse a forbidden file type before uploading anything', async () => {
+    const { protocol, task, deliverable, auth } = await setup()
+    const html = () => multipartBody({}, { filename: 'pagina.html', contentType: 'application/pdf', content: '<script>' })
+    vi.mocked(b2Module.uploadFile).mockClear() // setup already uploaded v1
+
+    const replaceMp = html()
+    const replace = await app.inject({ method: 'POST', url: `/protocols/${protocol.id}/replace`, headers: { authorization: auth, ...replaceMp.headers }, body: replaceMp.body })
+    const deliverMp = html()
+    const deliver = await app.inject({ method: 'POST', url: `/tasks/${task.id}/documents/deliveries/${deliverable.id}/upload`, headers: { authorization: auth, ...deliverMp.headers }, body: deliverMp.body })
+
+    expect([replace.statusCode, deliver.statusCode]).toEqual([422, 422])
+    expect(b2Module.uploadFile).not.toHaveBeenCalled()
+  })
+
+  it('XML delivery is stored with the type decided by the extension', async () => {
+    const { task, deliverable, auth } = await setup()
+    await prisma.taskDeliverable.update({ where: { id: deliverable.id }, data: { requiresPayment: false } })
+    const mp = multipartBody({}, { filename: 'nfe.xml', contentType: 'text/html', content: '<nfe/>' })
+
+    const res = await app.inject({ method: 'POST', url: `/tasks/${task.id}/documents/deliveries/${deliverable.id}/upload`, headers: { authorization: auth, ...mp.headers }, body: mp.body })
+
+    expect(res.statusCode).toBe(201)
+    expect(b2Module.uploadFile).toHaveBeenCalledWith(expect.any(String), expect.any(Buffer), 'application/xml')
+  })
+
   it('replace and payment edit are refused with 409 once the client marked it paid', async () => {
     const { protocol, auth } = await setup()
     await prisma.protocol.update({ where: { id: protocol.id }, data: { paidAt: new Date(), paidAmount: '10' } })

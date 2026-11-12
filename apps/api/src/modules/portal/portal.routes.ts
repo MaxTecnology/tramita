@@ -4,6 +4,7 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
+import { readUpload, DEFAULT_MAX_UPLOAD_BYTES, type UploadedFile } from '@/lib/read-upload'
 import { prisma } from '@/lib/prisma'
 import { canSeeTask, getClientAccessScope } from '@/modules/client-users/client-access'
 import { getTaskHistory, listAccessibleClients, listPortalTasks } from './portal.service'
@@ -22,7 +23,7 @@ import { markProtocolPaid, unmarkProtocolPaid } from '@/modules/protocols/protoc
 import { readMultipartField } from '@/lib/multipart-fields'
 import { portalProtocolsQuerySchema, markPaidSchema, portalClientQuerySchema, documentRequestsQuerySchema } from './portal.schema'
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024
+const MAX_FILE_SIZE = DEFAULT_MAX_UPLOAD_BYTES
 
 // request.user.sub is a ClientUser id (a person, not a company) — every route below that
 // touches company-scoped data (requests, tasks, documents) must resolve the actual Client id
@@ -61,27 +62,14 @@ export async function portalRoutes(app: FastifyInstance) {
   app.post('/tasks/:taskId/documents/requests/:reqId/upload', async (request, reply) => {
     const { taskId, reqId } = request.params as { taskId: string; reqId: string }
 
-    let file: Awaited<ReturnType<typeof request.file>>
-    try {
-      file = await request.file()
-    } catch (err: unknown) {
-      const e = err as { statusCode?: number; code?: string }
-      if (e?.statusCode === 413 || e?.code === 'FST_FILES_LIMIT' || e?.code === 'FST_REQ_FILE_TOO_LARGE') {
-        throw new AppError(413, 'Arquivo excede o limite de 20MB')
-      }
-      throw err
-    }
-    if (!file) throw new AppError(400, 'Nenhum arquivo enviado')
-
-    const buffer = await file.toBuffer()
-    if (buffer.length > MAX_FILE_SIZE) throw new AppError(413, 'Arquivo excede o limite de 20MB')
+    const { upload } = await readUpload(request)
 
     // task-documents.service.ts resolves the real Client.id itself from the task's board —
     // actor.id here no longer needs to be a company id, just an identifier for the actor type.
     return reply.status(201).send(
       await uploadForRequirement(
         taskId, reqId, request.user.organizationId!, { id: request.user.sub, type: 'client' }, request.user.sub,
-        { filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer },
+        upload,
       ),
     )
   })
@@ -152,20 +140,7 @@ export async function portalRoutes(app: FastifyInstance) {
   app.post('/requests/:id/attachments', { preHandler: [checkSubscription] }, async (request, reply) => {
     const { id: requestId } = request.params as { id: string }
 
-    let file: Awaited<ReturnType<typeof request.file>>
-    try {
-      file = await request.file()
-    } catch (err: unknown) {
-      const e = err as { statusCode?: number; code?: string }
-      if (e?.statusCode === 413 || e?.code === 'FST_FILES_LIMIT' || e?.code === 'FST_REQ_FILE_TOO_LARGE') {
-        throw new AppError(413, 'Arquivo excede o limite de 20MB')
-      }
-      throw err
-    }
-    if (!file) throw new AppError(400, 'Nenhum arquivo enviado')
-
-    const buffer = await file.toBuffer()
-    if (buffer.length > MAX_FILE_SIZE) throw new AppError(413, 'Arquivo excede o limite de 20MB')
+    const { upload } = await readUpload(request)
 
     const scope = await getClientAccessScope(request.user.sub)
     const found = await getRequestById(requestId, request.user.organizationId!)
@@ -174,7 +149,7 @@ export async function portalRoutes(app: FastifyInstance) {
       requestId,
       request.user.organizationId!,
       found.clientId,
-      { filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer },
+      upload,
     )
 
     return reply.status(201).send(attachment)
@@ -234,13 +209,12 @@ export async function portalRoutes(app: FastifyInstance) {
   app.post('/protocols/:id/pay', { preHandler: [checkSubscription] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     let amount: string | undefined
-    let proof: { filename: string; mimeType: string; size: number; buffer: Buffer } | undefined
+    let proof: UploadedFile | undefined
     if (request.isMultipart()) {
-      const file = await request.file()
-      if (file) {
-        amount = readMultipartField(file, 'amount')
-        const buffer = await file.toBuffer()
-        proof = { filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer }
+      const read = await readUpload(request, { optional: true })
+      if (read) {
+        amount = readMultipartField(read.file, 'amount')
+        proof = read.upload
       }
     } else {
       const body = markPaidSchema.safeParse(request.body)

@@ -5,6 +5,7 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
+import { readUpload, DEFAULT_MAX_UPLOAD_BYTES } from '@/lib/read-upload'
 import { addDocumentItemSchema, addDeliverableSchema, reviewDocumentRequirementSchema } from './task-documents.schema'
 import {
   listTaskDocuments,
@@ -15,7 +16,7 @@ import {
   deliverDocument,
 } from './task-documents.service'
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024
+const MAX_FILE_SIZE = DEFAULT_MAX_UPLOAD_BYTES
 
 export async function taskDocumentsRoutes(app: FastifyInstance) {
   await app.register(multipart, { limits: { fileSize: MAX_FILE_SIZE } })
@@ -66,25 +67,12 @@ export async function taskDocumentsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id, reqId } = request.params as { id: string; reqId: string }
 
-    let file: Awaited<ReturnType<typeof request.file>>
-    try {
-      file = await request.file()
-    } catch (err: unknown) {
-      const e = err as { statusCode?: number; code?: string }
-      if (e?.statusCode === 413 || e?.code === 'FST_FILES_LIMIT' || e?.code === 'FST_REQ_FILE_TOO_LARGE') {
-        throw new AppError(413, 'Arquivo excede o limite de 20MB')
-      }
-      throw err
-    }
-    if (!file) throw new AppError(400, 'Nenhum arquivo enviado')
-
-    const buffer = await file.toBuffer()
-    if (buffer.length > MAX_FILE_SIZE) throw new AppError(413, 'Arquivo excede o limite de 20MB')
+    const { file, upload } = await readUpload(request)
 
     return reply.status(201).send(
       await deliverDocument(
         id, reqId, request.user.organizationId!, { id: request.user.sub },
-        { filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer },
+        upload,
         { amount: readMultipartField(file, 'amount'), paymentDueDate: readMultipartField(file, 'paymentDueDate') },
       ),
     )
@@ -95,25 +83,12 @@ export async function taskDocumentsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id, reqId } = request.params as { id: string; reqId: string }
 
-    let file: Awaited<ReturnType<typeof request.file>>
-    try {
-      file = await request.file()
-    } catch (err: unknown) {
-      const e = err as { statusCode?: number; code?: string }
-      if (e?.statusCode === 413 || e?.code === 'FST_FILES_LIMIT' || e?.code === 'FST_REQ_FILE_TOO_LARGE') {
-        throw new AppError(413, 'Arquivo excede o limite de 20MB')
-      }
-      throw err
-    }
-    if (!file) throw new AppError(400, 'Nenhum arquivo enviado')
-
-    const buffer = await file.toBuffer()
-    if (buffer.length > MAX_FILE_SIZE) throw new AppError(413, 'Arquivo excede o limite de 20MB')
+    const { file, upload } = await readUpload(request)
 
     return reply.status(201).send(
       await uploadForRequirement(
         id, reqId, request.user.organizationId!, { id: request.user.sub, type: 'user' }, undefined,
-        { filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer },
+        upload,
       ),
     )
   })

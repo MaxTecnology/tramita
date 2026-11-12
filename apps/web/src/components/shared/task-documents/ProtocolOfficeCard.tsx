@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
+import { UPLOAD_ACCEPT } from '@/lib/upload'
 import { cn, mensagemDeErro } from '@/lib/utils'
 import { formatBRL } from '@/lib/money'
 import { formatDateOnlyUTC } from '@/lib/dates'
@@ -107,7 +108,7 @@ export function ProtocolOfficeCard({ protocol: p, taskId, onReceipt }: {
         {p.paidAt && <span className="text-xs text-muted-foreground">Para alterar, o cliente precisa desfazer o pagamento.</span>}
       </div>
       <input
-        ref={fileRef} type="file" className="hidden"
+        ref={fileRef} type="file" accept={UPLOAD_ACCEPT} className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0]
           e.target.value = ''

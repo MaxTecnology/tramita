@@ -7,6 +7,7 @@ import {
   ListObjectVersionsCommand,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { contentDispositionFor } from './upload-policy'
 
 // Lazy init so env vars are guaranteed to be loaded before first use
 let _b2: S3Client | null = null
@@ -31,7 +32,14 @@ function getBucket(): string {
 }
 
 export async function uploadFile(key: string, body: Buffer, mimeType: string): Promise<void> {
-  await getClient().send(new PutObjectCommand({ Bucket: getBucket(), Key: key, Body: body, ContentType: mimeType }))
+  await getClient().send(new PutObjectCommand({
+    Bucket: getBucket(),
+    Key: key,
+    Body: body,
+    ContentType: mimeType,
+    // Signed URLs point at the bucket: anything the browser could execute (XML, Office) downloads.
+    ContentDisposition: contentDispositionFor(mimeType),
+  }))
 }
 
 export async function getSignedDownloadUrl(key: string, ttlSeconds = 3600): Promise<string> {
