@@ -4,6 +4,18 @@
 
 ---
 
+## Regras transversais (2026-11-12)
+
+- **Uploads** (anexos, entregas, substituir protocolo, comprovante, uploads do portal): um único arquivo
+  por requisição, campos de texto **antes** do arquivo, limite 20MB (413 em pt-BR). O tipo é decidido
+  pela **extensão** numa lista permitida — PDF, JPG/JPEG, PNG, GIF, WEBP, DOC/DOCX, XLS/XLSX, TXT, CSV,
+  XML, OFX, ZIP — e nunca pelo `Content-Type` do navegador; fora da lista → 422. XML, Office e ZIP são
+  gravados no B2 com `Content-Disposition: attachment` (baixam, não abrem no navegador).
+- **ORG_MEMBER** só lê e age em processo que enxerga (responsável pelo processo, responsável por
+  departamento que atende o cliente, ou com tarefa atribuída). Rotas por id de processo, coluna, tarefa ou
+  protocolo respondem **404** fora desse escopo — inclusive o SSE do processo.
+- **Rate limit** global por IP: `RATE_LIMIT_MAX` requisições/minuto (padrão 100).
+
 ## Autenticação
 
 ### POST `/auth/login`

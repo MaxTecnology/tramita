@@ -42,11 +42,13 @@ Cobertura global final: 82.76% linhas / 78.09% branches / 81.25% funções (248 
 
 Teste E2E (`org-board.spec.ts`) atualizado pra afirmar diretamente no heading do drawer em vez de só no card do Kanban, já que agora os dois refletem a edição. 8/8 specs Playwright passando.
 
-## Migration `20260920160000_add_departments` assume `client_assignments` vazia (encontrado em 2026-09-20)
+## Migration `20260920160000_add_departments` assume `client_assignments` vazia (encontrado em 2026-09-20) ✅ (fechado em 2026-11-12)
 
 **Contexto:** essa migration foi escrita à mão (o CLI do Prisma recusa migrations destrutivas não-interativas) e adiciona `client_assignments.departmentId` como `NOT NULL` sem `DEFAULT`. Isso só é seguro porque a tabela foi verificada vazia em dev/test antes da migration rodar — o arquivo agora tem um comentário de aviso no topo (`apps/api/prisma/migrations/20260920160000_add_departments/migration.sql`).
 
 **Pendente:** se este repositório for implantado em um ambiente com dados reais em `client_assignments` antes de uma reescrita, a migration falhará. Nesse caso, ela precisa ser reescrita com um passo de backfill de `departmentId` antes de adicionar a constraint `NOT NULL`.
+
+**Fechado (2026-11-12):** o banco online foi zerado antes do deploy e a migration já foi aplicada em todos os ambientes existentes — ela nunca mais roda sobre dados reais. Só voltaria a importar num banco novo restaurado de um backup anterior a 2026-09-20, que não existe.
 
 ## Departamentos — itens parqueados na revisão de 2026-09-20 ✅ (resolvidos em 2026-10-05)
 
@@ -234,7 +236,7 @@ acumulado antes de uma feature similar), a abordagem fica registrada aqui como r
 tarefa, com fallback em `updatedAt` pra tarefas concluídas só via Kanban antes da correção que
 unificou o histórico (ver `fix(metrics)` nesta mesma feature).
 
-## Achados do review final — Evolução de Solicitações → OS (2026-10-10), não corrigidos nesta entrega
+## Achados do review final — Evolução de Solicitações → OS (2026-10-10) ✅ (todos resolvidos até 2026-11-10)
 
 Revisão final (`docs/superpowers/plans/2026-10-08-evolucao-solicitacoes-os-plan.md`) encontrou os
 seguintes pontos — os 2 "ALTO" e 1 "MÉDIO" ligados ao Review Focus da spec foram corrigidos na
@@ -284,7 +286,7 @@ mesma sessão (race no auto-revert de NEEDS_INFO, `TaskHistory`/`publishBoardEve
     `CANCELLED` mesmo com `boardId` presente — a tarefa associada virou `DISREGARDED`, não é mais
     um processo ativo.
 
-## Automação de documentos fiscais (Plano A) — débitos da revisão final (2026-10-16)
+## Automação de documentos fiscais (Plano A) — débitos da revisão final (2026-10-16) ✅ (todos fechados até 2026-11-12)
 
 Achados da revisão final (fresh reviewer, Opus) que não bloqueiam uso real e ficaram deferidos.
 Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fiscais-design.md` e
@@ -359,11 +361,13 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   em 2026-10-19). Cada documento agora tem seu próprio try/catch — uma falha (B2 fora do ar) loga
   via Pino (`logger.error`) e segue pro próximo; o que falhou continua íntegro (storageKey nunca
   vira `''`) pra tentar de novo na execução seguinte do cron.
-- **`POST /document-reader/modelos/analisar`** roda `extrairDocumento` (parsing de PDF via pdf.js)
+- **`POST /document-reader/modelos/analisar`** ✅ (fechado em 2026-11-12) roda `extrairDocumento` (parsing de PDF via pdf.js)
   direto no event loop da API, em vez de via fila BullMQ como o Plano A faz pro upload real
   (`document-reader.worker.ts`). Aceitável pro v1: rota só acessível a `ORG_ADMIN`, PDF de amostra
   limitado a 20MB, sem persistência. Revisitar se virar vetor de lentidão (muitos admins
-  modelando ao mesmo tempo) ou de negação de serviço.
+  modelando ao mesmo tempo) ou de negação de serviço. **Fechado:** desde 2026-11-11 `extrairDocumento`
+  roda numa `worker_thread` isolada com timeout (`executarIsolado`) — o parsing não ocupa mais o event
+  loop da API, que era o motivo da nota.
 - **Salvar um `DocumentModel` privado pode desligar o reconhecimento de outro modelo ativo da
   mesma org sem nenhum aviso** ✅ (resolvido em 2026-10-18). Mitigado com
   `verificarColisaoModelo` (`document-reader-models.service.ts`): no momento de salvar
@@ -375,7 +379,7 @@ Contexto completo em `docs/superpowers/specs/2026-10-15-automacao-documentos-fis
   completa (fora de escopo v1 por decisão explícita da spec) — só avisa sobre a amostra atual,
   não re-varre documentos já processados.
 
-## Worker (e API) carregam o `.env` depois dos imports — worker não sobe localmente (encontrado em 2026-11-11)
+## Worker (e API) carregam o `.env` depois dos imports — worker não sobe localmente (encontrado em 2026-11-11) ✅ (resolvido em 2026-11-12)
 
 **Sintoma:** `pnpm --filter api worker` quebra na inicialização com `Missing API key` do Resend,
 mesmo com `RESEND_API_KEY` no `.env`. Derruba o worker inteiro — notificações de WhatsApp/e-mail,
@@ -397,7 +401,11 @@ criar o cliente do Resend sob demanda (dentro de `sendEmail`), pra que a falta d
 falhe só o envio de e-mail, nunca a subida do worker. Teste: subir o worker sem `RESEND_API_KEY`
 e confirmar que os outros workers iniciam.
 
-## E2E não cobre os fluxos novos da cobertura de departamentos (encontrado em 2026-11-11)
+**Resolvido:** `src/load-env.ts` é o primeiro import de `app.ts` e `worker.ts`; o Resend nasce no
+primeiro envio (`getResend()`), e sem chave só o e-mail falha (`mailer.test.ts`). Validado de verdade:
+`pnpm worker` sobe sem `--env-file`, e `RESEND_API_KEY= tsx src/worker.ts` sobe todos os workers.
+
+## E2E não cobre os fluxos novos da cobertura de departamentos (encontrado em 2026-11-11) ✅ (resolvido em 2026-11-12)
 
 O cadastro de cliente em abas (painel de cobertura, bloqueio do salvar), a tela "Transferir
 responsabilidades" e o alerta de recorrentes não geradas no Dashboard foram validados com testes de
@@ -406,7 +414,11 @@ Playwright. Os 8 specs E2E existentes continuam passando com o seed atualizado. 
 menos um spec por fluxo (cadastro completo de cliente; transferência em dois lotes até desativar)
 quando a próxima rodada de E2E for mexida.
 
-## Cobertura de departamentos: checagem e escrita sem lock (encontrado na revisão final, 2026-11-11)
+**Resolvido:** `e2e/flows/client-form.spec.ts` (cadastro pelas três abas, salvar bloqueado até
+completar) e `e2e/flows/user-transfer.spec.ts` (dois lotes até desativar). O alerta de recorrentes
+não geradas continua só em teste de API/componente. 14/14 specs, estáveis em duas execuções seguidas.
+
+## Cobertura de departamentos: checagem e escrita sem lock (encontrado na revisão final, 2026-11-11) ✅ (resolvido em 2026-11-12)
 
 As invariantes de cobertura (`src/modules/clients/client-coverage.ts`) são checadas e gravadas na
 mesma transação, mas sem lock de linha (Postgres em READ COMMITTED). Duas edições simultâneas podem
@@ -421,7 +433,15 @@ cadastro do cliente mostra e corrige a cobertura quebrada. Correção sugerida: 
 que mexe em cobertura (cliente, usuário do cliente, tarefa, solicitação, desativação de usuário), e
 levar a checagem de I5 do `createTask` pra dentro da transação.
 
-## SSE autentica com o JWT na query string (encontrado em 2026-11-12)
+**Resolvido:** `lockClients` (`FOR UPDATE` em ordem de id) abre as transações de cadastro do cliente,
+usuário do cliente (criar/editar/desativar), criar/editar/mover tarefa e vínculo recorrente — a checagem
+de departamento atendido passou pra dentro da transação. `deleteUser` trava o colaborador (`FOR UPDATE`)
+e quem o define como responsável (cadastro, transferência) trava com `lockUsersForShare` (`FOR SHARE`).
+Testes de corrida determinísticos em `client-coverage-lock.test.ts` (transação concorrente segurando o
+lock com uma mudança não confirmada). A geração recorrente não precisou: desatender o departamento já é
+recusado enquanto existe vínculo recorrente ativo.
+
+## SSE autentica com o JWT na query string (encontrado em 2026-11-12) ✅ (resolvido em 2026-11-12)
 
 `EventSource` não envia header `Authorization`, então `/requests/stream` e `/boards/:id/stream` recebem o JWT em `?token=`. O log da API já mascara (`src/lib/log-redaction.ts`, `?token=[REDACTED]`), mas o token ainda passa por qualquer outro ponto que registre URL: access log do Traefik (se ativado), histórico do navegador, ferramentas de APM.
 
@@ -429,11 +449,20 @@ levar a checagem de I5 do `createTask` pra dentro da transação.
 
 **Antes de produção:** confirmar que o access log do Traefik está desligado ou sem query string.
 
-## Prisma: `package.json#prisma` deprecado (encontrado em 2026-11-12)
+**Resolvido:** `POST /stream/ticket` + `?ticket=` (Redis `sse-ticket:*`, 30s, `GETDEL`) nos dois streams;
+`?token=` não é mais aceito; `ticket` também é mascarado no log. Validado no ambiente local (reuso → 401,
+`?token=` → 401, log com `ticket=[REDACTED]`). **Ainda vale** conferir o access log do Traefik (Dokploy),
+mas o que pode aparecer lá agora é um ticket já consumido.
+
+## Prisma: `package.json#prisma` deprecado (encontrado em 2026-11-12) ✅ (resolvido em 2026-11-12)
 
 O `migrate deploy` avisa que a configuração em `package.json#prisma` (seed) será removida no Prisma 7. Migrar para `prisma.config.ts` quando formos atualizar para o Prisma 7 — hoje é só aviso, não quebra nada.
 
-## Visibilidade do ORG_MEMBER aplicada só em leitura de processo (encontrado em 2026-11-12)
+**Resolvido:** `apps/api/prisma.config.ts` (schema, migrations, seed) carrega o `.env` da raiz sem
+sobrescrever variáveis já definidas; o Dockerfile copia o arquivo. Build Docker validado, `prisma validate`
+dentro da imagem ok.
+
+## Visibilidade do ORG_MEMBER aplicada só em leitura de processo (encontrado em 2026-11-12) ✅ (resolvido em 2026-11-12)
 
 A regra de visibilidade do Membro (`apps/api/src/modules/boards/board-visibility.ts`: responsável do
 processo OU responsável por departamento que atende o cliente OU com tarefa atribuída) vale para
@@ -445,27 +474,45 @@ que não vê na lista. Mesma organização, sem vazamento entre tenants, mas fec
 **Correção sugerida:** helper `assertMemberCanSeeBoard(boardId, user)` chamado nessas rotas quando
 `role === 'ORG_MEMBER'`, com teste por rota (404 para processo fora do escopo).
 
-## Selos e tela de Assinatura com cores fixas claras (encontrado em 2026-11-12)
+**Resolvido:** preHandler `memberScope` (`src/middlewares/memberScope.ts`) em colunas, tarefas (criar,
+mover, reordenar, editar, histórico), comentários, anexos, documentos da tarefa, protocolos da
+tarefa/detalhe/recibo, busca e SSE do processo — 404 fora do escopo. 20 rotas testadas em
+`member-scope.routes.test.ts`, mais o caso do Membro vinculado que continua agindo.
+
+## Selos e tela de Assinatura com cores fixas claras (encontrado em 2026-11-12) ✅ (resolvido em 2026-11-12)
 
 Selos `bg-gray-100 text-gray-600` (prioridade baixa, status, perfis) e a tela Configurações →
 Assinatura (`bg-white`, `bg-gray-50`) não acompanham o modo escuro. Legíveis (fundo claro com texto
 escuro), mas destoam. Trocar por tokens (`bg-neutral-bg text-neutral-text`, `bg-surface`).
 
-## E2E sem os fluxos do novo portal de documentos (encontrado em 2026-11-12)
+**Resolvido:** eram ~300 classes fixas em 26 telas (não só selos e Assinatura). Trocadas por tokens,
+com dois novos (`info-*` azul e `highlight-*` roxo) em claro e escuro. QA com screenshots reais nos dois
+temas (Assinatura, Solicitações, Usuários, Clientes, Dashboard, TaskDrawer, portal e Master).
+
+## E2E sem os fluxos do novo portal de documentos (encontrado em 2026-11-12) ✅ (resolvido em 2026-11-12, parcial por decisão)
 
 O seed E2E já cria a "Guia DAS E2E" (guia de pagamento do cliente E2E), mas não há spec Playwright
 para: Início do portal, "Documentos recebidos" → "Marcar como pago" → aparece como paga e some de
 "Guias não pagas" no escritório; "Enviar documentos" com "Nada a enviar"; escritório entregando guia
 com valor e substituindo o arquivo. Cobertos por testes de API e de componente, não ponta a ponta.
 
-## Detalhe do documento registra "Visualizado" a cada abertura (encontrado em 2026-11-12)
+**Resolvido:** `e2e/flows/portal-documents.spec.ts` cobre Início → guia → "Marcar como pago" → sai de
+"Guias não pagas" no escritório, e "Nada a enviar" + desfazer. **Fica fora por decisão:** a entrega de
+guia e o substituir pelo escritório sobem o arquivo de verdade no B2 configurado no `.env` (a chamada é
+do servidor, o Playwright não intercepta) — seguem cobertos pelos testes de API, incluindo as corridas.
+Pra cobrir no E2E seria preciso um bucket/endpoint fake pro ambiente de teste.
+
+## Detalhe do documento registra "Visualizado" a cada abertura (encontrado em 2026-11-12) ✅ (resolvido em 2026-11-12)
 
 `GET /portal/protocols/:id` grava um evento `VIEWED` a cada chamada (regra antiga dos protocolos). No
 novo detalhe, a tela recarrega depois de "Marcar como pago" e o histórico ganha um "Visualizado"
 repetido. Inofensivo, mas polui o histórico: gravar `VIEWED` só na primeira visualização por usuário
 (ou não registrar de novo se o último evento do mesmo usuário for `VIEWED` há poucos minutos).
 
-## Portal de documentos — menores da revisão final (2026-11-12), não corrigidos
+**Resolvido:** um `VIEWED` por pessoa e por versão do arquivo (desde `fileUpdatedAt`): reabrir não
+repete; arquivo substituído visto de novo conta.
+
+## Portal de documentos — menores da revisão final (2026-11-12) ✅ (todos resolvidos em 2026-11-12)
 
 1. **Corrida no robô:** em `anexarDocumento`, `deliverDocument` cria/substitui o protocolo e avisa o cliente antes da escrita guardada no `receivedDocument`. Dois revisores ao mesmo tempo: o perdedor recebe 409, mas já gerou um REPLACED e um segundo aviso. Correção: reservar o `receivedDocument` (status intermediário via `updateMany`) antes de entregar.
 2. **Atualização parcial numa corrida rara:** `deliverDocument` grava arquivo/valor na entrega antes de `upsertProtocolForDeliverable`. Se o cliente pagar entre a checagem prévia e a escrita guardada, o 409 sobe com a entrega já atualizada e o protocolo antigo. Correção: substituir o protocolo antes ou compensar no erro.
@@ -474,3 +521,19 @@ repetido. Inofensivo, mas polui o histórico: gravar `VIEWED` só na primeira vi
 5. **Valor lido pelo robô passa por `number`** (`parseMoeda` → `toFixed(2)` em `pagamentoLido`). Exato para 2 casas, mas fere a convenção "nunca float"; o motor deveria expor a string normalizada.
 6. **Comprovante maior que 20MB** em `POST /portal/protocols/:id/pay` não vira `AppError(413)` em pt-BR como em `/protocols/:id/replace`.
 7. **`replaceProtocolFile` aceita `amount`** em protocolo que não é guia (a tela não envia, mas a API grava). Ignorar o valor quando `requiresPayment = false`.
+
+**Resolvidos:** (1) `anexarDocumento` reserva o documento (`attachingSince`, prazo de 5 min) antes de
+qualquer efeito — o segundo revisor recebe 409 sem subir arquivo nem gerar REPLACED/aviso; rejeitar
+respeita a reserva. (2) A reentrega troca o protocolo (escrita protegida) antes de atualizar a entrega.
+(3) `lockedProtocolError` relê o registro e diz se foi pagamento ou cancelamento. (4)
+`discardUploadedAttachment` apaga o arquivo que perdeu a corrida (substituir, reentregar, comprovante).
+(5) `moedaNormalizada` — o valor sai do texto lido, sem float. (6) `readUpload` responde 413 em pt-BR em
+todos os uploads. (7) Valor e vencimento ignorados em documento que não é guia.
+
+## Uploads sem validação de tipo de arquivo (encontrado e resolvido em 2026-11-12) ✅
+
+Só a rota de anexos tinha lista de tipos; entrega de documento, substituir, comprovante e uploads do
+portal aceitavam qualquer arquivo. **Resolvido:** política única (`src/lib/upload-policy.ts` +
+`src/lib/read-upload.ts`) em todas as rotas: tipo decidido pela extensão numa lista permitida (PDF,
+imagens, Office, TXT, CSV, XML, OFX, ZIP) — nunca pelo Content-Type do navegador —, e XML/Office/ZIP
+gravados no B2 com `Content-Disposition: attachment`. O web filtra o seletor de arquivo com `accept`.
