@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { insertProtocol } from '@/modules/protocols/protocols.service'
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClient, createTestDepartment,
-  serveClientDepartment, createTestBoard, createTestColumn, createTestTask, getAuthHeader,
+  serveClientDepartment, createTestBoard, createTestColumn, createTestTask, getAuthHeader, getStreamTicket,
 } from '@/test/helpers'
 
 beforeEach(() => {
@@ -40,7 +40,7 @@ async function setup() {
     board, column, other, task, requirement, protocol,
     outsiderAuth,
     insiderAuth: await getAuthHeader(insider.email, 'Test@1234'),
-    outsiderToken: outsiderAuth.replace('Bearer ', ''),
+    outsiderTicket: () => getStreamTicket(outsiderAuth),
   }
 }
 
@@ -94,7 +94,7 @@ describe('Membro só age em processo que enxerga', () => {
 
   it('board stream refuses a member outside the process', async () => {
     const c = await setup()
-    const res = await app.inject({ method: 'GET', url: `/boards/${c.board.id}/stream?token=${c.outsiderToken}` })
+    const res = await app.inject({ method: 'GET', url: `/boards/${c.board.id}/stream?ticket=${await c.outsiderTicket()}` })
     expect(res.statusCode).toBe(404)
   })
 

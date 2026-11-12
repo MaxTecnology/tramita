@@ -1,8 +1,8 @@
 import type { FastifyRequest } from 'fastify'
 
-// Query params that carry credentials. SSE endpoints receive the JWT as ?token=
+// Query params that carry credentials. SSE endpoints receive a one-time ?ticket= (formerly the JWT as ?token=)
 // because EventSource cannot send an Authorization header.
-const SENSITIVE_PARAMS = ['token', 'access_token', 'refresh_token']
+const SENSITIVE_PARAMS = ['token', 'ticket', 'access_token', 'refresh_token']
 
 const SENSITIVE_PARAM_RE = new RegExp(`([?&](?:${SENSITIVE_PARAMS.join('|')})=)[^&#]*`, 'g')
 

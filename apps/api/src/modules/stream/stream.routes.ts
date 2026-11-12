@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
-import { verifyAccessToken } from '@/lib/jwt'
+import { verifyJWT } from '@/middlewares/verifyJWT'
+import { consumeStreamTicket, issueStreamTicket } from './stream-ticket'
 import { prisma } from '@/lib/prisma'
 import { attachSSESubscriber } from '@/lib/sse'
 import { AppError } from '@/errors/AppError'
@@ -7,19 +8,16 @@ import { assertMemberSeesTargets } from '@/middlewares/memberScope'
 import { getClientAccessScope } from '@/modules/client-users/client-access'
 
 export async function streamRoutes(app: FastifyInstance) {
+  app.post('/stream/ticket', { preHandler: [verifyJWT] }, async (request, reply) => {
+    return reply.send({ ticket: await issueStreamTicket(request.user) })
+  })
+
   app.get('/boards/:id/stream', async (request, reply) => {
     const { id } = request.params as { id: string }
-    const { token } = request.query as { token?: string }
+    const { ticket } = request.query as { ticket?: string }
 
-    // Auth via query param — EventSource API doesn't support custom headers
-    if (!token) throw new AppError(401, 'Token não fornecido')
-
-    let user: ReturnType<typeof verifyAccessToken>
-    try {
-      user = verifyAccessToken(token)
-    } catch {
-      throw new AppError(401, 'Token inválido ou expirado')
-    }
+    // EventSource can't send headers: auth via a one-time ticket from POST /stream/ticket
+    const user = await consumeStreamTicket(ticket)
 
     // Verify board exists and belongs to the user's org
     const board = await prisma.board.findFirst({

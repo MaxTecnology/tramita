@@ -158,7 +158,7 @@
 - [x] `reports.service.test.ts` — PDF gerado com dados do mês correto, cache Redis funciona
 ### 8a — Tempo Real (SSE) ✅
 - [x] `stream.test.ts` — evento emitido ao mover tarefa, heartbeat (endpoint auth)
-- [x] `GET /boards/:id/stream?token=<jwt>` — endpoint SSE
+- [x] `GET /boards/:id/stream?ticket=<ticket>` — endpoint SSE (ticket de uso único via `POST /stream/ticket`, desde 2026-11-12; antes era `?token=<jwt>`)
 - [x] Emitir eventos: `task:moved`, `task:created`, `task:updated`, `comment:added`
 - [x] Frontend interno: conectar ao SSE, atualizar via react-query sem reload
 - [x] Portal do cliente: mesma lógica — board atualiza ao vivo

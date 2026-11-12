@@ -377,7 +377,7 @@ Contraparte, do lado do escritório, das Solicitações abertas pelo cliente no 
 ### GET `/requests` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — `?status=PENDING|APPROVED|REJECTED|CANCELLED`
 ### GET `/requests/pending-count` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — `{ count: number }`
 ### GET `/requests/:id` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_
-### GET `/requests/stream?token=<accessToken>` — SSE, evento `request:changed` (sem payload) a cada mutação de Solicitação da org
+### GET `/requests/stream?ticket=<ticket>` — SSE, evento `request:changed` (sem payload) a cada mutação de Solicitação da org
 ### POST `/requests/:id/approve` _(ORG_ADMIN | ORG_MANAGER)_
 ```json
 { "mode": "EXISTING_BOARD", "boardId": "string", "columnId": "string" }
@@ -626,7 +626,18 @@ Recebe eventos de pagamento do Asaas.
 
 ## SSE — Tempo Real
 
-### GET `/boards/:id/stream?token=<accessToken>`
+### POST `/stream/ticket`
+
+Autenticado por header (`Authorization: Bearer <accessToken>`, qualquer perfil). Devolve
+`{ "ticket": "<aleatório>" }`, guardado no Redis (`sse-ticket:<ticket>`) por **30s** e **de uso
+único**: a rota de stream consome (`GETDEL`) na conexão. O `EventSource` não manda header, então o
+JWT nunca vai na URL — o que aparece em log de proxy/histórico é um ticket já inútil. O web pede um
+ticket novo a cada (re)conexão. `?token=` não é mais aceito (401).
+
+### GET `/boards/:id/stream?ticket=<ticket>`
+
+401 sem ticket, ticket inválido/expirado/já usado. 404 se o processo não existe na org, se o
+CLIENT não tem acesso à empresa ou se o ORG_MEMBER não enxerga o processo.
 
 **Eventos emitidos:**
 ```

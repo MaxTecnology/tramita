@@ -38,26 +38,34 @@ it('refreshes an expired token before opening the stream (tab left idle)', async
   localStorage.setItem('accessToken', jwtWithExp(-60))
   localStorage.setItem('refreshToken', 'r1')
   const refreshCalls = vi.fn()
+  const ticketAuth = vi.fn()
   server.use(
     http.post(`${API}/auth/refresh`, () => {
       refreshCalls()
       return HttpResponse.json({ accessToken: fresh })
+    }),
+    http.post(`${API}/stream/ticket`, ({ request }) => {
+      ticketAuth(request.headers.get('authorization'))
+      return HttpResponse.json({ ticket: 't-1' })
     }),
   )
 
   renderHook(() => useRequestsBadgeStream(), { wrapper })
 
   await waitFor(() => expect(FakeEventSource.urls).toHaveLength(1))
-  expect(FakeEventSource.urls[0]).toBe(`${API}/requests/stream?token=${fresh}`)
+  expect(FakeEventSource.urls[0]).toBe(`${API}/requests/stream?ticket=t-1`)
   expect(refreshCalls).toHaveBeenCalledTimes(1)
+  expect(ticketAuth).toHaveBeenCalledWith(`Bearer ${fresh}`)
 })
 
-it('opens the stream with the stored token while it is still valid', async () => {
+it('trades the stored token for a ticket and never puts the token in the URL', async () => {
   const valid = jwtWithExp(900)
   localStorage.setItem('accessToken', valid)
+  server.use(http.post(`${API}/stream/ticket`, () => HttpResponse.json({ ticket: 't-2' })))
 
   renderHook(() => useRequestsBadgeStream(), { wrapper })
 
   await waitFor(() => expect(FakeEventSource.urls).toHaveLength(1))
-  expect(FakeEventSource.urls[0]).toBe(`${API}/requests/stream?token=${valid}`)
+  expect(FakeEventSource.urls[0]).toBe(`${API}/requests/stream?ticket=t-2`)
+  expect(FakeEventSource.urls[0]).not.toContain(valid)
 })

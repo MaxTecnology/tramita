@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { getFreshAccessToken, redirectToLogin } from '@/lib/auth-refresh'
-
-const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
+import { redirectToLogin } from '@/lib/auth-refresh'
+import { openStreamUrl, StreamAuthError } from '@/lib/stream-ticket'
 
 export function useRequestsBadgeStream(): void {
   const queryClient = useQueryClient()
@@ -13,6 +12,13 @@ export function useRequestsBadgeStream(): void {
   useEffect(() => {
     let cancelled = false
 
+    function scheduleRetry() {
+      if (cancelled) return
+      const delay = retryDelay.current
+      retryDelay.current = Math.min(delay * 2, 30_000)
+      setTimeout(connect, delay)
+    }
+
     function connect() {
       if (cancelled) return
 
@@ -21,18 +27,20 @@ export function useRequestsBadgeStream(): void {
       connectTimerRef.current = setTimeout(async () => {
         if (cancelled) return
 
-        // EventSource can't see a 401 nor refresh on its own: after the tab sits idle the
-        // stored token is expired, so refresh it here before (re)connecting.
-        let token: string | null
+        let url: string | null
         try {
-          token = await getFreshAccessToken()
-        } catch {
-          redirectToLogin()
+          url = await openStreamUrl(`/requests/stream`)
+        } catch (err) {
+          if (err instanceof StreamAuthError) {
+            redirectToLogin()
+            return
+          }
+          scheduleRetry() // ticket request failed (network/5xx): try again with backoff
           return
         }
-        if (!token || cancelled) return
+        if (!url || cancelled) return
 
-        const es = new EventSource(`${BASE_URL}/requests/stream?token=${token}`)
+        const es = new EventSource(url)
         esRef.current = es
 
         es.addEventListener('request:changed', () => {
@@ -53,10 +61,7 @@ export function useRequestsBadgeStream(): void {
         es.onerror = () => {
           es.close()
           esRef.current = null
-          if (cancelled) return
-          const delay = retryDelay.current
-          retryDelay.current = Math.min(delay * 2, 30_000)
-          setTimeout(connect, delay)
+          scheduleRetry()
         }
       }, 50)
     }

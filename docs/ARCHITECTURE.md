@@ -261,7 +261,9 @@ Webhook POST /webhooks/asaas
 ```
 Usuário abre board
     ↓
-GET /boards/:id/stream?token=<jwt>
+POST /stream/ticket (Authorization: Bearer <jwt>) → ticket de uso único, 30s
+    ↓
+GET /boards/:id/stream?ticket=<ticket>
     ↓
 Conexão SSE mantida aberta
     ↓

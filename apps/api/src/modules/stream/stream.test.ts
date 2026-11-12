@@ -12,6 +12,7 @@ import {
   createTestColumn,
   createTestTask,
   getAuthHeader,
+  getStreamTicket,
 } from '@/test/helpers'
 import { redis } from '@/lib/redis'
 import { moveTask } from '@/modules/tasks/tasks.service'
@@ -43,29 +44,29 @@ describe('SSE — event emission', () => {
 })
 
 describe('GET /boards/:id/stream', () => {
-  it('returns 401 without token', async () => {
+  it('returns 401 without ticket', async () => {
     const res = await app.inject({ method: 'GET', url: '/boards/xxx/stream' })
     expect(res.statusCode).toBe(401)
   })
 
-  it('returns 401 with invalid token', async () => {
+  it('returns 401 with invalid ticket', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/boards/xxx/stream?token=invalid-token',
+      url: '/boards/xxx/stream?ticket=invalid-ticket',
     })
     expect(res.statusCode).toBe(401)
   })
 
-  it('returns 404 for non-existent board with valid token', async () => {
+  it('returns 404 for non-existent board with valid ticket', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const user = await createTestUser(org.id)
     const authHeader = await getAuthHeader(user.email, 'Test@1234')
-    const token = authHeader.replace('Bearer ', '')
+    const ticket = await getStreamTicket(authHeader)
 
     const res = await app.inject({
       method: 'GET',
-      url: `/boards/nonexistent-board-id/stream?token=${token}`,
+      url: `/boards/nonexistent-board-id/stream?ticket=${ticket}`,
     })
     expect(res.statusCode).toBe(404)
   })
@@ -79,11 +80,11 @@ describe('GET /boards/:id/stream', () => {
     // clientUser has zero grants — no access to `client` at all
 
     const authHeader = await getAuthHeader(clientUser.email, password)
-    const token = authHeader.replace('Bearer ', '')
+    const ticket = await getStreamTicket(authHeader)
 
     const res = await app.inject({
       method: 'GET',
-      url: `/boards/${board.id}/stream?token=${token}`,
+      url: `/boards/${board.id}/stream?ticket=${ticket}`,
     })
     expect(res.statusCode).toBe(404)
   })
@@ -94,4 +95,37 @@ describe('GET /boards/:id/stream', () => {
   // timeout. The 404 test above already exercises the new access-scope gate added for I5;
   // the in-scope path is implicitly covered by it reaching `attachSSESubscriber` without
   // throwing 404/401 in the other GET /boards/:id/stream tests further up.
+})
+
+describe('stream ticket', () => {
+  async function adminAuth() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    return getAuthHeader(user.email, 'Test@1234')
+  }
+
+  it('requires the Authorization header to issue a ticket', async () => {
+    const res = await app.inject({ method: 'POST', url: '/stream/ticket' })
+    expect(res.statusCode).toBe(401)
+  })
+
+  it('ticket is single use and lives at most 30 seconds', async () => {
+    const ticket = await getStreamTicket(await adminAuth())
+    expect(await redis.ttl(`sse-ticket:${ticket}`)).toBeGreaterThan(0)
+    expect(await redis.ttl(`sse-ticket:${ticket}`)).toBeLessThanOrEqual(30)
+
+    const first = await app.inject({ method: 'GET', url: `/boards/nonexistent/stream?ticket=${ticket}` })
+    const second = await app.inject({ method: 'GET', url: `/boards/nonexistent/stream?ticket=${ticket}` })
+
+    expect(first.statusCode).toBe(404) // ticket accepted, board doesn't exist
+    expect(second.statusCode).toBe(401)
+  })
+
+  it('the access token in the query string is no longer accepted', async () => {
+    const token = (await adminAuth()).replace('Bearer ', '')
+    const board = await app.inject({ method: 'GET', url: `/boards/nonexistent/stream?token=${token}` })
+    const requests = await app.inject({ method: 'GET', url: `/requests/stream?token=${token}` })
+    expect([board.statusCode, requests.statusCode]).toEqual([401, 401])
+  })
 })

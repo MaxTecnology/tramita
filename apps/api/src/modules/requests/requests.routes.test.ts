@@ -10,6 +10,7 @@ import {
   grantClientAccess,
   getAuthHeader,
   serveClientDepartment,
+  getStreamTicket,
 } from '@/test/helpers'
 
 async function createTestClientLogin(orgId: string) {
@@ -314,13 +315,13 @@ describe('POST /requests/:id/cancel', () => {
 })
 
 describe('GET /requests/stream', () => {
-  it('retorna 401 sem token', async () => {
+  it('retorna 401 sem ticket', async () => {
     const res = await app.inject({ method: 'GET', url: '/requests/stream' })
     expect(res.statusCode).toBe(401)
   })
 
-  it('retorna 401 com token inválido', async () => {
-    const res = await app.inject({ method: 'GET', url: '/requests/stream?token=invalid-token' })
+  it('retorna 401 com ticket inválido', async () => {
+    const res = await app.inject({ method: 'GET', url: '/requests/stream?ticket=invalid-ticket' })
     expect(res.statusCode).toBe(401)
   })
 
@@ -328,9 +329,9 @@ describe('GET /requests/stream', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const { auth: authHeader } = await createTestClientLogin(org.id)
-    const token = authHeader.replace('Bearer ', '')
+    const ticket = await getStreamTicket(authHeader)
 
-    const res = await app.inject({ method: 'GET', url: `/requests/stream?token=${token}` })
+    const res = await app.inject({ method: 'GET', url: `/requests/stream?ticket=${ticket}` })
     expect(res.statusCode).toBe(403)
   })
 })

@@ -226,6 +226,12 @@ export async function getAuthHeader(email: string, password: string): Promise<st
   return `Bearer ${res.accessToken}`
 }
 
+// One-time ticket for the SSE routes (EventSource can't send the Authorization header).
+export async function getStreamTicket(authHeader: string): Promise<string> {
+  const res = await app.inject({ method: 'POST', url: '/stream/ticket', headers: { authorization: authHeader } })
+  return (JSON.parse(res.body) as { ticket: string }).ticket
+}
+
 export async function loginAs(email: string, password: string): Promise<LoginResponse> {
   const response = await app.inject({
     method: 'POST',

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
-import { verifyAccessToken } from '@/lib/jwt'
+import { consumeStreamTicket } from '@/modules/stream/stream-ticket'
 import { attachSSESubscriber } from '@/lib/sse'
 import { AppError } from '@/errors/AppError'
 import {
@@ -22,18 +22,11 @@ import {
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'] as const
 
 export async function requestsRoutes(app: FastifyInstance) {
-  // /stream fica fora do hook global de verifyJWT — autentica via query param,
-  // igual ao padrão de /boards/:id/stream (EventSource não manda headers customizados)
+  // /stream fica fora do hook global de verifyJWT — autentica via ticket de uso único
+  // (POST /stream/ticket), igual a /boards/:id/stream (EventSource não manda headers)
   app.get('/stream', async (request, reply) => {
-    const { token } = request.query as { token?: string }
-    if (!token) throw new AppError(401, 'Token não fornecido')
-
-    let user: ReturnType<typeof verifyAccessToken>
-    try {
-      user = verifyAccessToken(token)
-    } catch {
-      throw new AppError(401, 'Token inválido ou expirado')
-    }
+    const { ticket } = request.query as { ticket?: string }
+    const user = await consumeStreamTicket(ticket)
 
     if (!ORG_ROLES.includes(user.role as typeof ORG_ROLES[number]) || !user.organizationId) {
       throw new AppError(403, 'Acesso negado')
