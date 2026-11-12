@@ -13,6 +13,7 @@ import {
 beforeEach(() => {
   vi.restoreAllMocks()
   vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined)
+  vi.spyOn(b2Module, 'deleteFile').mockResolvedValue(undefined)
   vi.spyOn(b2Module, 'getSignedDownloadUrl').mockResolvedValue('https://signed')
   vi.spyOn(queue, 'enqueueNotification').mockResolvedValue(undefined)
 })
@@ -87,6 +88,21 @@ describe('marcar guia como paga (portal)', () => {
 
     expect(res.statusCode).toBe(413)
     expect(JSON.parse(res.body).message).toBe('Arquivo excede o limite de 20MB')
+  })
+
+  it('payment loses to a cancellation made during the proof upload: 409 says cancelled, proof removed', async () => {
+    const { protocol, task, auth } = await setup()
+    vi.mocked(b2Module.uploadFile).mockImplementation(async () => {
+      await prisma.protocol.update({ where: { id: protocol.id }, data: { cancelledAt: new Date(), cancellationReason: 'enviado por engano' } })
+    })
+    const mp = multipartBody({ amount: '1234.56' }, { filename: 'comprovante.pdf' })
+
+    const res = await app.inject({ method: 'POST', url: `/portal/protocols/${protocol.id}/pay`, headers: { authorization: auth, ...mp.headers }, body: mp.body })
+
+    expect(res.statusCode).toBe(409)
+    expect(JSON.parse(res.body).message).toBe('Esse documento foi cancelado pelo escritório')
+    expect(await prisma.attachment.count({ where: { taskId: task.id } })).toBe(0)
+    expect(b2Module.deleteFile).toHaveBeenCalledTimes(1)
   })
 
   it('accepts a JSON body without proof', async () => {

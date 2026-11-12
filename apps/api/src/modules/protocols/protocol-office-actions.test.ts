@@ -15,8 +15,15 @@ const pdf = (name: string) => ({ filename: name, mimeType: 'application/pdf', si
 beforeEach(() => {
   vi.restoreAllMocks()
   vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined)
+  vi.spyOn(b2Module, 'deleteFile').mockResolvedValue(undefined)
   vi.spyOn(queue, 'enqueueNotification').mockResolvedValue(undefined)
 })
+
+// Runs `change` while the file is being uploaded: the window between the early check and the
+// guarded write, where a client payment or an office cancellation can land.
+function duringUpload(change: () => Promise<unknown>) {
+  vi.mocked(b2Module.uploadFile).mockImplementation(async () => { await change() })
+}
 
 async function setup() {
   const plan = await createTestPlan()
@@ -34,6 +41,46 @@ async function setup() {
   vi.mocked(queue.enqueueNotification).mockClear()
   return { org, admin, client, board, task, deliverable, protocol, auth }
 }
+
+describe('corridas com pagamento/cancelamento durante o envio', () => {
+  it('re-delivery loses to a payment made during upload: 409, delivery untouched, uploaded file removed', async () => {
+    const { org, admin, task, deliverable, protocol } = await setup()
+    const before = await prisma.taskDeliverable.findUniqueOrThrow({ where: { id: deliverable.id } })
+    duringUpload(() => prisma.protocol.update({ where: { id: protocol.id }, data: { paidAt: new Date(), paidAmount: '10' } }))
+
+    await expect(deliverDocument(task.id, deliverable.id, org.id, { id: admin.id }, pdf('v2.pdf'), { amount: '99' }))
+      .rejects.toMatchObject({ statusCode: 409, message: 'Essa guia já foi marcada como paga pelo cliente. Peça para ele desfazer o pagamento antes de substituir.' })
+
+    const after = await prisma.taskDeliverable.findUniqueOrThrow({ where: { id: deliverable.id } })
+    expect([after.attachmentId, after.amount?.toString()]).toEqual([before.attachmentId, before.amount?.toString()])
+    expect(await prisma.attachment.count({ where: { taskId: task.id } })).toBe(1)
+    expect(b2Module.deleteFile).toHaveBeenCalledTimes(1)
+  })
+
+  it('replace loses to a cancellation made during upload: 409 says cancelled and the file is removed', async () => {
+    const { protocol, task, auth } = await setup()
+    duringUpload(() => prisma.protocol.update({ where: { id: protocol.id }, data: { cancelledAt: new Date(), cancellationReason: 'erro' } }))
+    const mp = multipartBody({}, { filename: 'v2.pdf' })
+
+    const res = await app.inject({ method: 'POST', url: `/protocols/${protocol.id}/replace`, headers: { authorization: auth, ...mp.headers }, body: mp.body })
+
+    expect(res.statusCode).toBe(409)
+    expect(JSON.parse(res.body).message).toBe('Protocolo cancelado não pode ser alterado')
+    expect(await prisma.attachment.count({ where: { taskId: task.id } })).toBe(1)
+    expect(b2Module.deleteFile).toHaveBeenCalledTimes(1)
+  })
+
+  it('replace ignores an amount sent for a document that is not a guide', async () => {
+    const { protocol, auth } = await setup()
+    await prisma.protocol.update({ where: { id: protocol.id }, data: { requiresPayment: false, amount: null } })
+    const mp = multipartBody({ amount: '50.00' }, { filename: 'v2.pdf' })
+
+    const res = await app.inject({ method: 'POST', url: `/protocols/${protocol.id}/replace`, headers: { authorization: auth, ...mp.headers }, body: mp.body })
+
+    expect(res.statusCode).toBe(200)
+    expect((await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })).amount).toBeNull()
+  })
+})
 
 describe('ações do escritório no protocolo', () => {
   it('manual protocol with requiresPayment requires amount and stores competence from the task', async () => {

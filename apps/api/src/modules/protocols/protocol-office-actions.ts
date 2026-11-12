@@ -4,7 +4,7 @@ import { formatBRL, parseMoney } from '@/lib/money'
 import { memberBoardWhere } from '@/modules/boards/board-visibility'
 import { createAttachment } from '@/modules/attachments/attachments.service'
 import type { UploadPayload } from '@/modules/task-documents/task-documents.service'
-import { assertProtocolEditable, replaceProtocolFileCore, PAID_GUIDE_LOCKED } from './protocol-from-deliverable'
+import { assertProtocolEditable, replaceProtocolFileCore, lockedProtocolError, discardUploadedAttachment } from './protocol-from-deliverable'
 
 export interface StaffActor {
   id: string
@@ -44,11 +44,18 @@ export async function replaceProtocolFile(
 ) {
   const protocol = await findProtocolForStaff(protocolId, organizationId, actor)
   assertProtocolEditable(protocol)
-  const amount = payment.amount ? parseMoney(payment.amount) : undefined
-  const dueDate = payment.paymentDueDate ? parseDueDate(payment.paymentDueDate) : undefined
+  // Amount and due date only mean something on a payment guide
+  const amount = protocol.requiresPayment && payment.amount ? parseMoney(payment.amount) : undefined
+  const dueDate = protocol.requiresPayment && payment.paymentDueDate ? parseDueDate(payment.paymentDueDate) : undefined
 
   const attachment = await createAttachment(protocol.taskId, organizationId, actor, payload)
-  const updated = await replaceProtocolFileCore(protocol.id, attachment.id, actor, { amount, dueDate })
+  let updated: Awaited<ReturnType<typeof replaceProtocolFileCore>>
+  try {
+    updated = await replaceProtocolFileCore(protocol.id, attachment.id, actor, { amount, dueDate })
+  } catch (err) {
+    await discardUploadedAttachment(attachment.id) // lost to a payment/cancellation: no orphan file
+    throw err
+  }
 
   // Keep the delivery checklist in sync with the document the client sees
   if (protocol.deliverableId) {
@@ -88,7 +95,7 @@ export async function updateProtocolPayment(
       where: { id: protocol.id, paidAt: null, cancelledAt: null },
       data: { ...(amount !== undefined ? { amount } : {}), ...(dueDate !== undefined ? { dueDate } : {}) },
     })
-    if (count === 0) throw new AppError(409, PAID_GUIDE_LOCKED)
+    if (count === 0) throw await lockedProtocolError(protocol.id)
     if (protocol.deliverableId) {
       await tx.taskDeliverable.update({
         where: { id: protocol.deliverableId },

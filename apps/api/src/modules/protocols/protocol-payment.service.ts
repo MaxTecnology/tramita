@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { discardUploadedAttachment } from './protocol-from-deliverable'
 import { AppError } from '@/errors/AppError'
 import { formatBRL, parseMoney } from '@/lib/money'
 import { uploadFile } from '@/lib/b2'
@@ -50,22 +51,30 @@ export async function markProtocolPaid(
   }
 
   const actor = await clientActor(clientUserId)
-  return prisma.$transaction(async (tx) => {
-    // Guarded write: two simultaneous clicks produce a single PAID
-    const { count } = await tx.protocol.updateMany({
-      where: { id: protocol.id, paidAt: null, cancelledAt: null },
-      data: { paidAt: new Date(), paidAmount: amount, paidByClientUserId: clientUserId, paymentProofAttachmentId: proofAttachmentId ?? null },
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // Guarded write: two simultaneous clicks produce a single PAID
+      const { count } = await tx.protocol.updateMany({
+        where: { id: protocol.id, paidAt: null, cancelledAt: null },
+        data: { paidAt: new Date(), paidAmount: amount, paidByClientUserId: clientUserId, paymentProofAttachmentId: proofAttachmentId ?? null },
+      })
+      if (count === 0) {
+        const current = await tx.protocol.findUnique({ where: { id: protocol.id }, select: { cancelledAt: true } })
+        throw new AppError(409, current?.cancelledAt ? 'Esse documento foi cancelado pelo escritório' : 'Essa guia já está marcada como paga')
+      }
+      const base = { protocolId: protocol.id, actorType: 'client', actorId: clientUserId, actorName: actor.name, actorEmail: actor.email }
+      await tx.protocolEvent.create({ data: { ...base, type: 'PAID', detail: formatBRL(amount) } })
+      // Paying implies having seen it — also lifts it out of "vencido sem visualização"
+      if (protocol.status === 'SENT' || protocol.status === 'EXPIRED') {
+        await tx.protocolEvent.create({ data: { ...base, type: 'VIEWED' } })
+        await tx.protocol.updateMany({ where: { id: protocol.id, status: { in: ['SENT', 'EXPIRED'] } }, data: { status: 'VIEWED' } })
+      }
+      return tx.protocol.findUniqueOrThrow({ where: { id: protocol.id } })
     })
-    if (count === 0) throw new AppError(409, 'Essa guia já está marcada como paga')
-    const base = { protocolId: protocol.id, actorType: 'client', actorId: clientUserId, actorName: actor.name, actorEmail: actor.email }
-    await tx.protocolEvent.create({ data: { ...base, type: 'PAID', detail: formatBRL(amount) } })
-    // Paying implies having seen it — also lifts it out of "vencido sem visualização"
-    if (protocol.status === 'SENT' || protocol.status === 'EXPIRED') {
-      await tx.protocolEvent.create({ data: { ...base, type: 'VIEWED' } })
-      await tx.protocol.updateMany({ where: { id: protocol.id, status: { in: ['SENT', 'EXPIRED'] } }, data: { status: 'VIEWED' } })
-    }
-    return tx.protocol.findUniqueOrThrow({ where: { id: protocol.id } })
-  })
+  } catch (err) {
+    if (proofAttachmentId) await discardUploadedAttachment(proofAttachmentId) // proof of a payment that did not happen
+    throw err
+  }
 }
 
 // Undo (marked by mistake). The proof file stays in the task attachments as history.

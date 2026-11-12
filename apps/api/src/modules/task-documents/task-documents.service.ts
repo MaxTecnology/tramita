@@ -6,7 +6,7 @@ import { resolveCompletedAt } from '@/lib/task-completion'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 import type { TaskStatus } from '@prisma/client'
 import { parseMoney } from '@/lib/money'
-import { assertProtocolEditable, upsertProtocolForDeliverable } from '@/modules/protocols/protocol-from-deliverable'
+import { assertProtocolEditable, upsertProtocolForDeliverable, replaceProtocolFileCore, discardUploadedAttachment } from '@/modules/protocols/protocol-from-deliverable'
 
 // "YYYY-MM-DD" → midnight UTC (date-only label, same convention as Task.dueDate)
 function parseDateOnly(value: string): Date {
@@ -230,6 +230,22 @@ export async function deliverDocument(
       uploadedBy: actor.id,
     },
   })
+
+  // Re-delivery of a document the client already has: swap it first (guarded write). If a payment
+  // or cancellation landed since the check above, nothing of the delivery changes and the new file
+  // is discarded — no checklist pointing at one file while the client sees another.
+  if (deliverable.protocol) {
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId }, select: { dueDate: true } })
+    try {
+      await replaceProtocolFileCore(deliverable.protocol.id, attachment.id, actor, {
+        amount: amount ?? deliverable.amount?.toString() ?? null,
+        dueDate: paymentDueDate ?? deliverable.paymentDueDate ?? task.dueDate,
+      })
+    } catch (err) {
+      await discardUploadedAttachment(attachment.id)
+      throw err
+    }
+  }
 
   const updated = await prisma.taskDeliverable.update({
     where: { id: deliverableId },

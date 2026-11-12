@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
+import { deleteFile } from '@/lib/b2'
+import { logger } from '@/lib/logger'
 import { buildPaymentInfo, insertProtocol } from './protocols.service'
 
 export const PAID_GUIDE_LOCKED =
@@ -10,6 +12,26 @@ export const CANCELLED_PROTOCOL_LOCKED = 'Protocolo cancelado não pode ser alte
 export interface ProtocolPaymentPatch {
   amount?: string | null
   dueDate?: Date | null
+}
+
+// A guarded write found the document changed since it was read (paid or cancelled in between):
+// re-read so the 409 names the real reason instead of always blaming a payment.
+export async function lockedProtocolError(protocolId: string): Promise<AppError> {
+  const current = await prisma.protocol.findUnique({ where: { id: protocolId }, select: { paidAt: true, cancelledAt: true } })
+  if (current?.cancelledAt) return new AppError(409, CANCELLED_PROTOCOL_LOCKED)
+  if (current?.paidAt) return new AppError(409, PAID_GUIDE_LOCKED)
+  return new AppError(409, 'O documento foi alterado por outra pessoa. Recarregue e tente de novo.')
+}
+
+// A file uploaded for a write that then lost the race is never referenced: remove the attachment
+// row and the object in B2. Cleanup failures are logged and never hide the original error.
+export async function discardUploadedAttachment(attachmentId: string): Promise<void> {
+  try {
+    const attachment = await prisma.attachment.delete({ where: { id: attachmentId }, select: { storageKey: true } })
+    await deleteFile(attachment.storageKey)
+  } catch (err) {
+    logger.error({ err, attachmentId, event: 'orphan_attachment_cleanup_failed' }, 'Falha ao remover anexo não utilizado')
+  }
 }
 
 // Guards shared by every path that changes a sent document (re-delivery, replace, payment edit).
@@ -42,7 +64,7 @@ export async function replaceProtocolFileCore(
         ...(payment.dueDate !== undefined ? { dueDate: payment.dueDate } : {}),
       },
     })
-    if (count === 0) throw new AppError(409, PAID_GUIDE_LOCKED)
+    if (count === 0) throw await lockedProtocolError(protocolId)
     await tx.protocolEvent.create({
       data: {
         protocolId,
