@@ -1,6 +1,7 @@
 // apps/api/src/modules/notifications/notifications.service.ts
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
+import { logger } from '@/lib/logger'
 import { getTemplate, renderTemplate, PREVIEW_VARS } from '@/lib/template'
 import { uploadFile, deleteFile } from '@/lib/b2'
 import type { NotificationEvent, MessageChannel, NotificationStatus } from '@prisma/client'
@@ -122,24 +123,40 @@ export async function previewTemplate(
   return { rendered: renderTemplate(templateBody, PREVIEW_VARS) }
 }
 
+function providerErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
 export async function testWhatsApp(organizationId: string, number: string) {
   const config = await prisma.notificationConfig.findUnique({ where: { organizationId } })
   if (!config?.maximizebotToken) throw new AppError(422, 'MaximizeBot não configurado')
   const { sendWhatsApp } = await import('@/lib/maximizebot')
-  await sendWhatsApp(config.maximizebotToken, {
-    number,
-    body: 'Teste de integração MaximizeBot — Tramita AutoHubs',
-    saveOnTicket: false,
-  })
+  try {
+    await sendWhatsApp(config.maximizebotToken, {
+      number,
+      body: 'Teste de integração MaximizeBot — Tramita AutoHubs',
+      saveOnTicket: false,
+    })
+  } catch (err) {
+    const reason = providerErrorMessage(err)
+    logger.warn({ organizationId, reason }, 'Envio de WhatsApp de teste recusado pelo MaximizeBot')
+    throw new AppError(502, `Não foi possível enviar o WhatsApp de teste: o MaximizeBot recusou o envio (${reason}).`)
+  }
   return { ok: true }
 }
 
-export async function testEmail(_organizationId: string, to: string) {
+export async function testEmail(organizationId: string, to: string) {
   const { sendEmail } = await import('@/lib/mailer')
   const { wrapEmailHtml } = await import('@/lib/email-template')
   const subject = 'Teste de Email — Tramita'
   const body = 'Este é um email de teste enviado pelo Tramita.\n\nSe você recebeu esta mensagem, a integração de email está funcionando corretamente.'
-  await sendEmail(to, subject, body, wrapEmailHtml(subject, body))
+  try {
+    await sendEmail(to, subject, body, wrapEmailHtml(subject, body))
+  } catch (err) {
+    const reason = providerErrorMessage(err)
+    logger.warn({ organizationId, reason }, 'Envio de e-mail de teste recusado pelo provedor')
+    throw new AppError(502, `Não foi possível enviar o e-mail de teste: o provedor recusou o envio (${reason}).`)
+  }
   return { ok: true }
 }
 

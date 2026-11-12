@@ -85,14 +85,14 @@ export function Comments({ entityType, entityId, currentUserId, role }: Props) {
               key={c.id}
               className={cn(
                 'rounded-lg p-3 border-l-2',
-                isClient ? 'bg-blue-50 border-blue-400' : 'bg-violet-50 border-violet-400',
+                isClient ? 'bg-blue-500/10 border-blue-400' : 'bg-violet-500/10 border-violet-400',
                 isDeleted && 'opacity-60',
               )}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className={cn('text-xs font-semibold', isClient ? 'text-blue-700' : 'text-violet-700')}>
+                <span className={cn('text-xs font-semibold', isClient ? 'text-blue-700 dark:text-blue-300' : 'text-violet-700 dark:text-violet-300')}>
                   {author?.name ?? (isClient ? 'Cliente' : 'Colaborador')}
-                  {isClient && <span className="ml-1 text-blue-500 font-normal">(cliente)</span>}
+                  {isClient && <span className="ml-1 text-blue-500 dark:text-blue-400 font-normal">(cliente)</span>}
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">

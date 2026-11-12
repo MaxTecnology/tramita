@@ -339,9 +339,10 @@ export default function Tasks() {
     queryFn: () => api.get('/clients').then((r) => r.data),
   })
 
-  const { data: users = [] } = useQuery<User[]>({
-    queryKey: ['users'],
-    queryFn: () => api.get('/users').then((r) => r.data),
+  // /users/options (id+name) is open to the whole team; /users is admin-only.
+  const { data: users = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['user-options'],
+    queryFn: () => api.get('/users/options').then((r) => r.data),
   })
 
   const { data: departments = [] } = useQuery<Department[]>({

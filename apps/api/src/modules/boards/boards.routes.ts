@@ -39,9 +39,9 @@ export async function boardsRoutes(app: FastifyInstance) {
       return reply.send(boards.map((board) => filterBoardTasksForClient(board, scope)))
     }
 
-    // ORG_MEMBER always sees only boards they are responsible for
+    // ORG_MEMBER sees only processes tied to them (see board-visibility.ts)
     if (role === 'ORG_MEMBER') {
-      return reply.send(await listBoards(organizationId!, { ...query, responsibleUserId: sub }))
+      return reply.send(await listBoards(organizationId!, { ...query, visibleToMemberId: sub }))
     }
 
     return reply.send(await listBoards(organizationId!, query))
@@ -54,7 +54,8 @@ export async function boardsRoutes(app: FastifyInstance) {
     const isClient = request.user.role === 'CLIENT'
 
     if (!isClient) {
-      return reply.send(await getBoardById(id, request.user.organizationId!, false))
+      const visibleToMemberId = request.user.role === 'ORG_MEMBER' ? request.user.sub : undefined
+      return reply.send(await getBoardById(id, request.user.organizationId!, false, undefined, visibleToMemberId))
     }
 
     const scope = await getClientAccessScope(request.user.sub)

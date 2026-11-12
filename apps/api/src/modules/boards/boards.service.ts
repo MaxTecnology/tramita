@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { CreateBoardBody, UpdateBoardBody, SearchQuery } from './boards.schema'
 import { todayInBRT, startOfTodayInBRT } from '@/lib/date-only'
+import { memberBoardWhere } from './board-visibility'
 
 const DEFAULT_COLUMNS = [
   { title: 'Pendente', position: 0, color: '#6B7280', statusEffect: 'NONE' as const },
@@ -17,6 +18,7 @@ export async function listBoards(
     columnTitle?: string
     overdue?: boolean
     dueSoon?: boolean
+    visibleToMemberId?: string
   } = {},
   now: Date = new Date(),
 ) {
@@ -30,6 +32,7 @@ export async function listBoards(
       organizationId,
       isActive: true,
       type: 'OS',
+      ...(query.visibleToMemberId ? { AND: [memberBoardWhere(query.visibleToMemberId)] } : {}),
       ...(query.clientId
         ? { clientId: Array.isArray(query.clientId) ? { in: query.clientId } : query.clientId }
         : {}),
@@ -87,6 +90,7 @@ export async function getBoardById(
   organizationId: string,
   hideInvisibleTasks = false,
   clientId?: string | string[],
+  visibleToMemberId?: string,
 ) {
   const board = await prisma.board.findFirst({
     where: {
@@ -94,6 +98,7 @@ export async function getBoardById(
       organizationId,
       isActive: true,
       type: 'OS',
+      ...(visibleToMemberId ? { AND: [memberBoardWhere(visibleToMemberId)] } : {}),
       ...(clientId ? { clientId: Array.isArray(clientId) ? { in: clientId } : clientId } : {}),
     },
     include: {

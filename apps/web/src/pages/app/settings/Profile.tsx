@@ -150,7 +150,7 @@ export default function Profile() {
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">{profile?.name ?? user?.name}</p>
-              <span className="text-xs bg-blue-50 text-[#185FA5] font-medium px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-blue-500/10 text-[#185FA5] dark:text-blue-300 font-medium px-2 py-0.5 rounded-full">
                 {ROLE_LABEL[profile?.role ?? ''] ?? profile?.role}
               </span>
             </div>

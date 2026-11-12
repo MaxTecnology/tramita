@@ -8,6 +8,7 @@ import { cn, mensagemDeErro } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
   computeClientFormStatus,
   type ClientFormState,
@@ -351,10 +352,11 @@ function PortalAccessTab({
   const [draft, setDraft] = useState({ name: '', email: '', password: '', phone: '' })
   const allServedIds = served.map((d) => d.id)
 
+  const debouncedSearch = useDebouncedValue(search.trim(), 300)
   const { data: results = [] } = useQuery<ClientUserSearchResult[]>({
-    queryKey: ['client-user-search', search],
-    queryFn: () => api.get('/clients/search-users', { params: { q: search } }).then((r) => r.data),
-    enabled: search.trim().length >= 2,
+    queryKey: ['client-user-search', debouncedSearch],
+    queryFn: () => api.get('/clients/search-users', { params: { q: debouncedSearch } }).then((r) => r.data),
+    enabled: debouncedSearch.length >= 2,
   })
 
   if (served.length === 0) {

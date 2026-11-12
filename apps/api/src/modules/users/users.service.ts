@@ -15,6 +15,14 @@ export async function listUsers(organizationId: string) {
   })
 }
 
+export async function listUserOptions(organizationId: string): Promise<{ id: string; name: string }[]> {
+  return prisma.user.findMany({
+    where: { organizationId, isActive: true },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  })
+}
+
 export async function createUser(organizationId: string, data: CreateUserBody) {
   const existing = await prisma.user.findUnique({ where: { email: data.email } })
   if (existing) throw new AppError(409, 'E-mail já cadastrado')

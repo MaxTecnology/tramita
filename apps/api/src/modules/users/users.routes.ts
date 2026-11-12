@@ -4,7 +4,7 @@ import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createUserSchema, updateUserSchema, updateMyProfileSchema } from './users.schema'
-import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, getMyProfile, updateMyProfile } from './users.service'
+import { listUsers, listUserOptions, createUser, updateUser, deleteUser, resetUserPassword, getMyProfile, updateMyProfile } from './users.service'
 import { getPortfolio, transferResponsibilities } from './responsibility-transfer.service'
 import { portfolioQuerySchema, transferSchema } from './responsibility-transfer.schema'
 
@@ -30,6 +30,14 @@ export async function usersRoutes(app: FastifyInstance) {
   // qualquer usuário não-admin, quebrando o acesso ao próprio perfil. Ver mesmo padrão em
   // os-templates.routes.ts.
   const adminOnly = [requireRole('ORG_ADMIN')]
+
+  // Light id+name list for filters (Tasks "Colaborador"), open to the whole office team.
+  // The full list (/users: e-mail, role, status) stays admin-only.
+  app.get('/options', {
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+  }, async (request, reply) => {
+    return reply.send(await listUserOptions(request.user.organizationId!))
+  })
 
   app.get('/', { preHandler: adminOnly }, async (request, reply) => {
     return reply.send(await listUsers(request.user.organizationId!))

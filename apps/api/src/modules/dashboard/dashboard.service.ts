@@ -1,9 +1,16 @@
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import type { ProductivityQuery, ProductivityMetrics, MetricsBreakdown } from './dashboard.types'
+import { memberBoardWhere } from '@/modules/boards/board-visibility'
 import { utcDayLabel, todayInBRT, startOfTodayInBRT, startOfMonthInBRT } from '@/lib/date-only'
 
-export async function getDashboardMetrics(organizationId: string, now: Date = new Date()) {
+export async function getDashboardMetrics(
+  organizationId: string,
+  now: Date = new Date(),
+  visibleToMemberId?: string,
+) {
+  // ORG_MEMBER: same visibility as the process list, so the numbers match what they can open.
+  const scope: Prisma.BoardWhereInput = visibleToMemberId ? { AND: [memberBoardWhere(visibleToMemberId)] } : {}
   // startOfMonth usava getters locais do processo (now.getFullYear()/getMonth()) — em produção
   // o container normalmente roda em UTC, não BRT, então "este mês" virava até 3h adiantado perto
   // da troca de mês. startOfTodayInBRT/startOfMonthInBRT convertem de verdade pro fuso da org.
@@ -19,13 +26,14 @@ export async function getDashboardMetrics(organizationId: string, now: Date = ne
     tasksByStatus,
     atRiskBoards,
   ] = await Promise.all([
-    prisma.board.count({ where: { organizationId, isActive: true, type: 'OS' } }),
+    prisma.board.count({ where: { organizationId, isActive: true, type: 'OS', ...scope } }),
 
     prisma.board.count({
       where: {
         organizationId,
         isActive: true,
         type: 'OS',
+        ...scope,
         OR: [
           {
             columns: {
@@ -49,7 +57,7 @@ export async function getDashboardMetrics(organizationId: string, now: Date = ne
       where: {
         status: 'DONE',
         updatedAt: { gte: startOfMonth },
-        column: { board: { organizationId, isActive: true } },
+        column: { board: { organizationId, isActive: true, ...scope } },
       },
     }),
 
@@ -57,13 +65,13 @@ export async function getDashboardMetrics(organizationId: string, now: Date = ne
       where: {
         priority: 'URGENT',
         status: { notIn: ['DONE', 'DISREGARDED'] },
-        column: { board: { organizationId, isActive: true } },
+        column: { board: { organizationId, isActive: true, ...scope } },
       },
     }),
 
     prisma.task.groupBy({
       by: ['status'],
-      where: { column: { board: { organizationId, isActive: true } } },
+      where: { column: { board: { organizationId, isActive: true, ...scope } } },
       _count: { status: true },
     }),
 
@@ -72,6 +80,7 @@ export async function getDashboardMetrics(organizationId: string, now: Date = ne
         organizationId,
         isActive: true,
         type: 'OS',
+        ...scope,
         OR: [
           {
             columns: {

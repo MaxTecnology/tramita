@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import * as maximizebot from '@/lib/maximizebot'
 import * as mailer from '@/lib/mailer'
 import { processNotificationJob } from '@/workers/notification.worker'
+import { logger } from '@/lib/logger'
 import type { NotificationJob } from '@/lib/queue'
 import {
   createTestPlan,
@@ -326,5 +327,63 @@ describe('processNotificationJob — eventos USER pré-existentes nunca ganham W
 
     const logs = await prisma.notificationLog.findMany({ where: { organizationId: org.id, event: 'TASK_COMMENT_ADDED' } })
     expect(logs.map((l) => l.channel)).toEqual(['EMAIL'])
+  })
+})
+
+describe('processNotificationJob — falha no envio aparece no log da aplicação, não só no banco', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('cliente: registra logger.warn com evento, canal e motivo (sem o número do destinatário)', async () => {
+    const warn = vi.spyOn(logger, 'warn')
+    const { org, client, task } = await setup(true)
+    vi.mocked(maximizebot.sendWhatsApp).mockRejectedValueOnce(new Error('Request failed with status code 401'))
+
+    await processNotificationJob({
+      data: {
+        event: 'TASK_MOVED',
+        organizationId: org.id,
+        clientId: client.id,
+        taskId: task.id,
+        metadata: { taskTitle: task.title, fromColumn: 'A', toColumn: 'B' },
+      },
+    })
+
+    const call = warn.mock.calls.find(([, msg]) => msg === 'Falha ao enviar notificação')
+    expect(call).toBeDefined()
+    expect(call![0]).toMatchObject({
+      organizationId: org.id,
+      event: 'TASK_MOVED',
+      channel: 'WHATSAPP',
+      reason: 'Request failed with status code 401',
+    })
+    expect(JSON.stringify(call![0])).not.toContain('5511999999999')
+  })
+
+  it('usuário do escritório: registra logger.warn quando o e-mail falha', async () => {
+    const warn = vi.spyOn(logger, 'warn')
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    await prisma.notificationConfig.upsert({
+      where: { organizationId: org.id },
+      create: { organizationId: org.id, slaDigestEnabled: true },
+      update: { slaDigestEnabled: true },
+    })
+    const user = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    vi.mocked(mailer.sendEmail).mockRejectedValueOnce(new Error('API key is invalid'))
+
+    await processNotificationJob({
+      data: {
+        event: 'SLA_DIGEST',
+        organizationId: org.id,
+        recipientType: 'USER',
+        userId: user.id,
+        metadata: { taskCount: '1', criticalCount: '0', taskListText: '- X' },
+      },
+    })
+
+    const call = warn.mock.calls.find(([, msg]) => msg === 'Falha ao enviar notificação')
+    expect(call?.[0]).toMatchObject({ organizationId: org.id, event: 'SLA_DIGEST', channel: 'EMAIL', reason: 'API key is invalid' })
   })
 })

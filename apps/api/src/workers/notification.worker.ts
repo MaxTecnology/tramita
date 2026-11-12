@@ -159,6 +159,8 @@ async function processClientNotification(
       } catch (err) {
         status = 'FAILED'
         error = err instanceof Error ? err.message : String(err)
+        // Recipient (phone/e-mail) stays out of the app log — it is in notification_logs.
+        logger.warn({ organizationId, clientId, taskId, requestId, event, channel, reason: error }, 'Falha ao enviar notificação')
       }
 
       await prisma.notificationLog.create({
@@ -247,6 +249,7 @@ async function processUserNotification(
       status = 'FAILED'
       error = err instanceof Error ? err.message : String(err)
       recipient = channel === 'EMAIL' ? user.email : (user.phone ?? '')
+      logger.warn({ organizationId, userId: user.id, event, channel, reason: error }, 'Falha ao enviar notificação')
     }
 
     await prisma.notificationLog.create({

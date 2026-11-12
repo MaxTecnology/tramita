@@ -432,3 +432,21 @@ levar a checagem de I5 do `createTask` pra dentro da transação.
 ## Prisma: `package.json#prisma` deprecado (encontrado em 2026-11-12)
 
 O `migrate deploy` avisa que a configuração em `package.json#prisma` (seed) será removida no Prisma 7. Migrar para `prisma.config.ts` quando formos atualizar para o Prisma 7 — hoje é só aviso, não quebra nada.
+
+## Visibilidade do ORG_MEMBER aplicada só em leitura de processo (encontrado em 2026-11-12)
+
+A regra de visibilidade do Membro (`apps/api/src/modules/boards/board-visibility.ts`: responsável do
+processo OU responsável por departamento que atende o cliente OU com tarefa atribuída) vale para
+`GET /boards`, `GET /boards/:id` e `GET /dashboard/metrics`. As demais rotas que recebem um id de
+processo/tarefa (`PATCH /boards/:id`, `/boards/:id/tasks/search`, `/boards/:id/stream`, mutações de
+tarefa/coluna) ainda só checam a organização — um Membro que conheça o id consegue agir num processo
+que não vê na lista. Mesma organização, sem vazamento entre tenants, mas fecha o modelo de permissão.
+
+**Correção sugerida:** helper `assertMemberCanSeeBoard(boardId, user)` chamado nessas rotas quando
+`role === 'ORG_MEMBER'`, com teste por rota (404 para processo fora do escopo).
+
+## Selos e tela de Assinatura com cores fixas claras (encontrado em 2026-11-12)
+
+Selos `bg-gray-100 text-gray-600` (prioridade baixa, status, perfis) e a tela Configurações →
+Assinatura (`bg-white`, `bg-gray-50`) não acompanham o modo escuro. Legíveis (fundo claro com texto
+escuro), mas destoam. Trocar por tokens (`bg-neutral-bg text-neutral-text`, `bg-surface`).
