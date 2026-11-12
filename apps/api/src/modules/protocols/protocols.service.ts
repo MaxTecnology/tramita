@@ -6,6 +6,7 @@ import { enqueueNotification } from '@/lib/queue'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 import { getSignedDownloadUrl } from '@/lib/b2'
 import { utcDayLabel, todayInBRT } from '@/lib/date-only'
+import { formatBRL } from '@/lib/money'
 import type { CreateProtocolBody } from './protocols.schema'
 import type { ProtocolStatus } from '@prisma/client'
 
@@ -62,26 +63,67 @@ export async function createProtocol(
     if (alreadyLinked) throw new AppError(409, 'Esse anexo já está vinculado a outro protocolo')
   }
 
-  const clientId = task.column.board.clientId
-  const number = await nextProtocolNumber(organizationId)
+  return insertProtocol({
+    organizationId,
+    clientId: task.column.board.clientId,
+    taskId,
+    attachmentId: data.attachmentId,
+    title: data.title,
+    content: data.content,
+    dueDate: data.dueDate,
+    createdById: staffId,
+  })
+}
+
+export interface InsertProtocolInput {
+  organizationId: string
+  clientId: string
+  taskId: string
+  title: string
+  createdById: string
+  attachmentId?: string
+  content?: string
+  dueDate?: Date | null
+  competence?: Date | null
+  requiresPayment?: boolean
+  amount?: string | null
+  deliverableId?: string
+}
+
+// "Valor: R$ 1.234,56 — vencimento 20/11/2026" for payment guides, '' otherwise (template var
+// {{paymentInfo}} of PROTOCOL_CREATED).
+export function buildPaymentInfo(p: { requiresPayment: boolean; amount: { toString(): string } | null; dueDate: Date | null }): string {
+  if (!p.requiresPayment || !p.amount) return ''
+  const due = p.dueDate ? ` — vencimento ${p.dueDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}` : ''
+  return `\nValor: ${formatBRL(p.amount)}${due}`
+}
+
+// Single writer of new protocols (manual and generated from a delivery): number, SENT event and
+// PROTOCOL_CREATED notification.
+export async function insertProtocol(input: InsertProtocolInput) {
+  const number = await nextProtocolNumber(input.organizationId)
 
   let protocol
   try {
     protocol = await prisma.protocol.create({
       data: {
-        organizationId,
+        organizationId: input.organizationId,
         number,
-        clientId,
-        taskId,
-        attachmentId: data.attachmentId,
-        title: data.title,
-        content: data.content,
-        dueDate: data.dueDate,
-        createdById: staffId,
+        clientId: input.clientId,
+        taskId: input.taskId,
+        attachmentId: input.attachmentId,
+        title: input.title,
+        content: input.content,
+        dueDate: input.dueDate ?? undefined,
+        competence: input.competence ?? undefined,
+        requiresPayment: input.requiresPayment ?? false,
+        amount: input.amount ?? undefined,
+        deliverableId: input.deliverableId,
+        createdById: input.createdById,
       },
     })
   } catch (err) {
-    // A checagem de "já vinculado" acima tem uma janela de corrida (duas requisições
+    // A checagem de "já vinculado" em createProtocol tem uma janela de corrida (duas requisições
     // concorrentes pro mesmo anexo passam as duas pelo findFirst antes de qualquer insert) — sem
     // isso, a perdedora cairia num P2002 bruto (500) em vez do mesmo erro de validação claro.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -90,13 +132,13 @@ export async function createProtocol(
     throw err
   }
 
-  const staffUser = await prisma.user.findUnique({ where: { id: staffId }, select: { name: true, email: true } })
+  const staffUser = await prisma.user.findUnique({ where: { id: input.createdById }, select: { name: true, email: true } })
   await prisma.protocolEvent.create({
     data: {
       protocolId: protocol.id,
       type: 'SENT',
       actorType: 'user',
-      actorId: staffId,
+      actorId: input.createdById,
       actorName: staffUser?.name ?? null,
       actorEmail: staffUser?.email ?? null,
     },
@@ -104,10 +146,10 @@ export async function createProtocol(
 
   await enqueueNotification({
     event: 'PROTOCOL_CREATED',
-    organizationId,
-    clientId,
-    taskId,
-    metadata: { protocolTitle: data.title },
+    organizationId: input.organizationId,
+    clientId: input.clientId,
+    taskId: input.taskId,
+    metadata: { protocolTitle: input.title, paymentInfo: buildPaymentInfo(protocol) },
   })
 
   return protocol

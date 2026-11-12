@@ -5,6 +5,16 @@ import { enqueueNotification } from '@/lib/queue'
 import { resolveCompletedAt } from '@/lib/task-completion'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 import type { TaskStatus } from '@prisma/client'
+import { parseMoney } from '@/lib/money'
+import { assertProtocolEditable, upsertProtocolForDeliverable } from '@/modules/protocols/protocol-from-deliverable'
+
+// "YYYY-MM-DD" → midnight UTC (date-only label, same convention as Task.dueDate)
+function parseDateOnly(value: string): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new AppError(400, 'Data de vencimento inválida')
+  const d = new Date(`${value}T00:00:00.000Z`)
+  if (Number.isNaN(d.getTime())) throw new AppError(400, 'Data de vencimento inválida')
+  return d
+}
 
 export interface UploadPayload {
   filename: string
@@ -163,10 +173,20 @@ export async function deliverDocument(
   organizationId: string,
   actor: { id: string },
   payload: UploadPayload,
+  payment: { amount?: string; paymentDueDate?: string } = {},
 ) {
   await verifyTaskAccess(taskId, organizationId)
-  const deliverable = await prisma.taskDeliverable.findFirst({ where: { id: deliverableId, taskId } })
+  const deliverable = await prisma.taskDeliverable.findFirst({ where: { id: deliverableId, taskId }, include: { protocol: true } })
   if (!deliverable) throw new AppError(404, 'Entregável não encontrado')
+
+  // Validate everything before uploading: a refused delivery leaves no orphan file behind
+  if (deliverable.protocol) assertProtocolEditable(deliverable.protocol)
+  let amount: string | undefined
+  if (deliverable.requiresPayment) {
+    if (!payment.amount?.trim()) throw new AppError(400, 'Informe o valor da guia')
+    amount = parseMoney(payment.amount)
+  }
+  const paymentDueDate = deliverable.requiresPayment && payment.paymentDueDate ? parseDateOnly(payment.paymentDueDate) : undefined
 
   const orgSlug = await getOrgSlug(organizationId)
   const storageKey = `task-documents/${orgSlug}/${taskId}/${Date.now()}-${payload.filename}`
@@ -181,9 +201,14 @@ export async function deliverDocument(
 
   const updated = await prisma.taskDeliverable.update({
     where: { id: deliverableId },
-    data: { attachmentId: attachment.id, deliveredById: actor.id, deliveredAt: new Date() },
+    data: {
+      attachmentId: attachment.id, deliveredById: actor.id, deliveredAt: new Date(),
+      ...(amount !== undefined ? { amount } : {}),
+      ...(paymentDueDate !== undefined ? { paymentDueDate } : {}),
+    },
   })
 
+  await upsertProtocolForDeliverable(deliverableId, actor)
   await recalculateTaskStatus(taskId)
 
   return updated

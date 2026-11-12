@@ -110,6 +110,7 @@ async function processClientNotification(
     commentText: metadata.commentText,
     commentAuthorName: metadata.commentAuthorName,
     protocolTitle: metadata.protocolTitle,
+    paymentInfo: metadata.paymentInfo,
   }
 
   // Destinatário por departamento do assunto (tarefa ou solicitação), nos dois canais. O número da

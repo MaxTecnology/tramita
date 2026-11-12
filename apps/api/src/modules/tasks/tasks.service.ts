@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client'
 import { resolveCompletedAt } from '@/lib/task-completion'
 import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, ListTasksQuery } from './tasks.schema'
 import { assertDepartmentServesClient } from '@/modules/clients/client-coverage'
+import { syncProtocolsForTask } from '@/modules/protocols/protocol-from-deliverable'
 
 export interface Actor {
   id: string
@@ -367,6 +368,11 @@ export async function updateTask(
 
   if (data.status !== undefined) {
     await notifyIfBlocked(id, task.status, data.status, task.column.board.clientId, organizationId, updated.visibleToClient)
+  }
+
+  // Task became visible to the client: deliveries already done turn into documents in the portal
+  if (!task.visibleToClient && updated.visibleToClient) {
+    await syncProtocolsForTask(id, { id: actor.id })
   }
 
   await publishBoardEvent(task.column.board.id, {

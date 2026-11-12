@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { readMultipartField } from '@/lib/multipart-fields'
 import multipart from '@fastify/multipart'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
@@ -84,6 +85,7 @@ export async function taskDocumentsRoutes(app: FastifyInstance) {
       await deliverDocument(
         id, reqId, request.user.organizationId!, { id: request.user.sub },
         { filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer },
+        { amount: readMultipartField(file, 'amount'), paymentDueDate: readMultipartField(file, 'paymentDueDate') },
       ),
     )
   })
