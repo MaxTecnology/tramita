@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { getFreshAccessToken, redirectToLogin } from '@/lib/auth-refresh'
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
 
@@ -15,13 +16,21 @@ export function useRequestsBadgeStream(): void {
     function connect() {
       if (cancelled) return
 
-      const token = localStorage.getItem('accessToken')
-      if (!token) return
-
       // 50ms delay prevents React StrictMode double-invocation from opening two
       // simultaneous connections — cleanup cancels the timer before EventSource opens
-      connectTimerRef.current = setTimeout(() => {
+      connectTimerRef.current = setTimeout(async () => {
         if (cancelled) return
+
+        // EventSource can't see a 401 nor refresh on its own: after the tab sits idle the
+        // stored token is expired, so refresh it here before (re)connecting.
+        let token: string | null
+        try {
+          token = await getFreshAccessToken()
+        } catch {
+          redirectToLogin()
+          return
+        }
+        if (!token || cancelled) return
 
         const es = new EventSource(`${BASE_URL}/requests/stream?token=${token}`)
         esRef.current = es
