@@ -102,6 +102,7 @@ model User {
   comments                     Comment[]
   requestComments              RequestComment[]
   protocols                    Protocol[]
+  cancelledProtocols           Protocol[]                @relation("ProtocolCancelledBy")
   attachments                  Attachment[]
   responsibleBoards            Board[]                   @relation("BoardResponsible")
   clientAssignments            ClientAssignment[]
@@ -195,8 +196,9 @@ model ClientUser {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  accesses     ClientUserAccess[]
+  organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  accesses      ClientUserAccess[]
+  paidProtocols Protocol[]
 
   @@unique([email, organizationId])
   @@map("client_users")
@@ -570,6 +572,8 @@ model RecurringTaskTemplateDocument {
   deliveryTemplateId String?
   name               String
   position           Int
+  // Only meaningful on delivery rows: the generated deliverable is a payment guide
+  requiresPayment    Boolean @default(false)
 
   requestTemplate  RecurringTaskTemplate? @relation("TemplateDocumentRequests", fields: [requestTemplateId], references: [id], onDelete: Cascade)
   deliveryTemplate RecurringTaskTemplate? @relation("TemplateDocumentDeliveries", fields: [deliveryTemplateId], references: [id], onDelete: Cascade)
@@ -637,22 +641,28 @@ enum DocumentRequirementStatus {
   UPLOADED
   APPROVED
   REJECTED
+  NOT_APPLICABLE
 }
 
 model TaskDeliverable {
-  id            String    @id @default(cuid())
-  taskId        String
-  name          String
-  attachmentId  String?   @unique
-  deliveredById String?
-  deliveredAt   DateTime?
-  position      Int
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  taskId          String
+  name            String
+  attachmentId    String?   @unique
+  deliveredById   String?
+  deliveredAt     DateTime?
+  position        Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  // Payment guide (DAS, FGTS...): amount and due date informed by the office on delivery
+  requiresPayment Boolean   @default(false)
+  amount          Decimal?  @db.Decimal(12, 2)
+  paymentDueDate  DateTime?
 
   task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
   attachment  Attachment? @relation(fields: [attachmentId], references: [id])
   deliveredBy User?       @relation(fields: [deliveredById], references: [id])
+  protocol    Protocol?
 
   @@map("task_deliverables")
 }
@@ -671,17 +681,37 @@ model Protocol {
   createdById    String
   createdAt      DateTime       @default(now())
 
-  organization Organization    @relation(fields: [organizationId], references: [id])
-  client       Client          @relation(fields: [clientId], references: [id])
-  task         Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  attachment   Attachment?     @relation(fields: [attachmentId], references: [id])
-  createdBy    User            @relation(fields: [createdById], references: [id])
+  // Client portal "documentos recebidos": competence, payment and lifecycle. dueDate above is the
+  // guide's due date (vencimento).
+  competence               DateTime?
+  requiresPayment          Boolean   @default(false)
+  amount                   Decimal?  @db.Decimal(12, 2)
+  paidAt                   DateTime?
+  paidAmount               Decimal?  @db.Decimal(12, 2)
+  paidByClientUserId       String?
+  paymentProofAttachmentId String?   @unique
+  deliverableId            String?   @unique
+  cancelledAt              DateTime?
+  cancelledById            String?
+  cancellationReason       String?
+  fileUpdatedAt            DateTime?
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  client       Client           @relation(fields: [clientId], references: [id])
+  task         Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  attachment   Attachment?      @relation(fields: [attachmentId], references: [id])
+  createdBy    User             @relation(fields: [createdById], references: [id])
   events       ProtocolEvent[]
+  paidBy       ClientUser?      @relation(fields: [paidByClientUserId], references: [id])
+  paymentProof Attachment?      @relation("ProtocolPaymentProof", fields: [paymentProofAttachmentId], references: [id])
+  deliverable  TaskDeliverable? @relation(fields: [deliverableId], references: [id])
+  cancelledBy  User?            @relation("ProtocolCancelledBy", fields: [cancelledById], references: [id])
 
   @@unique([organizationId, number])
   @@index([organizationId, status])
   @@index([organizationId, dueDate])
   @@index([clientId])
+  @@index([organizationId, requiresPayment, paidAt])
   @@map("protocols")
 }
 
@@ -693,16 +723,20 @@ enum ProtocolStatus {
 }
 
 model ProtocolEvent {
-  id         String            @id @default(cuid())
-  protocolId String
-  type       ProtocolEventType
-  actorType  String
-  actorId    String?
-  actorName  String?
-  actorEmail String?
-  ip         String?
-  userAgent  String?
-  createdAt  DateTime          @default(now())
+  id                   String            @id @default(cuid())
+  protocolId           String
+  type                 ProtocolEventType
+  actorType            String
+  actorId              String?
+  actorName            String?
+  actorEmail           String?
+  ip                   String?
+  userAgent            String?
+  createdAt            DateTime          @default(now())
+  // Free text shown in the history ("R$ 10,00 → R$ 12,00", cancellation reason)
+  detail               String?
+  // File replaced by a REPLACED event — kept, never deleted
+  previousAttachmentId String?
 
   protocol Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
 
@@ -715,6 +749,11 @@ enum ProtocolEventType {
   VIEWED
   DOWNLOADED
   EXPIRED
+  PAID
+  UNPAID
+  AMOUNT_CHANGED
+  REPLACED
+  CANCELLED
 }
 
 model ProtocolCounter {
@@ -802,6 +841,7 @@ model Attachment {
   deliverable         TaskDeliverable?
   protocol            Protocol?
   receivedDocument    ReceivedDocument?
+  paymentProofOf      Protocol?                @relation("ProtocolPaymentProof")
 
   @@map("attachments")
 }
