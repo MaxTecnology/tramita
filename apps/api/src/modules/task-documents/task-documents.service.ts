@@ -120,6 +120,36 @@ export async function uploadForRequirement(
   return prisma.taskDocumentRequirement.findUniqueOrThrow({ where: { id: requirementId }, include: { attachment: true } })
 }
 
+// Client's "Nada a enviar" (value=true) and its undo (false). Undo is refused once the task is done.
+export async function setNotApplicable(
+  taskId: string,
+  requirementId: string,
+  organizationId: string,
+  clientUserId: string,
+  value: boolean,
+) {
+  const task = await verifyTaskAccess(taskId, organizationId, clientUserId)
+  const requirement = await prisma.taskDocumentRequirement.findFirst({ where: { id: requirementId, taskId } })
+  if (!requirement) throw new AppError(404, 'Documento não encontrado')
+
+  if (value) {
+    if (requirement.status !== 'PENDING' && requirement.status !== 'REJECTED') {
+      throw new AppError(409, 'Esse documento já foi enviado ou resolvido')
+    }
+    await prisma.taskDocumentRequirement.update({
+      where: { id: requirementId },
+      data: { status: 'NOT_APPLICABLE', rejectionReason: null, reviewedById: null, reviewedAt: null },
+    })
+  } else {
+    if (requirement.status !== 'NOT_APPLICABLE') throw new AppError(409, 'Esse documento não está marcado como "Nada a enviar"')
+    if (task.status === 'DONE') throw new AppError(409, 'A tarefa já foi concluída')
+    await prisma.taskDocumentRequirement.update({ where: { id: requirementId }, data: { status: 'PENDING' } })
+  }
+
+  await recalculateTaskStatus(taskId)
+  return prisma.taskDocumentRequirement.findUniqueOrThrow({ where: { id: requirementId } })
+}
+
 export async function reviewDocumentRequirement(
   taskId: string,
   requirementId: string,
@@ -131,7 +161,9 @@ export async function reviewDocumentRequirement(
   await verifyTaskAccess(taskId, organizationId)
   const requirement = await prisma.taskDocumentRequirement.findFirst({ where: { id: requirementId, taskId } })
   if (!requirement) throw new AppError(404, 'Documento não encontrado')
-  if (requirement.status !== 'UPLOADED') {
+  // A client's "Nada a enviar" can be contested (rejected with a reason), never approved again
+  const contestingNotApplicable = requirement.status === 'NOT_APPLICABLE' && decision === 'REJECTED'
+  if (requirement.status !== 'UPLOADED' && !contestingNotApplicable) {
     throw new AppError(422, 'Só é possível avaliar um documento que já foi enviado')
   }
   if (decision === 'REJECTED' && !rejectionReason) {
@@ -256,7 +288,8 @@ export async function recalculateTaskStatus(taskId: string) {
   })
 
   const hasPendingOrRejected = task.documentRequirements.some((d) => d.status === 'PENDING' || d.status === 'REJECTED')
-  const allRequirementsApproved = task.documentRequirements.every((d) => d.status === 'APPROVED')
+  // "Nada a enviar" counts as resolved, like an approval
+  const allRequirementsApproved = task.documentRequirements.every((d) => d.status === 'APPROVED' || d.status === 'NOT_APPLICABLE')
   const allDeliverablesDone = task.deliverables.every((d) => d.deliveredAt !== null)
   const autoComplete = task.recurringTemplate?.autoCompleteOnAllActivitiesDone ?? false
 

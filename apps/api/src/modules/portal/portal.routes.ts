@@ -16,10 +16,11 @@ import {
 } from '@/modules/requests/requests.service'
 import { createRequestAttachment } from '@/modules/requests/request-attachments.service'
 import { listProtocolsForClient, registerView, registerDownload } from '@/modules/protocols/protocols.service'
-import { listTaskDocuments, uploadForRequirement } from '@/modules/task-documents/task-documents.service'
+import { listTaskDocuments, uploadForRequirement, setNotApplicable } from '@/modules/task-documents/task-documents.service'
+import { getPortalHome, listDocumentRequestMonths, listDocumentRequestsByMonth } from './portal-overview.service'
 import { markProtocolPaid, unmarkProtocolPaid } from '@/modules/protocols/protocol-payment.service'
 import { readMultipartField } from '@/lib/multipart-fields'
-import { portalProtocolsQuerySchema, markPaidSchema } from './portal.schema'
+import { portalProtocolsQuerySchema, markPaidSchema, portalClientQuerySchema, documentRequestsQuerySchema } from './portal.schema'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
 
@@ -177,6 +178,42 @@ export async function portalRoutes(app: FastifyInstance) {
     )
 
     return reply.status(201).send(attachment)
+  })
+
+  async function assertClientInScope(clientUserId: string, clientId: string) {
+    const scope = await getClientAccessScope(clientUserId)
+    if (!scope.clientIds.includes(clientId)) throw new AppError(404, 'Empresa não encontrada')
+  }
+
+  app.get('/home', async (request, reply) => {
+    const result = portalClientQuerySchema.safeParse(request.query)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    await assertClientInScope(request.user.sub, result.data.clientId)
+    return reply.send(await getPortalHome(request.user.organizationId!, result.data.clientId, request.user.sub))
+  })
+
+  app.get('/document-requests/months', async (request, reply) => {
+    const result = portalClientQuerySchema.safeParse(request.query)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    await assertClientInScope(request.user.sub, result.data.clientId)
+    return reply.send(await listDocumentRequestMonths(request.user.organizationId!, result.data.clientId, request.user.sub))
+  })
+
+  app.get('/document-requests', async (request, reply) => {
+    const result = documentRequestsQuerySchema.safeParse(request.query)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    await assertClientInScope(request.user.sub, result.data.clientId)
+    return reply.send(await listDocumentRequestsByMonth(request.user.organizationId!, result.data.clientId, request.user.sub, result.data.competence))
+  })
+
+  app.post('/tasks/:taskId/documents/requests/:reqId/not-applicable', { preHandler: [checkSubscription] }, async (request, reply) => {
+    const { taskId, reqId } = request.params as { taskId: string; reqId: string }
+    return reply.send(await setNotApplicable(taskId, reqId, request.user.organizationId!, request.user.sub, true))
+  })
+
+  app.delete('/tasks/:taskId/documents/requests/:reqId/not-applicable', { preHandler: [checkSubscription] }, async (request, reply) => {
+    const { taskId, reqId } = request.params as { taskId: string; reqId: string }
+    return reply.send(await setNotApplicable(taskId, reqId, request.user.organizationId!, request.user.sub, false))
   })
 
   app.get('/protocols', async (request, reply) => {
