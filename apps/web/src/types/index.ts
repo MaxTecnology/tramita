@@ -334,7 +334,13 @@ export interface ReceivedDocument {
   taskId: string | null
   how: string | null
   filename: string
-  task: { id: string; title: string; competence: string | null; client: { name: string } } | null
+  task: {
+    id: string
+    title: string
+    competence: string | null
+    client: { name: string }
+    pendingDeliverables: { id: string; name: string; requiresPayment: boolean }[]
+  } | null
   createdAt: string
 }
 

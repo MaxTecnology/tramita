@@ -8,7 +8,7 @@ import {
   ingerirDocumento, listarFilaDeRevisao, confirmarSugestao, trocarTarefa, rejeitarDocumento, reabrirDocumento,
   obterMetricas, listarObrigacoes, obterUrlVisualizacao, listarRejeitados,
 } from './document-reader.service'
-import { trocarTarefaBodySchema } from './document-reader.schema'
+import { trocarTarefaBodySchema, anexarOpcoesSchema } from './document-reader.schema'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'] as const
@@ -94,7 +94,9 @@ export async function documentReaderRoutes(app: FastifyInstance) {
     preHandler: [requireRole(...ORG_ROLES), checkSubscription],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    return reply.send(await confirmarSugestao(id, request.user.organizationId!, { id: request.user.sub, role: request.user.role }))
+    const opcoes = anexarOpcoesSchema.safeParse(request.body ?? {})
+    if (!opcoes.success) throw new AppError(400, opcoes.error.errors[0].message)
+    return reply.send(await confirmarSugestao(id, request.user.organizationId!, { id: request.user.sub, role: request.user.role }, opcoes.data))
   })
 
   app.post('/document-reader/:id/trocar-tarefa', {
@@ -103,7 +105,8 @@ export async function documentReaderRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const result = trocarTarefaBodySchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
-    return reply.send(await trocarTarefa(id, request.user.organizationId!, result.data.taskId, { id: request.user.sub, role: request.user.role }))
+    const { taskId, ...opcoes } = result.data
+    return reply.send(await trocarTarefa(id, request.user.organizationId!, taskId, { id: request.user.sub, role: request.user.role }, opcoes))
   })
 
   app.post('/document-reader/:id/rejeitar', {

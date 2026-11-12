@@ -1,10 +1,12 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import type { ReceivedDocument, RejectedDocument } from '@/types'
 import { toast } from 'sonner'
 import { mensagemDeErro } from '@/lib/utils'
+import { toApiAmount, toInputAmount } from '@/lib/money'
 
 function AbaRejeitados() {
   const queryClient = useQueryClient()
@@ -97,9 +99,78 @@ function SeletorDeTarefa({ onEscolher, onCancelar }: { onEscolher: (taskId: stri
   )
 }
 
+type Campo = { bruto: string; valor: string | number | null; valido: boolean }
+
+export interface AnexarOpcoes {
+  deliverableId?: string
+  amount?: string
+  paymentDueDate?: string
+}
+
+// Which pending delivery of the task the document fills, plus amount/due date when it is a payment
+// guide (pre-filled with what the robot read). Returns null while the form is incomplete.
+function OpcoesDeEntrega({ entregas, campos, onChange }: {
+  entregas: { id: string; name: string; requiresPayment: boolean }[]
+  campos: Record<string, unknown>
+  onChange: (opcoes: AnexarOpcoes | null) => void
+}) {
+  const valorLido = campos.valor as Campo | undefined
+  const vencLido = campos.vencimento as Campo | undefined
+  const [deliverableId, setDeliverableId] = useState(entregas.length === 1 ? entregas[0].id : '')
+  const [valor, setValor] = useState(valorLido?.valido && typeof valorLido.valor === 'number' ? toInputAmount(valorLido.valor.toFixed(2)) : '')
+  const [vencimento, setVencimento] = useState(vencLido?.valido && typeof vencLido.valor === 'string' ? vencLido.valor : '')
+  const entrega = entregas.find((e) => e.id === deliverableId)
+  // Parent passes a new callback every render; a ref keeps the effect from looping
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+
+  useEffect(() => {
+    const emit = onChangeRef.current
+    if (!entrega) return emit(null)
+    if (!entrega.requiresPayment) return emit({ deliverableId: entrega.id })
+    try {
+      emit({ deliverableId: entrega.id, amount: toApiAmount(valor), paymentDueDate: vencimento || undefined })
+    } catch {
+      emit(null)
+    }
+  }, [entrega, valor, vencimento])
+
+  return (
+    <div className="flex flex-wrap items-end gap-2 text-xs">
+      {entregas.length > 1 && (
+        <label className="flex flex-col gap-1 text-muted-foreground">
+          Preenche a entrega
+          <select
+            value={deliverableId}
+            onChange={(e) => setDeliverableId(e.target.value)}
+            className="h-8 rounded-md border border-border bg-surface px-2 text-sm text-foreground"
+          >
+            <option value="">Escolha…</option>
+            {entregas.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+        </label>
+      )}
+      {entrega?.requiresPayment && (
+        <>
+          <label className="flex flex-col gap-1 text-muted-foreground">
+            Valor da guia (R$)
+            <Input value={valor} onChange={(e) => setValor(e.target.value)} placeholder="1.234,56" className="h-8 w-32" inputMode="decimal" />
+          </label>
+          <label className="flex flex-col gap-1 text-muted-foreground">
+            Vencimento
+            <Input type="date" value={vencimento} onChange={(e) => setVencimento(e.target.value)} className="h-8 w-40" />
+          </label>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function ReviewQueue() {
   const queryClient = useQueryClient()
   const [trocandoId, setTrocandoId] = useState<string | null>(null)
+  // Per document: delivery choice + payment data (null = incomplete, blocks "Confirmar anexo")
+  const [opcoesPorDoc, setOpcoesPorDoc] = useState<Record<string, AnexarOpcoes | null>>({})
   const [aba, setAba] = useState<'fila' | 'rejeitados'>('fila')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -121,13 +192,15 @@ export default function ReviewQueue() {
   })
 
   const confirmarMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/document-reader/${id}/confirmar`),
+    mutationFn: (id: string) => api.post(`/document-reader/${id}/confirmar`, opcoesPorDoc[id] ?? {}),
     onSuccess: () => { toast.success('Documento anexado'); invalidar() },
     onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao confirmar')),
   })
 
   const trocarMutation = useMutation({
     mutationFn: ({ id, taskId }: { id: string; taskId: string }) => api.post(`/document-reader/${id}/trocar-tarefa`, { taskId }),
+    // Choosing another task: its deliveries are picked by the API (single pending one) or refused
+    // with a clear message; amount comes from the robot reading.
     onSuccess: () => { toast.success('Documento anexado na tarefa escolhida'); setTrocandoId(null); invalidar() },
     onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao trocar tarefa')),
   })
@@ -251,9 +324,21 @@ export default function ReviewQueue() {
                   </div>
                 )}
 
+                {doc.task && doc.task.pendingDeliverables.length > 0 && (
+                  <OpcoesDeEntrega
+                    entregas={doc.task.pendingDeliverables}
+                    campos={doc.extractedFields ?? {}}
+                    onChange={(opcoes) => setOpcoesPorDoc((prev) => ({ ...prev, [doc.id]: opcoes }))}
+                  />
+                )}
+
                 <div className="flex gap-2">
                   {doc.taskId && (
-                    <Button size="sm" onClick={() => confirmarMutation.mutate(doc.id)} disabled={confirmarMutation.isPending}>
+                    <Button
+                      size="sm"
+                      onClick={() => confirmarMutation.mutate(doc.id)}
+                      disabled={confirmarMutation.isPending || (!!doc.task?.pendingDeliverables.length && !opcoesPorDoc[doc.id])}
+                    >
                       Confirmar anexo
                     </Button>
                   )}

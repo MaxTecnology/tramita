@@ -7,6 +7,7 @@ import { getOrgSlug } from '@/lib/org-slug'
 import { AppError } from '@/errors/AppError'
 import { enqueueDocumentReader } from '@/lib/document-reader-queue'
 import { createAttachment } from '@/modules/attachments/attachments.service'
+import { deliverDocument } from '@/modules/task-documents/task-documents.service'
 import { extrairEInterpretar, decidir, type Modelo, type Base } from './engine/pipeline'
 import { soDigitos } from './engine/validadores'
 
@@ -224,6 +225,11 @@ export async function listarFilaDeRevisao(organizationId: string) {
         select: {
           id: true, title: true, competence: true,
           column: { select: { board: { select: { client: { select: { name: true } } } } } },
+          deliverables: {
+            where: { deliveredAt: null },
+            orderBy: { position: 'asc' },
+            select: { id: true, name: true, requiresPayment: true },
+          },
         },
       },
     },
@@ -234,7 +240,9 @@ export async function listarFilaDeRevisao(organizationId: string) {
     return {
       ...rest,
       filename: filenameDaStorageKey(doc.storageKey),
-      task: task ? { id: task.id, title: task.title, competence: task.competence, client: task.column.board.client } : null,
+      task: task
+        ? { id: task.id, title: task.title, competence: task.competence, client: task.column.board.client, pendingDeliverables: task.deliverables }
+        : null,
     }
   })
 }
@@ -290,42 +298,117 @@ async function assertCnpjBateComTarefa(doc: { organizationId: string; extractedF
   }
 }
 
+export interface AnexarOpcoes {
+  deliverableId?: string
+  amount?: string
+  paymentDueDate?: string
+}
+
+type Campos = Record<string, { bruto: string; valor: string | number | null; valido: boolean }> | null
+
+// Barreira: a competência lida no cabeçalho (YYYY-MM) tem que bater com a da tarefa. "pa" trimestral
+// ("2026-T2") não é comparado aqui — o casamento trimestral já é feito pelo motor (competenciaCab).
+async function assertCompetenciaBateComTarefa(doc: { extractedFields: unknown }, taskId: string) {
+  const campos = doc.extractedFields as Campos
+  const lida = [campos?.competencia, campos?.pa].find((c) => c?.valido && /^\d{4}-\d{2}$/.test(String(c.valor)))
+  if (!lida) return
+  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { competence: true } })
+  const esperada = competenciaParaRotulo(task?.competence ?? null)
+  if (!esperada || esperada === String(lida.valor)) return
+  const fmt = (r: string) => `${r.slice(5, 7)}/${r.slice(0, 4)}`
+  throw new AppError(
+    422,
+    `A competência lida no documento (${fmt(String(lida.valor))}) não bate com a da tarefa (${fmt(esperada)}) — confira se escolheu a tarefa certa`,
+  )
+}
+
+// Valor/vencimento lidos pelo robô (campos "valor" tipo moeda e "vencimento" tipo data), quando válidos
+function pagamentoLido(doc: { extractedFields: unknown }): { amount?: string; paymentDueDate?: string } {
+  const campos = doc.extractedFields as Campos
+  const valor = campos?.valor
+  const venc = campos?.vencimento
+  return {
+    amount: valor?.valido && typeof valor.valor === 'number' ? valor.valor.toFixed(2) : undefined,
+    paymentDueDate: venc?.valido && typeof venc.valor === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(venc.valor) ? venc.valor : undefined,
+  }
+}
+
 async function anexarDocumento(
   receivedDocumentId: string,
   organizationId: string,
   taskId: string,
   actor: { id: string; role: string },
   how: 'confirmado' | 'trocado' | 'criado',
+  opcoes: AnexarOpcoes = {},
 ) {
   const doc = await buscarDocumentoRevisavel(receivedDocumentId, organizationId)
-  if (how === 'trocado') await assertCnpjBateComTarefa(doc, taskId)
+  // Barreira em toda anexação (não só na troca): documento errado nunca chega ao cliente
+  await assertCnpjBateComTarefa(doc, taskId)
+  await assertCompetenciaBateComTarefa(doc, taskId)
+
+  const pendentes = await prisma.taskDeliverable.findMany({
+    where: { taskId, deliveredAt: null, task: { column: { board: { organizationId } } } },
+    orderBy: { position: 'asc' },
+  })
+  let entrega = null
+  if (opcoes.deliverableId) {
+    entrega = pendentes.find((d) => d.id === opcoes.deliverableId) ?? null
+    if (!entrega) throw new AppError(404, 'Entrega pendente não encontrada nesta tarefa')
+  } else if (pendentes.length === 1) {
+    entrega = pendentes[0]
+  } else if (pendentes.length > 1) {
+    throw new AppError(422, 'Essa tarefa tem mais de uma entrega pendente — escolha qual este documento preenche')
+  }
+
+  const lido = pagamentoLido(doc)
+  const pagamento = { amount: opcoes.amount ?? lido.amount, paymentDueDate: opcoes.paymentDueDate ?? lido.paymentDueDate }
+  // Valida antes de baixar/subir qualquer arquivo
+  if (entrega?.requiresPayment && !pagamento.amount) throw new AppError(400, 'Informe o valor da guia')
 
   const buffer = await downloadFile(doc.storageKey)
   const filename = filenameDaStorageKey(doc.storageKey)
-  const attachment = await createAttachment(taskId, organizationId, actor, {
-    filename, mimeType: 'application/pdf', size: buffer.length, buffer,
-  })
+  const payload = { filename, mimeType: 'application/pdf', size: buffer.length, buffer }
+
+  let attachmentId: string
+  if (entrega) {
+    // Preenche a entrega — gera/atualiza o protocolo que o cliente vê em "Documentos recebidos"
+    const entregue = await deliverDocument(taskId, entrega.id, organizationId, actor, payload, pagamento)
+    attachmentId = entregue.attachmentId!
+  } else {
+    attachmentId = (await createAttachment(taskId, organizationId, actor, payload)).id
+  }
 
   // Guarda de novo no update final (não só no findFirst inicial) — fecha a janela entre o check e
-  // o createAttachment acima: se outra revisão venceu a corrida nesse meio-tempo, não sobrescreve.
+  // o anexo acima: se outra revisão venceu a corrida nesse meio-tempo, não sobrescreve.
   const finalizado = await prisma.receivedDocument.updateMany({
     where: { id: receivedDocumentId, status: { in: AGUARDANDO_REVISAO } },
-    data: { status: 'ATTACHED', taskId, attachmentId: attachment.id, how, reviewedById: actor.id, reviewedAt: new Date() },
+    data: { status: 'ATTACHED', taskId, attachmentId, how, reviewedById: actor.id, reviewedAt: new Date() },
   })
   if (finalizado.count === 0) {
     throw new AppError(409, 'Documento foi revisado por outra pessoa enquanto este anexo era criado')
   }
-  return attachment
+  return prisma.attachment.findUniqueOrThrow({ where: { id: attachmentId } })
 }
 
-export async function confirmarSugestao(receivedDocumentId: string, organizationId: string, actor: { id: string; role: string }) {
+export async function confirmarSugestao(
+  receivedDocumentId: string,
+  organizationId: string,
+  actor: { id: string; role: string },
+  opcoes: AnexarOpcoes = {},
+) {
   const doc = await buscarDocumentoRevisavel(receivedDocumentId, organizationId)
   if (!doc.taskId) throw new AppError(422, 'Esse documento não tem tarefa sugerida — use trocarTarefa')
-  return anexarDocumento(receivedDocumentId, organizationId, doc.taskId, actor, 'confirmado')
+  return anexarDocumento(receivedDocumentId, organizationId, doc.taskId, actor, 'confirmado', opcoes)
 }
 
-export async function trocarTarefa(receivedDocumentId: string, organizationId: string, taskId: string, actor: { id: string; role: string }) {
-  return anexarDocumento(receivedDocumentId, organizationId, taskId, actor, 'trocado')
+export async function trocarTarefa(
+  receivedDocumentId: string,
+  organizationId: string,
+  taskId: string,
+  actor: { id: string; role: string },
+  opcoes: AnexarOpcoes = {},
+) {
+  return anexarDocumento(receivedDocumentId, organizationId, taskId, actor, 'trocado', opcoes)
 }
 
 export async function rejeitarDocumento(receivedDocumentId: string, organizationId: string, actor: { id: string; role: string }) {
