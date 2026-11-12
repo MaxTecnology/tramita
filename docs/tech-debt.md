@@ -537,3 +537,26 @@ portal aceitavam qualquer arquivo. **Resolvido:** política única (`src/lib/upl
 `src/lib/read-upload.ts`) em todas as rotas: tipo decidido pela extensão numa lista permitida (PDF,
 imagens, Office, TXT, CSV, XML, OFX, ZIP) — nunca pelo Content-Type do navegador —, e XML/Office/ZIP
 gravados no B2 com `Content-Disposition: attachment`. O web filtra o seletor de arquivo com `accept`.
+
+## Auditoria de segurança de 2026-11-12 — pendências que dependem de decisão de produto
+
+A auditoria (security-auditor) da rodada de débitos achou 0 crítico, 1 alto, 3 médios e 5 baixos. Foram
+corrigidos (commit `cfb6348`): webhook Asaas (header, comparação em tempo constante, segredo fora do
+log), SSE com duração máxima de 15 min, escrita do leitor de documentos no escopo do Membro, upload do
+leitor exige PDF de verdade, nome seguro na chave do B2, TXT/CSV baixam, MASTER no stream → 403.
+
+Ficam abertos, aguardando decisão do Max:
+
+- **Leitura do leitor de documentos pelo Membro** (`GET /document-reader/fila`, `/rejeitados`,
+  `/:id/visualizar`): hoje qualquer Membro vê a fila da organização inteira (nome do cliente, tarefa
+  sugerida, PDF). Opções: restringir a fila a ADMIN/MANAGER, ou mostrar ao Membro só documentos cuja
+  tarefa sugerida ele enxerga (os "não identificados" ficariam só com ADMIN/MANAGER).
+- **Solicitações para o Membro** (`/requests`, `/requests/:id`, comentários da solicitação): hoje
+  qualquer Membro vê e comenta todas as solicitações da organização. Pode ser intencional (pedido ainda
+  não virou processo); se a regra for "só a carteira dele", filtrar por cliente que ele atende.
+
+Ações fora do código:
+- Conferir no Dokploy se o webhook do Asaas está cadastrado com `?accessToken=` na URL; se sim, trocar
+  para o header (o Asaas envia `asaas-access-token`) e **rotacionar o `ASAAS_WEBHOOK_SECRET`**, que pode
+  ter ido para os logs antigos.
+- Conferir se o access log do Traefik está desligado (hoje só apareceria um ticket de SSE já consumido).
