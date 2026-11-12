@@ -7,7 +7,7 @@ import { SlaConfigProvider } from '@/hooks/useSlaConfig'
 import { useSlaAlerts } from '@/hooks/useSlaAlerts'
 import { SlaPermissionBanner } from '@/components/SlaPermissionBanner'
 import { api } from '@/lib/api'
-import { LayoutDashboard, Users, UserCheck, Settings, LogOut, ClipboardList, ListChecks, Inbox, Menu, X, UserCircle, FileStack, FileSearch } from 'lucide-react'
+import { LayoutDashboard, Users, UserCheck, Settings, LogOut, ClipboardList, ListChecks, Inbox, Menu, X, UserCircle, FileStack, FileSearch, Receipt } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER']
@@ -115,6 +115,9 @@ export default function AppLayout() {
             )}
             {ORG_ROLES.includes(role) && (
               <SidebarLink to="/app/document-reader" icon={<FileSearch size={16} />} label="Leitura de Documentos" onClick={handleNavClick} />
+            )}
+            {ORG_ROLES.includes(role) && (
+              <SidebarLink to="/app/guides" icon={<Receipt size={16} />} label="Guias não pagas" onClick={handleNavClick} />
             )}
 
             {(MANAGER_ROLES.includes(role) || ADMIN_ROLES.includes(role)) && (

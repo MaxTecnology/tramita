@@ -34,6 +34,7 @@ import Processes from '@/pages/app/Processes'
 import Requests from '@/pages/app/Requests'
 import Tasks from '@/pages/app/Tasks'
 import DocumentReaderQueue from '@/pages/app/document-reader/ReviewQueue'
+import UnpaidGuides from '@/pages/app/UnpaidGuides'
 import DocumentModels from '@/pages/app/settings/DocumentModels'
 import DocumentModelForm from '@/pages/app/settings/DocumentModelForm'
 
@@ -86,6 +87,7 @@ export const router = createBrowserRouter([
       },
       { path: 'requests', element: <Requests /> },
       { path: 'document-reader', element: <DocumentReaderQueue /> },
+      { path: 'guides', element: <UnpaidGuides /> },
       { path: 'board/:boardId', element: <Board /> },
       {
         path: 'clients',

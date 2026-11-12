@@ -10,6 +10,14 @@ import { useServedDepartments } from '@/hooks/useServedDepartments'
 import { hasUnseenClientReply } from '@/lib/request-comments'
 import type { Task, Attachment, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable, Protocol, Comment } from '@/types'
 import { toast } from 'sonner'
+import { formatBRL, toApiAmount } from '@/lib/money'
+import { PaymentFields, type PaymentValues } from './task-documents/PaymentFields'
+import { ProtocolOfficeCard } from './task-documents/ProtocolOfficeCard'
+import { AddDeliverableForm } from './task-documents/AddDeliverableForm'
+
+function isValidAmount(value: string): boolean {
+  try { toApiAmount(value); return true } catch { return false }
+}
 
 interface Props {
   task: Task
@@ -146,6 +154,8 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   const [protocolDueDate, setProtocolDueDate] = useState('')
   const [protocolAttachmentId, setProtocolAttachmentId] = useState('')
   const [protocolContent, setProtocolContent] = useState('')
+  const [protocolRequiresPayment, setProtocolRequiresPayment] = useState(false)
+  const [protocolAmount, setProtocolAmount] = useState('')
 
   const createProtocolMutation = useMutation({
     mutationFn: () => api.post(`/tasks/${task.id}/protocols`, {
@@ -153,6 +163,8 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
       dueDate: protocolDueDate ? new Date(protocolDueDate).toISOString() : undefined,
       attachmentId: protocolMode === 'attachment' ? protocolAttachmentId : undefined,
       content: protocolMode === 'text' ? protocolContent : undefined,
+      requiresPayment: protocolRequiresPayment,
+      amount: protocolRequiresPayment ? toApiAmount(protocolAmount) : undefined,
     }),
     onSuccess: () => {
       toast.success('Protocolo criado')
@@ -162,8 +174,10 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
       setProtocolDueDate('')
       setProtocolAttachmentId('')
       setProtocolContent('')
+      setProtocolRequiresPayment(false)
+      setProtocolAmount('')
     },
-    onError: () => toast.error('Erro ao criar protocolo'),
+    onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao criar protocolo')),
   })
 
   async function openProtocolReceipt(protocolId: string) {
@@ -208,9 +222,13 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   })
 
   const addDeliverableMutation = useMutation({
-    mutationFn: (name: string) => api.post(`/tasks/${task.id}/documents/deliveries`, { name }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] }),
+    mutationFn: ({ name, requiresPayment }: { name: string; requiresPayment: boolean }) =>
+      api.post(`/tasks/${task.id}/documents/deliveries`, { name, requiresPayment }),
+    onSuccess: () => { setAddingDeliverable(false); queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] }) },
   })
+  const [addingDeliverable, setAddingDeliverable] = useState(false)
+  // Payment guide delivery waits for amount/due date before uploading
+  const [pendingDelivery, setPendingDelivery] = useState<{ reqId: string; file: File } | null>(null)
 
   const uploadRequirementMutation = useMutation({
     mutationFn: ({ reqId, file }: { reqId: string; file: File }) => {
@@ -239,16 +257,21 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   })
 
   const deliverMutation = useMutation({
-    mutationFn: ({ reqId, file }: { reqId: string; file: File }) => {
+    mutationFn: ({ reqId, file, payment }: { reqId: string; file: File; payment?: Partial<PaymentValues> }) => {
       const form = new FormData()
+      // Text fields BEFORE the file: the API reads them from the same multipart stream
+      if (payment?.amount) form.append('amount', payment.amount)
+      if (payment?.paymentDueDate) form.append('paymentDueDate', payment.paymentDueDate)
       form.append('file', file)
       return api.post(`/tasks/${task.id}/documents/deliveries/${reqId}/upload`, form)
     },
     onSuccess: () => {
       toast.success('Documento entregue')
+      setPendingDelivery(null)
       queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] })
+      queryClient.invalidateQueries({ queryKey: ['protocols', task.id] })
     },
-    onError: () => toast.error('Erro ao entregar documento'),
+    onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao entregar documento')),
   })
 
   const uploadMutation = useMutation({
@@ -624,12 +647,20 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                 <div className="space-y-2">
                   {documents.deliverables.map((d) => (
                     <div key={d.id} className="bg-neutral-bg rounded-lg px-3 py-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-foreground">{d.name}</span>
-                        <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', d.deliveredAt ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500')}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm text-foreground">
+                          {d.name}
+                          {d.requiresPayment && <span className="ml-2 text-xs text-muted-foreground">guia de pagamento</span>}
+                        </span>
+                        <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', d.deliveredAt ? 'bg-success-bg text-success-text' : 'bg-neutral-bg text-neutral-text')}>
                           {d.deliveredAt ? 'Entregue' : 'Pendente'}
                         </span>
                       </div>
+                      {d.requiresPayment && d.amount && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatBRL(d.amount)}{d.paymentDueDate && ` · vence ${formatDateOnlyUTC(d.paymentDueDate)}`}
+                        </p>
+                      )}
                       {d.signedUrl && (
                         <a href={d.signedUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 block">
                           Ver arquivo entregue
@@ -639,23 +670,37 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                         <label className="inline-block mt-2 cursor-pointer">
                           <input type="file" className="hidden" onChange={(e) => {
                             const file = e.target.files?.[0]
-                            if (file) deliverMutation.mutate({ reqId: d.id, file })
+                            if (file && d.requiresPayment) setPendingDelivery({ reqId: d.id, file })
+                            else if (file) deliverMutation.mutate({ reqId: d.id, file })
                             e.target.value = ''
                           }} />
-                          <span className="text-xs text-blue-600 hover:underline">{d.deliveredAt ? 'Substituir arquivo' : 'Enviar arquivo'}</span>
+                          <span className="text-xs text-accent-hover hover:underline">{d.deliveredAt ? 'Substituir arquivo' : 'Enviar arquivo'}</span>
                         </label>
+                      )}
+                      {pendingDelivery?.reqId === d.id && (
+                        <PaymentFields
+                          initialAmount={d.amount}
+                          initialDueDate={d.paymentDueDate ?? task.dueDate}
+                          submitLabel={`Enviar ${pendingDelivery.file.name}`}
+                          pending={deliverMutation.isPending}
+                          onSubmit={(payment) => deliverMutation.mutate({ reqId: d.id, file: pendingDelivery.file, payment })}
+                          onCancel={() => setPendingDelivery(null)}
+                        />
                       )}
                     </div>
                   ))}
                 </div>
-                {canEdit && (
-                  <button
-                    onClick={() => { const name = window.prompt('Nome do documento a entregar:'); if (name?.trim()) addDeliverableMutation.mutate(name.trim()) }}
-                    className="text-xs text-blue-600 hover:underline mt-2"
-                  >
+                {canEdit && (addingDeliverable ? (
+                  <AddDeliverableForm
+                    pending={addDeliverableMutation.isPending}
+                    onSubmit={(v) => addDeliverableMutation.mutate(v)}
+                    onCancel={() => setAddingDeliverable(false)}
+                  />
+                ) : (
+                  <button onClick={() => setAddingDeliverable(true)} className="text-xs text-accent-hover hover:underline mt-2">
                     + Adicionar documento a entregar
                   </button>
-                )}
+                ))}
               </div>
             </div>
           )}
@@ -753,26 +798,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
               ) : (
                 <div className="space-y-2">
                   {protocols.map((p) => (
-                    <div key={p.id} className="rounded-lg border border-border p-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-foreground">{p.number} — {p.title}</p>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-bg text-muted-foreground">{p.status}</span>
-                      </div>
-                      {p.dueDate && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Vencimento: {formatDateOnlyUTC(p.dueDate)}
-                        </p>
-                      )}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="mt-1 h-auto px-0 text-xs text-[#185FA5] hover:underline"
-                        onClick={() => openProtocolReceipt(p.id)}
-                      >
-                        Ver comprovante
-                      </Button>
-                    </div>
+                    <ProtocolOfficeCard key={p.id} protocol={p} taskId={task.id} onReceipt={openProtocolReceipt} />
                   ))}
                 </div>
               )}
@@ -831,12 +857,29 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                     />
                   )}
 
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-foreground">
+                      <input type="checkbox" checked={protocolRequiresPayment} onChange={(e) => setProtocolRequiresPayment(e.target.checked)} />
+                      Guia de pagamento
+                    </label>
+                    {protocolRequiresPayment && (
+                      <input
+                        placeholder="Valor (1.234,56)"
+                        inputMode="decimal"
+                        value={protocolAmount}
+                        onChange={(e) => setProtocolAmount(e.target.value)}
+                        className="flex h-9 w-40 rounded-md border border-border bg-surface text-foreground px-3 text-sm"
+                      />
+                    )}
+                  </div>
+
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={() => setCreatingProtocol(false)}>Cancelar</Button>
                     <Button
                       onClick={() => createProtocolMutation.mutate()}
                       disabled={
                         createProtocolMutation.isPending || !protocolTitle.trim() ||
+                        (protocolRequiresPayment && !isValidAmount(protocolAmount)) ||
                         (protocolMode === 'attachment' ? !protocolAttachmentId : !protocolContent.trim())
                       }
                       className="bg-[#185FA5] hover:bg-[#0C447C] text-white"

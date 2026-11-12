@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { FailedGenerationsAlert } from '@/components/FailedGenerationsAlert'
+import { UnpaidGuidesCard } from '@/components/UnpaidGuidesCard'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { Protocol, ProtocolSummary } from '@/types'
@@ -75,6 +76,8 @@ function OverviewContent({ data }: { data: Metrics }) {
           </div>
         ))}
       </div>
+
+      <UnpaidGuidesCard />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Gráfico de barras — tarefas por status */}

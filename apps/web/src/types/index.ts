@@ -166,6 +166,15 @@ export interface Protocol {
   taskId: string
   clientId: string
   createdAt: string
+  competence?: string | null
+  requiresPayment?: boolean
+  amount?: string | null
+  paidAt?: string | null
+  paidAmount?: string | null
+  cancelledAt?: string | null
+  cancellationReason?: string | null
+  fileUpdatedAt?: string | null
+  deliverableId?: string | null
   client?: { id: string; name: string }
   attachment?: { filename: string } | null
   events?: ProtocolEvent[]
@@ -284,6 +293,9 @@ export interface TaskDeliverable {
   deliveredAt: string | null
   signedUrl: string | null
   position: number
+  requiresPayment: boolean
+  amount: string | null
+  paymentDueDate: string | null
 }
 
 export interface ClientUserAccessItem {
