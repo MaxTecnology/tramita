@@ -9,7 +9,7 @@ import { enqueueDocumentReader } from '@/lib/document-reader-queue'
 import { createAttachment } from '@/modules/attachments/attachments.service'
 import { deliverDocument } from '@/modules/task-documents/task-documents.service'
 import { extrairEInterpretar, decidir, type Modelo, type Base } from './engine/pipeline'
-import { soDigitos } from './engine/validadores'
+import { soDigitos, moedaNormalizada } from './engine/validadores'
 
 // Estados em que um ReceivedDocument ainda aguarda decisão humana — único momento em que o worker
 // (processarDocumento) ou uma ação da fila de revisão têm permissão de mudar o status.
@@ -328,7 +328,8 @@ function pagamentoLido(doc: { extractedFields: unknown }): { amount?: string; pa
   const valor = campos?.valor
   const venc = campos?.vencimento
   return {
-    amount: valor?.valido && typeof valor.valor === 'number' ? valor.valor.toFixed(2) : undefined,
+    // Exact text read from the document; the number is only a fallback for old extractions
+    amount: valor?.valido ? ((typeof valor.bruto === 'string' ? moedaNormalizada(valor.bruto) : null) ?? (typeof valor.valor === 'number' ? valor.valor.toFixed(2) : undefined)) : undefined,
     paymentDueDate: venc?.valido && typeof venc.valor === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(venc.valor) ? venc.valor : undefined,
   }
 }

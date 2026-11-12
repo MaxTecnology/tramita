@@ -85,6 +85,16 @@ describe('robô preenche a entrega com barreira de CNPJ/competência', () => {
     expect(await prisma.attachment.count({ where: { taskId: (await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })).taskId! } })).toBe(0)
   })
 
+  it('the amount comes from the text read in the document, not from the float', async () => {
+    const { org, deliverables, doc, actor } = await setup({
+      fields: { cnpj: campo('11222333000181', CNPJ), competencia: campo('2026-10'), valor: campo(10, 'R$ 12,34') },
+    })
+
+    await confirmarSugestao(doc.id, org.id, actor)
+
+    expect((await prisma.taskDeliverable.findUniqueOrThrow({ where: { id: deliverables[0].id } })).amount?.toString()).toBe('12.34')
+  })
+
   it('more than one pending deliverable requires choosing one', async () => {
     const { org, task, deliverables, doc, actor } = await setup({
       deliverables: [{ name: 'Guia DAS', requiresPayment: true }, { name: 'Extrato', requiresPayment: false }],

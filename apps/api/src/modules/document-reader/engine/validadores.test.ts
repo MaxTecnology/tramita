@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   normalizar, soDigitos, cnpjValido, cpfValido, parseData,
-  parsePeriodoApuracao, parseCompetencia, parseMoeda, extrairCnpjOuCpf,
+  parsePeriodoApuracao, parseCompetencia, parseMoeda, moedaNormalizada, extrairCnpjOuCpf,
 } from './validadores'
 
 describe('normalizar', () => {
@@ -65,6 +65,18 @@ describe('parsePeriodoApuracao', () => {
 describe('parseMoeda', () => {
   it('lê valor com separador de milhar', () => {
     expect(parseMoeda('R$ 1.234,56')).toBe(1234.56)
+  })
+})
+
+describe('moedaNormalizada', () => {
+  it('turns the read text into a decimal string without passing through float', () => {
+    expect(moedaNormalizada('R$ 1.234,56')).toBe('1234.56')
+    expect(moedaNormalizada('Total: 0,10')).toBe('0.10')
+    expect(moedaNormalizada('9.999.999.999,99')).toBe('9999999999.99')
+  })
+
+  it('returns null when there is no amount', () => {
+    expect(moedaNormalizada('sem valor')).toBeNull()
   })
 })
 

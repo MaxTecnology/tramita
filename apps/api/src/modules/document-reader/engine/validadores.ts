@@ -50,10 +50,17 @@ export function parseCompetencia(s: string): string | null {
 }
 
 /** "1.234,56" -> 1234.56 */
-export function parseMoeda(s: string): number | null {
+// "R$ 1.234,56" → "1234.56": exact decimal string, never through float (money convention).
+export function moedaNormalizada(s: string): string | null {
   const m = s.match(/\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}/)
   if (!m) return null
-  return Number(m[0].replace(/\./g, '').replace(',', '.'))
+  return m[0].replace(/\./g, '').replace(',', '.')
+}
+
+// Number kept for matching/display in the engine; money that gets stored uses moedaNormalizada.
+export function parseMoeda(s: string): number | null {
+  const normalizada = moedaNormalizada(s)
+  return normalizada === null ? null : Number(normalizada)
 }
 
 export function extrairCnpjOuCpf(s: string): { valor: string; valido: boolean } | null {
