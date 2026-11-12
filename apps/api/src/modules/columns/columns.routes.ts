@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
+import { memberScope, bodyIds, param } from '@/middlewares/memberScope'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createColumnSchema, updateColumnSchema, reorderColumnsSchema } from './columns.schema'
@@ -11,7 +12,7 @@ export async function columnsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', checkSubscription)
 
   app.post('/boards/:boardId/columns', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), memberScope((r) => ({ boardIds: param(r, 'boardId') }))],
   }, async (request, reply) => {
     const { boardId } = request.params as { boardId: string }
     const result = createColumnSchema.safeParse(request.body)
@@ -20,7 +21,7 @@ export async function columnsRoutes(app: FastifyInstance) {
   })
 
   app.patch('/columns/reorder', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), memberScope((r) => ({ columnIds: bodyIds(r.body, 'id') }))],
   }, async (request, reply) => {
     const result = reorderColumnsSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
@@ -28,7 +29,7 @@ export async function columnsRoutes(app: FastifyInstance) {
   })
 
   app.patch('/columns/:id', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), memberScope((r) => ({ columnIds: param(r, 'id') }))],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const result = updateColumnSchema.safeParse(request.body)

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
+import { memberScope, bodyIds, param } from '@/middlewares/memberScope'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createTaskSchema, updateTaskSchema, moveTaskSchema, reorderTasksSchema, listTasksQuerySchema } from './tasks.schema'
@@ -12,7 +13,7 @@ export async function tasksRoutes(app: FastifyInstance) {
   app.addHook('preHandler', checkSubscription)
 
   app.post('/columns/:columnId/tasks', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), memberScope((r) => ({ columnIds: param(r, 'columnId') }))],
   }, async (request, reply) => {
     const { columnId } = request.params as { columnId: string }
     const result = createTaskSchema.safeParse(request.body)
@@ -36,7 +37,7 @@ export async function tasksRoutes(app: FastifyInstance) {
 
   // reorder ANTES de /:id
   app.patch('/tasks/reorder', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), memberScope((r) => ({ taskIds: bodyIds(r.body, 'id'), columnIds: bodyIds(r.body, 'columnId') }))],
   }, async (request, reply) => {
     const result = reorderTasksSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
@@ -45,7 +46,7 @@ export async function tasksRoutes(app: FastifyInstance) {
 
   // /tasks/:id/move ANTES de /tasks/:id
   app.patch('/tasks/:id/move', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), memberScope((r) => ({ taskIds: param(r, 'id'), columnIds: bodyIds(r.body, 'columnId') }))],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const result = moveTaskSchema.safeParse(request.body)
@@ -55,7 +56,7 @@ export async function tasksRoutes(app: FastifyInstance) {
   })
 
   app.patch('/tasks/:id', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), memberScope((r) => ({ taskIds: param(r, 'id') }))],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const result = updateTaskSchema.safeParse(request.body)
@@ -65,7 +66,7 @@ export async function tasksRoutes(app: FastifyInstance) {
   })
 
   app.get('/tasks/:id/history', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), memberScope((r) => ({ taskIds: param(r, 'id') }))],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(await getTaskHistory(id, request.user.organizationId!))

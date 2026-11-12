@@ -1,12 +1,14 @@
 import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
+import { memberScope, param } from '@/middlewares/memberScope'
 import { AppError } from '@/errors/AppError'
 import { createCommentSchema } from './comments.schema'
 import { listComments, createComment, deleteComment } from './comments.service'
 
 export async function commentsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
+  app.addHook('preHandler', memberScope((r) => ({ taskIds: param(r, 'taskId') })))
 
   app.get('/tasks/:taskId/comments', {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT')],

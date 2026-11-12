@@ -3,6 +3,7 @@ import { verifyAccessToken } from '@/lib/jwt'
 import { prisma } from '@/lib/prisma'
 import { attachSSESubscriber } from '@/lib/sse'
 import { AppError } from '@/errors/AppError'
+import { assertMemberSeesTargets } from '@/middlewares/memberScope'
 import { getClientAccessScope } from '@/modules/client-users/client-access'
 
 export async function streamRoutes(app: FastifyInstance) {
@@ -25,6 +26,7 @@ export async function streamRoutes(app: FastifyInstance) {
       where: { id, organizationId: user.organizationId!, isActive: true, type: 'OS' },
     })
     if (!board) throw new AppError(404, 'Board não encontrado')
+    await assertMemberSeesTargets(user, { boardIds: [id] })
 
     // CLIENT subscribers are additionally gated at the company level — a ClientUser must have
     // access to the board's client, or the board effectively doesn't exist to them. Department

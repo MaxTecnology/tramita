@@ -24,6 +24,7 @@ describe('PATCH /tasks/:id/move', () => {
     const user = await createTestUser(org.id, { role: 'ORG_MEMBER' })
     const client = await createTestClient(org.id)
     const board = await createTestBoard(org.id, client.id)
+    await prisma.board.update({ where: { id: board.id }, data: { responsibleUserId: user.id } }) // member owns the process
     const col1 = await createTestColumn(board.id, { position: 0 })
     const col2 = await createTestColumn(board.id, { position: 1 })
     const task = await createTestTask(col1.id, user.id)

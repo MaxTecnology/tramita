@@ -22,6 +22,7 @@ describe('POST /tasks/:taskId/comments', () => {
     const user = await createTestUser(org.id, { role: 'ORG_MEMBER' })
     const client = await createTestClient(org.id)
     const board = await createTestBoard(org.id, client.id)
+    await prisma.board.update({ where: { id: board.id }, data: { responsibleUserId: user.id } }) // member owns the process
     const col = await createTestColumn(board.id, { position: 0 })
     const task = await createTestTask(col.id, user.id)
 
@@ -124,6 +125,7 @@ describe('POST /tasks/:taskId/comments', () => {
     const user = await createTestUser(org.id, { role: 'ORG_MEMBER' })
     const client = await createTestClient(org.id)
     const board = await createTestBoard(org.id, client.id)
+    await prisma.board.update({ where: { id: board.id }, data: { responsibleUserId: user.id } }) // member owns the process
     const col = await createTestColumn(board.id, { position: 0 })
     const task = await createTestTask(col.id, user.id)
     const auth = await getAuthHeader(user.email, 'Test@1234')
@@ -144,6 +146,7 @@ describe('POST /tasks/:taskId/comments', () => {
     const user = await createTestUser(org.id, { role: 'ORG_MEMBER' })
     const client = await createTestClient(org.id)
     const board = await createTestBoard(org.id, client.id)
+    await prisma.board.update({ where: { id: board.id }, data: { responsibleUserId: user.id } }) // member owns the process
     const col = await createTestColumn(board.id, { position: 0 })
     const task = await createTestTask(col.id, user.id)
     const auth = await getAuthHeader(user.email, 'Test@1234')

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
+import { memberScope, param } from '@/middlewares/memberScope'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createBoardSchema, updateBoardSchema, searchQuerySchema, listBoardsQuerySchema } from './boards.schema'
@@ -65,7 +66,7 @@ export async function boardsRoutes(app: FastifyInstance) {
   })
 
   app.get('/:id/tasks/search', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), memberScope((r) => ({ boardIds: param(r, 'id') }))],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const result = searchQuerySchema.safeParse(request.query)

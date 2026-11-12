@@ -24,6 +24,7 @@ describe('POST /tasks/:taskId/protocols', () => {
     const org = await createTestOrg(plan.id)
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
     const { task, attachment } = await setupTaskWithAttachment(org.id, member.id)
+    await prisma.task.update({ where: { id: task.id }, data: { assigneeId: member.id } }) // member's own task
     const auth = await getAuthHeader(member.email, 'Test@1234')
 
     const res = await app.inject({
