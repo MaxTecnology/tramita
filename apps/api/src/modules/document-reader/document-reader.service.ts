@@ -369,29 +369,50 @@ async function anexarDocumento(
   // Valida antes de baixar/subir qualquer arquivo
   if (entrega?.requiresPayment && !pagamento.amount) throw new AppError(400, 'Informe o valor da guia')
 
-  const buffer = await downloadFile(doc.storageKey)
-  const filename = filenameDaStorageKey(doc.storageKey)
-  const payload = { filename, mimeType: 'application/pdf', size: buffer.length, buffer }
+  // Reserva o documento ANTES de qualquer efeito (arquivo, entrega, protocolo, aviso ao cliente):
+  // um segundo revisor ao mesmo tempo recebe 409 aqui, sem gerar nada.
+  const reservadoEm = await reservarParaAnexar(receivedDocumentId)
+  try {
+    const buffer = await downloadFile(doc.storageKey)
+    const filename = filenameDaStorageKey(doc.storageKey)
+    const payload = { filename, mimeType: 'application/pdf', size: buffer.length, buffer }
 
-  let attachmentId: string
-  if (entrega) {
-    // Preenche a entrega — gera/atualiza o protocolo que o cliente vê em "Documentos recebidos"
-    const entregue = await deliverDocument(taskId, entrega.id, organizationId, actor, payload, pagamento)
-    attachmentId = entregue.attachmentId!
-  } else {
-    attachmentId = (await createAttachment(taskId, organizationId, actor, payload)).id
+    let attachmentId: string
+    if (entrega) {
+      // Preenche a entrega — gera/atualiza o protocolo que o cliente vê em "Documentos recebidos"
+      const entregue = await deliverDocument(taskId, entrega.id, organizationId, actor, payload, pagamento)
+      attachmentId = entregue.attachmentId!
+    } else {
+      attachmentId = (await createAttachment(taskId, organizationId, actor, payload)).id
+    }
+
+    const finalizado = await prisma.receivedDocument.updateMany({
+      where: { id: receivedDocumentId, status: { in: AGUARDANDO_REVISAO }, attachingSince: reservadoEm },
+      data: { status: 'ATTACHED', taskId, attachmentId, how, reviewedById: actor.id, reviewedAt: new Date(), attachingSince: null },
+    })
+    if (finalizado.count === 0) {
+      throw new AppError(409, 'Documento foi revisado por outra pessoa enquanto este anexo era criado')
+    }
+    return prisma.attachment.findUniqueOrThrow({ where: { id: attachmentId } })
+  } catch (err) {
+    // Falhou no meio: libera a reserva pra que o documento possa ser revisado de novo
+    await prisma.receivedDocument.updateMany({ where: { id: receivedDocumentId, attachingSince: reservadoEm }, data: { attachingSince: null } })
+    throw err
   }
+}
 
-  // Guarda de novo no update final (não só no findFirst inicial) — fecha a janela entre o check e
-  // o anexo acima: se outra revisão venceu a corrida nesse meio-tempo, não sobrescreve.
-  const finalizado = await prisma.receivedDocument.updateMany({
-    where: { id: receivedDocumentId, status: { in: AGUARDANDO_REVISAO } },
-    data: { status: 'ATTACHED', taskId, attachmentId, how, reviewedById: actor.id, reviewedAt: new Date() },
+// Reserva vencida (processo caiu no meio) pode ser retomada depois deste prazo
+const RESERVA_EXPIRA_MS = 5 * 60 * 1000
+const reservaLivre = (agora: Date) => ({ OR: [{ attachingSince: null }, { attachingSince: { lt: new Date(agora.getTime() - RESERVA_EXPIRA_MS) } }] })
+
+async function reservarParaAnexar(receivedDocumentId: string): Promise<Date> {
+  const agora = new Date()
+  const { count } = await prisma.receivedDocument.updateMany({
+    where: { id: receivedDocumentId, status: { in: AGUARDANDO_REVISAO }, ...reservaLivre(agora) },
+    data: { attachingSince: agora },
   })
-  if (finalizado.count === 0) {
-    throw new AppError(409, 'Documento foi revisado por outra pessoa enquanto este anexo era criado')
-  }
-  return prisma.attachment.findUniqueOrThrow({ where: { id: attachmentId } })
+  if (count === 0) throw new AppError(409, 'Outra pessoa está revisando este documento agora')
+  return agora
 }
 
 export async function confirmarSugestao(
@@ -418,7 +439,7 @@ export async function trocarTarefa(
 export async function rejeitarDocumento(receivedDocumentId: string, organizationId: string, actor: { id: string; role: string }) {
   await buscarDocumentoRevisavel(receivedDocumentId, organizationId)
   const resultado = await prisma.receivedDocument.updateMany({
-    where: { id: receivedDocumentId, organizationId, status: { in: AGUARDANDO_REVISAO } },
+    where: { id: receivedDocumentId, organizationId, status: { in: AGUARDANDO_REVISAO }, ...reservaLivre(new Date()) },
     data: { status: 'REJECTED', how: 'rejeitado', reviewedById: actor.id, reviewedAt: new Date() },
   })
   if (resultado.count === 0) throw new AppError(409, 'Documento foi revisado por outra pessoa')

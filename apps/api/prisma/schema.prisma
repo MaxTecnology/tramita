@@ -1014,6 +1014,9 @@ model ReceivedDocument {
   how             String?
   reviewedById    String?
   reviewedAt      DateTime?
+  // Lease taken by the reviewer attaching this document (anexarDocumento) before any side effect;
+  // a stale lease (process died mid-way) can be retaken after 5 minutes.
+  attachingSince  DateTime?
   createdAt       DateTime               @default(now())
 
   organization  Organization   @relation(fields: [organizationId], references: [id])

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as b2Module from '@/lib/b2'
 import * as queue from '@/lib/queue'
 import { prisma } from '@/lib/prisma'
-import { confirmarSugestao, trocarTarefa, listarFilaDeRevisao } from './document-reader.service'
+import { confirmarSugestao, trocarTarefa, listarFilaDeRevisao, rejeitarDocumento } from './document-reader.service'
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClient, createTestDepartment,
   createTestBoard, createTestColumn, createTestTask,
@@ -126,6 +126,50 @@ describe('robô preenche a entrega com barreira de CNPJ/competência', () => {
     const fila = await listarFilaDeRevisao(org.id)
 
     expect(fila[0].task?.pendingDeliverables.map((d) => [d.name, d.requiresPayment])).toEqual([['Guia DAS', true], ['Extrato', false]])
+  })
+})
+
+describe('dois revisores ao mesmo tempo', () => {
+  it('only one confirmation delivers: the other gets 409 before any protocol change or notice', async () => {
+    const { org, deliverables, doc, actor } = await setup()
+    // Slow download: both reviewers are past the initial checks before either one delivers
+    vi.mocked(b2Module.downloadFile).mockImplementation(() => new Promise((r) => setTimeout(() => r(Buffer.from('%PDF-1.4')), 80)))
+
+    const results = await Promise.allSettled([
+      confirmarSugestao(doc.id, org.id, actor),
+      confirmarSugestao(doc.id, org.id, actor),
+    ])
+
+    expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected'])
+    const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult
+    expect(rejected.reason).toMatchObject({ statusCode: 409 })
+    const protocol = await prisma.protocol.findUniqueOrThrow({ where: { deliverableId: deliverables[0].id }, include: { events: true } })
+    expect(protocol.events.filter((e) => e.type === 'REPLACED')).toHaveLength(0)
+    expect(vi.mocked(queue.enqueueNotification).mock.calls.filter(([n]) => n.event === 'PROTOCOL_CREATED')).toHaveLength(1)
+    expect(b2Module.uploadFile).toHaveBeenCalledTimes(1) // the loser never uploads
+    const deliverable = await prisma.taskDeliverable.findUniqueOrThrow({ where: { id: deliverables[0].id } })
+    expect(deliverable.attachmentId).toBe(protocol.attachmentId)
+  })
+
+  it('a failed delivery releases the document so it can be reviewed again', async () => {
+    const { org, doc, actor } = await setup({ fields: { cnpj: campo('11222333000181', CNPJ) } })
+
+    await expect(confirmarSugestao(doc.id, org.id, actor)).rejects.toMatchObject({ statusCode: 400 })
+    await confirmarSugestao(doc.id, org.id, actor, { amount: '10.00' })
+
+    expect((await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })).status).toBe('ATTACHED')
+  })
+
+  it('rejecting while another reviewer is attaching is refused with 409', async () => {
+    const { org, doc, actor } = await setup()
+    vi.mocked(b2Module.downloadFile).mockImplementation(() => new Promise((r) => setTimeout(() => r(Buffer.from('%PDF-1.4')), 80)))
+
+    const attaching = confirmarSugestao(doc.id, org.id, actor)
+    await new Promise((r) => setTimeout(r, 20))
+    await expect(rejeitarDocumento(doc.id, org.id, actor)).rejects.toMatchObject({ statusCode: 409 })
+    await attaching
+
+    expect((await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })).status).toBe('ATTACHED')
   })
 })
 
