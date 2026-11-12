@@ -26,6 +26,7 @@ COPY apps/web/package.json apps/web/package.json
 RUN pnpm install --frozen-lockfile --prod --filter api
 COPY --from=build /repo/apps/api/dist apps/api/dist
 COPY --from=build /repo/apps/api/prisma apps/api/prisma
+COPY --from=build /repo/apps/api/prisma.config.ts apps/api/prisma.config.ts
 COPY --from=build /prisma-client-output /prisma-client-output
 RUN PRISMA_CLIENT_NM="$(dirname "$(dirname "$(find /repo/node_modules/.pnpm -maxdepth 3 -path '*/node_modules/@prisma/client' | head -n1)")")" \
   && mkdir -p "$PRISMA_CLIENT_NM/.prisma/client" \
