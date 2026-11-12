@@ -411,6 +411,15 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
 Ordem combinada com o Max: item 10 (feito) → solicitações internas → retomar a rodada de testes
 manuais validando os dois. Os demais itens entram conforme o que os testes revelarem.
 
+   **Atualização 2026-11-12 (conversa com o Max):** o problema real são duas coisas separadas.
+   (a) **Troca de informação entre departamentos** (ex.: Pessoal precisa de dado que o Fiscal
+   preenche todo mês) — decidido fazer **atrelado ao cliente**, como o Nibo: dependência entre
+   tarefas (a do Pessoal da empresa X fica "aguardando/bloqueada" até a do Fiscal da empresa X
+   ser concluída, e a informação do Fiscal chega junto). Cabe no modelo atual, sem tarefa sem
+   cliente. **Vem primeiro.** (b) **Rotinas do próprio escritório** sem cliente específico —
+   esse sim exige tarefa sem cliente; fica depois de (a). Ordem combinada: testes manuais do que
+   já existe → (a) → (b).
+
 1. **Solicitações internas** (próximo projeto, precisa de brainstorm + spec) — colaborador
    pedindo coisas a outro colaborador/departamento, referenciando ou não um cliente;
    "departamento interno" (que não atende cliente). Exige tarefa com cliente **opcional** hoje
