@@ -184,15 +184,43 @@ o cliente antes que os juros cresçam.
 - **Expiração e digest de SLA:** guia paga sai da expiração (`EXPIRED`) e do digest; marcar como pago
   também registra visualização se ainda não houver. Protocolos sem exigência de pagamento seguem a
   regra atual.
-- **Documento entregue nunca some (decidido com o Max):** protocolo gerado fica no portal mesmo que
-  a tarefa depois seja ocultada do cliente — o cliente consulta o histórico e o dono da empresa
-  confere o que o financeiro fez. Para retirar um documento enviado por engano, o escritório
-  **cancela** o protocolo com motivo: ele continua visível ao cliente com status **"Cancelado pelo
-  escritório"** e o motivo, sai de "Guias a pagar" e dos indicadores, e nunca é apagado (novo
-  status/evento de cancelamento). Tarefa que passa a ser visível gera os protocolos das entregas já
-  concluídas que ainda não têm protocolo.
+- **Documento entregue nunca some** (o cliente consulta o histórico; o dono confere o que o
+  financeiro fez) — mesmo que a tarefa depois seja ocultada do cliente. Tarefa que passa a ser
+  visível gera os protocolos das entregas já concluídas que ainda não têm protocolo. Erro de envio
+  é tratado pela barreira e pela substituição da seção 7.10, não por apagar.
 - **"Nada a enviar" reversível:** o cliente desfaz enquanto a tarefa não estiver concluída; o
   escritório pode **recusar** um "Nada a enviar" como recusa um upload (volta a pendente, com motivo).
+
+### 7.10 Documento errado: barreira, substituição e cancelamento (decidido com o Max)
+
+Premissa do Max: com entregas definidas no template e o robô de leitura identificando os PDFs,
+documento errado é quase sempre **erro de leitura do robô**. Então: impedir que chegue ao cliente;
+se chegar, **corrigir** em vez de cancelar.
+
+1. **Barreira antes de chegar ao cliente.** Hoje o robô está em modo sombra: sugere, e um
+   colaborador confirma na fila de revisão (`confirmarSugestao` / `trocarTarefa` em
+   `document-reader.service.ts`), o que cria um `Attachment` na tarefa.
+   - Ao anexar um documento lido pelo robô a uma tarefa, ele passa a **preencher a entrega** da
+     tarefa (e assim gerar o protocolo, 7.1). Se a tarefa tem uma única entrega pendente, é ela; se
+     tem mais de uma, o revisor escolhe qual na fila. *(Mecânica de escolha: decisão minha.)*
+   - **Validação obrigatória em toda anexação** (não só em "trocado", como hoje): o CNPJ/documento
+     lido tem que ser do cliente da tarefa e, quando o robô extrair competência, ela tem que bater
+     com a da tarefa. Se não bater, o documento **não** vai para a tarefa nem para o cliente: fica na
+     fila com o motivo ("CNPJ da guia não é deste cliente", "competência 10/2026 ≠ 11/2026").
+   - **Pré-preenchimento:** valor e vencimento extraídos pelo robô (quando o modelo de documento tem
+     esses campos e a leitura é válida) já vêm preenchidos na entrega; o colaborador só confere. Sem
+     leitura válida, digita como na 7.3.
+2. **Substituir documento (correção padrão).** O escritório troca o arquivo **no mesmo protocolo**,
+   podendo corrigir valor e vencimento. O cliente vê só o documento atual, com a indicação discreta
+   "Documento atualizado em dd/mm", e recebe novo aviso (`PROTOCOL_CREATED` ou evento próprio de
+   "documento corrigido"). A versão anterior fica no **histórico** do protocolo (arquivo preservado),
+   visível ao escritório e no histórico do documento no portal. Substituir guia **já marcada como
+   paga** é recusado com mensagem clara: o cliente precisa desfazer o pagamento antes (não apaga
+   registro de pagamento real).
+3. **Cancelar (exceção).** Só para documento que não deveria existir (ex.: enviado ao cliente
+   errado). Exige motivo, **some da visão do cliente** (mostrar documento de outra empresa seria pior)
+   e fica registrado só no histórico do escritório; sai de todos os indicadores. Nunca apaga o
+   arquivo nem o registro.
 
 ## 8. Fica a critério do builder
 
@@ -220,6 +248,10 @@ o cliente antes que os juros cresçam.
 7. "Nada a enviar" num pedido pendente desbloqueia a tarefa como uma aprovação.
 8. Tarefa não visível ao cliente: entrega concluída não gera protocolo.
 9. Telas novas legíveis em modo claro e escuro (screenshot), inclusive em largura de celular.
-10. Escritório cancela um protocolo enviado por engano → cliente continua vendo o documento com
-    "Cancelado pelo escritório" e o motivo; ele sai de "Guias a pagar" e dos indicadores.
-11. Entrega de guia gera WhatsApp/e-mail ao cliente do departamento com valor e vencimento na mensagem.
+10. Guia lida pelo robô com CNPJ de outro cliente (ou competência diferente) não é anexada à tarefa:
+    fica na fila de revisão com o motivo, e o cliente nada recebe.
+11. Escritório substitui uma guia não paga → cliente vê só a nova, com "Documento atualizado em …",
+    recebe aviso, e a versão anterior está no histórico; substituir guia já paga é recusado.
+12. Escritório cancela documento enviado ao cliente errado → some do portal desse cliente, sai dos
+    indicadores e fica no histórico do escritório.
+13. Entrega de guia gera WhatsApp/e-mail ao cliente do departamento com valor e vencimento na mensagem.
