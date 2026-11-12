@@ -1,3 +1,4 @@
+import { lockUsersForShare } from '@/modules/clients/client-coverage'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { publishBoardEvent } from '@/lib/sse'
@@ -95,6 +96,9 @@ export async function transferResponsibilities(
   const moved: { taskId: string; boardId: string }[] = []
 
   const result = await prisma.$transaction(async (tx) => {
+    await lockUsersForShare(tx, [body.toUserId])
+    const stillActive = await tx.user.count({ where: { id: body.toUserId, isActive: true } })
+    if (!stillActive) throw new AppError(400, 'Colaborador de destino inválido')
     const assignments = await tx.clientAssignment.updateMany({
       where: { userId: fromUserId, clientId: { in: body.clientIds }, ...departmentFilter },
       data: { userId: body.toUserId },

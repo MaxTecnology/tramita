@@ -6,7 +6,7 @@ import { lookupCnpj, type CnpjLookupResult } from '@/lib/cnpjws'
 import { hashPassword } from '@/modules/auth/auth.service'
 import { normalizarTelefoneBr } from '@/lib/phone'
 import type { ClientBody } from './clients.schema'
-import { assertCanUnserveDepartments, assertPayloadCoverage } from './client-coverage'
+import { assertCanUnserveDepartments, assertPayloadCoverage, lockClients, lockUsersForShare } from './client-coverage'
 
 const SELECT = {
   id: true, name: true, codigo: true, clientType: true, cnpj: true, cpf: true,
@@ -142,6 +142,7 @@ async function assertResponsiblesValid(
   departmentNames: Map<string, string>,
 ) {
   const userIds = [...new Set(departments.map((d) => d.responsibleUserId))]
+  await lockUsersForShare(tx, userIds) // nobody deactivates them until this client is saved
   const valid = await tx.user.findMany({
     where: { id: { in: userIds }, organizationId, isActive: true, role: { in: [...ORG_STAFF_ROLES] } },
     select: { id: true },
@@ -198,6 +199,7 @@ export async function createClient(organizationId: string, data: ClientBody) {
 export async function updateClient(id: string, organizationId: string, data: ClientBody) {
   try {
     return await prisma.$transaction(async (tx) => {
+      await lockClients(tx, [id]) // serializes with task creation and client-user changes of this client
       const client = await tx.client.findFirst({ where: { id, organizationId, isActive: true } })
       if (!client) throw new AppError(404, 'Cliente não encontrado')
 

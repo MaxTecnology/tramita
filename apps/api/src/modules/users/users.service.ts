@@ -51,16 +51,20 @@ export async function deleteUser(id: string, organizationId: string) {
   const user = await prisma.user.findFirst({ where: { id, organizationId, isActive: true } })
   if (!user) throw new AppError(404, 'Usuário não encontrado')
 
-  // I2: todo departamento que atende um cliente ativo precisa ter responsável ativo.
-  const responsibilities = await prisma.clientAssignment.count({ where: { userId: id, client: { isActive: true } } })
-  if (responsibilities > 0) {
-    throw new AppError(
-      409,
-      `${user.name} é responsável por ${responsibilities} cliente(s)/departamento(s). Defina outro responsável antes de desativar.`,
-    )
-  }
-
-  return prisma.user.update({ where: { id }, data: { isActive: false }, select: SELECT })
+  return prisma.$transaction(async (tx) => {
+    // Exclusive lock on this user: a client form or transfer making them responsible right now
+    // (lockUsersForShare) finishes first and is counted below, or waits and sees them inactive.
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${id} FOR UPDATE`
+    // I2: todo departamento que atende um cliente ativo precisa ter responsável ativo.
+    const responsibilities = await tx.clientAssignment.count({ where: { userId: id, client: { isActive: true } } })
+    if (responsibilities > 0) {
+      throw new AppError(
+        409,
+        `${user.name} é responsável por ${responsibilities} cliente(s)/departamento(s). Defina outro responsável antes de desativar.`,
+      )
+    }
+    return tx.user.update({ where: { id }, data: { isActive: false }, select: SELECT })
+  })
 }
 
 export async function getMyProfile(id: string) {

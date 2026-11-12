@@ -23,7 +23,7 @@ import type {
   CreateAssignmentBody,
   UpdateAssignmentBody,
 } from './recurring-templates.schema'
-import { assertDepartmentServesClient } from '@/modules/clients/client-coverage'
+import { assertDepartmentServesClient, lockClients } from '@/modules/clients/client-coverage'
 
 // Antes do Plano B (modelagem de documentos) só existia ObligationType global, então vincular
 // qualquer id aqui era seguro por construção. Desde que orgs passaram a criar ObligationType
@@ -169,7 +169,11 @@ export async function createAssignment(templateId: string, organizationId: strin
   })
   if (existing) throw new AppError(409, 'Este cliente já está vinculado a este template')
 
-  return prisma.recurringTaskAssignment.create({ data: { templateId, clientId: data.clientId } })
+  return prisma.$transaction(async (tx) => {
+    await lockClients(tx, [client.id]) // an admin unserving the department meanwhile wins or waits
+    await assertDepartmentServesClient(tx, client.id, template.departmentId)
+    return tx.recurringTaskAssignment.create({ data: { templateId, clientId: data.clientId } })
+  })
 }
 
 async function getAssignmentOrThrow(templateId: string, assignmentId: string, organizationId: string) {
@@ -195,7 +199,14 @@ export async function updateAssignment(
     await assertDepartmentServesClient(prisma, assignment.clientId, template.departmentId)
   }
 
-  return prisma.recurringTaskAssignment.update({ where: { id: assignmentId }, data })
+  return prisma.$transaction(async (tx) => {
+    if (data.isActive === true && !assignment.isActive) {
+      const template = await tx.recurringTaskTemplate.findUniqueOrThrow({ where: { id: templateId }, select: { departmentId: true } })
+      await lockClients(tx, [assignment.clientId])
+      await assertDepartmentServesClient(tx, assignment.clientId, template.departmentId)
+    }
+    return tx.recurringTaskAssignment.update({ where: { id: assignmentId }, data })
+  })
 }
 
 export async function deleteAssignment(templateId: string, assignmentId: string, organizationId: string) {

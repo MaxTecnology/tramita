@@ -1,9 +1,10 @@
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { hashPassword } from '@/modules/auth/auth.service'
 import { normalizarTelefoneBr } from '@/lib/phone'
 import type { CreateClientUserBody, UpdateClientUserBody } from './client-users.schema'
-import { assertAccessesServed, assertClientUserChangeKeepsCoverage } from '@/modules/clients/client-coverage'
+import { assertAccessesServed, assertClientUserChangeKeepsCoverage, lockClients } from '@/modules/clients/client-coverage'
 
 const SELECT = {
   id: true, name: true, email: true, phone: true, isActive: true, createdAt: true,
@@ -50,19 +51,23 @@ export async function createClientUser(organizationId: string, data: CreateClien
   if (existing) throw new AppError(409, 'E-mail já cadastrado nesta organização')
 
   await assertAccessesBelongToOrg(data.accesses, organizationId)
-  await assertAccessesServed(prisma, data.accesses)
+  const passwordHash = await hashPassword(data.password)
 
-  return prisma.clientUser.create({
-    data: {
-      name: data.name,
-      email: data.email,
-      passwordHash: await hashPassword(data.password),
-      phone: data.phone ? normalizarTelefoneBr(data.phone) : null,
-      isActive: data.isActive,
-      organizationId,
-      accesses: { create: data.accesses },
-    },
-    select: SELECT,
+  return prisma.$transaction(async (tx) => {
+    await lockClients(tx, data.accesses.map((a) => a.clientId))
+    await assertAccessesServed(tx, data.accesses)
+    return tx.clientUser.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        passwordHash,
+        phone: data.phone ? normalizarTelefoneBr(data.phone) : null,
+        isActive: data.isActive,
+        organizationId,
+        accesses: { create: data.accesses },
+      },
+      select: SELECT,
+    })
   })
 }
 
@@ -78,6 +83,7 @@ export async function updateClientUser(id: string, organizationId: string, data:
   if (data.accesses) await assertAccessesBelongToOrg(data.accesses, organizationId)
 
   return prisma.$transaction(async (tx) => {
+    await lockClients(tx, await clientsTouchedBy(tx, id, data.accesses))
     if (data.accesses) await assertAccessesServed(tx, data.accesses)
     const currentAccesses = data.accesses
       ?? (await tx.clientUserAccess.findMany({ where: { clientUserId: id }, select: { clientId: true, departmentId: true } }))
@@ -106,11 +112,23 @@ export async function updateClientUser(id: string, organizationId: string, data:
   })
 }
 
+// Companies whose coverage a change of this client user can affect: the ones they access today plus
+// the ones in the new access list.
+async function clientsTouchedBy(
+  tx: Prisma.TransactionClient,
+  clientUserId: string,
+  nextAccesses: { clientId: string }[] = [],
+): Promise<string[]> {
+  const current = await tx.clientUserAccess.findMany({ where: { clientUserId }, select: { clientId: true } })
+  return [...current, ...nextAccesses].map((a) => a.clientId)
+}
+
 export async function deleteClientUser(id: string, organizationId: string) {
   const clientUser = await prisma.clientUser.findFirst({ where: { id, organizationId } })
   if (!clientUser) throw new AppError(404, 'Usuário de cliente não encontrado')
 
   return prisma.$transaction(async (tx) => {
+    await lockClients(tx, await clientsTouchedBy(tx, id))
     await assertClientUserChangeKeepsCoverage(tx, id, { accesses: [], isActive: false })
     return tx.clientUser.update({ where: { id }, data: { isActive: false }, select: SELECT })
   })

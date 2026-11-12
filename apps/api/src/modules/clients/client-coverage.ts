@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { ClientBody } from './clients.schema'
@@ -10,6 +10,24 @@ import type { ClientBody } from './clients.schema'
 export type Db = Prisma.TransactionClient | typeof prisma
 
 const CLOSED_TASK_STATUSES = ['DONE', 'DISREGARDED'] as const
+
+// Row lock on the clients whose coverage a transaction checks and changes. Postgres runs in READ
+// COMMITTED: without it two admins editing at the same instant each pass their own check and
+// together break the rule. Locks in id order so two transactions never deadlock. Must be the first
+// thing the transaction does, before any coverage read.
+export async function lockClients(tx: Prisma.TransactionClient, clientIds: string[]): Promise<void> {
+  const ids = [...new Set(clientIds)].sort()
+  if (ids.length === 0) return
+  await tx.$queryRaw`SELECT id FROM clients WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`
+}
+
+// Shared lock on staff about to become responsible (client form, transfer). deleteUser takes the
+// exclusive lock on the same row, so deactivating someone and making them responsible serialize.
+export async function lockUsersForShare(tx: Prisma.TransactionClient, userIds: string[]): Promise<void> {
+  const ids = [...new Set(userIds)].sort()
+  if (ids.length === 0) return
+  await tx.$queryRaw`SELECT id FROM users WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR SHARE`
+}
 
 export async function listServedDepartmentIds(db: Db, clientId: string): Promise<string[]> {
   const rows = await db.clientAssignment.findMany({ where: { clientId }, select: { departmentId: true } })

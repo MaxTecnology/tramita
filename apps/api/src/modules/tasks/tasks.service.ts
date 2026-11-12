@@ -7,7 +7,7 @@ import { recalculateTaskStatus, notifyIfBlocked } from '@/modules/task-documents
 import { Prisma } from '@prisma/client'
 import { resolveCompletedAt } from '@/lib/task-completion'
 import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, ListTasksQuery } from './tasks.schema'
-import { assertDepartmentServesClient } from '@/modules/clients/client-coverage'
+import { assertDepartmentServesClient, lockClients } from '@/modules/clients/client-coverage'
 import { syncProtocolsForTask } from '@/modules/protocols/protocol-from-deliverable'
 
 export interface Actor {
@@ -68,11 +68,14 @@ export async function createTask(
 ) {
   const column = await verifyColumnBelongsToOrg(columnId, organizationId)
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
-  const departmentResponsibleId = await assertDepartmentServesClient(prisma, column.board.clientId, data.departmentId)
   const departmentId = data.departmentId
   const actorName = await resolveActorName(actor.id, actor.type)
 
   const task = await prisma.$transaction(async (tx) => {
+    // Coverage checked under the client lock: an admin unserving this department at the same
+    // instant either commits first (this is refused) or waits for this task to exist (and is refused)
+    await lockClients(tx, [column.board.clientId])
+    const departmentResponsibleId = await assertDepartmentServesClient(tx, column.board.clientId, data.departmentId)
     const position = await tx.task.count({ where: { columnId } })
 
     const created = await tx.task.create({
@@ -144,6 +147,10 @@ export async function moveTask(
   const completedAt = resolveCompletedAt(task.status, nextStatus, new Date())
 
   const updatedTask = await prisma.$transaction(async (tx) => {
+    if (isReopening(task.status, nextStatus)) {
+      await lockClients(tx, [task.column.board.clientId])
+      await assertDepartmentServesClient(tx, task.column.board.clientId, task.departmentId)
+    }
     const updated = await tx.task.update({
       where: { id: taskId },
       data: { columnId: data.columnId, position: data.position, status: nextStatus, completedAt },
@@ -322,6 +329,14 @@ export async function updateTask(
     : undefined
 
   const updated = await prisma.$transaction(async (tx) => {
+    // Same checks as above, now under the client lock (the early ones only fail fast)
+    if (data.departmentId && data.departmentId !== task.departmentId) {
+      await lockClients(tx, [task.column.board.clientId])
+      await assertDepartmentServesClient(tx, task.column.board.clientId, data.departmentId)
+    } else if (data.status && isReopening(task.status, data.status)) {
+      await lockClients(tx, [task.column.board.clientId])
+      await assertDepartmentServesClient(tx, task.column.board.clientId, task.departmentId)
+    }
     const result = await tx.task.update({
       where: { id },
       data: {
