@@ -4,7 +4,7 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
-import { addDocumentItemSchema, reviewDocumentRequirementSchema } from './task-documents.schema'
+import { addDocumentItemSchema, addDeliverableSchema, reviewDocumentRequirementSchema } from './task-documents.schema'
 import {
   listTaskDocuments,
   addDocumentRequirement,
@@ -41,9 +41,9 @@ export async function taskDocumentsRoutes(app: FastifyInstance) {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), checkSubscription],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    const result = addDocumentItemSchema.safeParse(request.body)
+    const result = addDeliverableSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
-    return reply.status(201).send(await addDeliverable(id, request.user.organizationId!, result.data.name))
+    return reply.status(201).send(await addDeliverable(id, request.user.organizationId!, result.data.name, result.data.requiresPayment))
   })
 
   app.patch('/tasks/:id/documents/requests/:reqId', {

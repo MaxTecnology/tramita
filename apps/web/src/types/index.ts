@@ -190,6 +190,7 @@ export interface RecurringTaskTemplateDocumentItem {
   id: string
   name: string
   position: number
+  requiresPayment: boolean
 }
 
 export interface RecurringTaskTemplate {

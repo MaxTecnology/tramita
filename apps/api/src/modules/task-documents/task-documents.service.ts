@@ -66,10 +66,10 @@ export async function addDocumentRequirement(taskId: string, organizationId: str
   return requirement
 }
 
-export async function addDeliverable(taskId: string, organizationId: string, name: string) {
+export async function addDeliverable(taskId: string, organizationId: string, name: string, requiresPayment = false) {
   await verifyTaskAccess(taskId, organizationId)
   const position = await prisma.taskDeliverable.count({ where: { taskId } })
-  return prisma.taskDeliverable.create({ data: { taskId, name, position } })
+  return prisma.taskDeliverable.create({ data: { taskId, name, position, requiresPayment } })
 }
 
 export async function uploadForRequirement(

@@ -104,7 +104,7 @@ interface FormState {
   visibleToClient: boolean
   isActive: boolean
   documentRequests: { name: string }[]
-  documentDeliveries: { name: string }[]
+  documentDeliveries: { name: string; requiresPayment?: boolean }[]
 }
 
 const EMPTY_FORM: FormState = {
@@ -116,10 +116,15 @@ const EMPTY_FORM: FormState = {
   visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
 }
 
-function DocumentListEditor({ label, items, onChange }: {
+type DocumentListItem = { name: string; requiresPayment?: boolean }
+
+// withPaymentToggle: delivery rows get "Exige pagamento" (guia → tracked as paid/unpaid in the
+// client portal; extrato/declaração → not)
+function DocumentListEditor({ label, items, onChange, withPaymentToggle = false }: {
   label: string
-  items: { name: string }[]
-  onChange: (items: { name: string }[]) => void
+  items: DocumentListItem[]
+  onChange: (items: DocumentListItem[]) => void
+  withPaymentToggle?: boolean
 }) {
   const [draft, setDraft] = useState('')
   return (
@@ -141,8 +146,18 @@ function DocumentListEditor({ label, items, onChange }: {
       {items.length > 0 && (
         <ul className="space-y-1">
           {items.map((item, i) => (
-            <li key={i} className="flex items-center justify-between text-sm bg-neutral-bg rounded px-2 py-1">
-              {item.name}
+            <li key={i} className="flex items-center justify-between gap-2 text-sm bg-neutral-bg rounded px-2 py-1">
+              <span className="flex-1 truncate">{item.name}</span>
+              {withPaymentToggle && (
+                <label className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={!!item.requiresPayment}
+                    onChange={(e) => onChange(items.map((it, idx) => (idx === i ? { ...it, requiresPayment: e.target.checked } : it)))}
+                  />
+                  Exige pagamento
+                </label>
+              )}
               <button type="button" onClick={() => onChange(items.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-danger-text">
                 <Trash2 size={12} />
               </button>
@@ -189,7 +204,7 @@ export default function RecurringTemplateForm() {
       notifyViaWhatsapp: template.notifyViaWhatsapp, notifyViaEmail: template.notifyViaEmail, visibleToClient: template.visibleToClient,
       isActive: template.isActive,
       documentRequests: template.documentRequests.map((d) => ({ name: d.name })),
-      documentDeliveries: template.documentDeliveries.map((d) => ({ name: d.name })),
+      documentDeliveries: template.documentDeliveries.map((d) => ({ name: d.name, requiresPayment: d.requiresPayment })),
     })
   }, [template])
 
@@ -413,6 +428,7 @@ export default function RecurringTemplateForm() {
           label="Documentos a entregar ao cliente"
           items={form.documentDeliveries}
           onChange={(items) => setForm({ ...form, documentDeliveries: items })}
+          withPaymentToggle
         />
 
         <label className="flex items-center gap-2 text-sm text-foreground">

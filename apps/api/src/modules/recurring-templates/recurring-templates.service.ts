@@ -77,7 +77,7 @@ export async function createTemplate(organizationId: string, data: CreateTemplat
       ...templateData,
       organizationId,
       documentRequests: { create: documentRequests.map((d, i) => ({ name: d.name, position: i })) },
-      documentDeliveries: { create: documentDeliveries.map((d, i) => ({ name: d.name, position: i })) },
+      documentDeliveries: { create: documentDeliveries.map((d, i) => ({ name: d.name, requiresPayment: d.requiresPayment, position: i })) },
     },
     include: { documentRequests: true, documentDeliveries: true },
   })
@@ -122,7 +122,7 @@ export async function updateTemplate(id: string, organizationId: string, data: U
     if (documentDeliveries) {
       await tx.recurringTaskTemplateDocument.deleteMany({ where: { deliveryTemplateId: id } })
       await tx.recurringTaskTemplateDocument.createMany({
-        data: documentDeliveries.map((d, i) => ({ deliveryTemplateId: id, name: d.name, position: i })),
+        data: documentDeliveries.map((d, i) => ({ deliveryTemplateId: id, name: d.name, requiresPayment: d.requiresPayment, position: i })),
       })
     }
     return tx.recurringTaskTemplate.update({
@@ -309,7 +309,7 @@ export async function generateTaskForAssignment(
       }
       if (template.documentDeliveries.length > 0) {
         await tx.taskDeliverable.createMany({
-          data: template.documentDeliveries.map((d, i) => ({ taskId: task.id, name: d.name, position: i })),
+          data: template.documentDeliveries.map((d, i) => ({ taskId: task.id, name: d.name, requiresPayment: d.requiresPayment, position: i })),
         })
       }
 

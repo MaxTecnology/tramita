@@ -4,6 +4,10 @@ export const addDocumentItemSchema = z.object({
   name: z.string().trim().min(1, 'Nome do documento obrigatório'),
 })
 
+export const addDeliverableSchema = addDocumentItemSchema.extend({
+  requiresPayment: z.boolean().default(false),
+})
+
 export const reviewDocumentRequirementSchema = z.object({
   decision: z.enum(['APPROVED', 'REJECTED']),
   rejectionReason: z.string().trim().min(1).optional(),

@@ -111,7 +111,7 @@ describe('createTemplate', () => {
       visibleToClient: true,
       isActive: true,
       documentRequests: [{ name: 'Ponto' }],
-      documentDeliveries: [{ name: 'Resumo da folha' }, { name: 'Recibos' }],
+      documentDeliveries: [{ name: 'Resumo da folha', requiresPayment: false }, { name: 'Recibos', requiresPayment: false }],
     })
 
     expect(template.documentRequests).toHaveLength(1)
@@ -375,7 +375,7 @@ describe('generateTaskForAssignment', () => {
       generationMonthOffset: 1, generationDayOfPeriod: 20,
       autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
       visibleToClient: true, isActive: true,
-      documentRequests: [{ name: 'Ponto' }], documentDeliveries: [{ name: 'Resumo' }],
+      documentRequests: [{ name: 'Ponto' }], documentDeliveries: [{ name: 'Resumo', requiresPayment: false }],
     })
     const assignment = await createTestRecurringAssignment(template.id, org.id, { clientId: client.id })
     return { org, dept, client, template, assignment }

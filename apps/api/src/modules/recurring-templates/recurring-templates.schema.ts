@@ -1,7 +1,14 @@
 import { z } from 'zod'
 
-const documentItemSchema = z.object({
+const documentRequestItemSchema = z.object({
   name: z.string().trim().min(1, 'Nome do documento obrigatório'),
+})
+
+// Delivery = document the office sends to the client; a payment guide (DAS, FGTS) is tracked as
+// paid/unpaid in the client portal, an extract/declaration is not.
+const documentDeliveryItemSchema = z.object({
+  name: z.string().trim().min(1, 'Nome do documento obrigatório'),
+  requiresPayment: z.boolean().default(false),
 })
 
 export const createTemplateSchema = z.object({
@@ -35,8 +42,8 @@ export const createTemplateSchema = z.object({
   visibleToClient: z.boolean().default(true),
   isActive: z.boolean().default(true),
 
-  documentRequests: z.array(documentItemSchema).default([]),
-  documentDeliveries: z.array(documentItemSchema).default([]),
+  documentRequests: z.array(documentRequestItemSchema).default([]),
+  documentDeliveries: z.array(documentDeliveryItemSchema).default([]),
 })
 
 export const updateTemplateSchema = createTemplateSchema.partial().extend({
