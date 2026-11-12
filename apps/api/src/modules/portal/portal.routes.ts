@@ -17,6 +17,9 @@ import {
 import { createRequestAttachment } from '@/modules/requests/request-attachments.service'
 import { listProtocolsForClient, registerView, registerDownload } from '@/modules/protocols/protocols.service'
 import { listTaskDocuments, uploadForRequirement } from '@/modules/task-documents/task-documents.service'
+import { markProtocolPaid, unmarkProtocolPaid } from '@/modules/protocols/protocol-payment.service'
+import { readMultipartField } from '@/lib/multipart-fields'
+import { portalProtocolsQuerySchema, markPaidSchema } from './portal.schema'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
 
@@ -177,16 +180,43 @@ export async function portalRoutes(app: FastifyInstance) {
   })
 
   app.get('/protocols', async (request, reply) => {
-    const { clientId, status, search } = request.query as { clientId?: string; status?: string; search?: string }
-    if (!clientId) throw new AppError(400, 'clientId é obrigatório')
+    const result = portalProtocolsQuerySchema.safeParse(request.query)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    const { clientId, dueFrom, dueTo, ...filters } = result.data
     const scope = await getClientAccessScope(request.user.sub)
     if (!scope.clientIds.includes(clientId)) throw new AppError(404, 'Empresa não encontrada')
     return reply.send(
       await listProtocolsForClient(request.user.organizationId!, clientId, request.user.sub, {
-        status: status as never,
-        search,
+        ...filters,
+        dueFrom: dueFrom ? new Date(`${dueFrom}T00:00:00.000Z`) : undefined,
+        dueTo: dueTo ? new Date(`${dueTo}T00:00:00.000Z`) : undefined,
       }),
     )
+  })
+
+  app.post('/protocols/:id/pay', { preHandler: [checkSubscription] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    let amount: string | undefined
+    let proof: { filename: string; mimeType: string; size: number; buffer: Buffer } | undefined
+    if (request.isMultipart()) {
+      const file = await request.file()
+      if (file) {
+        amount = readMultipartField(file, 'amount')
+        const buffer = await file.toBuffer()
+        proof = { filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer }
+      }
+    } else {
+      const body = markPaidSchema.safeParse(request.body)
+      if (!body.success) throw new AppError(400, body.error.errors[0].message)
+      amount = body.data.amount
+    }
+    if (!amount) throw new AppError(400, 'Informe o valor pago')
+    return reply.send(await markProtocolPaid(id, request.user.organizationId!, request.user.sub, { amount, proof }))
+  })
+
+  app.delete('/protocols/:id/pay', { preHandler: [checkSubscription] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    return reply.send(await unmarkProtocolPaid(id, request.user.organizationId!, request.user.sub))
   })
 
   app.get('/protocols/:id', async (request, reply) => {

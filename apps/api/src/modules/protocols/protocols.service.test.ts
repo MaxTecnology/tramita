@@ -401,7 +401,7 @@ describe('listProtocolsForOrg / listProtocolsForClient / getProtocolById / getPr
     expect(list).toHaveLength(0)
   })
 
-  it('listProtocolsForClient esconde protocolo cuja task deixou de ser visível ao cliente', async () => {
+  it('listProtocolsForClient mantém o documento já enviado mesmo se a task deixar de ser visível (decisão 2026-11-12: documento entregue nunca some)', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
@@ -413,7 +413,7 @@ describe('listProtocolsForOrg / listProtocolsForClient / getProtocolById / getPr
 
     const list = await listProtocolsForClient(org.id, client.id, clientUser.id, {})
 
-    expect(list).toHaveLength(0)
+    expect(list.map((p) => p.title)).toEqual(['Vira interno'])
   })
 
   it('getProtocolById inclui a timeline de eventos ordenada', async () => {

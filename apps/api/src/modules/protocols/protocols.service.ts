@@ -193,27 +193,48 @@ export async function listProtocolsForTask(taskId: string, organizationId: strin
   return prisma.protocol.findMany({ where: { taskId }, orderBy: { createdAt: 'desc' } })
 }
 
+export interface ClientProtocolFilters {
+  status?: ProtocolStatus
+  search?: string
+  competence?: string // 'YYYY-MM'
+  departmentId?: string
+  dueFrom?: Date
+  dueTo?: Date
+  paymentStatus?: 'unpaid' | 'paid'
+  from?: Date
+  to?: Date
+}
+
+// "Documentos recebidos" do portal. A document sent to the client never disappears when its task is
+// later hidden (the client and the company owner keep the history); only a cancellation removes it.
 export async function listProtocolsForClient(
   organizationId: string,
   clientId: string,
   clientUserId: string,
-  filters: { status?: ProtocolStatus; from?: Date; to?: Date; search?: string },
+  filters: ClientProtocolFilters,
 ) {
   const scope = await getClientAccessScope(clientUserId)
   const departmentIds = scope.departmentIdsByClient.get(clientId)
   if (!departmentIds || departmentIds.size === 0) return []
+  if (filters.departmentId && !departmentIds.has(filters.departmentId)) return []
 
-  return prisma.protocol.findMany({
+  const competence = filters.competence ? (() => {
+    const [y, m] = filters.competence!.split('-').map(Number)
+    return { gte: new Date(Date.UTC(y, m - 1, 1)), lt: new Date(Date.UTC(y, m, 1)) }
+  })() : undefined
+
+  const rows = await prisma.protocol.findMany({
     where: {
       organizationId,
       clientId,
-      // Um protocolo cuja Task foi marcada como visibleToClient: false depois de criado nunca
-      // pode aparecer nesta lista — senão o card aparece pro cliente mas abrir/baixar (que
-      // revalida isso em registerView/registerDownload) devolveria 404, uma inconsistência
-      // visível pro próprio cliente.
-      task: { visibleToClient: true, departmentId: { in: [...departmentIds] } },
+      cancelledAt: null,
+      task: { departmentId: filters.departmentId ?? { in: [...departmentIds] } },
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.from || filters.to ? { createdAt: { gte: filters.from, lte: filters.to } } : {}),
+      ...(filters.dueFrom || filters.dueTo ? { dueDate: { gte: filters.dueFrom, lte: filters.dueTo } } : {}),
+      ...(competence ? { competence } : {}),
+      ...(filters.paymentStatus === 'unpaid' ? { requiresPayment: true, paidAt: null } : {}),
+      ...(filters.paymentStatus === 'paid' ? { requiresPayment: true, paidAt: { not: null } } : {}),
       ...(filters.search ? { title: { contains: filters.search, mode: 'insensitive' } } : {}),
     },
     // Nunca inclui `content` aqui: essa lista não registra VIEWED (só GET /protocols/:id via
@@ -222,9 +243,17 @@ export async function listProtocolsForClient(
     select: {
       id: true, number: true, title: true, dueDate: true, status: true,
       attachmentId: true, taskId: true, clientId: true, createdAt: true,
+      competence: true, requiresPayment: true, amount: true, paidAt: true, paidAmount: true, fileUpdatedAt: true,
+      task: { select: { department: { select: { name: true } } } },
     },
     orderBy: { createdAt: 'desc' },
   })
+  return rows.map(({ task, amount, paidAmount, ...r }) => ({
+    ...r,
+    amount: amount?.toString() ?? null,
+    paidAmount: paidAmount?.toString() ?? null,
+    departmentName: task.department.name,
+  }))
 }
 
 export async function getProtocolById(id: string, organizationId: string): Promise<ProtocolDetail> {
@@ -273,10 +302,10 @@ export async function registerView(
   userAgent: string | undefined,
 ) {
   const protocol = await prisma.protocol.findFirst({
-    where: { id: protocolId, organizationId },
-    include: { task: { select: { departmentId: true, visibleToClient: true } } },
+    where: { id: protocolId, organizationId, cancelledAt: null },
+    include: { task: { select: { departmentId: true } } },
   })
-  if (!protocol || !protocol.task.visibleToClient) throw new AppError(404, 'Protocolo não encontrado')
+  if (!protocol) throw new AppError(404, 'Protocolo não encontrado')
   await assertClientAccess(protocol.clientId, protocol.task.departmentId, clientUserId)
 
   const actor = await resolveClientUserActor(clientUserId)
@@ -289,7 +318,28 @@ export async function registerView(
   // regra de negócio é EXPIRED só vale pra quem nunca viu o protocolo.
   await prisma.protocol.updateMany({ where: { id: protocolId, status: { in: ['SENT', 'EXPIRED'] } }, data: { status: 'VIEWED' } })
 
-  return prisma.protocol.findUniqueOrThrow({ where: { id: protocolId } })
+  // Detail for the portal: history (who marked as paid and when), amounts as decimal strings.
+  // Previous file versions stay in the events (REPLACED), but only the current file is downloadable.
+  const detail = await prisma.protocol.findUniqueOrThrow({
+    where: { id: protocolId },
+    include: {
+      attachment: { select: { filename: true, mimeType: true } },
+      paymentProof: { select: { filename: true } },
+      paidBy: { select: { name: true } },
+      task: { select: { department: { select: { name: true } } } },
+      events: {
+        orderBy: { createdAt: 'asc' },
+        select: { type: true, actorName: true, actorType: true, detail: true, createdAt: true },
+      },
+    },
+  })
+  const { task, amount, paidAmount, ...rest } = detail
+  return {
+    ...rest,
+    amount: amount?.toString() ?? null,
+    paidAmount: paidAmount?.toString() ?? null,
+    departmentName: task.department.name,
+  }
 }
 
 export async function registerDownload(
@@ -300,10 +350,10 @@ export async function registerDownload(
   userAgent: string | undefined,
 ) {
   const protocol = await prisma.protocol.findFirst({
-    where: { id: protocolId, organizationId },
-    include: { task: { select: { departmentId: true, visibleToClient: true } }, attachment: true },
+    where: { id: protocolId, organizationId, cancelledAt: null },
+    include: { task: { select: { departmentId: true } }, attachment: true },
   })
-  if (!protocol || !protocol.task.visibleToClient) throw new AppError(404, 'Protocolo não encontrado')
+  if (!protocol) throw new AppError(404, 'Protocolo não encontrado')
   await assertClientAccess(protocol.clientId, protocol.task.departmentId, clientUserId)
   if (!protocol.attachment || protocol.attachment.deletedAt) throw new AppError(404, 'Esse protocolo não tem arquivo pra baixar')
 
