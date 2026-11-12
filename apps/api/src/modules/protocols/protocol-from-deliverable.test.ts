@@ -170,3 +170,19 @@ describe('POST /tasks/:id/documents/deliveries/:reqId/upload com valor', () => {
     expect(JSON.parse(res.body).message).toBe('Valor inválido: use até 2 casas decimais')
   })
 })
+
+describe('reentrega com a tarefa oculta (revisão final)', () => {
+  it('visible → hidden → re-delivery → visible again: the client document gets the latest file', async () => {
+    const { org, user, task, deliverable } = await setup()
+    await deliverDocument(task.id, deliverable.id, org.id, { id: user.id }, pdf('v1.pdf'), { amount: '10' })
+    await updateTask(task.id, org.id, { visibleToClient: false }, { id: user.id, type: 'user' })
+
+    await deliverDocument(task.id, deliverable.id, org.id, { id: user.id }, pdf('v2.pdf'), { amount: '12' })
+    await updateTask(task.id, org.id, { visibleToClient: true }, { id: user.id, type: 'user' })
+
+    const protocols = await prisma.protocol.findMany({ where: { taskId: task.id }, include: { attachment: true } })
+    expect(protocols).toHaveLength(1)
+    expect(protocols[0].attachment?.filename).toBe('v2.pdf')
+    expect(protocols[0].amount?.toString()).toBe('12')
+  })
+})

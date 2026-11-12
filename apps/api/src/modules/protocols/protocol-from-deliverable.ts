@@ -78,9 +78,11 @@ export async function upsertProtocolForDeliverable(deliverableId: string, actor:
     },
   })
   const { task } = deliverable
-  if (!task.visibleToClient || !deliverable.attachmentId) return null
+  if (!deliverable.attachmentId) return null
 
   const dueDate = deliverable.paymentDueDate ?? task.dueDate
+  // A document already sent never goes stale: it stays in the portal even if the task was hidden
+  // since, so a re-delivery always reaches it (the worker drops the notice for hidden tasks).
   if (deliverable.protocol) {
     if (deliverable.protocol.attachmentId === deliverable.attachmentId) return deliverable.protocol
     return replaceProtocolFileCore(deliverable.protocol.id, deliverable.attachmentId, actor, {
@@ -88,6 +90,7 @@ export async function upsertProtocolForDeliverable(deliverableId: string, actor:
       dueDate,
     })
   }
+  if (!task.visibleToClient) return null
 
   return insertProtocol({
     organizationId: task.column.board.organizationId,

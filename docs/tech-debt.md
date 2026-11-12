@@ -464,3 +464,13 @@ com valor e substituindo o arquivo. Cobertos por testes de API e de componente, 
 novo detalhe, a tela recarrega depois de "Marcar como pago" e o histórico ganha um "Visualizado"
 repetido. Inofensivo, mas polui o histórico: gravar `VIEWED` só na primeira visualização por usuário
 (ou não registrar de novo se o último evento do mesmo usuário for `VIEWED` há poucos minutos).
+
+## Portal de documentos — menores da revisão final (2026-11-12), não corrigidos
+
+1. **Corrida no robô:** em `anexarDocumento`, `deliverDocument` cria/substitui o protocolo e avisa o cliente antes da escrita guardada no `receivedDocument`. Dois revisores ao mesmo tempo: o perdedor recebe 409, mas já gerou um REPLACED e um segundo aviso. Correção: reservar o `receivedDocument` (status intermediário via `updateMany`) antes de entregar.
+2. **Atualização parcial numa corrida rara:** `deliverDocument` grava arquivo/valor na entrega antes de `upsertProtocolForDeliverable`. Se o cliente pagar entre a checagem prévia e a escrita guardada, o 409 sobe com a entrega já atualizada e o protocolo antigo. Correção: substituir o protocolo antes ou compensar no erro.
+3. **409 com mensagem de "guia paga"** quando o motivo real foi um cancelamento concorrente (`replaceProtocolFileCore`/`updateProtocolPayment`). Reler o registro e escolher a mensagem.
+4. **Arquivo órfão quando a escrita guardada perde:** `markProtocolPaid` (comprovante) e `replaceProtocolFile` sobem o arquivo antes do `updateMany`; num 409 o arquivo fica sem uso no B2.
+5. **Valor lido pelo robô passa por `number`** (`parseMoeda` → `toFixed(2)` em `pagamentoLido`). Exato para 2 casas, mas fere a convenção "nunca float"; o motor deveria expor a string normalizada.
+6. **Comprovante maior que 20MB** em `POST /portal/protocols/:id/pay` não vira `AppError(413)` em pt-BR como em `/protocols/:id/replace`.
+7. **`replaceProtocolFile` aceita `amount`** em protocolo que não é guia (a tela não envia, mas a API grava). Ignorar o valor quando `requiresPayment = false`.

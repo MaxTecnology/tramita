@@ -119,3 +119,16 @@ describe('guias não pagas no escritório', () => {
     expect(statuses).toEqual({ DAS: 'SENT', FGTS: 'SENT', INSS: 'EXPIRED' })
   })
 })
+
+describe('resumo de protocolos (revisão final)', () => {
+  it('GET /protocols/summary ignores cancelled protocols', async () => {
+    const { guide, auth } = await setup()
+    await guide('DAS', '10.00', '2026-11-20')
+    const cancelled = await guide('INSS', '10.00', '2026-11-20')
+    await prisma.protocol.update({ where: { id: cancelled.id }, data: { cancelledAt: new Date() } })
+
+    const res = await app.inject({ method: 'GET', url: '/protocols/summary', headers: { authorization: auth } })
+
+    expect(JSON.parse(res.body).SENT).toBe(1)
+  })
+})

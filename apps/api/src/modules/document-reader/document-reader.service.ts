@@ -342,6 +342,10 @@ async function anexarDocumento(
   opcoes: AnexarOpcoes = {},
 ) {
   const doc = await buscarDocumentoRevisavel(receivedDocumentId, organizationId)
+  // Tarefa de outro escritório: 404 antes de qualquer checagem (a mensagem do CNPJ citaria o
+  // nome do cliente dela)
+  const daOrg = await prisma.task.findFirst({ where: { id: taskId, column: { board: { organizationId } } }, select: { id: true } })
+  if (!daOrg) throw new AppError(404, 'Tarefa não encontrada')
   // Barreira em toda anexação (não só na troca): documento errado nunca chega ao cliente
   await assertCnpjBateComTarefa(doc, taskId)
   await assertCompetenciaBateComTarefa(doc, taskId)

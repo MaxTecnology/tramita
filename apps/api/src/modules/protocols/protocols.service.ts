@@ -274,7 +274,8 @@ export async function getProtocolsSummary(organizationId: string, actor: { id: s
     by: ['status'],
     // Mesmo escopo de listProtocolsForOrg — sem isso, o resumo (cards do Dashboard) mostraria
     // contagem org-wide pro ORG_MEMBER mesmo com a lista abaixo restrita, uma inconsistência.
-    where: { organizationId, ...(actor.role === 'ORG_MEMBER' ? { task: { column: { board: memberBoardWhere(actor.id) } } } : {}) },
+    // Cancelled documents leave every indicator (spec 7.10)
+    where: { organizationId, cancelledAt: null, ...(actor.role === 'ORG_MEMBER' ? { task: { column: { board: memberBoardWhere(actor.id) } } } : {}) },
     _count: { _all: true },
   })
   const summary: Record<ProtocolStatus, number> = { SENT: 0, VIEWED: 0, DOWNLOADED: 0, EXPIRED: 0 }

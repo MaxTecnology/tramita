@@ -128,3 +128,22 @@ describe('robô preenche a entrega com barreira de CNPJ/competência', () => {
     expect(fila[0].task?.pendingDeliverables.map((d) => [d.name, d.requiresPayment])).toEqual([['Guia DAS', true], ['Extrato', false]])
   })
 })
+
+describe('isolamento entre escritórios (revisão final)', () => {
+  it('task of another organization answers 404 without revealing its client name', async () => {
+    const { org, doc, actor } = await setup()
+    const plan = await createTestPlan()
+    const otherOrg = await createTestOrg(plan.id)
+    const otherAdmin = await createTestUser(otherOrg.id, { role: 'ORG_ADMIN' })
+    const dept = await createTestDepartment(otherOrg.id)
+    const secretClient = await createTestClient(otherOrg.id, { name: 'CLIENTE SIGILOSO LTDA', cnpj: '99.888.777/0001-66' })
+    const board = await createTestBoard(otherOrg.id, secretClient.id)
+    const column = await createTestColumn(board.id)
+    const foreignTask = await createTestTask(column.id, otherAdmin.id, { departmentId: dept.id })
+
+    const err = await trocarTarefa(doc.id, org.id, foreignTask.id, actor).catch((e: unknown) => e as { statusCode: number; message: string })
+
+    expect(err).toMatchObject({ statusCode: 404 })
+    expect(err.message).not.toContain('SIGILOSO')
+  })
+})
