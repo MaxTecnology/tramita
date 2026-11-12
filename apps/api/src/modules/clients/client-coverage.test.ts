@@ -77,7 +77,7 @@ describe('assertDepartmentServesClient / listServedDepartmentIds', () => {
   it('aceita departamento atendido e lista os atendidos', async () => {
     const { client, fiscal, user } = await setup()
     await serveClientDepartment(client.id, fiscal.id, user.id)
-    await expect(assertDepartmentServesClient(prisma, client.id, fiscal.id)).resolves.toBeUndefined()
+    await expect(assertDepartmentServesClient(prisma, client.id, fiscal.id)).resolves.toBe(user.id)
     expect(await listServedDepartmentIds(prisma, client.id)).toEqual([fiscal.id])
   })
 })

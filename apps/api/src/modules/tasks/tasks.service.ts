@@ -67,7 +67,7 @@ export async function createTask(
 ) {
   const column = await verifyColumnBelongsToOrg(columnId, organizationId)
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
-  await assertDepartmentServesClient(prisma, column.board.clientId, data.departmentId)
+  const departmentResponsibleId = await assertDepartmentServesClient(prisma, column.board.clientId, data.departmentId)
   const departmentId = data.departmentId
   const actorName = await resolveActorName(actor.id, actor.type)
 
@@ -79,7 +79,8 @@ export async function createTask(
         title: data.title,
         description: data.description,
         priority: data.priority,
-        assigneeId: data.assigneeId,
+        // No assignee chosen → the department's responsible for this client (never orphaned)
+        assigneeId: data.assigneeId ?? departmentResponsibleId,
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
         tags: data.tags,
         departmentId,

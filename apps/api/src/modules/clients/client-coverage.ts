@@ -16,12 +16,13 @@ export async function listServedDepartmentIds(db: Db, clientId: string): Promise
   return rows.map((r) => r.departmentId)
 }
 
-export async function assertDepartmentServesClient(db: Db, clientId: string, departmentId: string): Promise<void> {
+// Returns the department's responsible for this client — the default assignee of new tasks.
+export async function assertDepartmentServesClient(db: Db, clientId: string, departmentId: string): Promise<string> {
   const served = await db.clientAssignment.findUnique({
     where: { clientId_departmentId: { clientId, departmentId } },
-    select: { id: true },
+    select: { userId: true },
   })
-  if (served) return
+  if (served) return served.userId
 
   const [department, client] = await Promise.all([
     db.department.findUnique({ where: { id: departmentId }, select: { name: true } }),

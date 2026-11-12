@@ -263,7 +263,7 @@ export async function generateTaskForAssignment(
   try {
     const served = await prisma.clientAssignment.findUnique({
       where: { clientId_departmentId: { clientId: assignment.clientId, departmentId: template.departmentId } },
-      select: { id: true },
+      select: { userId: true },
     })
     if (!served) {
       const [department, client] = await Promise.all([
@@ -291,6 +291,7 @@ export async function generateTaskForAssignment(
           status: initialStatus,
           columnId,
           departmentId: template.departmentId,
+          assigneeId: served.userId,
           competence,
           dueDate,
           targetDate,
