@@ -1,0 +1,28 @@
+import type { FastifyRequest } from 'fastify'
+
+// Query params that carry credentials. SSE endpoints receive the JWT as ?token=
+// because EventSource cannot send an Authorization header.
+const SENSITIVE_PARAMS = ['token', 'access_token', 'refresh_token']
+
+const SENSITIVE_PARAM_RE = new RegExp(`([?&](?:${SENSITIVE_PARAMS.join('|')})=)[^&#]*`, 'g')
+
+export function redactUrl(url: string): string {
+  return url.replace(SENSITIVE_PARAM_RE, '$1[REDACTED]')
+}
+
+// Same fields as Fastify's default `req` serializer, with the URL redacted.
+export function buildLoggerOptions() {
+  return {
+    serializers: {
+      req(request: FastifyRequest) {
+        return {
+          method: request.method,
+          url: redactUrl(request.url),
+          host: request.host,
+          remoteAddress: request.ip,
+          remotePort: request.socket?.remotePort,
+        }
+      },
+    },
+  }
+}

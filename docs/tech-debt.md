@@ -420,3 +420,15 @@ cadastro do cliente mostra e corrige a cobertura quebrada. Correção sugerida: 
 `lockClients(tx, clientIds)` (`SELECT … FOR UPDATE` via `tx.$queryRaw`) no início de toda transação
 que mexe em cobertura (cliente, usuário do cliente, tarefa, solicitação, desativação de usuário), e
 levar a checagem de I5 do `createTask` pra dentro da transação.
+
+## SSE autentica com o JWT na query string (encontrado em 2026-11-12)
+
+`EventSource` não envia header `Authorization`, então `/requests/stream` e `/boards/:id/stream` recebem o JWT em `?token=`. O log da API já mascara (`src/lib/log-redaction.ts`, `?token=[REDACTED]`), mas o token ainda passa por qualquer outro ponto que registre URL: access log do Traefik (se ativado), histórico do navegador, ferramentas de APM.
+
+**Correção sugerida:** ticket de uso único — `POST /stream/ticket` (autenticado por header) devolve um código aleatório guardado no Redis com TTL de 30s; o `EventSource` usa `?ticket=` e a rota consome (apaga) o ticket na primeira conexão. Assim o que aparece em URL não serve para mais nada.
+
+**Antes de produção:** confirmar que o access log do Traefik está desligado ou sem query string.
+
+## Prisma: `package.json#prisma` deprecado (encontrado em 2026-11-12)
+
+O `migrate deploy` avisa que a configuração em `package.json#prisma` (seed) será removida no Prisma 7. Migrar para `prisma.config.ts` quando formos atualizar para o Prisma 7 — hoje é só aviso, não quebra nada.

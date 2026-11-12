@@ -29,9 +29,13 @@ import { slaRoutes } from '@/modules/sla/sla.routes'
 import { documentReaderRoutes } from '@/modules/document-reader/document-reader.routes'
 import { documentReaderModelsRoutes } from '@/modules/document-reader/document-reader-models.routes'
 import { AppError } from '@/errors/AppError'
+import { buildLoggerOptions } from '@/lib/log-redaction'
 
 export function buildApp() {
-  const app = Fastify({ logger: process.env.NODE_ENV !== 'test', trustProxy: 1 })
+  const app = Fastify({
+    logger: process.env.NODE_ENV === 'test' ? false : buildLoggerOptions(),
+    trustProxy: 1,
+  })
 
   app.register(corsPlugin)
   app.register(rateLimitPlugin)
