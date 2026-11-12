@@ -3,7 +3,7 @@ import { test as base, expect, type Page, type APIRequestContext } from '@playwr
 
 const API = process.env.VITE_API_URL ?? 'http://localhost:3001'
 
-async function loginAndInject(
+export async function loginAndInject(
   page: Page,
   request: APIRequestContext,
   email: string,
