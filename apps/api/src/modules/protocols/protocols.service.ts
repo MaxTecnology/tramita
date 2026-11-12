@@ -309,10 +309,18 @@ export async function registerView(
   if (!protocol) throw new AppError(404, 'Protocolo não encontrado')
   await assertClientAccess(protocol.clientId, protocol.task.departmentId, clientUserId)
 
-  const actor = await resolveClientUserActor(clientUserId)
-  await prisma.protocolEvent.create({
-    data: { protocolId, type: 'VIEWED', actorType: 'client', actorId: clientUserId, actorName: actor.name, actorEmail: actor.email, ip, userAgent },
+  // One VIEWED per person per file version: reopening the detail (or the reload after "Marcar como
+  // pago") doesn't pollute the history, but a replaced file seen again is a new view.
+  const seenThisVersion = await prisma.protocolEvent.findFirst({
+    where: { protocolId, type: 'VIEWED', actorId: clientUserId, createdAt: { gte: protocol.fileUpdatedAt ?? protocol.createdAt } },
+    select: { id: true },
   })
+  if (!seenThisVersion) {
+    const actor = await resolveClientUserActor(clientUserId)
+    await prisma.protocolEvent.create({
+      data: { protocolId, type: 'VIEWED', actorType: 'client', actorId: clientUserId, actorName: actor.name, actorEmail: actor.email, ip, userAgent },
+    })
+  }
 
   // Guarda pelo status atual no banco (não pela leitura anterior, que pode estar obsoleta) — e
   // inclui EXPIRED como origem válida: visualizar depois do vencimento ainda é visualizar, e a

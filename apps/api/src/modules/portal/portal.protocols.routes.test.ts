@@ -25,6 +25,47 @@ async function setupProtocol(orgId: string, staffId: string) {
   return { client, department, protocol: JSON.parse(created.body) }
 }
 
+describe('VIEWED uma vez por pessoa e por versão do arquivo', () => {
+  async function viewers() {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const { client, department, protocol } = await setupProtocol(org.id, admin.id)
+    const login = async () => {
+      const { clientUser, password } = await createTestClientUser(org.id)
+      await grantClientAccess(clientUser.id, client.id, department.id)
+      return getAuthHeader(clientUser.email, password)
+    }
+    return { protocol, owner: await login(), finance: await login() }
+  }
+  const view = (id: string, auth: string) => app.inject({ method: 'GET', url: `/portal/protocols/${id}`, headers: { authorization: auth } })
+  const viewedCount = (id: string) => prisma.protocolEvent.count({ where: { protocolId: id, type: 'VIEWED' } })
+
+  it('reopening the detail does not repeat VIEWED for the same person', async () => {
+    const { protocol, owner } = await viewers()
+    await view(protocol.id, owner)
+    await view(protocol.id, owner)
+    expect(await viewedCount(protocol.id)).toBe(1)
+  })
+
+  it('each person who opens it is recorded once', async () => {
+    const { protocol, owner, finance } = await viewers()
+    await view(protocol.id, owner)
+    await view(protocol.id, finance)
+    await view(protocol.id, finance)
+    expect(await viewedCount(protocol.id)).toBe(2)
+  })
+
+  it('a replaced file counts as a new view', async () => {
+    const { protocol, owner } = await viewers()
+    await view(protocol.id, owner)
+    await prisma.protocol.update({ where: { id: protocol.id }, data: { fileUpdatedAt: new Date(Date.now() + 1000) } })
+    await new Promise((r) => setTimeout(r, 1100))
+    await view(protocol.id, owner)
+    expect(await viewedCount(protocol.id)).toBe(2)
+  })
+})
+
 describe('GET /portal/protocols/:id', () => {
   it('registra VIEWED com o IP real do cliente (via X-Forwarded-For, graças ao trustProxy)', async () => {
     const plan = await createTestPlan()

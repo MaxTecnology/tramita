@@ -185,7 +185,7 @@ describe('registerView / registerDownload', () => {
     expect(events[0].actorEmail).toBe(clientUser.email)
   })
 
-  it('registerView duas vezes gera dois eventos, mas status não regride', async () => {
+  it('registerView duas vezes gera um só VIEWED (mesma pessoa, mesmo arquivo) e o status não regride', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
@@ -203,7 +203,7 @@ describe('registerView / registerDownload', () => {
     const updated = await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })
     expect(updated.status).toBe('DOWNLOADED') // não regride pra VIEWED
     const viewedEvents = await prisma.protocolEvent.findMany({ where: { protocolId: protocol.id, type: 'VIEWED' } })
-    expect(viewedEvents).toHaveLength(2)
+    expect(viewedEvents).toHaveLength(1)
   })
 
   it('registerView lança 404 pra ClientUser sem acesso à empresa', async () => {
