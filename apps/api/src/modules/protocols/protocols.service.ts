@@ -6,7 +6,8 @@ import { enqueueNotification } from '@/lib/queue'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 import { getSignedDownloadUrl } from '@/lib/b2'
 import { utcDayLabel, todayInBRT } from '@/lib/date-only'
-import { formatBRL } from '@/lib/money'
+import { formatBRL, parseMoney } from '@/lib/money'
+import { memberBoardWhere } from '@/modules/boards/board-visibility'
 import type { CreateProtocolBody } from './protocols.schema'
 import type { ProtocolStatus } from '@prisma/client'
 
@@ -39,7 +40,7 @@ export async function createProtocol(
   taskId: string,
   organizationId: string,
   staffId: string,
-  data: Omit<CreateProtocolBody, 'dueDate'> & { dueDate?: Date },
+  data: Omit<CreateProtocolBody, 'dueDate' | 'requiresPayment'> & { dueDate?: Date; requiresPayment?: boolean },
 ) {
   if (!data.attachmentId && !data.content) {
     throw new AppError(400, 'Informe um anexo existente ou um texto pro protocolo')
@@ -63,6 +64,7 @@ export async function createProtocol(
     if (alreadyLinked) throw new AppError(409, 'Esse anexo já está vinculado a outro protocolo')
   }
 
+  const requiresPayment = data.requiresPayment ?? false
   return insertProtocol({
     organizationId,
     clientId: task.column.board.clientId,
@@ -71,6 +73,9 @@ export async function createProtocol(
     title: data.title,
     content: data.content,
     dueDate: data.dueDate,
+    competence: task.competence,
+    requiresPayment,
+    amount: requiresPayment && data.amount ? parseMoney(data.amount) : null,
     createdById: staffId,
   })
 }
@@ -166,7 +171,7 @@ export async function listProtocolsForOrg(
       // Mesma restrição já aplicada em listTasks: ORG_MEMBER só vê o que é dele — sem isso,
       // qualquer membro via a lista org-wide de protocolos (de todos os clientes/departamentos),
       // inclusive os que não tem nenhuma relação com a tarefa.
-      ...(actor.role === 'ORG_MEMBER' ? { task: { assigneeId: actor.id } } : {}),
+      ...(actor.role === 'ORG_MEMBER' ? { task: { column: { board: memberBoardWhere(actor.id) } } } : {}),
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.clientId ? { clientId: filters.clientId } : {}),
       ...(filters.from || filters.to ? { createdAt: { gte: filters.from, lte: filters.to } } : {}),
@@ -240,7 +245,7 @@ export async function getProtocolsSummary(organizationId: string, actor: { id: s
     by: ['status'],
     // Mesmo escopo de listProtocolsForOrg — sem isso, o resumo (cards do Dashboard) mostraria
     // contagem org-wide pro ORG_MEMBER mesmo com a lista abaixo restrita, uma inconsistência.
-    where: { organizationId, ...(actor.role === 'ORG_MEMBER' ? { task: { assigneeId: actor.id } } : {}) },
+    where: { organizationId, ...(actor.role === 'ORG_MEMBER' ? { task: { column: { board: memberBoardWhere(actor.id) } } } : {}) },
     _count: { _all: true },
   })
   const summary: Record<ProtocolStatus, number> = { SENT: 0, VIEWED: 0, DOWNLOADED: 0, EXPIRED: 0 }

@@ -6,9 +6,23 @@ export const createProtocolSchema = z.object({
   dueDate: z.string().datetime().optional(),
   attachmentId: z.string().cuid().optional(),
   content: z.string().min(1).optional(),
+  requiresPayment: z.boolean().default(false),
+  amount: z.string().trim().optional(),
 }).refine((data) => !!data.attachmentId || !!data.content, {
   message: 'Informe um anexo existente ou um texto pro protocolo',
   path: ['content'],
+}).refine((data) => !data.requiresPayment || !!data.amount, {
+  message: 'Informe o valor da guia',
+  path: ['amount'],
+})
+
+export const updateProtocolPaymentSchema = z.object({
+  amount: z.string().trim().optional(),
+  dueDate: z.string().trim().optional(),
+})
+
+export const cancelProtocolSchema = z.object({
+  reason: z.string({ required_error: 'Informe o motivo do cancelamento' }).trim().min(3, 'Informe o motivo do cancelamento'),
 })
 
 export const listProtocolsQuerySchema = z.object({
