@@ -420,6 +420,23 @@ manuais validando os dois. Os demais itens entram conforme o que os testes revel
    esse sim exige tarefa sem cliente; fica depois de (a). Ordem combinada: testes manuais do que
    já existe → (a) → (b).
 
+   **Atualização 2026-11-12 — novo portal do cliente (entra ANTES de (a)/(b), conversa em andamento):**
+   testes manuais mostraram que "Minhas Tarefas" no portal mistura processos e recorrentes (~30/mês
+   num cliente com todos os departamentos). Decidido seguir o modelo do Nibo (portal centrado em
+   documentos, não em tarefas), mantendo Processos como diferencial do Tramita:
+   - **Fase A:** Início (cartões: guias a pagar, documentos a enviar, processos em andamento);
+     **Documentos recebidos** (protocolos + competência, valor, tipo, status Não visto/Visto/Pago);
+     **Enviar documentos** (pedidos agrupados por mês, cores vermelho/amarelo/verde, "Nada a
+     enviar"); **Processos** (OS com etapas/progresso). A tela "Tarefas" sai do portal.
+   - **Fase B:** Arquivo permanente (contrato social, sócios, certificado, procurações, certidões)
+     com alerta de vencimento (certificado/certidão).
+   - **Marcar como pago (decidido):** só o **cliente** marca (valor + comprovante opcional) — é
+     controle dele. O escritório **só vê**, sem notificação ativa: indicador no Dashboard "N guias
+     não pagas" (destaque vencidas) que abre a lista filtrada; o colaborador usa isso pra alertar o
+     cliente de imposto alto no dia ou logo após vencer (juros). Entregas do template recorrente
+     ganham a marca **"Exige pagamento"** (guia sim; extrato/declaração não) — só essas entram no
+     indicador e mostram "Pago". Entrega avulsa: marca na hora de enviar.
+
 1. **Solicitações internas** (próximo projeto, precisa de brainstorm + spec) — colaborador
    pedindo coisas a outro colaborador/departamento, referenciando ou não um cliente;
    "departamento interno" (que não atende cliente). Exige tarefa com cliente **opcional** hoje
