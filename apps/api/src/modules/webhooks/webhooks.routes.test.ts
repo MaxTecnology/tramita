@@ -43,6 +43,24 @@ describe('POST /webhooks/asaas', () => {
     expect(res.statusCode).toBe(401)
   })
 
+  it('accepts the token in the asaas-access-token header (how Asaas sends it)', async () => {
+    const plan = await createTestPlan()
+    const org = await orgWithSubscription(plan.id)
+    const res = await app.inject({
+      method: 'POST', url: '/webhooks/asaas', headers: { 'asaas-access-token': SECRET },
+      payload: webhookPayload('PAYMENT_CONFIRMED', org.asaasSubscriptionId!),
+    })
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('wrong header token of a different length is refused without throwing', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/webhooks/asaas', headers: { 'asaas-access-token': 'x' },
+      payload: { event: 'PAYMENT_CONFIRMED', payment: {} },
+    })
+    expect(res.statusCode).toBe(401)
+  })
+
   it('PAYMENT_CONFIRMED sets subscriptionStatus to ACTIVE', async () => {
     const plan = await createTestPlan()
     const org = await orgWithSubscription(plan.id)

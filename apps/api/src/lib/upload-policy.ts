@@ -29,8 +29,20 @@ export function resolveUploadMimeType(filename: string): string | null {
 }
 
 // Types the browser only displays (never executes) may open in a tab; everything else downloads.
-const INLINE_SAFE = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'text/plain', 'text/csv'])
+// Text/CSV download too: a browser that sniffs content could render HTML written inside them.
+const INLINE_SAFE = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 
 export function contentDispositionFor(mimeType: string): 'inline' | 'attachment' {
   return INLINE_SAFE.has(mimeType) ? 'inline' : 'attachment'
+}
+
+// File name as it goes into the B2 key: only [A-Za-z0-9._-] (anything else becomes "_"), at most 120
+// characters keeping the extension. The original name stays in the database for display/download.
+const MAX_KEY_NAME = 120
+export function storageSafeName(filename: string): string {
+  const safe = filename.replace(/[^A-Za-z0-9._-]/g, '_') || 'arquivo'
+  if (safe.length <= MAX_KEY_NAME) return safe
+  const dot = safe.lastIndexOf('.')
+  const ext = dot > 0 ? safe.slice(dot).slice(0, 16) : ''
+  return safe.slice(0, MAX_KEY_NAME - ext.length) + ext
 }

@@ -1,6 +1,15 @@
 import type { FastifyInstance } from 'fastify'
 import { AppError } from '@/errors/AppError'
 import { prisma } from '@/lib/prisma'
+import { createHash, timingSafeEqual } from 'node:crypto'
+
+// Constant-time comparison (hashes first so different lengths never short-circuit)
+function secretMatches(received: string | undefined): boolean {
+  const expected = process.env.ASAAS_WEBHOOK_SECRET
+  if (!received || !expected) return false
+  const digest = (v: string) => createHash('sha256').update(v).digest()
+  return timingSafeEqual(digest(received), digest(expected))
+}
 
 interface AsaasPayload {
   event: 'PAYMENT_CONFIRMED' | 'PAYMENT_OVERDUE' | 'PAYMENT_DELETED'
@@ -14,8 +23,11 @@ interface AsaasPayload {
 
 export async function webhooksRoutes(app: FastifyInstance) {
   app.post('/asaas', async (request, reply) => {
+    // Asaas sends the token in the asaas-access-token header; ?accessToken= kept for webhooks already
+    // registered with the URL form (the log masks it either way).
+    const header = request.headers['asaas-access-token']
     const { accessToken } = request.query as { accessToken?: string }
-    if (!accessToken || accessToken !== process.env.ASAAS_WEBHOOK_SECRET) {
+    if (!secretMatches(typeof header === 'string' ? header : accessToken)) {
       throw new AppError(401, 'Webhook token inválido')
     }
 

@@ -12,6 +12,8 @@ describe('redactUrl', () => {
   it('masks other credential-like params', () => {
     expect(redactUrl('/a?access_token=s1&refresh_token=s2')).toBe('/a?access_token=[REDACTED]&refresh_token=[REDACTED]')
     expect(redactUrl('/requests/stream?ticket=abc123')).toBe('/requests/stream?ticket=[REDACTED]')
+    expect(redactUrl('/webhooks/asaas?accessToken=s3cr3t')).toBe('/webhooks/asaas?accessToken=[REDACTED]')
+    expect(redactUrl('/x?TOKEN=a')).toBe('/x?TOKEN=[REDACTED]')
   })
 
   it('leaves URLs without sensitive params untouched', () => {

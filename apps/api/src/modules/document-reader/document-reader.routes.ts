@@ -52,8 +52,13 @@ export async function documentReaderRoutes(app: FastifyInstance) {
       throw err
     }
 
+    // The declared type is not enough: the content must be a PDF (header within the first 1KB, as
+    // the spec allows) and the stored name always ends in .pdf
+    if (!buffer.subarray(0, 1024).includes('%PDF-')) throw new AppError(422, 'O arquivo não é um PDF válido')
+    const filename = `${file.filename.replace(/\.[^.]*$/, '') || 'documento'}.pdf`
+
     const doc = await ingerirDocumento(request.user.organizationId!, { id: request.user.sub }, {
-      filename: file.filename, mimeType: file.mimetype, size: buffer.length, buffer,
+      filename, mimeType: 'application/pdf', size: buffer.length, buffer,
     })
     return reply.status(201).send(doc)
   })

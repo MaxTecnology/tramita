@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveUploadMimeType, contentDispositionFor } from './upload-policy'
+import { resolveUploadMimeType, contentDispositionFor, storageSafeName } from './upload-policy'
 
 describe('resolveUploadMimeType', () => {
   it.each([
@@ -26,10 +26,14 @@ describe('resolveUploadMimeType', () => {
 })
 
 describe('contentDispositionFor', () => {
-  it('PDF, images and plain text open in the browser', () => {
+  it('PDF and images open in the browser', () => {
     expect(contentDispositionFor('application/pdf')).toBe('inline')
     expect(contentDispositionFor('image/png')).toBe('inline')
-    expect(contentDispositionFor('text/plain')).toBe('inline')
+  })
+
+  it('text and CSV download (a browser that sniffs could render HTML inside them)', () => {
+    expect(contentDispositionFor('text/plain')).toBe('attachment')
+    expect(contentDispositionFor('text/csv')).toBe('attachment')
   })
 
   it('XML, Office files, ZIP and anything unknown are forced to download', () => {
@@ -37,5 +41,18 @@ describe('contentDispositionFor', () => {
     expect(contentDispositionFor('application/zip')).toBe('attachment')
     expect(contentDispositionFor('application/vnd.ms-excel')).toBe('attachment')
     expect(contentDispositionFor('text/html')).toBe('attachment')
+  })
+})
+
+describe('storageSafeName', () => {
+  it('keeps letters, digits, dot, dash and underscore; replaces the rest', () => {
+    expect(storageSafeName('Guia DAS #1 (out).pdf')).toBe('Guia_DAS__1__out_.pdf')
+    expect(storageSafeName('relatório.pdf')).toBe('relat_rio.pdf')
+  })
+
+  it('caps the length keeping the extension', () => {
+    const name = storageSafeName(`${'a'.repeat(500)}.xlsx`)
+    expect(name.length).toBeLessThanOrEqual(120)
+    expect(name.endsWith('.xlsx')).toBe(true)
   })
 })

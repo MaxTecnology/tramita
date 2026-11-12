@@ -97,6 +97,16 @@ describe('GET /boards/:id/stream', () => {
   // throwing 404/401 in the other GET /boards/:id/stream tests further up.
 })
 
+describe('stream ticket sem organização', () => {
+  it('MASTER ticket (no organization) on a board stream answers 403, not 500', async () => {
+    const { issueStreamTicket } = await import('./stream-ticket')
+    const ticket = await issueStreamTicket({ sub: 'master-id', role: 'MASTER', organizationId: null })
+
+    const res = await app.inject({ method: 'GET', url: `/boards/any/stream?ticket=${ticket}` })
+    expect(res.statusCode).toBe(403)
+  })
+})
+
 describe('stream ticket', () => {
   async function adminAuth() {
     const plan = await createTestPlan()

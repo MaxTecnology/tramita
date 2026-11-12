@@ -4,8 +4,10 @@ import { prisma } from '@/lib/prisma'
 import { createTestPlan, createTestOrg, createTestUser, getAuthHeader } from '@/test/helpers'
 import * as b2Module from '@/lib/b2'
 import * as queueModule from '@/lib/document-reader-queue'
+import { multipartBody } from '@/test/multipart'
 
 beforeEach(() => {
+  vi.restoreAllMocks()
   vi.spyOn(b2Module, 'uploadFile').mockResolvedValue(undefined)
   vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from('%PDF-1.4'))
   vi.spyOn(queueModule, 'enqueueDocumentReader').mockResolvedValue()
@@ -28,6 +30,32 @@ describe('POST /document-reader/upload', () => {
 
     expect(res.statusCode).toBe(201)
     expect(JSON.parse(res.body).status).toBe('PENDING')
+  })
+
+  it('refuses a file declared as PDF whose content is not a PDF', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const auth = await getAuthHeader(member.email, 'Test@1234')
+    const mp = multipartBody({}, { filename: 'pagina.html', contentType: 'application/pdf', content: '<html><script>x</script>' })
+
+    const res = await app.inject({ method: 'POST', url: '/document-reader/upload', headers: { authorization: auth, ...mp.headers }, body: mp.body })
+
+    expect(res.statusCode).toBe(422)
+    expect(b2Module.uploadFile).not.toHaveBeenCalled()
+  })
+
+  it('stores the PDF under a safe name with the .pdf extension', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const auth = await getAuthHeader(member.email, 'Test@1234')
+    const mp = multipartBody({}, { filename: 'guia #1?;.html', content: '%PDF-1.4' })
+
+    const res = await app.inject({ method: 'POST', url: '/document-reader/upload', headers: { authorization: auth, ...mp.headers }, body: mp.body })
+
+    expect(res.statusCode).toBe(201)
+    expect(vi.mocked(b2Module.uploadFile).mock.calls[0][0]).toMatch(/-guia__1__\.pdf$/)
   })
 
   it('lança 413 com mensagem em pt-BR quando o PDF excede 20MB', async () => {

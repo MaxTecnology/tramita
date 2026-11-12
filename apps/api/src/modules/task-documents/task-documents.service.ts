@@ -1,3 +1,4 @@
+import { storageSafeName } from '@/lib/upload-policy'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { uploadFile, getSignedDownloadUrl } from '@/lib/b2'
@@ -95,7 +96,7 @@ export async function uploadForRequirement(
   if (!requirement) throw new AppError(404, 'Documento não encontrado')
 
   const orgSlug = await getOrgSlug(organizationId)
-  const storageKey = `task-documents/${orgSlug}/${taskId}/${Date.now()}-${payload.filename}`
+  const storageKey = `task-documents/${orgSlug}/${taskId}/${Date.now()}-${storageSafeName(payload.filename)}`
   await uploadFile(storageKey, payload.buffer, payload.mimeType)
 
   const attachment = await prisma.attachment.create({
@@ -221,7 +222,7 @@ export async function deliverDocument(
   const paymentDueDate = deliverable.requiresPayment && payment.paymentDueDate ? parseDateOnly(payment.paymentDueDate) : undefined
 
   const orgSlug = await getOrgSlug(organizationId)
-  const storageKey = `task-documents/${orgSlug}/${taskId}/${Date.now()}-${payload.filename}`
+  const storageKey = `task-documents/${orgSlug}/${taskId}/${Date.now()}-${storageSafeName(payload.filename)}`
   await uploadFile(storageKey, payload.buffer, payload.mimeType)
 
   const attachment = await prisma.attachment.create({

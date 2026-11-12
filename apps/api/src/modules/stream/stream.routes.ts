@@ -18,6 +18,7 @@ export async function streamRoutes(app: FastifyInstance) {
 
     // EventSource can't send headers: auth via a one-time ticket from POST /stream/ticket
     const user = await consumeStreamTicket(ticket)
+    if (!user.organizationId) throw new AppError(403, 'Acesso negado') // MASTER has no processes
 
     // Verify board exists and belongs to the user's org
     const board = await prisma.board.findFirst({

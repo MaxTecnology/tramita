@@ -183,6 +183,28 @@ describe('dois revisores ao mesmo tempo', () => {
   })
 })
 
+describe('Membro e o leitor de documentos', () => {
+  it('a member outside the process cannot attach the document to its task', async () => {
+    const { org, doc, task } = await setup()
+    const outsider = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+
+    await expect(confirmarSugestao(doc.id, org.id, { id: outsider.id, role: 'ORG_MEMBER' })).rejects.toMatchObject({ statusCode: 404 })
+    await expect(trocarTarefa(doc.id, org.id, task.id, { id: outsider.id, role: 'ORG_MEMBER' })).rejects.toMatchObject({ statusCode: 404 })
+    expect(b2Module.uploadFile).not.toHaveBeenCalled()
+    expect((await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })).status).toBe('PENDING')
+  })
+
+  it('a member assigned to the task attaches normally', async () => {
+    const { org, doc, task } = await setup()
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    await prisma.task.update({ where: { id: task.id }, data: { assigneeId: member.id } })
+
+    await confirmarSugestao(doc.id, org.id, { id: member.id, role: 'ORG_MEMBER' })
+
+    expect((await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })).status).toBe('ATTACHED')
+  })
+})
+
 describe('isolamento entre escritórios (revisão final)', () => {
   it('task of another organization answers 404 without revealing its client name', async () => {
     const { org, doc, actor } = await setup()

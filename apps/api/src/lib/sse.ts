@@ -19,6 +19,8 @@ export async function publishOrgEvent(organizationId: string, payload: SSEEvent)
   } catch { /* ignore in test/offline environments */ }
 }
 
+export const SSE_MAX_CONNECTION_MS = 15 * 60 * 1000
+
 // Hijacks the reply, subscribes to `channel` on a dedicated Redis connection, and
 // forwards every published message as an SSE event. Shared by every SSE route in
 // the project so the hijack/heartbeat/cleanup plumbing exists in exactly one place.
@@ -60,10 +62,24 @@ export function attachSSESubscriber(
     raw.write(`event: heartbeat\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`)
   }, 15_000)
 
-  // Cleanup on client disconnect
-  request.raw.on('close', () => {
+  let closed = false
+  const cleanup = () => {
+    if (closed) return
+    closed = true
     clearInterval(heartbeat)
+    clearTimeout(maxDuration)
     sub.unsubscribe().catch(() => {})
     sub.quit().catch(() => {})
-  })
+  }
+
+  // Access is checked only when the connection opens (one-time ticket). Ending it after a while
+  // makes the client reconnect with a fresh ticket, so a deactivated user or a lost scope stops
+  // receiving events within this window.
+  const maxDuration = setTimeout(() => {
+    cleanup()
+    raw.end()
+  }, SSE_MAX_CONNECTION_MS)
+
+  // Cleanup on client disconnect
+  request.raw.on('close', cleanup)
 }

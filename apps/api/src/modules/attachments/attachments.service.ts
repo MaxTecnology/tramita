@@ -1,3 +1,4 @@
+import { storageSafeName } from '@/lib/upload-policy'
 import { prisma } from '@/lib/prisma'
 import { uploadFile, getSignedDownloadUrl, deleteFile } from '@/lib/b2'
 import { getOrgSlug } from '@/lib/org-slug'
@@ -58,7 +59,7 @@ export async function createAttachment(
   const resolvedClientId = task.column.board.clientId
 
   const orgSlug = await getOrgSlug(organizationId)
-  const storageKey = `attachments/${orgSlug}/${taskId}/${Date.now()}-${payload.filename}`
+  const storageKey = `attachments/${orgSlug}/${taskId}/${Date.now()}-${storageSafeName(payload.filename)}`
   await uploadFile(storageKey, payload.buffer, payload.mimeType)
 
   const actorName = await resolveActorName(actor)

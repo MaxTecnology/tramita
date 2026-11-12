@@ -1,3 +1,4 @@
+import { storageSafeName } from '@/lib/upload-policy'
 import { prisma } from '@/lib/prisma'
 import { discardUploadedAttachment } from './protocol-from-deliverable'
 import { AppError } from '@/errors/AppError'
@@ -39,7 +40,7 @@ export async function markProtocolPaid(
   let proofAttachmentId: string | undefined
   if (input.proof) {
     const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { slug: true } })
-    const storageKey = `payment-proofs/${org?.slug ?? organizationId}/${protocol.taskId}/${Date.now()}-${input.proof.filename}`
+    const storageKey = `payment-proofs/${org?.slug ?? organizationId}/${protocol.taskId}/${Date.now()}-${storageSafeName(input.proof.filename)}`
     await uploadFile(storageKey, input.proof.buffer, input.proof.mimeType)
     const attachment = await prisma.attachment.create({
       data: {
