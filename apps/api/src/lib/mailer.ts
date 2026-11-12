@@ -1,8 +1,16 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
-const EMAIL_FROM = process.env.EMAIL_FROM ?? 'Tramita <notificacoes@autohubs.com.br>'
+// Created on first send, never at import: a missing key fails the e-mail only, not the boot of the
+// worker that imports this module (WhatsApp, document reader and crons keep running).
+let client: Resend | null = null
+function getResend(): Resend {
+  if (!client) {
+    const key = process.env.RESEND_API_KEY
+    if (!key) throw new Error('RESEND_API_KEY não configurada — e-mail não enviado')
+    client = new Resend(key)
+  }
+  return client
+}
 
 export async function sendEmail(
   to: string,
@@ -11,8 +19,8 @@ export async function sendEmail(
   html?: string,
   fromOverride?: string,
 ): Promise<void> {
-  const { error } = await resend.emails.send({
-    from: fromOverride ?? EMAIL_FROM,
+  const { error } = await getResend().emails.send({
+    from: fromOverride ?? process.env.EMAIL_FROM ?? 'Tramita <notificacoes@autohubs.com.br>',
     to,
     subject,
     text: body,

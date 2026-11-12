@@ -1,8 +1,4 @@
-import { resolve } from 'node:path'
-import { config } from 'dotenv'
-
-// Load .env from monorepo root
-config({ path: resolve(import.meta.dirname, '../../../.env') })
+import './load-env'
 
 import { buildApp } from '@/server'
 
