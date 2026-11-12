@@ -415,6 +415,35 @@ ou
 
 ### GET `/portal/tasks/:taskId/documents` _(CLIENT)_ — mesmo formato de `GET /tasks/:id/documents`; 404 se a tarefa não pertence ao cliente ou não é `visibleToClient`
 ### POST `/portal/tasks/:taskId/documents/requests/:reqId/upload` _(CLIENT)_ — multipart, max 20MB — cliente envia o documento pedido pelo escritório
+### POST / DELETE `/portal/tasks/:taskId/documents/requests/:reqId/not-applicable` _(CLIENT)_ — "Nada a enviar" (PENDING/REJECTED → `NOT_APPLICABLE`, conta como resolvido igual APPROVED) e desfazer (volta a PENDING; 409 `'A tarefa já foi concluída'` se a tarefa está DONE). O escritório pode recusar um `NOT_APPLICABLE` via `PATCH /tasks/:id/documents/requests/:reqId` `{ decision: 'REJECTED', rejectionReason }`.
+
+---
+
+## Portal do Cliente — Documentos recebidos, Início e Enviar documentos (2026-11-12)
+
+Portal centrado em documentos (spec `docs/superpowers/specs/2026-11-12-portal-cliente-documentos-design.md`). Todo documento que o cliente recebe é um `Protocol`; a entrega (`TaskDeliverable`) concluída numa tarefa `visibleToClient` gera/atualiza o protocolo dela (1:1, `Protocol.deliverableId`). Documento enviado **nunca some** se a tarefa for ocultada depois; só o cancelamento (exceção) o tira do portal. Valores trafegam como string decimal com ponto (`"1234.56"`); o front converte do formato brasileiro.
+
+### GET `/portal/home?clientId=` _(CLIENT)_ — `{ unpaidGuides: { count, overdueCount }, documentsToSend, documentsToSendInProcesses, processesInProgress, dueThisWeek: { kind: 'guide'|'request', id, title, dueDate, amount? }[] }` — tudo no escopo de departamento do usuário
+### GET `/portal/protocols?clientId=&search=&competence=AAAA-MM&departmentId=&dueFrom=&dueTo=&paymentStatus=unpaid|paid` _(CLIENT)_ — lista sem `content`; inclui `competence, requiresPayment, amount, paidAt, paidAmount, fileUpdatedAt, departmentName`; exclui cancelados
+### GET `/portal/protocols/:id` _(CLIENT)_ — registra `VIEWED`; devolve detalhe + `events` (`type, actorName, detail, createdAt`), `paidBy`, `paymentProof`. 404 fora do escopo ou cancelado
+### POST `/portal/protocols/:id/pay` _(CLIENT)_ — JSON `{ amount }` ou multipart (`amount` antes do arquivo + comprovante opcional). Só em guia (`requiresPayment`, senão 422); 409 se já paga (escrita guardada: clique duplo gera um só `PAID`); marca `VIEWED` se ainda não visto
+### DELETE `/portal/protocols/:id/pay` _(CLIENT)_ — desfaz (evento `UNPAID`); comprovante fica no histórico de anexos
+### GET `/portal/document-requests/months?clientId=` _(CLIENT)_ — `{ competence: 'AAAA-MM', pending, total }[]` desc — só pedidos de tarefas recorrentes (board `RECURRING_SYSTEM`)
+### GET `/portal/document-requests?clientId=&competence=AAAA-MM` _(CLIENT)_ — `{ competence, requests: { id, taskId, name, status, rejectionReason, taskTitle, departmentName }[] }`
+
+## Escritório — guias e ações no documento enviado (2026-11-12)
+
+### POST `/tasks/:id/documents/deliveries` — body `{ name, requiresPayment? }`
+### POST `/tasks/:id/documents/deliveries/:reqId/upload` — multipart: `amount` (obrigatório se a entrega exige pagamento → 400 `'Informe o valor da guia'`), `paymentDueDate` (AAAA-MM-DD, padrão = prazo da tarefa) **antes** do arquivo. Gera/atualiza o protocolo e avisa o cliente (`PROTOCOL_CREATED`, variável `{{paymentInfo}}` com valor e vencimento). Reentregar guia já paga → 409
+### POST `/tasks/:taskId/protocols` — aceita também `requiresPayment`, `amount`; grava `competence` da tarefa
+### POST `/protocols/:id/replace` — multipart (arquivo + `amount?`/`paymentDueDate?`): substitui o arquivo no mesmo protocolo (evento `REPLACED` com `previousAttachmentId`), cliente é avisado de novo; 409 se paga ou cancelada
+### PATCH `/protocols/:id/payment` — `{ amount?, dueDate? }` (evento `AMOUNT_CHANGED` com antes → depois); 409 se paga
+### POST `/protocols/:id/cancel` — `{ reason }` (mín. 3): exceção (ex.: enviado ao cliente errado); sai do portal e dos indicadores; nunca apaga
+### GET `/protocols/unpaid?clientId=&departmentId=&competence=AAAA-MM&situation=overdue|upcoming|paid` — guias não pagas (vencidas primeiro, por vencimento) ou pagas (`paidByName`, `paidAmount`)
+### GET `/protocols/unpaid/summary` — `{ unpaidCount, unpaidTotal, overdueCount, overdueTotal }` (totais string decimal) — cartão "Guias não pagas" do Dashboard
+### Robô (`POST /document-reader/:id/confirmar` e `/trocar-tarefa`) — body aceita `{ deliverableId?, amount?, paymentDueDate? }`. Toda anexação confere CNPJ e competência (AAAA-MM) com a tarefa (422 se não bater); o documento preenche a entrega pendente (uma só: automática; várias: o revisor escolhe) com valor/vencimento lidos (campos `valor` tipo moeda e `vencimento` tipo data) ou informados
+
+Visibilidade do `ORG_MEMBER` nessas rotas e em `GET /protocols`/`summary`: `memberBoardWhere` (responsável do processo, responsável de departamento que atende o cliente, ou com tarefa atribuída).
 
 ---
 

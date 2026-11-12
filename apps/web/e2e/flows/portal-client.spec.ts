@@ -9,12 +9,12 @@ test.beforeEach(async ({ page }) => {
 })
 
 test.describe('Portal do Cliente', () => {
-  test('login como CLIENT redireciona para /portal/board', async ({ page }) => {
+  test('login como CLIENT redireciona para o Início do portal', async ({ page }) => {
     await page.goto('/login')
     await page.locator('input[type="email"]').fill('cliente@g2a.com.br')
     await page.locator('input[type="password"]').fill('Cliente@2025')
     await page.getByRole('button', { name: 'Entrar' }).click()
-    await expect(page).toHaveURL(/\/portal\/board/, { timeout: 10_000 })
+    await expect(page).toHaveURL(/\/portal\/home/, { timeout: 10_000 })
   })
 
   test('portal exibe o board do cliente', async ({ clientPage: page }) => {

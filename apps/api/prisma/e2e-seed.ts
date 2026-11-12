@@ -111,7 +111,7 @@ async function main() {
   })
 
   // Create board with 3 columns and 2 tasks in the first column
-  await prisma.board.create({
+  const board = await prisma.board.create({
     data: {
       title: 'Processo E2E',
       organizationId: org.id,
@@ -153,7 +153,18 @@ async function main() {
     },
   })
 
-  console.log('E2E seed concluído: org G2A + admin@g2a.com.br + cliente@g2a.com.br (ClientUser) + board "Processo E2E"')
+  // Payment guide sent to the client (portal "Documentos recebidos" / "Marcar como pago")
+  const firstTask = await prisma.task.findFirstOrThrow({ where: { column: { boardId: board.id } }, orderBy: { position: 'asc' } })
+  await prisma.task.update({ where: { id: firstTask.id }, data: { visibleToClient: true } })
+  await prisma.protocol.create({
+    data: {
+      organizationId: org.id, number: `E2E-${Date.now()}`, clientId: client.id, taskId: firstTask.id,
+      title: 'Guia DAS E2E', content: 'Guia de teste', createdById: admin.id,
+      requiresPayment: true, amount: '1234.56', dueDate: new Date(Date.UTC(2030, 0, 20)),
+    },
+  })
+
+  console.log('E2E seed concluído: org G2A + admin@g2a.com.br + cliente@g2a.com.br (ClientUser) + board "Processo E2E" + guia "Guia DAS E2E"')
 }
 
 main()

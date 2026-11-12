@@ -27,7 +27,7 @@ export default function Login() {
       if (role === 'MASTER') navigate('/master/dashboard')
       else if (role === 'ORG_ADMIN' || role === 'ORG_MANAGER') navigate('/app/dashboard')
       else if (role === 'ORG_MEMBER') navigate('/app/dashboard')
-      else navigate('/portal/board')
+      else navigate('/portal/home')
     } catch {
       setError('E-mail ou senha inválidos')
     } finally {

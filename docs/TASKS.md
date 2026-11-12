@@ -424,7 +424,9 @@ manuais validando os dois. Os demais itens entram conforme o que os testes revel
    testes manuais mostraram que "Minhas Tarefas" no portal mistura processos e recorrentes (~30/mês
    num cliente com todos os departamentos). Decidido seguir o modelo do Nibo (portal centrado em
    documentos, não em tarefas), mantendo Processos como diferencial do Tramita:
-   - **Fase A:** Início (cartões: guias a pagar, documentos a enviar, processos em andamento);
+   - **Fase A — ✅ implementada em 2026-11-12** (branch `feat/portal-documentos`, plano
+     `docs/superpowers/plans/2026-11-12-portal-cliente-documentos.md`):
+     Início (cartões: guias a pagar, documentos a enviar, processos em andamento);
      **Documentos recebidos** (protocolos + competência, valor, tipo, status Não visto/Visto/Pago);
      **Enviar documentos** (pedidos agrupados por mês, cores vermelho/amarelo/verde, "Nada a
      enviar"); **Processos** (OS com etapas/progresso). A tela "Tarefas" sai do portal.

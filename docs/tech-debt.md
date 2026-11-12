@@ -450,3 +450,17 @@ que não vê na lista. Mesma organização, sem vazamento entre tenants, mas fec
 Selos `bg-gray-100 text-gray-600` (prioridade baixa, status, perfis) e a tela Configurações →
 Assinatura (`bg-white`, `bg-gray-50`) não acompanham o modo escuro. Legíveis (fundo claro com texto
 escuro), mas destoam. Trocar por tokens (`bg-neutral-bg text-neutral-text`, `bg-surface`).
+
+## E2E sem os fluxos do novo portal de documentos (encontrado em 2026-11-12)
+
+O seed E2E já cria a "Guia DAS E2E" (guia de pagamento do cliente E2E), mas não há spec Playwright
+para: Início do portal, "Documentos recebidos" → "Marcar como pago" → aparece como paga e some de
+"Guias não pagas" no escritório; "Enviar documentos" com "Nada a enviar"; escritório entregando guia
+com valor e substituindo o arquivo. Cobertos por testes de API e de componente, não ponta a ponta.
+
+## Detalhe do documento registra "Visualizado" a cada abertura (encontrado em 2026-11-12)
+
+`GET /portal/protocols/:id` grava um evento `VIEWED` a cada chamada (regra antiga dos protocolos). No
+novo detalhe, a tela recarrega depois de "Marcar como pago" e o histórico ganha um "Visualizado"
+repetido. Inofensivo, mas polui o histórico: gravar `VIEWED` só na primeira visualização por usuário
+(ou não registrar de novo se o último evento do mesmo usuário for `VIEWED` há poucos minutos).
