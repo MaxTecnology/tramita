@@ -48,7 +48,7 @@ export default function Login() {
       </div>
 
       {/* Form panel */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-white">
+      <div className="flex-1 flex items-center justify-center p-8 bg-surface">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8">
@@ -56,11 +56,11 @@ export default function Login() {
             <span className="text-xl font-bold text-[#185FA5]">Tramita</span>
           </div>
 
-          <h2 className="text-2xl font-semibold text-gray-900 mb-1">Bem-vindo</h2>
-          <p className="text-gray-500 text-sm mb-8">Entre com suas credenciais para acessar</p>
+          <h2 className="text-2xl font-semibold text-foreground mb-1">Bem-vindo</h2>
+          <p className="text-muted-foreground text-sm mb-8">Entre com suas credenciais para acessar</p>
 
           {successMessage && (
-            <div className="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
+            <div className="mb-4 rounded-md bg-success-bg border border-success-text/30 px-4 py-3 text-sm text-success-text">
               {successMessage}
             </div>
           )}
@@ -88,7 +88,7 @@ export default function Login() {
                 required
               />
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-danger-text">{error}</p>}
             <Button
               type="submit"
               disabled={loading}

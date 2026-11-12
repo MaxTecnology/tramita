@@ -152,7 +152,7 @@ export default function PortalProfile() {
             <Label htmlFor="pw-confirm">Confirmar nova senha</Label>
             <Input id="pw-confirm" type="password" value={pwForm.confirmPassword} onChange={(e) => setPwForm({ ...pwForm, confirmPassword: e.target.value })} />
           </div>
-          {pwError && <p className="text-sm text-red-500">{pwError}</p>}
+          {pwError && <p className="text-sm text-danger-text">{pwError}</p>}
           <div className="flex justify-end pt-1">
             <Button
               onClick={handleChangePw}

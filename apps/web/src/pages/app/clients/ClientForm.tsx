@@ -431,7 +431,7 @@ function PortalAccessTab({
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-foreground">
                   {u.name} <span className="text-muted-foreground">— {u.email}{u.phone ? ` · ${u.phone}` : ' · sem WhatsApp'}</span>
-                  {u.isActive === false && <span className="ml-1 text-xs text-red-600">(inativo — não conta na cobertura)</span>}
+                  {u.isActive === false && <span className="ml-1 text-xs text-danger-text">(inativo — não conta na cobertura)</span>}
                 </span>
                 <button type="button" aria-label={`Remover ${u.name}`} onClick={() => onChange(clientUsers.filter((_, idx) => idx !== i))}
                   className="text-muted-foreground hover:text-danger-text">
@@ -459,8 +459,8 @@ function PortalAccessTab({
             key={row.departmentId}
             className={cn(
               'flex items-center justify-between rounded-md px-3 py-1.5 text-sm',
-              row.status === 'sem_usuario' && 'bg-red-50 text-red-700',
-              row.status === 'sem_whatsapp' && 'bg-amber-50 text-amber-700',
+              row.status === 'sem_usuario' && 'bg-danger-bg text-danger-text',
+              row.status === 'sem_whatsapp' && 'bg-warning-bg text-warning-text',
               row.status === 'ok' && 'bg-neutral-bg text-foreground',
             )}
           >

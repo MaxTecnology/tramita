@@ -367,7 +367,7 @@ export default function Processes() {
             className={cn(
               'h-9 px-3 rounded-lg text-sm font-medium border transition-colors flex items-center gap-1.5',
               showOnlyOverdue
-                ? 'bg-danger-text text-white border-danger-text shadow-sm'
+                ? 'bg-danger-text text-danger-foreground border-danger-text shadow-sm'
                 : 'bg-surface text-muted-foreground border-border hover:bg-neutral-bg',
             )}
           >

@@ -23,11 +23,11 @@ const STATUS_LABEL: Record<ClientRequest['status'], string> = {
 }
 
 const STATUS_STYLE: Record<ClientRequest['status'], string> = {
-  PENDING: 'bg-amber-100 text-amber-700',
-  APPROVED: 'bg-green-100 text-green-700',
-  REJECTED: 'bg-red-100 text-red-700',
-  CANCELLED: 'bg-gray-100 text-gray-500',
-  NEEDS_INFO: 'bg-blue-100 text-blue-700',
+  PENDING: 'bg-warning-bg text-warning-text',
+  APPROVED: 'bg-success-bg text-success-text',
+  REJECTED: 'bg-danger-bg text-danger-text',
+  CANCELLED: 'bg-neutral-bg text-muted-foreground',
+  NEEDS_INFO: 'bg-info-bg text-info-text',
 }
 
 export default function PortalRequests() {
@@ -118,10 +118,10 @@ export default function PortalRequests() {
                     <p className="text-sm font-medium text-foreground">{r.title}</p>
                     {r.description && <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>}
                     {r.status === 'REJECTED' && r.rejectionReason && (
-                      <p className="text-xs text-red-500 mt-1 italic">Motivo: {r.rejectionReason}</p>
+                      <p className="text-xs text-danger-text mt-1 italic">Motivo: {r.rejectionReason}</p>
                     )}
                     {r.status === 'CANCELLED' && r.cancelledByType === 'USER' && r.cancellationReason && (
-                      <p className="text-xs text-gray-500 mt-1 italic">Cancelada pelo escritório — motivo: {r.cancellationReason}</p>
+                      <p className="text-xs text-muted-foreground mt-1 italic">Cancelada pelo escritório — motivo: {r.cancellationReason}</p>
                     )}
                   </div>
                   <span className={cn('text-xs px-2 py-0.5 rounded-full flex-shrink-0', STATUS_STYLE[r.status])}>
@@ -135,7 +135,7 @@ export default function PortalRequests() {
                       variant="ghost"
                       size="sm"
                       onClick={() => { if (window.confirm('Cancelar esta solicitação?')) cancelMutation.mutate(r.id) }}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 -ml-2"
+                      className="text-danger-text hover:text-danger-hover hover:bg-danger-bg -ml-2"
                     >
                       Cancelar
                     </Button>
@@ -228,7 +228,7 @@ export default function PortalRequests() {
                 ))}
               </select>
             </div>
-            {createMutation.isError && <p className="text-sm text-red-600">Erro ao enviar. Tente novamente.</p>}
+            {createMutation.isError && <p className="text-sm text-danger-text">Erro ao enviar. Tente novamente.</p>}
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={createMutation.isPending || !form.title.trim() || !form.departmentId} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">

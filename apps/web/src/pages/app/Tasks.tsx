@@ -139,7 +139,7 @@ function DraggableTaskCard({ task, onClick }: { task: TaskListItem; onClick: () 
       </p>
       <div className="flex items-center gap-1.5 flex-wrap">
         {task.sourceRequestId && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-600" title="Originado de uma solicitação do cliente">
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-highlight-bg text-highlight-text" title="Originado de uma solicitação do cliente">
             <Inbox size={11} />
           </span>
         )}

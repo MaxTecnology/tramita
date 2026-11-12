@@ -477,7 +477,7 @@ function ProtocolsTab() {
                 )}
                 <span className={cn(
                   'text-xs px-2 py-0.5 rounded-full',
-                  p.status === 'EXPIRED' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600',
+                  p.status === 'EXPIRED' ? 'bg-danger-bg text-danger-text' : 'bg-neutral-bg text-muted-foreground',
                 )}>
                   {PROTOCOL_STATUS_LABEL[p.status]}
                 </span>

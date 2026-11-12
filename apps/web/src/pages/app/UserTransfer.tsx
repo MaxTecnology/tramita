@@ -140,7 +140,7 @@ export default function UserTransfer() {
           {!departmentId && source?.isActive && (
             <Button
               variant="outline"
-              className="text-red-600 hover:text-red-700"
+              className="text-danger-text hover:text-danger-hover"
               disabled={deactivateMutation.isPending}
               onClick={() => { if (window.confirm(`Desativar ${source.name}?`)) deactivateMutation.mutate() }}
             >

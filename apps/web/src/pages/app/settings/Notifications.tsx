@@ -70,9 +70,9 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  SENT: 'bg-green-100 text-green-700',
-  FAILED: 'bg-red-100 text-red-700',
-  PENDING: 'bg-amber-100 text-amber-700',
+  SENT: 'bg-success-bg text-success-text',
+  FAILED: 'bg-danger-bg text-danger-text',
+  PENDING: 'bg-warning-bg text-warning-text',
 }
 
 const CHANNEL_LABEL: Record<string, string> = {
@@ -93,7 +93,7 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       )}
     >
       <span className={cn(
-        'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
+        'inline-block h-4 w-4 rounded-full bg-surface shadow-sm transition-transform',
         checked ? 'translate-x-4' : 'translate-x-0.5',
       )} />
     </button>
@@ -580,7 +580,7 @@ export default function Notifications() {
                       <p className="text-muted-foreground truncate">{log.recipient}</p>
                     </div>
                     <div className="w-24 text-right">
-                      <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', STATUS_BADGE[log.status] ?? 'bg-gray-100 text-gray-600')}>
+                      <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', STATUS_BADGE[log.status] ?? 'bg-neutral-bg text-muted-foreground')}>
                         {STATUS_LABEL[log.status] ?? log.status}
                       </span>
                     </div>

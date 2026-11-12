@@ -274,7 +274,7 @@ export const router = createBrowserRouter([
     path: '/portal',
     element: (
       <ProtectedRoute allowedRoles={['CLIENT']}>
-        <Suspense fallback={<div className="flex items-center justify-center h-screen text-gray-500">Carregando...</div>}>
+        <Suspense fallback={<div className="flex items-center justify-center h-screen text-muted-foreground">Carregando...</div>}>
           <PortalLayout />
         </Suspense>
       </ProtectedRoute>

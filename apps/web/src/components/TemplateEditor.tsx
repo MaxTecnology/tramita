@@ -118,7 +118,7 @@ export function TemplateEditor({ event, channel }: Props) {
       {/* Preview */}
       {preview && (
         <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-4">
-          <p className="text-xs font-semibold text-blue-400 uppercase tracking-wide mb-2">Prévia renderizada</p>
+          <p className="text-xs font-semibold text-info-text uppercase tracking-wide mb-2">Prévia renderizada</p>
           <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{preview}</p>
         </div>
       )}

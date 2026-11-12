@@ -173,8 +173,8 @@ export default function MasterPlans() {
                     <Badge
                       className={
                         plan.isActive
-                          ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-100'
+                          ? 'bg-success-bg text-success-text hover:bg-success-bg'
+                          : 'bg-neutral-bg text-muted-foreground hover:bg-neutral-bg'
                       }
                     >
                       {plan.isActive ? 'Ativo' : 'Inativo'}
@@ -214,7 +214,7 @@ export default function MasterPlans() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 text-red-600 border-red-200 hover:bg-red-50"
+                          className="h-7 text-danger-text border-danger-text/30 hover:bg-danger-bg"
                           onClick={() => deleteMutation.mutate(plan.id)}
                         >
                           Desativar

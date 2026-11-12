@@ -5,10 +5,10 @@ import { computeSlaLevel } from '@/lib/sla'
 import { useSlaConfig } from '@/hooks/useSlaConfig'
 
 const PRIORITY_STYLES: Record<Task['priority'], string> = {
-  LOW: 'bg-gray-100 text-gray-600',
-  MEDIUM: 'bg-blue-100 text-blue-600',
-  HIGH: 'bg-orange-100 text-orange-600',
-  URGENT: 'bg-red-100 text-red-600',
+  LOW: 'bg-neutral-bg text-muted-foreground',
+  MEDIUM: 'bg-info-bg text-info-text',
+  HIGH: 'bg-warning-bg text-warning-text',
+  URGENT: 'bg-danger-bg text-danger-text',
 }
 
 const PRIORITY_LABELS: Record<Task['priority'], string> = {
@@ -45,14 +45,14 @@ export function TaskCard({ task, onClick }: Props) {
     <div
       className={cn(
         'bg-surface rounded-lg p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow select-none',
-        effectiveLevel === 'DUE_CRITICAL' ? 'border-red-400' : effectiveLevel === 'TARGET_WARNING' ? 'border-yellow-400' : 'border-border',
+        effectiveLevel === 'DUE_CRITICAL' ? 'border-danger-text/60' : effectiveLevel === 'TARGET_WARNING' ? 'border-warning-text' : 'border-border',
       )}
       onClick={onClick}
     >
       <p className="text-sm font-medium text-foreground mb-2 line-clamp-2">{task.title}</p>
       <div className="flex items-center gap-2 flex-wrap">
         {task.sourceRequestId && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-600" title="Originado de uma solicitação do cliente">
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-highlight-bg text-highlight-text" title="Originado de uma solicitação do cliente">
             <Inbox size={11} />
             Solicitação
           </span>
@@ -66,10 +66,10 @@ export function TaskCard({ task, onClick }: Props) {
           {PRIORITY_LABELS[task.priority]}
         </span>
         {effectiveLevel === 'DUE_CRITICAL' && (
-          <span className="text-xs text-red-500 font-medium">⚠ Prazo crítico</span>
+          <span className="text-xs text-danger-text font-medium">⚠ Prazo crítico</span>
         )}
         {effectiveLevel === 'TARGET_WARNING' && (
-          <span className="text-xs text-yellow-600 font-medium">⏰ Meta próxima</span>
+          <span className="text-xs text-warning-text font-medium">⏰ Meta próxima</span>
         )}
       </div>
       <p className="text-xs text-muted-foreground mt-1.5">{daysOpen(task.createdAt)}</p>

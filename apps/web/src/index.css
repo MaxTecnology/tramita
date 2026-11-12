@@ -21,6 +21,10 @@
   --color-danger-hover: #B91C1C;
   --color-accent-foreground: #FFFFFF;
   --color-danger-foreground: #FFFFFF;
+  --color-info-bg: #DBEAFE;
+  --color-info-text: #1D4ED8;
+  --color-highlight-bg: #F3E8FF;
+  --color-highlight-text: #7E22CE;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -44,6 +48,10 @@
     --color-danger-hover: #FCA5A5;
     --color-accent-foreground: #0B1220;
     --color-danger-foreground: #0B1220;
+    --color-info-bg: #172554;
+    --color-info-text: #93C5FD;
+    --color-highlight-bg: #3B0764;
+    --color-highlight-text: #D8B4FE;
   }
 }
 

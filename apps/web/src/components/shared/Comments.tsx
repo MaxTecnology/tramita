@@ -85,7 +85,7 @@ export function Comments({ entityType, entityId, currentUserId, role }: Props) {
               key={c.id}
               className={cn(
                 'rounded-lg p-3 border-l-2',
-                isClient ? 'bg-blue-500/10 border-blue-400' : 'bg-violet-500/10 border-violet-400',
+                isClient ? 'bg-blue-500/10 border-accent' : 'bg-violet-500/10 border-violet-400',
                 isDeleted && 'opacity-60',
               )}
             >
@@ -102,7 +102,7 @@ export function Comments({ entityType, entityId, currentUserId, role }: Props) {
                     <button
                       type="button"
                       onClick={() => deleteMutation.mutate(c.id)}
-                      className="text-xs text-red-400 hover:text-red-600"
+                      className="text-xs text-danger-text hover:text-danger-hover"
                     >
                       Remover
                     </button>

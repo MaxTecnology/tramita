@@ -65,7 +65,7 @@ export default function PortalBoard() {
           <div className="flex items-center gap-3 mt-1">
             <div className="flex-1 h-1.5 bg-neutral-bg rounded-full overflow-hidden">
               <div
-                className={cn('h-full rounded-full transition-all', progress >= 80 ? 'bg-green-500' : 'bg-[#185FA5]')}
+                className={cn('h-full rounded-full transition-all', progress >= 80 ? 'bg-success-text' : 'bg-[#185FA5]')}
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -119,7 +119,7 @@ export default function PortalBoard() {
                       onKeyDown={(e) => e.key === 'Enter' && setSelectedTask(task)}
                       className={cn(
                         'bg-surface rounded-lg p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow',
-                        isOverdue ? 'border-red-400' : 'border-border',
+                        isOverdue ? 'border-danger-text/60' : 'border-border',
                       )}
                     >
                       <p className="text-sm font-medium text-foreground line-clamp-2">{task.title}</p>
@@ -132,16 +132,16 @@ export default function PortalBoard() {
                         <span className={cn(
                           'text-xs font-medium px-2 py-0.5 rounded-full',
                           ({
-                            LOW: 'bg-gray-100 text-gray-600',
-                            MEDIUM: 'bg-blue-100 text-blue-600',
-                            HIGH: 'bg-orange-100 text-orange-600',
-                            URGENT: 'bg-red-100 text-red-600',
-                          } as Record<string, string>)[task.priority] ?? 'bg-gray-100 text-gray-600',
+                            LOW: 'bg-neutral-bg text-muted-foreground',
+                            MEDIUM: 'bg-info-bg text-info-text',
+                            HIGH: 'bg-warning-bg text-warning-text',
+                            URGENT: 'bg-danger-bg text-danger-text',
+                          } as Record<string, string>)[task.priority] ?? 'bg-neutral-bg text-muted-foreground',
                         )}>
                           {PRIORITY_LABELS[task.priority] ?? task.priority}
                         </span>
                         {task.dueDate && (
-                          <span className={cn('text-xs', isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground')}>
+                          <span className={cn('text-xs', isOverdue ? 'text-danger-text font-medium' : 'text-muted-foreground')}>
                             {isOverdue ? '⚠ ' : ''}{formatDateOnlyUTC(task.dueDate)}
                           </span>
                         )}

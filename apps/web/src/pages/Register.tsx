@@ -53,18 +53,18 @@ export default function Register() {
 
   if (step === 'plan') {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="bg-surface border-b border-border px-6 py-4 flex items-center gap-3">
           <HubIcon />
           <span className="font-bold text-[#185FA5]">Tramita</span>
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-center p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Escolha seu plano</h1>
-          <p className="text-gray-500 mb-8">Comece com um trial gratuito. Sem cartão de crédito.</p>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Escolha seu plano</h1>
+          <p className="text-muted-foreground mb-8">Comece com um trial gratuito. Sem cartão de crédito.</p>
 
           {isLoading ? (
-            <p className="text-gray-400">Carregando planos...</p>
+            <p className="text-muted-foreground">Carregando planos...</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl">
               {plans.map((plan) => (
@@ -74,12 +74,12 @@ export default function Register() {
                   onClick={() => { setSelectedPlan(plan); setStep('form') }}
                 >
                   <CardContent className="pt-6">
-                    <h2 className="text-lg font-bold text-gray-900 mb-1">{plan.name}</h2>
+                    <h2 className="text-lg font-bold text-foreground mb-1">{plan.name}</h2>
                     <p className="text-3xl font-bold text-[#185FA5] mb-1">
                       R$ {Number(plan.priceMonthly).toFixed(0)}
-                      <span className="text-sm font-normal text-gray-500">/mês</span>
+                      <span className="text-sm font-normal text-muted-foreground">/mês</span>
                     </p>
-                    <p className="text-sm text-gray-500 mb-4">Até {plan.maxClients} clientes</p>
+                    <p className="text-sm text-muted-foreground mb-4">Até {plan.maxClients} clientes</p>
                     <Button className="w-full bg-[#185FA5] hover:bg-[#0C447C] text-white">
                       Escolher
                     </Button>
@@ -89,7 +89,7 @@ export default function Register() {
             </div>
           )}
 
-          <p className="mt-8 text-sm text-gray-500">
+          <p className="mt-8 text-sm text-muted-foreground">
             Já tem conta?{' '}
             <Link to="/login" className="text-[#185FA5] hover:underline font-medium">Entrar</Link>
           </p>
@@ -99,23 +99,23 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="bg-surface border-b border-border px-6 py-4 flex items-center gap-3">
         <button
           onClick={() => setStep('plan')}
-          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft size={16} />
           Planos
         </button>
-        <span className="text-gray-300">/</span>
-        <span className="text-sm font-medium text-gray-700">{selectedPlan?.name}</span>
+        <span className="text-muted-foreground">/</span>
+        <span className="text-sm font-medium text-foreground">{selectedPlan?.name}</span>
       </header>
 
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Criar conta</h1>
-          <p className="text-gray-500 text-sm mb-6">
+          <h1 className="text-2xl font-bold text-foreground mb-1">Criar conta</h1>
+          <p className="text-muted-foreground text-sm mb-6">
             Plano <strong>{selectedPlan?.name}</strong> — R$ {Number(selectedPlan?.priceMonthly).toFixed(2)}/mês
           </p>
 
@@ -131,7 +131,7 @@ export default function Register() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="cnpj">
-                CNPJ <span className="text-gray-400 font-normal">(opcional)</span>
+                CNPJ <span className="text-muted-foreground font-normal">(opcional)</span>
               </Label>
               <Input
                 id="cnpj"
@@ -151,7 +151,7 @@ export default function Register() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="phone">
-                Telefone <span className="text-gray-400 font-normal">(opcional)</span>
+                Telefone <span className="text-muted-foreground font-normal">(opcional)</span>
               </Label>
               <Input
                 id="phone"
@@ -160,8 +160,8 @@ export default function Register() {
               />
             </div>
 
-            <div className="border-t border-gray-200 pt-4">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">
+            <div className="border-t border-border pt-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
                 Administrador da conta
               </p>
               <div className="space-y-3">
@@ -187,7 +187,7 @@ export default function Register() {
               </div>
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-danger-text">{error}</p>}
 
             <Button
               type="submit"

@@ -242,7 +242,7 @@ export default function Profile() {
             />
           </div>
 
-          {pwError && <p className="text-sm text-red-500">{pwError}</p>}
+          {pwError && <p className="text-sm text-danger-text">{pwError}</p>}
 
           <div className="flex justify-end pt-1">
             <Button

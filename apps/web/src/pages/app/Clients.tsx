@@ -239,11 +239,11 @@ export default function Clients() {
                 <p className="text-sm font-medium text-foreground truncate">
                   {client.codigo ? `${client.codigo} - ${client.name}` : client.name}
                 </p>
-                <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0">
+                <span className="text-xs bg-neutral-bg text-muted-foreground px-1.5 py-0.5 rounded flex-shrink-0">
                   {client.clientType ?? 'PJ'}
                 </span>
                 {!client.isActive && (
-                  <span className="text-xs bg-red-100 text-red-500 px-1.5 py-0.5 rounded flex-shrink-0">
+                  <span className="text-xs bg-danger-bg text-danger-text px-1.5 py-0.5 rounded flex-shrink-0">
                     Inativo
                   </span>
                 )}
@@ -254,7 +254,7 @@ export default function Clients() {
                 </p>
               )}
               {client.notes && (
-                <p className="text-xs text-amber-600 truncate mt-0.5 italic">{client.notes}</p>
+                <p className="text-xs text-warning-text truncate mt-0.5 italic">{client.notes}</p>
               )}
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
@@ -270,7 +270,7 @@ export default function Clients() {
                   deleteMutation.mutate(client.id)
                 }}
                 disabled={deleteMutation.isPending && deletingId === client.id}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                className="text-danger-text hover:text-danger-hover hover:bg-danger-bg"
               >
                 {deleteMutation.isPending && deletingId === client.id ? 'Desativando...' : 'Desativar'}
               </Button>

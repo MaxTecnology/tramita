@@ -61,10 +61,10 @@ export const PRIORITY_LABEL: Record<Task['priority'], string> = {
 }
 
 export const PRIORITY_COLOR: Record<Task['priority'], string> = {
-  LOW: 'bg-gray-100 text-gray-600',
-  MEDIUM: 'bg-blue-100 text-blue-600',
-  HIGH: 'bg-orange-100 text-orange-600',
-  URGENT: 'bg-red-100 text-red-600',
+  LOW: 'bg-neutral-bg text-muted-foreground',
+  MEDIUM: 'bg-info-bg text-info-text',
+  HIGH: 'bg-warning-bg text-warning-text',
+  URGENT: 'bg-danger-bg text-danger-text',
 }
 
 export const STATUS_LABEL: Record<Task['status'], string> = {
@@ -76,11 +76,11 @@ export const STATUS_LABEL: Record<Task['status'], string> = {
 }
 
 export const STATUS_COLOR: Record<Task['status'], string> = {
-  OPEN: 'bg-gray-100 text-gray-600',
-  STARTED: 'bg-blue-100 text-blue-600',
-  DONE: 'bg-green-100 text-green-600',
-  DISREGARDED: 'bg-gray-200 text-gray-500',
-  BLOCKED: 'bg-red-100 text-red-600',
+  OPEN: 'bg-neutral-bg text-muted-foreground',
+  STARTED: 'bg-info-bg text-info-text',
+  DONE: 'bg-success-bg text-success-text',
+  DISREGARDED: 'bg-neutral-bg text-muted-foreground',
+  BLOCKED: 'bg-danger-bg text-danger-text',
 }
 
 type Tab = 'comments' | 'documents' | 'attachments' | 'history' | 'protocols'
@@ -436,7 +436,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                 </label>
                 {/* Aviso quando prazo da tarefa ultrapassa prazo do processo */}
                 {task.dueDate && boardDueDate && new Date(task.dueDate) > new Date(boardDueDate) && (
-                  <p className="text-xs text-amber-600">
+                  <p className="text-xs text-warning-text">
                     ⚠ Prazo além do processo ({formatDateOnlyUTC(boardDueDate)})
                   </p>
                 )}
@@ -444,7 +444,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
             ) : (
               task.dueDate && (
                 <span
-                  className={cn('text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700', isOverdue && 'bg-red-100 text-red-600 font-medium')}
+                  className={cn('text-xs px-2 py-0.5 rounded-full bg-neutral-bg text-foreground', isOverdue && 'bg-danger-bg text-danger-text font-medium')}
                   title={isRecurring ? 'Tarefa recorrente — vencimento fixado pelo template' : undefined}
                 >
                   {isOverdue ? '⚠ ' : ''}Prazo: {formatDateOnlyUTC(task.dueDate)}{isRecurring ? ' 🔒' : ''}
@@ -474,13 +474,13 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
               </label>
             ) : (
               task.targetDate && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700" title={isRecurring ? 'Tarefa recorrente — meta fixada pelo template' : 'Meta interna'}>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-bg text-foreground" title={isRecurring ? 'Tarefa recorrente — meta fixada pelo template' : 'Meta interna'}>
                   Meta: {formatDateOnlyUTC(task.targetDate)}{isRecurring ? ' 🔒' : ''}
                 </span>
               )
             )}
             {task.competence && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700" title="Competência">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-bg text-foreground" title="Competência">
                 Competência: {new Date(task.competence).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })}
               </span>
             )}
@@ -568,7 +568,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                       {sourceRequestOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       Solicitação de origem
                       {hasUnseenClientReply(sourceRequestComments) && (
-                        <span className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-100 rounded-full px-2 py-0.5 ml-1">
+                        <span className="flex items-center gap-1 text-xs font-medium text-warning-text bg-warning-bg rounded-full px-2 py-0.5 ml-1">
                           <AlertCircle size={12} />
                           Resposta não vista
                         </span>
@@ -608,13 +608,13 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                       </div>
                       {r.rejectionReason && <p className="text-xs text-danger-text mt-1">Motivo: {r.rejectionReason}</p>}
                       {r.signedUrl && (
-                        <a href={r.signedUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 block">
+                        <a href={r.signedUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-info-text hover:underline mt-1 block">
                           Ver arquivo enviado
                         </a>
                       )}
                       {canEdit && r.status === 'UPLOADED' && (
                         <div className="flex gap-2 mt-2">
-                          <button onClick={() => reviewRequirementMutation.mutate({ reqId: r.id, decision: 'APPROVED' })} className="text-xs text-green-600 hover:underline">
+                          <button onClick={() => reviewRequirementMutation.mutate({ reqId: r.id, decision: 'APPROVED' })} className="text-xs text-success-text hover:underline">
                             Aprovar
                           </button>
                           <button
@@ -622,7 +622,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                               const reason = window.prompt('Motivo da rejeição:')
                               if (reason?.trim()) reviewRequirementMutation.mutate({ reqId: r.id, decision: 'REJECTED', rejectionReason: reason.trim() })
                             }}
-                            className="text-xs text-red-600 hover:underline"
+                            className="text-xs text-danger-text hover:underline"
                           >
                             Rejeitar
                           </button>
@@ -656,7 +656,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                             if (file) uploadRequirementMutation.mutate({ reqId: r.id, file })
                             e.target.value = ''
                           }} />
-                          <span className="text-xs text-blue-600 hover:underline">Enviar arquivo</span>
+                          <span className="text-xs text-info-text hover:underline">Enviar arquivo</span>
                         </label>
                       )}
                     </div>
@@ -665,7 +665,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                 {canEdit && (
                   <button
                     onClick={() => { const name = window.prompt('Nome do documento a cobrar:'); if (name?.trim()) addRequirementMutation.mutate(name.trim()) }}
-                    className="text-xs text-blue-600 hover:underline mt-2"
+                    className="text-xs text-info-text hover:underline mt-2"
                   >
                     + Adicionar documento a cobrar
                   </button>
@@ -693,7 +693,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                         </p>
                       )}
                       {d.signedUrl && (
-                        <a href={d.signedUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 block">
+                        <a href={d.signedUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-info-text hover:underline mt-1 block">
                           Ver arquivo entregue
                         </a>
                       )}
@@ -748,23 +748,23 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                     key={a.id}
                     className={cn(
                       'flex items-start justify-between rounded-lg px-3 py-2.5 gap-2',
-                      isDeleted ? 'bg-red-50 border border-red-100' : 'bg-neutral-bg',
+                      isDeleted ? 'bg-danger-bg border border-danger-text/30' : 'bg-neutral-bg',
                     )}
                   >
                     <div className="flex items-start gap-2 min-w-0">
                       {isDeleted
-                        ? <Trash2 size={14} className="text-red-300 flex-shrink-0 mt-0.5" />
+                        ? <Trash2 size={14} className="text-danger-text flex-shrink-0 mt-0.5" />
                         : <Paperclip size={14} className="text-muted-foreground flex-shrink-0 mt-0.5" />
                       }
                       <div className="min-w-0">
                         {isDeleted ? (
-                          <span className="text-sm text-red-400 line-through block truncate">{a.filename}</span>
+                          <span className="text-sm text-danger-text line-through block truncate">{a.filename}</span>
                         ) : (
                           <a
                             href={a.signedUrl ?? '#'}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline block truncate"
+                            className="text-sm text-info-text hover:underline block truncate"
                           >
                             {a.filename}
                           </a>
@@ -777,7 +777,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                           {new Date(a.createdAt).toLocaleString('pt-BR')}
                         </p>
                         {isDeleted && (
-                          <p className="text-xs text-red-400 mt-0.5">
+                          <p className="text-xs text-danger-text mt-0.5">
                             Removido por {a.deletedByName} · {new Date(a.deletedAt!).toLocaleString('pt-BR')}
                           </p>
                         )}
@@ -787,7 +787,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                       <button
                         type="button"
                         onClick={() => deleteAttachmentMutation.mutate(a.id)}
-                        className="text-xs text-red-400 hover:text-red-600 flex-shrink-0 mt-0.5"
+                        className="text-xs text-danger-text hover:text-danger-hover flex-shrink-0 mt-0.5"
                       >
                         Remover
                       </button>
@@ -810,7 +810,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                       e.target.value = ''
                     }}
                   />
-                  <span className="text-sm text-blue-600 hover:underline">
+                  <span className="text-sm text-info-text hover:underline">
                     {uploadMutation.isPending ? 'Enviando...' : '+ Adicionar arquivo'}
                   </span>
                 </label>
@@ -932,7 +932,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
               <div className="absolute left-1.5 top-0 bottom-0 w-px bg-border" />
               {history.map((h) => (
                 <div key={h.id} className="relative mb-4 last:mb-0">
-                  <div className="absolute -left-[11px] top-1.5 w-2 h-2 rounded-full bg-blue-400" />
+                  <div className="absolute -left-[11px] top-1.5 w-2 h-2 rounded-full bg-accent" />
                   <p className="text-xs text-muted-foreground">
                     <span className="font-medium text-foreground">{h.actorName}</span>
                     {' — '}

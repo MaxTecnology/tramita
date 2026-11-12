@@ -86,7 +86,7 @@ export default function PortalBoards() {
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-xs bg-neutral-bg text-muted-foreground px-2 py-0.5 rounded-full truncate">{stage}</span>
                   {board.dueDate && (
-                    <span className={cn('text-xs ml-auto flex-shrink-0', isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground')}>
+                    <span className={cn('text-xs ml-auto flex-shrink-0', isOverdue ? 'text-danger-text font-medium' : 'text-muted-foreground')}>
                       {isOverdue ? '⚠ ' : ''}{formatDateOnlyUTC(board.dueDate)}
                     </span>
                   )}
@@ -95,7 +95,7 @@ export default function PortalBoards() {
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-neutral-bg rounded-full overflow-hidden">
                     <div
-                      className={cn('h-full rounded-full transition-all', progress >= 80 ? 'bg-green-500' : 'bg-[#185FA5]')}
+                      className={cn('h-full rounded-full transition-all', progress >= 80 ? 'bg-success-text' : 'bg-[#185FA5]')}
                       style={{ width: `${progress}%` }}
                     />
                   </div>

@@ -22,11 +22,11 @@ const STATUS_LABEL: Record<ClientRequest['status'], string> = {
 }
 
 const STATUS_STYLE: Record<ClientRequest['status'], string> = {
-  PENDING: 'bg-amber-100 text-amber-700',
-  APPROVED: 'bg-green-100 text-green-700',
-  REJECTED: 'bg-red-100 text-red-700',
-  CANCELLED: 'bg-gray-100 text-gray-500',
-  NEEDS_INFO: 'bg-blue-100 text-blue-700',
+  PENDING: 'bg-warning-bg text-warning-text',
+  APPROVED: 'bg-success-bg text-success-text',
+  REJECTED: 'bg-danger-bg text-danger-text',
+  CANCELLED: 'bg-neutral-bg text-muted-foreground',
+  NEEDS_INFO: 'bg-info-bg text-info-text',
 }
 
 type Mode = 'NEW_BOARD' | 'EXISTING_BOARD'
@@ -232,7 +232,7 @@ export default function Requests() {
                     <p className="text-xs text-muted-foreground">{r.client?.name}</p>
                     {r.description && <p className="text-xs text-muted-foreground mt-1">{r.description}</p>}
                     {r.status === 'CANCELLED' && r.cancelledByType === 'USER' && r.cancellationReason && (
-                      <p className="text-xs text-gray-500 mt-1 italic">Cancelada pelo escritório — motivo: {r.cancellationReason}</p>
+                      <p className="text-xs text-muted-foreground mt-1 italic">Cancelada pelo escritório — motivo: {r.cancellationReason}</p>
                     )}
                   </div>
                   <span className={cn('text-xs px-2 py-0.5 rounded-full flex-shrink-0', STATUS_STYLE[r.status])}>
@@ -246,7 +246,7 @@ export default function Requests() {
                       <Button size="sm" onClick={() => setApproving(r)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
                         Aprovar
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setRejecting(r)} className="text-red-600 border-red-200 hover:bg-red-50">
+                      <Button size="sm" variant="outline" onClick={() => setRejecting(r)} className="text-danger-text border-danger-text/30 hover:bg-danger-bg">
                         Rejeitar
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setNeedsInfoTarget(r)}>
@@ -259,13 +259,13 @@ export default function Requests() {
                       <Button size="sm" onClick={() => setApproving(r)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
                         Aprovar
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setRejecting(r)} className="text-red-600 border-red-200 hover:bg-red-50">
+                      <Button size="sm" variant="outline" onClick={() => setRejecting(r)} className="text-danger-text border-danger-text/30 hover:bg-danger-bg">
                         Rejeitar
                       </Button>
                     </>
                   )}
                   {r.status === 'APPROVED' && (
-                    <Button size="sm" variant="outline" onClick={() => setCancelling(r)} className="text-red-600 border-red-200 hover:bg-red-50">
+                    <Button size="sm" variant="outline" onClick={() => setCancelling(r)} className="text-danger-text border-danger-text/30 hover:bg-danger-bg">
                       Cancelar
                     </Button>
                   )}
@@ -397,7 +397,7 @@ export default function Requests() {
               <Button
                 onClick={() => rejectMutation.mutate()}
                 disabled={rejectMutation.isPending}
-                className="bg-red-600 hover:bg-red-700 text-white"
+                className="bg-danger-text hover:bg-danger-hover text-danger-foreground"
               >
                 {rejectMutation.isPending ? 'Rejeitando...' : 'Rejeitar'}
               </Button>
@@ -459,7 +459,7 @@ export default function Requests() {
               <Button
                 onClick={() => cancelApprovedMutation.mutate()}
                 disabled={cancelApprovedMutation.isPending || !cancelReason.trim()}
-                className="bg-red-600 hover:bg-red-700 text-white"
+                className="bg-danger-text hover:bg-danger-hover text-danger-foreground"
               >
                 {cancelApprovedMutation.isPending ? 'Cancelando...' : 'Confirmar cancelamento'}
               </Button>

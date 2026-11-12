@@ -49,11 +49,11 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 const STATUS_CLASS: Record<string, string> = {
-  ACTIVE: 'bg-green-100 text-green-700 hover:bg-green-100',
-  SUSPENDED: 'bg-red-100 text-red-700 hover:bg-red-100',
-  TRIAL: 'bg-blue-100 text-blue-700 hover:bg-blue-100',
-  GRACE_PERIOD: 'bg-amber-100 text-amber-700 hover:bg-amber-100',
-  CANCELLED: 'bg-gray-100 text-gray-500 hover:bg-gray-100',
+  ACTIVE: 'bg-success-bg text-success-text hover:bg-success-bg',
+  SUSPENDED: 'bg-danger-bg text-danger-text hover:bg-danger-bg',
+  TRIAL: 'bg-info-bg text-info-text hover:bg-info-bg',
+  GRACE_PERIOD: 'bg-warning-bg text-warning-text hover:bg-warning-bg',
+  CANCELLED: 'bg-neutral-bg text-muted-foreground hover:bg-neutral-bg',
 }
 
 export default function MasterOrganizations() {
@@ -144,7 +144,7 @@ export default function MasterOrganizations() {
                   <td className="px-4 py-3 text-muted-foreground text-xs">{org.email}</td>
                   <td className="px-4 py-3 text-foreground">{org.planName}</td>
                   <td className="px-4 py-3">
-                    <Badge className={STATUS_CLASS[org.subscriptionStatus] ?? 'bg-gray-100 text-gray-500'}>
+                    <Badge className={STATUS_CLASS[org.subscriptionStatus] ?? 'bg-neutral-bg text-muted-foreground'}>
                       {STATUS_LABEL[org.subscriptionStatus] ?? org.subscriptionStatus}
                     </Badge>
                   </td>
@@ -155,7 +155,7 @@ export default function MasterOrganizations() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 text-red-600 border-red-200 hover:bg-red-50"
+                        className="h-7 text-danger-text border-danger-text/30 hover:bg-danger-bg"
                         disabled={patchMutation.isPending}
                         onClick={() =>
                           patchMutation.mutate({
@@ -170,7 +170,7 @@ export default function MasterOrganizations() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 text-green-700 border-green-200 hover:bg-green-50"
+                        className="h-7 text-success-text border-success-text/30 hover:bg-success-bg"
                         disabled={patchMutation.isPending}
                         onClick={() =>
                           patchMutation.mutate({
@@ -273,7 +273,7 @@ export default function MasterOrganizations() {
                   </div>
                 )}
                 {createOrgMutation.isError && (
-                  <p className="text-sm text-red-600">Erro ao criar organização. Verifique os dados.</p>
+                  <p className="text-sm text-danger-text">Erro ao criar organização. Verifique os dados.</p>
                 )}
                 <div className="flex justify-end gap-2 pt-2">
                   <Button variant="outline" onClick={closeCreateDialog}>Cancelar</Button>

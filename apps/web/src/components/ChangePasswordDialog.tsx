@@ -98,7 +98,7 @@ export function ChangePasswordDialog({ triggerClassName }: Props) {
               required
             />
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-danger-text">{error}</p>}
           <Button type="submit" disabled={loading} className="w-full">
             {loading ? 'Salvando...' : 'Salvar'}
           </Button>

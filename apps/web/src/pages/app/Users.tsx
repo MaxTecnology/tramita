@@ -31,9 +31,9 @@ const ROLE_LABEL: Record<string, string> = {
 }
 
 const ROLE_BADGE: Record<string, string> = {
-  ORG_ADMIN: 'bg-gray-100 text-gray-600',
-  ORG_MANAGER: 'bg-blue-100 text-blue-600',
-  ORG_MEMBER: 'bg-green-100 text-green-600',
+  ORG_ADMIN: 'bg-neutral-bg text-muted-foreground',
+  ORG_MANAGER: 'bg-info-bg text-info-text',
+  ORG_MEMBER: 'bg-success-bg text-success-text',
 }
 
 export default function Users() {
@@ -191,7 +191,7 @@ export default function Users() {
             </div>
           </div>
           {createMutation.isError && (
-            <p className="text-sm text-red-600">Erro ao cadastrar. Verifique os dados.</p>
+            <p className="text-sm text-danger-text">Erro ao cadastrar. Verifique os dados.</p>
           )}
           <div className="flex gap-2 pt-1">
             <Button
@@ -260,7 +260,7 @@ export default function Users() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
-                <span className={cn('text-xs px-1.5 py-0.5 rounded flex-shrink-0', ROLE_BADGE[user.role] ?? 'bg-gray-100 text-gray-500')}>
+                <span className={cn('text-xs px-1.5 py-0.5 rounded flex-shrink-0', ROLE_BADGE[user.role] ?? 'bg-neutral-bg text-muted-foreground')}>
                   {ROLE_LABEL[user.role] ?? user.role}
                 </span>
               </div>
@@ -297,7 +297,7 @@ export default function Users() {
                     deleteMutation.mutate(user.id)
                   }}
                   disabled={deleteMutation.isPending && deletingId === user.id}
-                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                  className="text-danger-text hover:text-danger-hover hover:bg-danger-bg"
                 >
                   {deleteMutation.isPending && deletingId === user.id ? 'Desativando...' : 'Desativar'}
                 </Button>
@@ -340,7 +340,7 @@ export default function Users() {
               <Input id="e-phone" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="(82) 99999-9999" />
             </div>
             {updateMutation.isError && (
-              <p className="text-sm text-red-600">Erro ao salvar. Tente novamente.</p>
+              <p className="text-sm text-danger-text">Erro ao salvar. Tente novamente.</p>
             )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setEditingUser(null)}>Cancelar</Button>
