@@ -5,7 +5,8 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
-import { createProtocolSchema, listProtocolsQuerySchema, updateProtocolPaymentSchema, cancelProtocolSchema } from './protocols.schema'
+import { createProtocolSchema, listProtocolsQuerySchema, updateProtocolPaymentSchema, cancelProtocolSchema, unpaidGuidesQuerySchema } from './protocols.schema'
+import { listUnpaidGuides, getUnpaidGuidesSummary } from './unpaid-guides.service'
 import { replaceProtocolFile, updateProtocolPayment, cancelProtocol } from './protocol-office-actions'
 import { readMultipartField } from '@/lib/multipart-fields'
 import {
@@ -47,6 +48,21 @@ export async function protocolsRoutes(app: FastifyInstance) {
     preHandler: [requireRole(...ORG_ROLES)],
   }, async (request, reply) => {
     return reply.send(await getProtocolsSummary(request.user.organizationId!, { id: request.user.sub, role: request.user.role }))
+  })
+
+  // Before /protocols/:id so "unpaid" is never read as an id
+  app.get('/protocols/unpaid/summary', {
+    preHandler: [requireRole(...ORG_ROLES)],
+  }, async (request, reply) => {
+    return reply.send(await getUnpaidGuidesSummary(request.user.organizationId!, { id: request.user.sub, role: request.user.role }))
+  })
+
+  app.get('/protocols/unpaid', {
+    preHandler: [requireRole(...ORG_ROLES)],
+  }, async (request, reply) => {
+    const result = unpaidGuidesQuerySchema.safeParse(request.query)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(await listUnpaidGuides(request.user.organizationId!, { id: request.user.sub, role: request.user.role }, result.data))
   })
 
   app.get('/protocols', {

@@ -116,6 +116,8 @@ async function runSlaDigestForOrg(
       organizationId: org.id,
       status: { in: ['SENT', 'EXPIRED'] },
       dueDate: { not: null, lte: protocolThreshold },
+      paidAt: null,
+      cancelledAt: null,
     },
     select: {
       id: true, title: true, dueDate: true, status: true,

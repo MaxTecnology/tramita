@@ -34,3 +34,10 @@ export const listProtocolsQuerySchema = z.object({
 
 export type CreateProtocolBody = z.infer<typeof createProtocolSchema>
 export type ListProtocolsQuery = z.infer<typeof listProtocolsQuerySchema>
+
+export const unpaidGuidesQuerySchema = z.object({
+  clientId: z.string().cuid().optional(),
+  departmentId: z.string().cuid().optional(),
+  competence: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Competência inválida (use AAAA-MM)').optional(),
+  situation: z.enum(['overdue', 'upcoming', 'paid']).optional(),
+})

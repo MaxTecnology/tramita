@@ -220,6 +220,28 @@ describe('runSlaDigest — protocolos', () => {
     )
   })
 
+  it('guia já paga pelo cliente não entra no digest nem expira', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const assignee = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const column = await createTestColumn(board.id)
+    const task = await createTestTask(column.id, assignee.id)
+    await prisma.task.update({ where: { id: task.id }, data: { assigneeId: assignee.id } })
+    const dueDate = new Date()
+    dueDate.setUTCDate(dueDate.getUTCDate() - 2)
+    const p = await createProtocol(task.id, org.id, assignee.id, { title: 'Guia FGTS paga', content: 'x', dueDate })
+    await prisma.protocol.update({ where: { id: p.id }, data: { requiresPayment: true, amount: '10', paidAt: new Date(), paidAmount: '10' } })
+
+    await runSlaDigest(new Date())
+
+    const digestCalls = vi.mocked(enqueueNotification).mock.calls.filter(([j]) => j.event === 'SLA_DIGEST')
+    expect(JSON.stringify(digestCalls)).not.toContain('Guia FGTS paga')
+    expect((await prisma.protocol.findUniqueOrThrow({ where: { id: p.id } })).status).toBe('SENT')
+  })
+
   it('marca protocolo vencido como EXPIRED e inclui no digest com a tag de vencido', async () => {
     const { enqueueNotification } = await import('@/lib/queue')
     const plan = await createTestPlan()

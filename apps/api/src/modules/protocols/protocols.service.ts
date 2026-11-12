@@ -324,7 +324,8 @@ export async function expireOverdueProtocols(organizationId: string, now: Date):
   // de dia-calendário também satisfaz essa comparação bruta, então nunca descarta um candidato
   // real — o filtro definitivo é a comparação de rótulos de dia abaixo.
   const candidates = await prisma.protocol.findMany({
-    where: { organizationId, status: 'SENT', dueDate: { not: null, lt: now } },
+    // Paid or cancelled documents never expire ("vencido sem visualização" no longer applies)
+    where: { organizationId, status: 'SENT', dueDate: { not: null, lt: now }, paidAt: null, cancelledAt: null },
     select: { id: true, dueDate: true },
   })
   const today = todayInBRT(now)
@@ -336,7 +337,7 @@ export async function expireOverdueProtocols(organizationId: string, now: Date):
     // visualizado o protocolo (SENT -> VIEWED) — sem a guarda, este update sobrescreveria
     // incondicionalmente de volta pra EXPIRED, regredindo um protocolo já visualizado.
     const { count } = await prisma.protocol.updateMany({
-      where: { id: p.id, status: 'SENT' },
+      where: { id: p.id, status: 'SENT', paidAt: null, cancelledAt: null },
       data: { status: 'EXPIRED' },
     })
     if (count === 0) continue
