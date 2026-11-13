@@ -7,8 +7,10 @@ import { AppError } from '@/errors/AppError'
 import {
   ingerirDocumento, listarFilaDeRevisao, confirmarSugestao, trocarTarefa, rejeitarDocumento, reabrirDocumento,
   obterMetricas, listarObrigacoes, obterUrlVisualizacao, listarRejeitados,
+  assertDocumentInScope,
 } from './document-reader.service'
-import { trocarTarefaBodySchema, anexarOpcoesSchema } from './document-reader.schema'
+import { trocarTarefaBodySchema, anexarOpcoesSchema, filaQuerySchema } from './document-reader.schema'
+import { getStaffScope } from '@/modules/staff-scope/staff-scope'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'] as const
@@ -17,8 +19,9 @@ export async function documentReaderRoutes(app: FastifyInstance) {
   await app.register(multipart, { limits: { fileSize: MAX_FILE_SIZE } })
   app.addHook('preHandler', verifyJWT)
 
+  // Upload feeds the unidentified-documents triage: admins and managers only
   app.post('/document-reader/upload', {
-    preHandler: [requireRole(...ORG_ROLES), checkSubscription],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription],
   }, async (request, reply) => {
     let file: Awaited<ReturnType<typeof request.file>>
     try {
@@ -66,21 +69,24 @@ export async function documentReaderRoutes(app: FastifyInstance) {
   app.get('/document-reader/fila', {
     preHandler: [requireRole(...ORG_ROLES)],
   }, async (request, reply) => {
-    return reply.send(await listarFilaDeRevisao(request.user.organizationId!))
+    const query = filaQuerySchema.safeParse(request.query)
+    if (!query.success) throw new AppError(400, query.error.errors[0].message)
+    const view = query.data.scope === 'mine' ? { mineOf: request.user.sub } : undefined
+    return reply.send(await listarFilaDeRevisao(request.user.organizationId!, await getStaffScope(request), view))
   })
 
   app.get('/document-reader/:id/visualizar', {
     preHandler: [requireRole(...ORG_ROLES)],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    const url = await obterUrlVisualizacao(id, request.user.organizationId!)
+    const url = await obterUrlVisualizacao(id, request.user.organizationId!, await getStaffScope(request))
     return reply.send({ url })
   })
 
   app.get('/document-reader/rejeitados', {
     preHandler: [requireRole(...ORG_ROLES)],
   }, async (request, reply) => {
-    return reply.send(await listarRejeitados(request.user.organizationId!))
+    return reply.send(await listarRejeitados(request.user.organizationId!, await getStaffScope(request)))
   })
 
   app.get('/document-reader/obrigacoes', {
@@ -99,6 +105,7 @@ export async function documentReaderRoutes(app: FastifyInstance) {
     preHandler: [requireRole(...ORG_ROLES), checkSubscription],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
+    await assertDocumentInScope(id, request.user.organizationId!, await getStaffScope(request))
     const opcoes = anexarOpcoesSchema.safeParse(request.body ?? {})
     if (!opcoes.success) throw new AppError(400, opcoes.error.errors[0].message)
     return reply.send(await confirmarSugestao(id, request.user.organizationId!, { id: request.user.sub, role: request.user.role }, opcoes.data))
@@ -108,6 +115,7 @@ export async function documentReaderRoutes(app: FastifyInstance) {
     preHandler: [requireRole(...ORG_ROLES), checkSubscription],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
+    await assertDocumentInScope(id, request.user.organizationId!, await getStaffScope(request))
     const result = trocarTarefaBodySchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     const { taskId, ...opcoes } = result.data
@@ -118,6 +126,7 @@ export async function documentReaderRoutes(app: FastifyInstance) {
     preHandler: [requireRole(...ORG_ROLES), checkSubscription],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
+    await assertDocumentInScope(id, request.user.organizationId!, await getStaffScope(request))
     await rejeitarDocumento(id, request.user.organizationId!, { id: request.user.sub, role: request.user.role })
     return reply.status(204).send()
   })
@@ -126,6 +135,7 @@ export async function documentReaderRoutes(app: FastifyInstance) {
     preHandler: [requireRole(...ORG_ROLES), checkSubscription],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
+    await assertDocumentInScope(id, request.user.organizationId!, await getStaffScope(request))
     await reabrirDocumento(id, request.user.organizationId!)
     return reply.status(204).send()
   })

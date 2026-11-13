@@ -12,7 +12,7 @@ import { deliverDocument } from '@/modules/task-documents/task-documents.service
 import { extrairEInterpretar, decidir, type Modelo, type Base } from './engine/pipeline'
 import { soDigitos, moedaNormalizada } from './engine/validadores'
 import { assertStaffSees } from '@/middlewares/staffScope'
-import { actorScope } from '@/modules/staff-scope/staff-scope'
+import { actorScope, receivedDocumentWhere, type StaffScope } from '@/modules/staff-scope/staff-scope'
 
 // Estados em que um ReceivedDocument ainda aguarda decisão humana — único momento em que o worker
 // (processarDocumento) ou uma ação da fila de revisão têm permissão de mudar o status.
@@ -197,7 +197,17 @@ export async function ingerirDocumento(
   return doc
 }
 
-export async function obterUrlVisualizacao(receivedDocumentId: string, organizationId: string): Promise<string> {
+// Document the office user reads or acts on: out of their scope answers 404 (never reveals it).
+export async function assertDocumentInScope(receivedDocumentId: string, organizationId: string, scope: StaffScope): Promise<void> {
+  if (scope.kind === 'ALL') return
+  const exists = await prisma.receivedDocument.count({ where: { id: receivedDocumentId, organizationId } })
+  if (!exists) return // the service answers its usual 404
+  const visible = await prisma.receivedDocument.count({ where: { id: receivedDocumentId, organizationId, ...receivedDocumentWhere(scope) } })
+  if (!visible) throw new AppError(404, 'Documento não encontrado')
+}
+
+export async function obterUrlVisualizacao(receivedDocumentId: string, organizationId: string, scope: StaffScope = { kind: 'ALL' }): Promise<string> {
+  await assertDocumentInScope(receivedDocumentId, organizationId, scope)
   const doc = await prisma.receivedDocument.findFirst({ where: { id: receivedDocumentId, organizationId } })
   if (!doc) throw new AppError(404, 'Documento não encontrado')
   if (!doc.storageKey) throw new AppError(422, 'Esse documento já foi expurgado — o arquivo não existe mais')
@@ -219,9 +229,17 @@ function filenameDaStorageKey(storageKey: string): string {
   return base.replace(/^\d+-/, '')
 }
 
-export async function listarFilaDeRevisao(organizationId: string) {
+export async function listarFilaDeRevisao(
+  organizationId: string,
+  scope: StaffScope = { kind: 'ALL' },
+  view?: { mineOf: string },
+) {
   const docs = await prisma.receivedDocument.findMany({
-    where: { organizationId, status: { in: ['PENDING', 'NOT_IDENTIFIED'] } },
+    where: {
+      organizationId,
+      status: { in: ['PENDING', 'NOT_IDENTIFIED'] },
+      AND: [receivedDocumentWhere(scope), ...(view ? [{ task: { assigneeId: view.mineOf } }] : [])],
+    },
     orderBy: { createdAt: 'asc' },
     include: {
       task: {
@@ -250,9 +268,9 @@ export async function listarFilaDeRevisao(organizationId: string) {
   })
 }
 
-export async function listarRejeitados(organizationId: string) {
+export async function listarRejeitados(organizationId: string, scope: StaffScope = { kind: 'ALL' }) {
   const docs = await prisma.receivedDocument.findMany({
-    where: { organizationId, status: 'REJECTED' },
+    where: { organizationId, status: 'REJECTED', ...receivedDocumentWhere(scope) },
     orderBy: { reviewedAt: 'desc' },
     include: { reviewedBy: { select: { id: true, name: true } } },
   })

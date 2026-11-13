@@ -14,10 +14,10 @@ beforeEach(() => {
 })
 
 describe('POST /document-reader/upload', () => {
-  it('ORG_MEMBER sobe um PDF e recebe o ReceivedDocument criado', async () => {
+  it('ORG_MANAGER sobe um PDF e recebe o ReceivedDocument criado', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const member = await createTestUser(org.id, { role: 'ORG_MANAGER' })
     const auth = await getAuthHeader(member.email, 'Test@1234')
     const boundary = 'boundary-doc-reader-1'
     const body = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="guia.pdf"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.4\r\n--${boundary}--`
@@ -35,7 +35,7 @@ describe('POST /document-reader/upload', () => {
   it('refuses a file declared as PDF whose content is not a PDF', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const member = await createTestUser(org.id, { role: 'ORG_MANAGER' })
     const auth = await getAuthHeader(member.email, 'Test@1234')
     const mp = multipartBody({}, { filename: 'pagina.html', contentType: 'application/pdf', content: '<html><script>x</script>' })
 
@@ -48,7 +48,7 @@ describe('POST /document-reader/upload', () => {
   it('stores the PDF under a safe name with the .pdf extension', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const member = await createTestUser(org.id, { role: 'ORG_MANAGER' })
     const auth = await getAuthHeader(member.email, 'Test@1234')
     const mp = multipartBody({}, { filename: 'guia #1?;.html', content: '%PDF-1.4' })
 
@@ -61,7 +61,7 @@ describe('POST /document-reader/upload', () => {
   it('lança 413 com mensagem em pt-BR quando o PDF excede 20MB', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const member = await createTestUser(org.id, { role: 'ORG_MANAGER' })
     const auth = await getAuthHeader(member.email, 'Test@1234')
     const arquivoGrande = Buffer.alloc(21 * 1024 * 1024, 0)
     const boundary = 'boundary-doc-reader-grande'

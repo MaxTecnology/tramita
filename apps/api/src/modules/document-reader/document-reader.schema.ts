@@ -11,3 +11,8 @@ export const anexarOpcoesSchema = z.object({
 export const trocarTarefaBodySchema = anexarOpcoesSchema.extend({
   taskId: z.string().cuid(),
 })
+
+// Review queue filter: "Minhas" = documents suggested for my tasks
+export const filaQuerySchema = z.object({
+  scope: z.enum(['mine', 'department', 'all']).optional(),
+})
