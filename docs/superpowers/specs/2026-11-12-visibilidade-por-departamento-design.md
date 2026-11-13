@@ -37,6 +37,9 @@ Usuários (Admin edita). Regras:
 - `ORG_ADMIN` não precisa (vê tudo).
 - Ser responsável por um cliente num departamento (`ClientAssignment`) exige pertencer a ele — o
   cadastro do cliente e a transferência só oferecem/aceitam responsáveis do departamento (400).
+  **Exceção: `ORG_ADMIN`** pode ser responsável sem pertencer (escritório pequeno, seed).
+- Tirar alguém de um departamento onde ele é responsável por cliente ativo → 409 "Transfira as
+  responsabilidades antes", igual à desativação de usuário (mesmo lock `FOR UPDATE` no usuário).
 - Migration de backfill: cada `ClientAssignment(userId, departmentId)` existente vira membership.
   Colaborador sem nenhuma responsabilidade fica sem departamento e o admin completa (a tela de Usuários
   marca em vermelho quem está sem departamento).
@@ -70,7 +73,16 @@ Uma regra só, `staffScope(user)`, usada em todos os pontos que hoje usam `membe
 - **Guias não pagas / protocolos:** pela tarefa do protocolo (departamento).
 - **Dashboard:** mesmos filtros.
 
-Fora do escopo → 404 (como hoje), inclusive SSE.
+- **Criar processo:** só para clientes que o usuário enxerga (cliente atendido por um departamento dele;
+  Membro sem "ver colegas": cliente da carteira).
+- **Contador de solicitações pendentes** (selo do menu) e **resumo diário de prazos**: mesmo escopo.
+  No resumo diário, item sem responsável ativo vai para os admins e para os gerentes **do departamento da
+  tarefa** (não mais todos os gerentes).
+
+Fora do escopo → 404 (como hoje), inclusive SSE. O portal do cliente não muda.
+
+O escopo do usuário (departamentos, opção "ver colegas") é lido do banco **uma vez por requisição** e
+reaproveitado por todas as checagens dela.
 
 Na prática Membro e Gerente do mesmo departamento **enxergam o mesmo**; a diferença é o **filtro
 padrão** e as **ações** que o papel já permite (o gerente continua com o que hoje é `ORG_MANAGER`, como
@@ -85,17 +97,35 @@ Desligada: o Membro não tem o filtro "Meu departamento" nem o botão **Assumir*
 admin, que reatribuem a tarefa — atribuída a ele, ela entra na carteira e ele passa a enxergar.
 Mudar a opção vale na próxima requisição (o escopo é lido do banco, não do token).
 
+### O que cada um pode fazer na tarefa (2026-11-13)
+
+Ver não é o mesmo que mexer:
+
+- **Membro, tarefa de colega** (visível pelo departamento): **ver e comentar**. Para mover, editar,
+  concluir, entregar documento ou anexar, precisa **assumir** antes (403 "Assuma a tarefa para
+  alterá-la").
+- **Membro, tarefa dele**: tudo, inclusive **passar para outro colega do mesmo departamento** (troca de
+  responsável restrita a quem pertence ao departamento da tarefa).
+- **Membro, processo visível pela carteira** (responsável pelo processo ou pelo cliente): como hoje.
+- **Gerente e Admin**: qualquer tarefa dentro do escopo, como hoje.
+
 ### Filtro padrão
 
 Nas listas de Tarefas, Solicitações, fila do robô e Guias não pagas, um seletor:
 **Minhas · Meu departamento · Todas** (Todas só para admin). Abre em:
 
-- Membro → **Minhas** (atribuídas a mim; solicitações e documentos dos clientes da minha carteira).
-  Com "ver colegas" desligado, o seletor não aparece.
+- Membro → **Minhas**. Com "ver colegas" desligado, o seletor não aparece.
 - Gerente → **Meu departamento**.
 - Admin → **Todas**.
 
-A escolha fica lembrada no navegador (localStorage, por tela).
+A escolha fica lembrada no navegador (localStorage, por tela). Quem pertence a mais de um departamento
+vê, em "Meu departamento", todos eles, com um seletor para escolher um só.
+
+"Minhas", por tela:
+- **Tarefas:** atribuídas a mim.
+- **Solicitações:** as do par (cliente, departamento) em que sou o responsável (`ClientAssignment`).
+- **Fila do robô:** documentos cuja tarefa sugerida é minha.
+- **Guias não pagas:** guias de tarefas minhas.
 
 ### Assumir
 
@@ -135,12 +165,17 @@ atual).
 3. Responsável por cliente precisa pertencer ao departamento (consistência: quem cobre a falta dele
    está no mesmo departamento).
 4. Cadastro de clientes fica fora (acima).
+5. Admin pode ser responsável de cliente sem pertencer ao departamento.
+6. Resumo diário: sem responsável ativo → admins + gerentes do departamento da tarefa.
 
 ## Como validar
 
 - Testes de API por perfil (admin, gerente do Fiscal, membro do Fiscal com e sem "ver colegas", membro
   da Folha) em cada recurso da tabela: vê / 404. Desligar a opção corta o acesso na requisição seguinte.
 - Assumir: uma, em lote, corrida (dois assumindo ao mesmo tempo → um 409), histórico e aviso.
+- Membro em tarefa de colega: comenta (201), move/edita/conclui (403); depois de assumir, tudo (200).
+- Membro passa tarefa dele para colega do departamento (200) e para alguém de fora (400).
+- Tirar do departamento quem é responsável → 409; contador de pendentes e resumo diário no escopo.
 - Aprovar por colega → tarefa com o aprovador; por admin fora do departamento → responsável do cliente.
 - E2E: membro abre Tarefas em "Minhas", troca para "Meu departamento", assume a tarefa do colega.
 - QA visual nos dois temas das telas com o seletor novo e do cadastro de usuários.
