@@ -11,13 +11,16 @@ import {
   getAuthHeader,
   serveClientDepartment,
   getStreamTicket,
+  addUserToDepartment,
 } from '@/test/helpers'
 
-async function createTestClientLogin(orgId: string) {
+// `staffIds`: office users who belong to the request's department (staff scope)
+async function createTestClientLogin(orgId: string, ...staffIds: string[]) {
   const client = await createTestClient(orgId)
   const department = await createTestDepartment(orgId)
   const responsible = await createTestUser(orgId, { role: 'ORG_MEMBER' })
   await serveClientDepartment(client.id, department.id, responsible.id)
+  for (const id of staffIds) await addUserToDepartment(id, department.id)
   const { clientUser, password } = await createTestClientUser(orgId)
   await grantClientAccess(clientUser.id, client.id, department.id)
   return { client, department, auth: await getAuthHeader(clientUser.email, password) }
@@ -28,7 +31,7 @@ describe('GET /requests', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
-    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id, member.id)
     const auth = await getAuthHeader(member.email, 'Test@1234')
 
     await app.inject({
@@ -45,7 +48,7 @@ describe('GET /requests', () => {
 })
 
 describe('POST /requests/:id/approve', () => {
-  it('ORG_MEMBER não pode aprovar (403)', async () => {
+  it('ORG_MEMBER de fora do departamento não aprova (404)', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
@@ -65,7 +68,7 @@ describe('POST /requests/:id/approve', () => {
       headers: { authorization: auth },
       payload: { mode: 'NEW_BOARD' },
     })
-    expect(res.statusCode).toBe(403)
+    expect(res.statusCode).toBe(404)
   })
 
   it('ORG_ADMIN aprova com NEW_BOARD e a request passa a ter taskId', async () => {
@@ -100,7 +103,7 @@ describe('POST /requests/:id/reject', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
-    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id, manager.id)
     const created = await app.inject({
       method: 'POST',
       url: '/portal/requests',
@@ -162,7 +165,7 @@ describe('POST /requests/:id/needs-info', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
-    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id, manager.id)
     const created = await app.inject({
       method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
       payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
@@ -182,7 +185,7 @@ describe('POST /requests/:id/needs-info', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
-    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id, manager.id)
     const created = await app.inject({
       method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
       payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
@@ -201,7 +204,7 @@ describe('POST /requests/:id/needs-info', () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
-    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id, manager.id)
     const created = await app.inject({
       method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
       payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },
@@ -247,7 +250,7 @@ describe('POST /requests/:id/cancel', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
-    const { client, department, auth: authClient } = await createTestClientLogin(org.id)
+    const { client, department, auth: authClient } = await createTestClientLogin(org.id, member.id)
     const created = await app.inject({
       method: 'POST', url: '/portal/requests', headers: { authorization: authClient },
       payload: { clientId: client.id, title: 'Pedido', departmentId: department.id },

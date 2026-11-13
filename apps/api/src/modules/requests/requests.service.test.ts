@@ -87,7 +87,7 @@ describe('listRequestsForOrg / listRequestsForClient / getRequestById', () => {
     const all = await listRequestsForOrg(org.id)
     expect(all).toHaveLength(2)
 
-    const onlyCancelled = await listRequestsForOrg(org.id, 'CANCELLED')
+    const onlyCancelled = await listRequestsForOrg(org.id, { status: 'CANCELLED' })
     expect(onlyCancelled).toHaveLength(1)
     expect(onlyCancelled[0].title).toBe('Pedido 2')
   })

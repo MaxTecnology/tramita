@@ -63,6 +63,11 @@ export function getStaffScope(request: FastifyRequest): Promise<StaffScope> {
   return scope
 }
 
+// Prisma ignores an empty OR nested in AND; an empty list of alternatives must match nothing.
+function anyRequest(alternatives: Prisma.RequestWhereInput[]): Prisma.RequestWhereInput {
+  return alternatives.length > 0 ? { OR: alternatives } : { id: { in: [] } }
+}
+
 // Department reach applies only with the option on and at least one department — never `in: []`
 // turning into "everything", never an empty IN.
 function departmentReach(scope: Limited): string[] | null {
@@ -98,18 +103,16 @@ export function mineTaskWhere(userId: string): Prisma.TaskWhereInput {
 
 export function mineRequestWhere(scope: StaffScope): Prisma.RequestWhereInput {
   if (scope.kind === 'ALL') return {}
-  return { OR: scope.assignments.map((a) => ({ clientId: a.clientId, departmentId: a.departmentId })) }
+  return anyRequest(scope.assignments.map((a) => ({ clientId: a.clientId, departmentId: a.departmentId })))
 }
 
 export function requestWhere(scope: StaffScope): Prisma.RequestWhereInput {
   if (scope.kind === 'ALL') return {}
   const reach = departmentReach(scope)
-  return {
-    OR: [
-      ...scope.assignments.map((a) => ({ clientId: a.clientId, departmentId: a.departmentId })),
-      ...(reach ? [{ departmentId: { in: reach } }] : []),
-    ],
-  }
+  return anyRequest([
+    ...scope.assignments.map((a) => ({ clientId: a.clientId, departmentId: a.departmentId })),
+    ...(reach ? [{ departmentId: { in: reach } }] : []),
+  ])
 }
 
 export function canSeeUnidentifiedDocuments(scope: StaffScope): boolean {

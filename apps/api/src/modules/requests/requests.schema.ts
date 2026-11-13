@@ -33,6 +33,8 @@ export const cancelApprovedRequestSchema = z.object({
 
 export const listRequestsQuerySchema = z.object({
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'NEEDS_INFO']).optional(),
+  // Minhas · Meu departamento · Todas (permission is still the staff scope)
+  scope: z.enum(['mine', 'department', 'all']).optional(),
 })
 
 export type CreateRequestBody = z.infer<typeof createRequestSchema>

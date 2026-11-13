@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client'
+import { requestWhere, userBelongsToDepartment, type StaffScope } from '@/modules/staff-scope/staff-scope'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
@@ -75,9 +77,25 @@ export async function createRequest(
   return request
 }
 
-export async function listRequestsForOrg(organizationId: string, status?: RequestStatus) {
+// Requests of the (client, department) pairs this user is responsible for — "Minhas"
+async function mineRequestWhereFor(userId: string): Promise<Prisma.RequestWhereInput> {
+  const pairs = await prisma.clientAssignment.findMany({ where: { userId }, select: { clientId: true, departmentId: true } })
+  return pairs.length > 0
+    ? { OR: pairs.map((p) => ({ clientId: p.clientId, departmentId: p.departmentId })) }
+    : { id: { in: [] } } // Prisma ignores an empty OR nested in AND
+}
+
+export async function listRequestsForOrg(
+  organizationId: string,
+  opts: { status?: RequestStatus; scope?: StaffScope; userId?: string; view?: 'mine' | 'department' | 'all' } = {},
+) {
+  const { status, scope = { kind: 'ALL' }, userId, view } = opts
   const requests = await prisma.request.findMany({
-    where: { organizationId, ...(status ? { status } : {}) },
+    where: {
+      organizationId,
+      ...(status ? { status } : {}),
+      AND: [requestWhere(scope), ...(view === 'mine' && userId ? [await mineRequestWhereFor(userId)] : [])],
+    },
     include: {
       client: { select: { id: true, name: true } },
       task: { select: { column: { select: { boardId: true } } } },
@@ -294,6 +312,9 @@ export async function approveRequest(
       priority: 'MEDIUM',
       tags: [],
       departmentId,
+      // A colleague of the department who approves takes the task; an admin outside it leaves it
+      // with the department responsible for the client
+      ...((await userBelongsToDepartment(reviewerId, departmentId)) ? { assigneeId: reviewerId } : {}),
     },
     { id: reviewerId, type: 'user' },
   )
@@ -352,6 +373,16 @@ export async function rejectRequest(
   return updated
 }
 
-export async function countPendingRequests(organizationId: string): Promise<number> {
-  return prisma.request.count({ where: { organizationId, status: 'PENDING' } })
+export async function countPendingRequests(organizationId: string, scope: StaffScope = { kind: 'ALL' }): Promise<number> {
+  return prisma.request.count({ where: { organizationId, status: 'PENDING', ...requestWhere(scope) } })
+}
+
+// Request the office user is about to read or act on: out of their scope answers 404 (never reveals
+// that it exists). Clients have their own access check.
+export async function assertRequestInStaffScope(requestId: string, organizationId: string, scope: StaffScope): Promise<void> {
+  if (scope.kind === 'ALL') return
+  const exists = await prisma.request.count({ where: { id: requestId, organizationId } })
+  if (!exists) return // the service answers its usual 404
+  const visible = await prisma.request.count({ where: { id: requestId, organizationId, ...requestWhere(scope) } })
+  if (!visible) throw new AppError(404, 'Solicitação não encontrada')
 }

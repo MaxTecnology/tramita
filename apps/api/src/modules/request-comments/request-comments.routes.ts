@@ -5,9 +5,17 @@ import { requireRole } from '@/middlewares/requireRole'
 import { AppError } from '@/errors/AppError'
 import { createRequestCommentSchema } from './request-comments.schema'
 import { listRequestComments, createRequestComment, deleteRequestComment } from './request-comments.service'
+import { assertRequestInStaffScope } from '@/modules/requests/requests.service'
+import { getStaffScope } from '@/modules/staff-scope/staff-scope'
 
 export async function requestCommentsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
+  // Office staff only reads and comments on requests within their scope (clients: own check)
+  app.addHook('preHandler', async (request) => {
+    const { requestId } = request.params as { requestId?: string }
+    if (!requestId || (request.user.role !== 'ORG_MEMBER' && request.user.role !== 'ORG_MANAGER')) return
+    await assertRequestInStaffScope(requestId, request.user.organizationId!, await getStaffScope(request))
+  })
 
   app.get('/requests/:requestId/comments', {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT')],

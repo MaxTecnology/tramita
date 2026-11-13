@@ -17,7 +17,9 @@ import {
   markNeedsInfo,
   cancelApprovedRequest,
   countPendingRequests,
+  assertRequestInStaffScope,
 } from './requests.service'
+import { getStaffScope } from '@/modules/staff-scope/staff-scope'
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'] as const
 
@@ -43,13 +45,16 @@ export async function requestsRoutes(app: FastifyInstance) {
     }, async (request, reply) => {
       const result = listRequestsQuerySchema.safeParse(request.query)
       const query = result.success ? result.data : {}
-      return reply.send(await listRequestsForOrg(request.user.organizationId!, query.status))
+      const scope = await getStaffScope(request)
+      return reply.send(await listRequestsForOrg(request.user.organizationId!, {
+        status: query.status, scope, userId: request.user.sub, view: query.scope,
+      }))
     })
 
     authed.get('/pending-count', {
       preHandler: [requireRole(...ORG_ROLES)],
     }, async (request, reply) => {
-      const count = await countPendingRequests(request.user.organizationId!)
+      const count = await countPendingRequests(request.user.organizationId!, await getStaffScope(request))
       return reply.send({ count })
     })
 
@@ -57,13 +62,15 @@ export async function requestsRoutes(app: FastifyInstance) {
       preHandler: [requireRole(...ORG_ROLES)],
     }, async (request, reply) => {
       const { id } = request.params as { id: string }
+      await assertRequestInStaffScope(id, request.user.organizationId!, await getStaffScope(request))
       return reply.send(await getRequestById(id, request.user.organizationId!))
     })
 
     authed.post('/:id/approve', {
-      preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription],
+      preHandler: [requireRole(...ORG_ROLES), checkSubscription],
     }, async (request, reply) => {
       const { id } = request.params as { id: string }
+      await assertRequestInStaffScope(id, request.user.organizationId!, await getStaffScope(request))
       const result = approveRequestSchema.safeParse(request.body)
       if (!result.success) throw new AppError(400, result.error.errors[0].message)
       return reply.send(
@@ -72,18 +79,20 @@ export async function requestsRoutes(app: FastifyInstance) {
     })
 
     authed.post('/:id/reject', {
-      preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription],
+      preHandler: [requireRole(...ORG_ROLES), checkSubscription],
     }, async (request, reply) => {
       const { id } = request.params as { id: string }
+      await assertRequestInStaffScope(id, request.user.organizationId!, await getStaffScope(request))
       const result = rejectRequestSchema.safeParse(request.body)
       if (!result.success) throw new AppError(400, result.error.errors[0].message)
       return reply.send(await rejectRequest(id, request.user.organizationId!, request.user.sub, result.data))
     })
 
     authed.post('/:id/needs-info', {
-      preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription],
+      preHandler: [requireRole(...ORG_ROLES), checkSubscription],
     }, async (request, reply) => {
       const { id } = request.params as { id: string }
+      await assertRequestInStaffScope(id, request.user.organizationId!, await getStaffScope(request))
       const result = needsInfoRequestSchema.safeParse(request.body)
       if (!result.success) throw new AppError(400, result.error.errors[0].message)
       return reply.send(
@@ -95,6 +104,7 @@ export async function requestsRoutes(app: FastifyInstance) {
       preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription],
     }, async (request, reply) => {
       const { id } = request.params as { id: string }
+      await assertRequestInStaffScope(id, request.user.organizationId!, await getStaffScope(request))
       const result = cancelApprovedRequestSchema.safeParse(request.body)
       if (!result.success) throw new AppError(400, result.error.errors[0].message)
       return reply.send(
