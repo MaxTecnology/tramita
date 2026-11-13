@@ -593,3 +593,14 @@ Ações fora do código (ainda pendentes, por último na ordem combinada):
   do B2; no E2E as aprovações vêm do seed. O upload está coberto no teste de componente e na API (B2 mockado).
 - **Aprovação em processo (OS):** o modelo serve, mas a tela só existe no painel da tarefa; o cartão do
   Kanban de processo não mostra o selo "Aguardando aprovação". Fora do escopo até o Max pedir.
+- **Achados menores da revisão final (2026-11-13), adiados:**
+  - `read-by-task` marca como lidas também as notificações de aprovação/documento daquela tarefa (a spec fala só de comentário); filtrar `type: 'TASK_COMMENT'`.
+  - Comprovante do "fechar sem o portal" é gravado antes da escrita protegida: num 409 fica anexo órfão. Arquivos da aprovação aparecem (e podem ser apagados) na aba Anexos.
+  - E-mail `APPROVAL_CHANGES_REQUESTED` para a equipe aponta para `/app/requests` em vez da tarefa.
+  - Pedido de ajuste: WhatsApp/e-mail vai só para quem pediu; o sino vai também para o responsável atual.
+  - Destinatários da equipe no sino não filtram `isActive` (linhas mortas, sem vazamento).
+  - Aprovação pendente continua pendente em tarefa desconsiderada (conta no Início do cliente).
+  - "Mensagens do escritório" não revalida se a tarefa continua visível / no departamento do usuário.
+  - Portal → Solicitações re-rola até o item aberto a cada render.
+  - API aceita duas aprovações `PENDING` na mesma tarefa (só a tela impede).
+  - `in_app_notifications` / `task_approvals` sem FK para `organizations`; `taskId` da notificação sem FK.
