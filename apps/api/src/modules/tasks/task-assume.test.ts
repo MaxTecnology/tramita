@@ -105,3 +105,17 @@ describe('passar tarefa para colega', () => {
     expect((await patch(c.carlos.id)).statusCode).toBe(200)
   })
 })
+
+describe('viewerCanEdit nas listas', () => {
+  it('colleague task is read-only for the member until assumed', async () => {
+    const c = await setup()
+    const flag = async () => {
+      const items = JSON.parse((await app.inject({ method: 'GET', url: '/tasks?scope=department', headers: { authorization: c.brunaAuth } })).body).items as { id: string; viewerCanEdit: boolean }[]
+      return items.find((t) => t.id === c.f1.id)?.viewerCanEdit
+    }
+    expect(await flag()).toBe(false)
+    await assume(c.f1.id, c.brunaAuth, c.carlos.id)
+    expect(await flag()).toBe(true)
+  })
+})
+

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
-import { getStaffScope } from '@/modules/staff-scope/staff-scope'
+import { getStaffScope, actableTaskIds } from '@/modules/staff-scope/staff-scope'
 import { staffScope, param } from '@/middlewares/staffScope'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
@@ -52,7 +52,14 @@ export async function boardsRoutes(app: FastifyInstance) {
     const isClient = request.user.role === 'CLIENT'
 
     if (!isClient) {
-      return reply.send(await getBoardById(id, request.user.organizationId!, false, undefined, await getStaffScope(request)))
+      const staffScope = await getStaffScope(request)
+      const board = await getBoardById(id, request.user.organizationId!, false, undefined, staffScope)
+      // Each task says whether this viewer may change it (else: read and comment, "Assumir")
+      const editable = await actableTaskIds(staffScope, board.columns.flatMap((c) => c.tasks.map((t) => t.id)))
+      return reply.send({
+        ...board,
+        columns: board.columns.map((c) => ({ ...c, tasks: c.tasks.map((t) => ({ ...t, viewerCanEdit: editable.has(t.id) })) })),
+      })
     }
 
     const scope = await getClientAccessScope(request.user.sub)

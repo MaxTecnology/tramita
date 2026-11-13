@@ -24,6 +24,7 @@ interface Config {
   requestCommentAdded?: boolean
   requestCancelled?: boolean
   protocolCreated?: boolean
+  taskAssumed?: boolean
   protocolWarningDays?: number
   recurringGenerationFailed?: boolean
   documentRejected?: boolean
@@ -61,6 +62,7 @@ const EVENT_LABEL: Record<string, string> = {
   REQUEST_CANCELLED: 'Solicitação cancelada (pós-aprovação)',
   PROTOCOL_CREATED: 'Protocolo criado',
   SLA_DIGEST: 'Resumo diário de prazos',
+  TASK_ASSUMED: 'Tarefa assumida por um colega',
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -335,6 +337,15 @@ export default function Notifications() {
               description="Notifica o cliente quando um protocolo formal é criado"
               checked={form.protocolCreated ?? false}
               onChange={(v) => setForm({ ...form, protocolCreated: v })}
+            />
+          </Section>
+
+          <Section title="Eventos — Equipe">
+            <SwitchRow
+              label="Tarefa assumida por um colega"
+              description="Avisa o colaborador quando um colega do departamento assume uma tarefa dele (cobertura de falta)"
+              checked={form.taskAssumed ?? false}
+              onChange={(v) => setForm({ ...form, taskAssumed: v })}
             />
           </Section>
 

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { Comments } from '@/components/shared/Comments'
 import { useServedDepartments } from '@/hooks/useServedDepartments'
+import { useMyScope } from '@/hooks/useMyScope'
 import { hasUnseenClientReply } from '@/lib/request-comments'
 import type { Task, Attachment, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable, Protocol, Comment } from '@/types'
 import { toast } from 'sonner'
@@ -31,6 +32,7 @@ interface Props {
 }
 
 const ACTION_LABELS: Record<string, string> = {
+  assumed: 'assumiu a tarefa',
   moved_to: 'moveu para',
   created: 'criou a tarefa',
   updated_priority: 'alterou prioridade para',
@@ -104,9 +106,18 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   const [titleValue, setTitleValue] = useState(task.title)
   const [descValue, setDescValue] = useState(task.description ?? '')
 
-  const canEdit = isOrgRole(role)
+  const isStaff = isOrgRole(role)
+  // Office staff sees everything in the drawer; changing it needs the task to be theirs (or their
+  // portfolio / manager scope). A colleague's task seen through the department must be assumed first.
+  const canEdit = isStaff && task.viewerCanEdit !== false
+  const me = useMyScope()
+  const isOpen = task.status !== 'DONE' && task.status !== 'DISREGARDED'
+  const canAssume = isStaff && !!me && isOpen && task.assigneeId !== currentUserId
+    && (me.role === 'ORG_ADMIN' || (!!task.departmentId && me.departments.some((d) => d.id === task.departmentId)))
+    && (me.role !== 'ORG_MEMBER' || me.seesDepartmentWork)
+  const [assumeError, setAssumeError] = useState<string | null>(null)
 
-  const { departments } = useServedDepartments(canEdit ? clientId : undefined)
+  const { departments } = useServedDepartments(isStaff ? clientId : undefined)
 
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Pick<Task, 'title' | 'priority' | 'status' | 'description' | 'dueDate' | 'departmentId' | 'visibleToClient' | 'targetDate' | 'competence'>>) =>
@@ -318,11 +329,28 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   const isRecurring = task.recurringTemplateId !== null
   const canEditDates = canEdit && !isRecurring
 
+  const assumeMutation = useMutation({
+    mutationFn: () => api.post(`/tasks/${task.id}/assume`, { expectedAssigneeId: task.assigneeId ?? null }),
+    onSuccess: () => {
+      setAssumeError(null)
+      toast.success('Tarefa assumida')
+      queryClient.invalidateQueries({ queryKey: ['board'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    },
+    onError: (err) => {
+      const message = mensagemDeErro(err, 'Erro ao assumir a tarefa')
+      setAssumeError(message)
+      toast.error(message)
+      queryClient.invalidateQueries({ queryKey: ['board'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    },
+  })
+
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'comments', label: 'Comentários', icon: <MessageSquare size={14} /> },
     { id: 'documents', label: 'Documentos', icon: <FileCheck size={14} /> },
     { id: 'attachments', label: 'Anexos', icon: <Paperclip size={14} /> },
-    ...(canEdit ? [{ id: 'protocols' as Tab, label: 'Protocolos', icon: <Stamp size={14} /> }] : []),
+    ...(isStaff ? [{ id: 'protocols' as Tab, label: 'Protocolos', icon: <Stamp size={14} /> }] : []),
     { id: 'history', label: 'Histórico', icon: <Clock size={14} /> },
   ]
 
@@ -333,6 +361,19 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
 
         {/* Header fixo */}
         <div className="px-5 pt-5 pb-4 border-b border-border flex-shrink-0">
+          {(canAssume || (isStaff && !canEdit)) && (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning-text/40 bg-warning-bg px-3 py-2">
+              <div className="text-xs text-warning-text">
+                {!canEdit ? <p>Assuma a tarefa para alterá-la</p> : <p>Esta tarefa está com outro colaborador.</p>}
+                {assumeError && <p className="font-medium text-danger-text">{assumeError}</p>}
+              </div>
+              {canAssume && (
+                <Button size="sm" onClick={() => assumeMutation.mutate()} disabled={assumeMutation.isPending}>
+                  {assumeMutation.isPending ? 'Assumindo...' : 'Assumir'}
+                </Button>
+              )}
+            </div>
+          )}
           <div className="flex items-start justify-between mb-3">
             {canEdit && editingTitle ? (
               <input
@@ -783,7 +824,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                         )}
                       </div>
                     </div>
-                    {!isDeleted && isOrgRole(role) && (
+                    {!isDeleted && canEdit && (
                       <button
                         type="button"
                         onClick={() => deleteAttachmentMutation.mutate(a.id)}
@@ -798,7 +839,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
               {!attachments.some((a) => !a.deletedAt) && attachments.length > 0 && (
                 <p className="text-xs text-muted-foreground pt-1">Todos os anexos foram removidos.</p>
               )}
-              {isOrgRole(role) && (
+              {canEdit && (
                 <label className="flex items-center gap-2 cursor-pointer pt-1">
                   <input
                     type="file"

@@ -13,7 +13,8 @@ import {
 } from '@dnd-kit/core'
 import { List, LayoutGrid, Inbox, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react'
 import { api } from '@/lib/api'
-import { cn } from '@/lib/utils'
+import { cn, mensagemDeErro } from '@/lib/utils'
+import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { TaskDrawer, STATUS_LABEL, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR } from '@/components/shared/TaskDrawer'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
@@ -401,6 +402,27 @@ export default function Tasks() {
 
   const tasks = useMemo(() => tasksPages?.pages.flatMap((p) => p.items) ?? [], [tasksPages])
 
+  // Cover an absent colleague: take all their open tasks of my departments at once
+  const bulkQc = useQueryClient()
+  const colleague = assigneeId && me && assigneeId !== me.id && scopeFilter.scope === 'department'
+    && (me.role !== 'ORG_MEMBER' || me.seesDepartmentWork)
+    ? users.find((u) => u.id === assigneeId) ?? null
+    : null
+  const colleagueOpenCount = colleague
+    ? tasks.filter((t) => t.assigneeId === colleague.id && t.status !== 'DONE' && t.status !== 'DISREGARDED').length
+    : 0
+  const assumeBulkMutation = useMutation({
+    mutationFn: () => api.post('/tasks/assume-bulk', {
+      fromUserId: assigneeId,
+      ...(scopeFilter.departmentId ? { departmentId: scopeFilter.departmentId } : {}),
+    }).then((r) => r.data as { count: number }),
+    onSuccess: ({ count }) => {
+      toast.success(count === 1 ? '1 tarefa assumida' : `${count} tarefas assumidas`)
+      bulkQc.invalidateQueries({ queryKey: ['tasks'] })
+    },
+    onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao assumir as tarefas')),
+  })
+
   const selectedTask = selectedTaskId ? tasks.find((t) => t.id === selectedTaskId) ?? null : null
 
   const hasFilters =
@@ -528,6 +550,18 @@ export default function Tasks() {
             <option key={u.id} value={u.id}>{u.name}</option>
           ))}
         </FilterSelect>
+        {colleague && colleagueOpenCount > 0 && (
+          <button
+            type="button"
+            disabled={assumeBulkMutation.isPending}
+            onClick={() => {
+              if (window.confirm(`Assumir ${colleagueOpenCount === 1 ? 'a tarefa aberta' : `as ${colleagueOpenCount} tarefas abertas`} de ${colleague.name}?`)) assumeBulkMutation.mutate()
+            }}
+            className="h-8 rounded-md border border-warning-text/40 bg-warning-bg px-3 text-sm font-medium text-warning-text hover:opacity-90 disabled:opacity-50"
+          >
+            Assumir todas as abertas de {colleague.name}
+          </button>
+        )}
         <FilterSelect value={departmentId} onChange={setDepartmentId} placeholder="Departamento">
           {departments.map((d) => (
             <option key={d.id} value={d.id}>{d.name}</option>

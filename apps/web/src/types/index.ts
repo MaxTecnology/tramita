@@ -18,6 +18,8 @@ export interface Task {
   targetDate: string | null
   recurringTemplateId: string | null
   visibleToClient: boolean
+  /** false when the viewer must assume the task before changing it (colleague's task) */
+  viewerCanEdit?: boolean
 }
 
 export interface Column {

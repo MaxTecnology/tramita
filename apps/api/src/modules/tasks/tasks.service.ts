@@ -9,7 +9,7 @@ import { resolveCompletedAt } from '@/lib/task-completion'
 import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, ListTasksQuery } from './tasks.schema'
 import { assertDepartmentServesClient, lockClients } from '@/modules/clients/client-coverage'
 import { syncProtocolsForTask } from '@/modules/protocols/protocol-from-deliverable'
-import { actorScope, taskWhere, mineTaskWhere } from '@/modules/staff-scope/staff-scope'
+import { actorScope, taskWhere, mineTaskWhere, actableTaskIds } from '@/modules/staff-scope/staff-scope'
 
 export interface Actor {
   id: string
@@ -539,8 +539,11 @@ export async function listTasks(
   })
 
   const hasMore = rows.length > limit
-  const items = hasMore ? rows.slice(0, limit) : rows
-  const nextCursor = hasMore ? items[items.length - 1].id : null
+  const page = hasMore ? rows.slice(0, limit) : rows
+  const nextCursor = hasMore ? page[page.length - 1].id : null
+  // Read-only for the viewer until they assume it (colleague's task seen through the department)
+  const editable = await actableTaskIds(scope, page.map((t) => t.id))
+  const items = page.map((t) => ({ ...t, viewerCanEdit: editable.has(t.id) }))
 
   return { items, nextCursor }
 }

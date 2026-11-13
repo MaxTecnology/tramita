@@ -160,6 +160,13 @@ export function actableTaskWhere(scope: StaffScope): Prisma.TaskWhereInput {
   }
 }
 
+// Which of these tasks the user may change (one query for a whole list)
+export async function actableTaskIds(scope: StaffScope, taskIds: string[]): Promise<Set<string>> {
+  if (scope.kind === 'ALL' || taskIds.length === 0) return new Set(taskIds)
+  const rows = await prisma.task.findMany({ where: { id: { in: taskIds }, AND: [actableTaskWhere(scope)] }, select: { id: true } })
+  return new Set(rows.map((r) => r.id))
+}
+
 export async function canActOnTask(scope: StaffScope, task: { id: string }): Promise<boolean> {
   if (scope.kind === 'ALL') return true
   return (await prisma.task.count({ where: { id: task.id, AND: [actableTaskWhere(scope)] } })) > 0
