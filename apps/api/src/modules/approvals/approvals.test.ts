@@ -218,3 +218,27 @@ describe('exclusão', () => {
     expect(await prisma.taskApproval.count({ where: { id } })).toBe(0)
   })
 })
+
+describe('revisão final', () => {
+  it('a colleague who only sees the task through the department cannot ask for approval', async () => {
+    const c = await setup()
+    const pessoal = await prisma.department.findFirstOrThrow({ where: { organizationId: c.org.id, name: 'Pessoal' } })
+    const ana = await createTestUser(c.org.id, { role: 'ORG_MEMBER', departmentIds: [pessoal.id], seesDepartmentWork: true })
+    const mp = multipartBody({ title: 'Prévia' }, { filename: 'previa.pdf' })
+    const res = await app.inject({ method: 'POST', url: `/tasks/${c.task.id}/approvals`, headers: { authorization: await getAuthHeader(ana.email, 'Test@1234'), ...mp.headers }, body: mp.body })
+    expect(res.statusCode).toBe(403)
+    expect(await prisma.taskApproval.count({ where: { taskId: c.task.id } })).toBe(0)
+  })
+
+  it('a change request never auto-completes the task (checklist auto-complete on)', async () => {
+    const c = await setup()
+    const pessoal = await prisma.department.findFirstOrThrow({ where: { organizationId: c.org.id, name: 'Pessoal' } })
+    const tpl = await prisma.recurringTaskTemplate.create({
+      data: { organizationId: c.org.id, departmentId: pessoal.id, title: 'Folha', periodicity: 'MONTHLY', dueDayOfPeriod: 5, generationDayOfPeriod: 1, autoCompleteOnAllActivitiesDone: true },
+    })
+    await prisma.task.update({ where: { id: c.task.id }, data: { recurringTemplateId: tpl.id } })
+    const { id } = JSON.parse((await requestApproval(c)).body)
+    await post(`/portal/approvals/${id}/request-changes`, c.rhAuth, { note: 'Faltou o adicional' })
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: c.task.id } })).status).not.toBe('DONE')
+  })
+})

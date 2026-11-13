@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { MessageSquare, Send, Upload } from 'lucide-react'
@@ -56,10 +56,11 @@ export function SendDocumentsView({ clientId }: { clientId: string }) {
   const queryClient = useQueryClient()
   // A notification link carries the month (?competence=AAAA-MM)
   const [searchParams] = useSearchParams()
-  const [competence, setCompetence] = useState(() => {
-    const linked = searchParams.get('competence')
-    return linked && /^\d{4}-\d{2}$/.test(linked) ? linked : ''
-  })
+  const linkedCompetence = searchParams.get('competence')
+  const validLinked = linkedCompetence && /^\d{4}-\d{2}$/.test(linkedCompetence) ? linkedCompetence : ''
+  const [competence, setCompetence] = useState(validLinked)
+  // Also when the link is clicked while already on this page (bell → another month)
+  useEffect(() => { if (validLinked) setCompetence(validLinked) }, [validLinked])
 
   const { data: months = [] } = useQuery<MonthSummary[]>({
     queryKey: ['portal-request-months', clientId],
@@ -120,8 +121,16 @@ export function SendDocumentsView({ clientId }: { clientId: string }) {
         queryClient.invalidateQueries({ queryKey: LIST_KEY })
       })
       .catch(() => undefined)
-    document.getElementById(`task-${conversationTaskId}`)?.scrollIntoView?.({ block: 'start' })
   }, [conversationTaskId])
+
+  // Scroll to the opened conversation once its group is on screen (the month may still be loading)
+  const scrolledTo = useRef<string | null>(null)
+  useEffect(() => {
+    if (!conversationTaskId || scrolledTo.current === conversationTaskId) return
+    if (!groups.some((g) => g.taskId === conversationTaskId)) return
+    scrolledTo.current = conversationTaskId
+    document.getElementById(`task-${conversationTaskId}`)?.scrollIntoView?.({ block: 'start' })
+  }, [conversationTaskId, groups])
 
   const toggleConversation = (taskId: string) => {
     if (conversationTaskId === taskId) { setConversationTaskId(null); clearLinkedTask() } else setConversationTaskId(taskId)

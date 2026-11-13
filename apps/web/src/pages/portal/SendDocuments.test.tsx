@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Link } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { server } from '@/test/server'
 import { SendDocumentsView } from './SendDocuments'
@@ -102,4 +102,41 @@ it('shows the approval request inside its task group with Aprovar and Pedir ajus
   await waitFor(() => expect(screen.getByText('Prévia da folha de outubro')).toBeInTheDocument())
   expect(screen.getByRole('button', { name: 'Aprovar' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Pedir ajuste' })).toBeInTheDocument()
+})
+
+it('a notification for another month, clicked while already on the page, switches the month and opens the conversation', async () => {
+  const readByTask: string[] = []
+  server.use(
+    http.get(`${API}/portal/document-requests/months`, () => HttpResponse.json([{ competence: '2026-10', pending: 0, total: 0 }, { competence: '2026-09', pending: 0, total: 0 }])),
+    http.get(`${API}/portal/home`, () => HttpResponse.json({ documentsToSendInProcesses: 0 })),
+    http.get(`${API}/portal/document-requests`, ({ request }) => {
+      const competence = new URL(request.url).searchParams.get('competence')
+      return HttpResponse.json({
+        competence,
+        tasks: competence === '2026-09'
+          ? [{ taskId: 't9', title: 'Folha de setembro', departmentName: 'Pessoal', approvals: [], unreadMessages: 1, requests: [] }]
+          : TASKS,
+      })
+    }),
+    http.get(`${API}/tasks/:taskId/comments`, () => HttpResponse.json([
+      { id: 'c9', content: 'Mensagem de setembro', authorType: 'USER', createdAt: '2026-09-10T12:00:00.000Z', user: { id: 'u1', name: 'Dani' }, client: null, deletedAt: null },
+    ])),
+    http.post(`${API}/notifications/read-by-task`, async ({ request }) => {
+      readByTask.push(((await request.json()) as { taskId: string }).taskId)
+      return HttpResponse.json({ count: 1 })
+    }),
+  )
+  localStorage.setItem('user', JSON.stringify({ id: 'cu1', name: 'Financeiro', role: 'CLIENT', organizationId: 'o1', orgName: 'G2A' }))
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={['/portal/send']}>
+        <Link to="/portal/send?competence=2026-09&task=t9">abrir notificação</Link>
+        <SendDocumentsView clientId="c1" />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+  await waitFor(() => expect(screen.getByText('Apuração — Fiscal')).toBeInTheDocument())
+  await userEvent.click(screen.getByText('abrir notificação'))
+  await waitFor(() => expect(screen.getByText('Mensagem de setembro')).toBeInTheDocument())
+  expect(readByTask).toEqual(['t9'])
 })

@@ -81,7 +81,8 @@ async function staffTask(taskId: string, organizationId: string, actor: Staff) {
 }
 
 export async function requestApproval(taskId: string, organizationId: string, actor: Staff, body: RequestApprovalBody, file: UploadedFile) {
-  const { task } = await staffTask(taskId, organizationId, actor)
+  const { task, scope } = await staffTask(taskId, organizationId, actor)
+  if (!(await canActOnTask(scope, task))) throw new AppError(403, MUST_ASSUME)
   if (!task.visibleToClient) throw new AppError(422, 'Só tarefas visíveis ao cliente podem pedir aprovação')
   if (task.status === 'DONE' || task.status === 'DISREGARDED') throw new AppError(409, 'A tarefa já foi encerrada')
 
@@ -182,7 +183,8 @@ export async function decideAsClient(id: string, organizationId: string, clientU
     })
   }
   await onApprovalDecided(id, { clientUserId, name: clientUser.name })
-  await recalculateTaskStatus(task.id)
+  // A change request means work is still to be done: never let the checklist auto-complete it
+  if (decision === 'APPROVED') await recalculateTaskStatus(task.id)
   await publishBoardEvent(task.column.board.id, { event: 'task:updated', data: { taskId: task.id } })
   return presentApproval(await prisma.taskApproval.findUniqueOrThrow({ where: { id }, include: approvalInclude }))
 }
