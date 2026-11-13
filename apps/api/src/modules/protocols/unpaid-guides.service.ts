@@ -8,6 +8,7 @@ export interface UnpaidGuidesFilters {
   departmentId?: string
   competence?: string // 'YYYY-MM'
   situation?: 'overdue' | 'upcoming' | 'paid'
+  scope?: 'mine' | 'department' | 'all'
 }
 
 type Actor = { id: string; role: string }
@@ -34,11 +35,16 @@ function competenceRange(competence: string): { gte: Date; lt: Date } {
 // the amount prominent so a high tax gets a call to the client before interest grows.
 export async function listUnpaidGuides(organizationId: string, actor: Actor, filters: UnpaidGuidesFilters, now: Date = new Date()) {
   const paidView = filters.situation === 'paid'
+  // Screen filter on top of the permission scope (same rules as the task list)
+  const scope = await actorScope(actor, organizationId)
+  const view = scope.kind === 'ALL' ? (filters.scope ?? 'all') : filters.scope === 'mine' ? 'mine' : 'department'
+  if (scope.kind === 'LIMITED' && view === 'department' && filters.departmentId && !scope.departmentIds.includes(filters.departmentId)) return []
   const rows = await prisma.protocol.findMany({
     where: {
       // AND: the member scope and the department filter both constrain `task`
       AND: [
         await scopeWhere(organizationId, actor),
+        ...(view === 'mine' ? [{ task: { assigneeId: actor.id } }] : []),
         { paidAt: paidView ? { not: null } : null },
         ...(filters.clientId ? [{ clientId: filters.clientId }] : []),
         ...(filters.departmentId ? [{ task: { departmentId: filters.departmentId } }] : []),

@@ -179,7 +179,7 @@ describe('GET /tasks', () => {
     expect(clientIds).toEqual([clientA.id, clientB.id].sort())
   })
 
-  it('ORG_MEMBER só vê tarefas em que é assigneeId, mesmo sem filtro explícito', async () => {
+  it('ORG_MEMBER com o filtro "Minhas" vê só as tarefas atribuídas a ele', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
@@ -195,7 +195,7 @@ describe('GET /tasks', () => {
     const auth = await getAuthHeader(member.email, 'Test@1234')
     const res = await app.inject({
       method: 'GET',
-      url: '/tasks',
+      url: '/tasks?scope=mine',
       headers: { authorization: auth },
     })
 

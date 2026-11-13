@@ -9,6 +9,7 @@ import { resolveCompletedAt } from '@/lib/task-completion'
 import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, ListTasksQuery } from './tasks.schema'
 import { assertDepartmentServesClient, lockClients } from '@/modules/clients/client-coverage'
 import { syncProtocolsForTask } from '@/modules/protocols/protocol-from-deliverable'
+import { actorScope, taskWhere, mineTaskWhere } from '@/modules/staff-scope/staff-scope'
 
 export interface Actor {
   id: string
@@ -491,7 +492,14 @@ export async function listTasks(
     ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
   }
 
-  if (actor.role === 'ORG_MEMBER') where.assigneeId = actor.id
+  // Permission (staff scope) + the screen filter (Minhas · Meu departamento · Todas)
+  const scope = await actorScope(actor, organizationId)
+  const view = scope.kind === 'ALL' ? (query.scope ?? 'all') : query.scope === 'mine' ? 'mine' : 'department'
+  // A department filter outside my departments shows nothing (never another department's work)
+  if (scope.kind === 'LIMITED' && view === 'department' && query.departmentId && !scope.departmentIds.includes(query.departmentId)) {
+    return { items: [], nextCursor: null }
+  }
+  where.AND = [taskWhere(scope), ...(view === 'mine' ? [mineTaskWhere(actor.id)] : [])]
 
   const limit = Math.min(query.limit ?? DEFAULT_LIST_TASKS_LIMIT, MAX_LIST_TASKS_LIMIT)
 

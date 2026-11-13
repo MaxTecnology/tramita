@@ -51,6 +51,8 @@ export const listTasksQuerySchema = z.object({
   // regulares (que nunca ganham targetDate, só as recorrentes) da janela do mês.
   dateField: z.enum(['target', 'effective']).optional(),
   boardType: z.enum(['OS', 'RECURRING_SYSTEM']).optional(),
+  // Minhas · Meu departamento · Todas — default: department for office staff, all for admins
+  scope: z.enum(['mine', 'department', 'all']).optional(),
   openOnly: z.coerce.boolean().optional(),
   q: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
