@@ -46,19 +46,34 @@ export async function createTestUser(
     password: string
     phone: string
     isActive: boolean
+    name: string
+    departmentIds: string[]
+    seesDepartmentWork: boolean
   }>,
 ) {
   const password = overrides?.password ?? 'Test@1234'
   return prisma.user.create({
     data: {
-      name: 'Test User',
+      name: overrides?.name ?? 'Test User',
       email: overrides?.email ?? `user-${Date.now()}-${++testUserCounter}@test.com`,
       passwordHash: await bcrypt.hash(password, 10),
       role: overrides?.role ?? 'ORG_ADMIN',
       phone: overrides?.phone,
       isActive: overrides?.isActive ?? true,
+      seesDepartmentWork: overrides?.seesDepartmentWork ?? true,
       organizationId,
+      ...(overrides?.departmentIds?.length
+        ? { departments: { create: overrides.departmentIds.map((departmentId) => ({ departmentId })) } }
+        : {}),
     },
+  })
+}
+
+export async function addUserToDepartment(userId: string, departmentId: string) {
+  return prisma.userDepartment.upsert({
+    where: { userId_departmentId: { userId, departmentId } },
+    update: {},
+    create: { userId, departmentId },
   })
 }
 
@@ -117,6 +132,9 @@ export async function createTestClientUser(
 
 // Declara que o departamento atende o cliente, com o responsável do escritório (ClientAssignment).
 export async function serveClientDepartment(clientId: string, departmentId: string, responsibleUserId: string) {
+  // The responsible of a department must belong to it (admins are exempt)
+  const responsible = await prisma.user.findUniqueOrThrow({ where: { id: responsibleUserId }, select: { role: true } })
+  if (responsible.role !== 'ORG_ADMIN') await addUserToDepartment(responsibleUserId, departmentId)
   return prisma.clientAssignment.create({ data: { clientId, departmentId, userId: responsibleUserId } })
 }
 

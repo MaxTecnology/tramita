@@ -67,5 +67,9 @@ export const DEFAULT_TEMPLATES: TemplateMap = {
   PROTOCOL_CREATED: {
     WHATSAPP: { body: 'Olá, {{clientName}}! Você tem um novo documento: *{{protocolTitle}}*.{{paymentInfo}}\n\nAcesse o portal pra ver os detalhes: {{portalUrl}}' },
     EMAIL: { subject: 'Novo documento — {{protocolTitle}}', body: 'Olá, {{clientName}}!\n\nVocê tem um novo documento: *{{protocolTitle}}*.{{paymentInfo}}\n\nAcesse o portal pra ver os detalhes: {{portalUrl}}' },
+  },  // Staff notice: a colleague took over the task(s) of the recipient (Assumir)
+  TASK_ASSUMED: {
+    WHATSAPP: { body: '{{assumedByName}} assumiu *{{taskTitle}}* ({{clientName}}).' },
+    EMAIL: { subject: 'Tarefa assumida — {{taskTitle}}', body: '{{assumedByName}} assumiu *{{taskTitle}}* ({{clientName}}).' },
   },
 }
