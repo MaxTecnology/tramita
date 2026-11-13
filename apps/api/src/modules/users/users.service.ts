@@ -34,9 +34,14 @@ export async function listUsers(organizationId: string) {
   return users.map(present)
 }
 
-export async function listUserOptions(organizationId: string): Promise<{ id: string; name: string }[]> {
+export async function listUserOptions(organizationId: string, departmentId?: string): Promise<{ id: string; name: string }[]> {
   return prisma.user.findMany({
-    where: { organizationId, isActive: true },
+    where: {
+      organizationId,
+      isActive: true,
+      // Responsible pickers: only who belongs to the department (admins are exempt)
+      ...(departmentId ? { OR: [{ role: 'ORG_ADMIN' }, { departments: { some: { departmentId } } }] } : {}),
+    },
     select: { id: true, name: true },
     orderBy: { name: 'asc' },
   })

@@ -145,12 +145,17 @@ async function assertResponsiblesValid(
   await lockUsersForShare(tx, userIds) // nobody deactivates them until this client is saved
   const valid = await tx.user.findMany({
     where: { id: { in: userIds }, organizationId, isActive: true, role: { in: [...ORG_STAFF_ROLES] } },
-    select: { id: true },
+    select: { id: true, name: true, role: true, departments: { select: { departmentId: true } } },
   })
-  const validIds = new Set(valid.map((u) => u.id))
+  const byId = new Map(valid.map((u) => [u.id, u]))
   for (const d of departments) {
-    if (!validIds.has(d.responsibleUserId)) {
+    const user = byId.get(d.responsibleUserId)
+    if (!user) {
       throw new AppError(400, `Responsável inválido para o departamento ${departmentNames.get(d.departmentId) ?? ''}`)
+    }
+    // The responsible must belong to the department (admins are exempt)
+    if (user.role !== 'ORG_ADMIN' && !user.departments.some((m) => m.departmentId === d.departmentId)) {
+      throw new AppError(400, `${user.name} não pertence ao departamento ${departmentNames.get(d.departmentId) ?? ''}`)
     }
   }
 }

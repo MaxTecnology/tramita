@@ -11,10 +11,10 @@ async function setup() {
   const plan = await createTestPlan()
   const org = await createTestOrg(plan.id)
   const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-  const from = await createTestUser(org.id, { role: 'ORG_MEMBER' })
-  const to = await createTestUser(org.id, { role: 'ORG_MEMBER' })
   const fiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
   const folha = await createTestDepartment(org.id, { name: 'Folha' })
+  const from = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+  const to = await createTestUser(org.id, { role: 'ORG_MEMBER', departmentIds: [fiscal.id, folha.id] })
 
   const acme = await createTestClient(org.id, { name: 'ACME', codigo: '001' })
   await serveClientDepartment(acme.id, fiscal.id, from.id)

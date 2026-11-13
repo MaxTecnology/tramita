@@ -3,7 +3,7 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
-import { createUserSchema, updateUserSchema, updateMyProfileSchema } from './users.schema'
+import { createUserSchema, updateUserSchema, updateMyProfileSchema, userOptionsQuerySchema } from './users.schema'
 import { listUsers, listUserOptions, createUser, updateUser, deleteUser, resetUserPassword, getMyProfile, updateMyProfile } from './users.service'
 import { getPortfolio, transferResponsibilities } from './responsibility-transfer.service'
 import { portfolioQuerySchema, transferSchema } from './responsibility-transfer.schema'
@@ -36,7 +36,9 @@ export async function usersRoutes(app: FastifyInstance) {
   app.get('/options', {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
   }, async (request, reply) => {
-    return reply.send(await listUserOptions(request.user.organizationId!))
+    const result = userOptionsQuerySchema.safeParse(request.query)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(await listUserOptions(request.user.organizationId!, result.data.departmentId))
   })
 
   app.get('/', { preHandler: adminOnly }, async (request, reply) => {

@@ -99,6 +99,17 @@ export async function transferResponsibilities(
     await lockUsersForShare(tx, [body.toUserId])
     const stillActive = await tx.user.count({ where: { id: body.toUserId, isActive: true } })
     if (!stillActive) throw new AppError(400, 'Colaborador de destino inválido')
+    if (target.role !== 'ORG_ADMIN') {
+      // The new responsible must belong to every department being handed over
+      const moving = await tx.clientAssignment.findMany({
+        where: { userId: fromUserId, clientId: { in: body.clientIds }, ...departmentFilter },
+        select: { departmentId: true, department: { select: { name: true } } },
+        distinct: ['departmentId'],
+      })
+      const memberOf = new Set((await tx.userDepartment.findMany({ where: { userId: body.toUserId }, select: { departmentId: true } })).map((m) => m.departmentId))
+      const missing = moving.find((m) => !memberOf.has(m.departmentId))
+      if (missing) throw new AppError(400, `${target.name} não pertence ao departamento ${missing.department.name}`)
+    }
     const assignments = await tx.clientAssignment.updateMany({
       where: { userId: fromUserId, clientId: { in: body.clientIds }, ...departmentFilter },
       data: { userId: body.toUserId },

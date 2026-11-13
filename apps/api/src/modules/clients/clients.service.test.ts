@@ -209,7 +209,7 @@ describe('updateClient', () => {
 
   it('atualiza os dados da empresa e troca o responsável de um departamento', async () => {
     const { org, admin, fiscal, folha, client, clientUserId } = await createServedClient()
-    const other = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const other = await createTestUser(org.id, { role: 'ORG_MEMBER', departmentIds: [fiscal.id] })
 
     await updateClient(client.id, org.id, body({
       codigo: client.codigo, cnpj: client.cnpj, notes: 'nova nota',

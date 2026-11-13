@@ -20,6 +20,10 @@ export const updateUserSchema = z.object({
   seesDepartmentWork: z.boolean().optional(),
 })
 
+export const userOptionsQuerySchema = z.object({
+  departmentId: z.string().cuid('Departamento inválido').optional(),
+})
+
 export const updateMyProfileSchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').optional(),
   phone: z.string().nullable().optional(),
