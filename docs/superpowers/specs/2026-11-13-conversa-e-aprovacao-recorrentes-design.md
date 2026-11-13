@@ -1,4 +1,4 @@
-# Conversa e aprovação do cliente nas tarefas recorrentes — design
+# Central de notificações, conversa e aprovação nas tarefas recorrentes — design
 
 Data: 2026-11-13. Origem: teste manual do Max no portal novo (Fase A).
 
@@ -21,6 +21,42 @@ Dois casos reais do Max:
 - Fazer as duas coisas; a conversa primeiro (corrige uma lacuna do que já está no ar).
 - Aprovação: o colaborador **pode fechar sem a aprovação no portal**, mas fica **registrado como foi** —
   aprovação recebida fora da plataforma (ex.: WhatsApp) ou sem resposta do cliente depois de esperar.
+- **Central de notificações (sino)** para a equipe **e** para o cliente, no modelo do Gestta: histórico,
+  lidas/não lidas, clicar abre o lugar certo e marca como lida (2026-11-13).
+- Ordem: parar os testes manuais, implementar as três peças, retomar os testes ponto a ponto.
+
+## Peça 0 — Central de notificações (equipe e cliente)
+
+- **Modelo `InAppNotification`**: uma linha por destinatário — `recipientUserId` (equipe) **ou**
+  `recipientClientUserId` (cliente), `organizationId`, `type`, `title`, `body`, `link` (rota da tela),
+  referências (`taskId`, `boardId`, `requestId`, `approvalId`, `protocolId`, `clientId`), `actorName`,
+  `readAt`, `createdAt`. Índices por destinatário + `readAt` + `createdAt`.
+- **Sempre gravada**, independente das configurações de WhatsApp/e-mail (que continuam como hoje). Os
+  canais externos e o sino são independentes.
+- **Destinatários** pela mesma regra dos avisos de hoje: equipe → o usuário do evento; cliente → os
+  usuários do cliente com acesso à empresa **e** ao departamento do item, e nunca para tarefa interna
+  (`visibleToClient = false`). Quem causou o evento não é notificado.
+- **Sino no topo** (equipe em `/app`, cliente em `/portal`) com o número de não lidas; abre a lista das
+  últimas 10 e "Ver todas".
+- **Página de notificações**: Todas · Lidas · Não lidas, filtro por tipo e por cliente (equipe), período,
+  busca no texto, "Marcar todas como lidas", paginação.
+- **Clicar** abre o `link` e marca como lida. Uma notificação pode ser marcada como não lida de novo.
+- Atualização do número: ao voltar para a aba e a cada 60 s (SSE por usuário fica para depois).
+- Escopo: cada um só lê e marca as próprias notificações (404 nas dos outros).
+
+**Eventos para a equipe** (sino; WhatsApp/e-mail só onde já existe hoje):
+- cliente comentou numa tarefa sua · colega comentou numa tarefa sua
+- cliente abriu solicitação no seu departamento · comentou numa solicitação
+- cliente enviou um documento pedido numa tarefa sua
+- cliente aprovou / pediu ajuste numa aprovação sua
+- colega assumiu uma tarefa sua
+- tarefa nova atribuída a você (criação, transferência, passada por colega)
+- processo novo criado com você como responsável
+
+**Eventos para o cliente** (sino; WhatsApp/e-mail como hoje):
+- comentário do escritório numa tarefa visível · documento novo recebido (guia, etc.)
+- pedido de aprovação · documento pedido recusado pelo escritório
+- solicitação aprovada / recusada / precisa de informação / comentário / cancelada
 
 ## Peça 1 — Conversa da tarefa recorrente no portal
 
@@ -33,13 +69,11 @@ Dois casos reais do Max:
   lê e responde. Escopo do cliente igual ao de hoje (empresa + departamento; fora → 404).
 - **Link do aviso** de comentário (e-mail/WhatsApp ao cliente) abre direto a conversa daquela tarefa:
   `/portal/send?competence=AAAA-MM&task=<id>` para recorrente; `/portal/board/<processo>?task=<id>` para OS.
-- **Não lidas:** guardar quando cada usuário do cliente leu a conversa de cada tarefa
-  (`TaskReadReceipt (clientUserId, taskId, lastReadAt)`, único por par). Uma conversa está "não lida" se
-  há comentário **do escritório** depois do `lastReadAt` desse usuário. Abrir a conversa marca como lida.
-- **Início:** cartão novo **"Mensagens do escritório"** com o número de conversas não lidas (só das
-  empresas/departamentos que o usuário acessa); clicar leva para "Enviar documentos" no mês da mais
-  antiga não lida, com ela aberta.
-- O mês no seletor de "Enviar documentos" mostra "N mensagens" além de "N pendentes".
+- **Não lidas vêm da central (peça 0):** a conversa de uma tarefa está "não lida" para o usuário enquanto
+  ele tiver notificação de comentário não lida daquela tarefa. Abrir a conversa marca essas notificações
+  como lidas. (Sem tabela própria de leitura.)
+- **Início:** cartão **"Mensagens do escritório"** com o número de conversas não lidas; clicar leva para a
+  conversa mais antiga não lida.
 
 ## Peça 2 — Aprovação do cliente
 
@@ -99,13 +133,18 @@ Decisão do cliente e fechamento pelo escritório são escritas protegidas (`upd
 ## Chamadas minhas (o Max confere)
 
 1. Conversa dentro de "Enviar documentos", agrupada por tarefa, em vez de uma aba nova "Conversas".
-2. "Não lida" só conta comentário do escritório (não os do próprio cliente).
+2. "Não lida" vem da central de notificações (quem comentou não recebe notificação do próprio comentário).
+6. Sino atualiza ao voltar para a aba e a cada 60 s; tempo real por SSE fica para depois.
+7. Notificação no sino é sempre gravada, mesmo com WhatsApp/e-mail do evento desligados.
 3. Aprovação é um objeto próprio da tarefa (não um tipo de entrega): a prévia não vai para "Documentos
    recebidos"; o definitivo vai.
 4. Pedido de ajuste avisa a equipe com evento novo, desligável.
 5. Fechar sem o portal exige observação nos dois motivos; o print é opcional.
 
 ## Como validar
+
+- Central: destinatários de cada evento (equipe e cliente), quem causou não recebe, tarefa interna não
+  notifica o cliente, ler/não ler/marcar todas, escopo (404 nas dos outros), contador.
 
 - API: escopo do cliente na conversa (404 fora), não lidas por usuário, cartão do Início; aprovação:
   pedir, aprovar, pedir ajuste, fechar sem o portal (motivos, dias esperados, histórico), conclusão
