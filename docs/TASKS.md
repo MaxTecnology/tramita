@@ -408,6 +408,13 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
 
 ### Próximos passos a discutir (anotados em 2026-11-11, não esquecer)
 
+   **Atualização 2026-11-12 (após a rodada de débitos e a auditoria de segurança):** ordem combinada
+   com o Max — **primeiro** a visibilidade do Membro (fila do robô e solicitações, com filtro "minhas"
+   por padrão e acesso ao departamento para cobrir colega ausente — ver `docs/tech-debt.md`, seção da
+   auditoria); **por último** as ações fora do código: rotacionar a `DOKPLOY_API_KEY`, conferir o webhook
+   do Asaas (se usa `?accessToken=` na URL, trocar pelo header `asaas-access-token` e rotacionar o
+   `ASAAS_WEBHOOK_SECRET`) e conferir se o access log do Traefik está desligado.
+
 Ordem combinada com o Max: item 10 (feito) → solicitações internas → retomar a rodada de testes
 manuais validando os dois. Os demais itens entram conforme o que os testes revelarem.
 
