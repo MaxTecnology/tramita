@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
+import { onTaskAssigned } from '@/modules/inbox/inbox-events'
 import { publishBoardEvent } from '@/lib/sse'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
 import { recalculateTaskStatus, notifyIfBlocked } from '@/modules/task-documents/task-documents.service'
@@ -116,6 +117,8 @@ export async function createTask(
     clientId: column.board.clientId,
     metadata: { taskTitle: task.title },
   })
+  // Recurring generation (system) fills every month: only a person handing work over rings the bell
+  if (actor.type === 'user') await onTaskAssigned(task.id, { userId: actor.id, name: actorName })
 
   await publishBoardEvent(column.board.id, {
     event: 'task:created',
@@ -384,6 +387,10 @@ export async function updateTask(
 
   if (data.status !== undefined) {
     await notifyIfBlocked(id, task.status, data.status, task.column.board.clientId, organizationId, updated.visibleToClient)
+  }
+
+  if (data.assigneeId && data.assigneeId !== task.assigneeId) {
+    await onTaskAssigned(id, actor.type === 'user' ? { userId: actor.id, name: actorName } : { name: actorName })
   }
 
   // Task became visible to the client: deliveries already done turn into documents in the portal

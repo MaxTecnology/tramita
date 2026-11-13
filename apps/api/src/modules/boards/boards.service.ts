@@ -1,3 +1,4 @@
+import { onBoardAssigned, staffActor } from '@/modules/inbox/inbox-events'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { CreateBoardBody, UpdateBoardBody, SearchQuery } from './boards.schema'
@@ -138,7 +139,7 @@ export async function createBoard(
     ? await buildColumnsFromTemplate(data.osTemplateId, organizationId)
     : DEFAULT_COLUMNS
 
-  return prisma.board.create({
+  const board = await prisma.board.create({
     data: {
       title: data.title,
       description: data.description,
@@ -155,6 +156,8 @@ export async function createBoard(
       columns: { orderBy: { position: 'asc' } },
     },
   })
+  if (responsibleUserId && responsibleUserId !== userId) await onBoardAssigned(board.id, await staffActor(userId))
+  return board
 }
 
 async function buildColumnsFromTemplate(osTemplateId: string, organizationId: string) {

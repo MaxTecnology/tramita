@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
+import { onProtocolCreated } from '@/modules/inbox/inbox-events'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 import { getSignedDownloadUrl } from '@/lib/b2'
 import { utcDayLabel, todayInBRT } from '@/lib/date-only'
@@ -156,6 +157,7 @@ export async function insertProtocol(input: InsertProtocolInput) {
     taskId: input.taskId,
     metadata: { protocolTitle: input.title, paymentInfo: buildPaymentInfo(protocol) },
   })
+  await onProtocolCreated(protocol.id, input.taskId, input.title, { userId: input.createdById, name: staffUser?.name ?? 'Escritório' })
 
   return protocol
 }

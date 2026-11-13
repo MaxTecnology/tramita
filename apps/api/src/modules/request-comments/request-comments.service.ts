@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { publishOrgEvent } from '@/lib/sse'
 import { enqueueNotification } from '@/lib/queue'
+import { onRequestComment } from '@/modules/inbox/inbox-events'
 import { canSeeTask, getClientAccessScope } from '@/modules/client-users/client-access'
 import type { CreateRequestCommentBody } from './request-comments.schema'
 
@@ -141,6 +142,11 @@ export async function createRequestComment(
       },
     })
   }
+
+  const clientUserName = isClient
+    ? (await prisma.clientUser.findUnique({ where: { id: actor.id }, select: { name: true } }))?.name ?? authorName
+    : authorName
+  await onRequestComment(requestId, isClient ? { clientUserId: actor.id, name: clientUserName } : { userId: actor.id, name: authorName }, data.content)
 
   return comment
 }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { uploadFile, getSignedDownloadUrl } from '@/lib/b2'
 import { enqueueNotification } from '@/lib/queue'
+import { onDocumentUploaded, onDocumentRejected, staffActor, clientActor } from '@/modules/inbox/inbox-events'
 import { resolveCompletedAt } from '@/lib/task-completion'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 import type { TaskStatus } from '@prisma/client'
@@ -117,6 +118,9 @@ export async function uploadForRequirement(
   })
 
   await recalculateTaskStatus(taskId)
+  if (actor.type === 'client' && clientUserId) {
+    await onDocumentUploaded(taskId, await clientActor(clientUserId), requirement.name)
+  }
 
   return prisma.taskDocumentRequirement.findUniqueOrThrow({ where: { id: requirementId }, include: { attachment: true } })
 }
@@ -195,6 +199,7 @@ export async function reviewDocumentRequirement(
       taskId,
       metadata: { taskTitle: task.title, documentName: requirement.name, rejectionReason: rejectionReason! },
     })
+    await onDocumentRejected(taskId, await staffActor(reviewerId), requirement.name, rejectionReason!)
   }
 
   return updated

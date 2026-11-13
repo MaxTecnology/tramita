@@ -1,3 +1,4 @@
+import { onTasksMoved } from '@/modules/inbox/inbox-events'
 import { lockUsersForShare } from '@/modules/clients/client-coverage'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
@@ -93,7 +94,7 @@ export async function transferResponsibilities(
   const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { name: true } })
   const departmentFilter = body.departmentId ? { departmentId: body.departmentId } : {}
 
-  const moved: { taskId: string; boardId: string }[] = []
+  const moved: { taskId: string; boardId: string; clientName: string }[] = []
 
   const result = await prisma.$transaction(async (tx) => {
     await lockUsersForShare(tx, [body.toUserId])
@@ -132,10 +133,10 @@ export async function transferResponsibilities(
           column: { board: { clientId: { in: body.clientIds } } },
           ...departmentFilter,
         },
-        select: { id: true, column: { select: { boardId: true } } },
+        select: { id: true, column: { select: { boardId: true, board: { select: { client: { select: { name: true } } } } } } },
       })
       const taskIds = tasks.map((t) => t.id)
-      moved.push(...tasks.map((t) => ({ taskId: t.id, boardId: t.column.boardId })))
+      moved.push(...tasks.map((t) => ({ taskId: t.id, boardId: t.column.boardId, clientName: t.column.board.client.name })))
       if (taskIds.length > 0) {
         await tx.task.updateMany({ where: { id: { in: taskIds } }, data: { assigneeId: body.toUserId } })
         await tx.taskHistory.createMany({
@@ -158,6 +159,10 @@ export async function transferResponsibilities(
 
   // Boards abertos refletem o novo responsável na hora (mesmo evento da edição de tarefa).
   await Promise.all(moved.map(({ taskId, boardId }) => publishBoardEvent(boardId, { event: 'task:updated', data: { taskId } })))
+  await onTasksMoved({
+    organizationId, type: 'TASK_ASSIGNED', recipientUserId: body.toUserId, count: moved.length,
+    clientNames: moved.map((m) => m.clientName), actor: { userId: actorId, name: actor?.name ?? 'Escritório' },
+  })
 
   return result
 }

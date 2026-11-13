@@ -3,6 +3,7 @@ import { requestWhere, userBelongsToDepartment, type StaffScope } from '@/module
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
+import { onRequestCreated, onRequestStatus, staffActor, clientActor } from '@/modules/inbox/inbox-events'
 import { publishOrgEvent, publishBoardEvent } from '@/lib/sse'
 import { createBoard } from '@/modules/boards/boards.service'
 import { createTask } from '@/modules/tasks/tasks.service'
@@ -71,6 +72,7 @@ export async function createRequest(
       }),
     ),
   )
+  await onRequestCreated(request.id, await clientActor(clientUserId))
 
   await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
 
@@ -168,6 +170,7 @@ export async function markNeedsInfo(id: string, organizationId: string, staffId:
     requestId: id,
     metadata: { requestTitle: request.title, commentText: comment },
   })
+  await onRequestStatus(id, 'NEEDS_INFO', await staffActor(staffId), comment)
 
   await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
   return updated
@@ -248,6 +251,7 @@ export async function cancelApprovedRequest(
     // criar uma TemplateVar nova só pra este evento.
     metadata: { requestTitle: request.title, rejectionReason: reason },
   })
+  await onRequestStatus(id, 'CANCELLED', await staffActor(staffId), reason)
 
   await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
   return updated
@@ -335,6 +339,7 @@ export async function approveRequest(
     requestId: id,
     metadata: { requestTitle: request.title },
   })
+  await onRequestStatus(id, 'APPROVED', await staffActor(reviewerId))
 
   await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
 
@@ -367,6 +372,7 @@ export async function rejectRequest(
     requestId: id,
     metadata: { requestTitle: request.title, rejectionReason: data.reason },
   })
+  await onRequestStatus(id, 'REJECTED', await staffActor(reviewerId), data.reason)
 
   await publishOrgEvent(organizationId, { event: 'request:changed', data: {} })
 

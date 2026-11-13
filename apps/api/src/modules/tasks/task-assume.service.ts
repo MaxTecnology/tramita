@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
 import { publishBoardEvent } from '@/lib/sse'
+import { onTaskAssumed, onTasksMoved } from '@/modules/inbox/inbox-events'
 import { actorScope, taskWhere, type StaffScope } from '@/modules/staff-scope/staff-scope'
 
 type Actor = { id: string; role: string }
@@ -50,6 +51,7 @@ export async function assumeTask(taskId: string, organizationId: string, actor: 
       event: 'TASK_ASSUMED', organizationId, recipientType: 'USER', userId: expectedAssigneeId, taskId,
       metadata: { taskTitle: task.title, clientName: task.column.board.client.name, assumedByName: name },
     })
+    await onTaskAssumed(taskId, expectedAssigneeId, { userId: actor.id, name })
   }
   return prisma.task.findUniqueOrThrow({ where: { id: taskId } })
 }
@@ -106,6 +108,10 @@ export async function assumeTasksBulk(
         clientName: clients.length === 1 ? clients[0] : `${clients.length} clientes`,
         assumedByName: name,
       },
+    })
+    await onTasksMoved({
+      organizationId, type: 'TASK_ASSUMED', recipientUserId: input.fromUserId, count: movedTasks.length,
+      clientNames: movedTasks.map((t) => t.column.board.client.name), actor: { userId: actor.id, name },
     })
   }
   return { count: movedTasks.length }
