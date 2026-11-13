@@ -61,7 +61,16 @@ type ViewMode = 'list' | 'kanban' | 'calendar'
 const STATUS_ORDER: Task['status'][] = ['OPEN', 'STARTED', 'BLOCKED', 'DISREGARDED', 'DONE']
 
 // Every filter shows its name above it (the placeholder alone did not say what the select was)
-function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
+// `group` for a set of buttons: a <label> around several controls would rename the first one
+function FilterField({ label, group = false, children }: { label: string; group?: boolean; children: React.ReactNode }) {
+  if (group) {
+    return (
+      <div role="group" aria-label={label} className="flex flex-col gap-0.5">
+        <span aria-hidden className="text-[11px] font-medium text-muted-foreground">{label}</span>
+        {children}
+      </div>
+    )
+  }
   return (
     <label className="flex flex-col gap-0.5">
       <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
@@ -587,7 +596,7 @@ export default function Tasks() {
       {/* Filtros */}
       <div className="flex flex-wrap items-end gap-3 px-4 md:px-6 py-2 border-b border-border bg-surface">
         {me && (me.role !== 'ORG_MEMBER' || me.seesDepartmentWork) && (
-          <FilterField label="Mostrar">
+          <FilterField label="Mostrar" group>
             <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />
           </FilterField>
         )}
@@ -644,7 +653,7 @@ export default function Tasks() {
           </FilterField>
         )}
         {view !== 'calendar' && (
-          <FilterField label="Período">
+          <FilterField label="Período" group>
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex rounded-md border border-border overflow-hidden">
                 {(['this', 'last', 'custom'] as const).map((k) => (

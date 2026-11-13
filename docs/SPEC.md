@@ -459,13 +459,13 @@ ou
 
 Portal centrado em documentos (spec `docs/superpowers/specs/2026-11-12-portal-cliente-documentos-design.md`). Todo documento que o cliente recebe é um `Protocol`; a entrega (`TaskDeliverable`) concluída numa tarefa `visibleToClient` gera/atualiza o protocolo dela (1:1, `Protocol.deliverableId`). Documento enviado **nunca some** se a tarefa for ocultada depois; só o cancelamento (exceção) o tira do portal. Valores trafegam como string decimal com ponto (`"1234.56"`); o front converte do formato brasileiro.
 
-### GET `/portal/home?clientId=` _(CLIENT)_ — `{ unpaidGuides: { count, overdueCount }, documentsToSend, documentsToSendInProcesses, processesInProgress, dueThisWeek: { kind: 'guide'|'request', id, title, dueDate, amount? }[] }` — tudo no escopo de departamento do usuário
+### GET `/portal/home?clientId=` _(CLIENT)_ — `{ unpaidGuides: { count, overdueCount }, documentsToSend, documentsToSendInProcesses, processesInProgress, dueThisWeek: { kind: 'guide'|'request', id, title, dueDate, amount? }[], unreadMessages: { count, link|null }, pendingApprovals, pendingApprovalLink|null }` — tudo no escopo de departamento do usuário. `unreadMessages.count` = conversas (tarefas) com comentário do escritório não lido no sino; `link` abre a mais antiga. `pendingApprovalLink` abre a aprovação pendente mais antiga
 ### GET `/portal/protocols?clientId=&search=&competence=AAAA-MM&departmentId=&dueFrom=&dueTo=&paymentStatus=unpaid|paid` _(CLIENT)_ — lista sem `content`; inclui `competence, requiresPayment, amount, paidAt, paidAmount, fileUpdatedAt, departmentName`; exclui cancelados
 ### GET `/portal/protocols/:id` _(CLIENT)_ — registra `VIEWED`; devolve detalhe + `events` (`type, actorName, detail, createdAt`), `paidBy`, `paymentProof`. 404 fora do escopo ou cancelado
 ### POST `/portal/protocols/:id/pay` _(CLIENT)_ — JSON `{ amount }` ou multipart (`amount` antes do arquivo + comprovante opcional). Só em guia (`requiresPayment`, senão 422); 409 se já paga (escrita guardada: clique duplo gera um só `PAID`); marca `VIEWED` se ainda não visto
 ### DELETE `/portal/protocols/:id/pay` _(CLIENT)_ — desfaz (evento `UNPAID`); comprovante fica no histórico de anexos
-### GET `/portal/document-requests/months?clientId=` _(CLIENT)_ — `{ competence: 'AAAA-MM', pending, total }[]` desc — só pedidos de tarefas recorrentes (board `RECURRING_SYSTEM`)
-### GET `/portal/document-requests?clientId=&competence=AAAA-MM` _(CLIENT)_ — `{ competence, requests: { id, taskId, name, status, rejectionReason, taskTitle, departmentName }[] }`
+### GET `/portal/document-requests/months?clientId=` _(CLIENT)_ — `{ competence: 'AAAA-MM', pending, total }[]` desc — meses com tarefa recorrente visível (board `RECURRING_SYSTEM`) que tenha pedido de documento, conversa ou aprovação; `pending/total` contam só os pedidos
+### GET `/portal/document-requests?clientId=&competence=AAAA-MM` _(CLIENT)_ — agrupado por tarefa: `{ competence, tasks: { taskId, title, departmentName, requests: { id, taskId, name, status, rejectionReason, taskTitle, departmentName }[], approvals: Approval[], unreadMessages }[] }`. Tarefa recorrente visível aparece se tiver pedido, comentário ou aprovação; sem nada, não aparece
 
 ## Escritório — guias e ações no documento enviado (2026-11-12)
 
@@ -593,6 +593,56 @@ Envia email de teste para validar configuração SMTP.
 
 ### GET `/notifications/logs` _(ORG_ADMIN)_
 **Query:** `?page=1&limit=50&status=SENT|FAILED|PENDING&channel=WHATSAPP|EMAIL`
+
+---
+
+## Central de notificações (sino) — equipe e cliente
+
+Uma linha por destinatário em `in_app_notifications` (`recipientUserId` **ou** `recipientClientUserId`, CHECK no banco), sempre gravada, independente dos toggles de WhatsApp/e-mail. Quem causou o evento não recebe. Cliente: só usuários com acesso à empresa **e** ao departamento do item; tarefa interna (`visibleToClient=false`) nunca notifica o cliente. Emissores em `src/modules/inbox/inbox-events.ts` (falha no sino é logada, nunca derruba a ação).
+
+Destinatário pelo papel do token (CLIENT → usuário do cliente; equipe → usuário). Cada um só lê/marca as próprias (404 nas dos outros).
+
+### GET `/notifications` _(equipe | CLIENT)_
+**Query:** `?status=all|read|unread&type=<InAppType>&clientId=&from=AAAA-MM-DD&to=AAAA-MM-DD&q=&cursor=&limit≤50` → `{ items: InAppNotification[], nextCursor|null }` (mais recente primeiro)
+### GET `/notifications/unread-count` → `{ count }`
+### POST `/notifications/:id/read` · POST `/notifications/:id/unread` → `{ ok: true }`
+### POST `/notifications/read-all` → `{ count }`
+### POST `/notifications/read-by-task` `{ taskId }` → `{ count }` — usado ao abrir a conversa da tarefa no portal
+
+**Tipos (`InAppType`) e destinatários:**
+| Tipo | Quem recebe | Link |
+|---|---|---|
+| `TASK_COMMENT` | responsável da tarefa (ou do departamento) quando cliente/colega comenta; usuários do cliente quando o escritório comenta | equipe `/app/tasks?task=` (recorrente) ou `/app/board/<id>?task=`; cliente `/portal/send?competence=AAAA-MM&task=` ou `/portal/board/<id>?task=` |
+| `REQUEST_CREATED` | responsável do departamento | `/app/requests?request=` |
+| `REQUEST_COMMENT` | nos dois sentidos | `/app/requests?request=` · `/portal/requests?request=` |
+| `REQUEST_STATUS` | usuários do cliente (aprovada, recusada, precisa de info, cancelada) | `/portal/requests?request=` |
+| `DOCUMENT_UPLOADED` | responsável da tarefa | tarefa (equipe) |
+| `DOCUMENT_REJECTED` | usuários do cliente | tarefa (cliente) |
+| `DOCUMENT_RECEIVED` | usuários do cliente (protocolo novo) | `/portal/documents/<protocolo>` |
+| `APPROVAL_REQUESTED` | usuários do cliente | tarefa (cliente) |
+| `APPROVAL_DECIDED` | quem pediu + responsável da tarefa | tarefa (equipe) |
+| `TASK_ASSUMED` | responsável anterior (em lote: 1 linha resumida) | tarefa / `/app/tasks` |
+| `TASK_ASSIGNED` | novo responsável (criação por pessoa, edição, transferência em lote resumida) — geração automática de recorrentes não notifica | tarefa / `/app/tasks` |
+| `BOARD_ASSIGNED` | responsável do processo novo | `/app/board/<id>` |
+
+`GET /tasks?taskId=<id>` (equipe) devolve só essa tarefa, ignorando os filtros da tela e respeitando o escopo — usado pelo link da notificação. Os itens da lista trazem `awaitingApproval`.
+
+---
+
+## Aprovação do cliente (`task_approvals`)
+
+`Approval = { id, taskId, title, message, status: PENDING|APPROVED|CHANGES_REQUESTED|CLOSED_BY_OFFICE, requestedAt, requestedByName, decidedAt, decisionNote, closeReason: APPROVED_OUTSIDE|NO_RESPONSE|null, waitedDays, decidedByName, decidedByClient, fileName, fileUrl (assinada), proofName, proofUrl }`
+
+### POST `/tasks/:id/approvals` _(equipe, multipart: `title`, `message?` antes do arquivo `file`)_ → 201 `Approval`
+Tarefa fora do escopo → 404; tarefa interna → 422 `Só tarefas visíveis ao cliente podem pedir aprovação`; encerrada → 409. Histórico `approval_requested`; aviso `APPROVAL_REQUESTED` (WhatsApp/e-mail, toggle `approvalRequested`) + sino.
+### GET `/tasks/:id/approvals` _(equipe)_ → `Approval[]`
+### POST `/approvals/:id/close` _(equipe)_ — JSON `{ reason, note }` ou multipart com os mesmos campos antes do `file` (print opcional)
+`note` obrigatória nos dois motivos. Exige poder mexer na tarefa (fora do escopo 404; só vê → 403 `Assuma a tarefa para alterá-la`). Grava `decidedByUserId`, `decidedAt`, `waitedDays` (dias inteiros desde o pedido). Histórico `approval_closed_by_office`.
+### GET `/portal/tasks/:taskId/approvals` _(CLIENT)_ → `Approval[]` (fora da empresa/departamento → 404)
+### POST `/portal/approvals/:id/approve` _(CLIENT)_ `{ note? }` · POST `/portal/approvals/:id/request-changes` _(CLIENT)_ `{ note }` (obrigatória)
+Histórico `approval_approved` / `approval_changes_requested`; pedido de ajuste avisa quem pediu (`APPROVAL_CHANGES_REQUESTED`, toggle `approvalChangesRequested`); sino `APPROVAL_DECIDED`.
+
+**Regras:** decisão e fechamento são escritas protegidas (`updateMany` com `status: PENDING`) — quem chega depois recebe 409 `Essa aprovação já foi <aprovada pelo cliente | respondida com pedido de ajuste | fechada pelo escritório>`. Com aprovação `PENDING` a tarefa não conclui (409 `Há aprovação do cliente pendente`) por `PATCH /tasks/:id`, por mover para coluna `DONE` nem pela conclusão automática do checklist. Decidir/fechar recalcula o status (a conclusão automática pode acontecer em seguida).
 
 ---
 

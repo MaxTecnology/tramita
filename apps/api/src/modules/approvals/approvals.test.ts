@@ -207,3 +207,14 @@ describe('lista de tarefas', () => {
     expect((await list()).awaitingApproval).toBe(true)
   })
 })
+
+describe('exclusão', () => {
+  it('a task with an approval (file and proof) can still be deleted', async () => {
+    const c = await setup()
+    const { id } = JSON.parse((await requestApproval(c)).body)
+    const mp = multipartBody({ reason: 'NO_RESPONSE', note: 'Sem resposta' }, { filename: 'print.png', contentType: 'image/png' })
+    await app.inject({ method: 'POST', url: `/approvals/${id}/close`, headers: { authorization: c.daniAuth, ...mp.headers }, body: mp.body })
+    await prisma.task.delete({ where: { id: c.task.id } })
+    expect(await prisma.taskApproval.count({ where: { id } })).toBe(0)
+  })
+})

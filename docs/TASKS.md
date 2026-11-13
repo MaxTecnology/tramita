@@ -408,6 +408,14 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
 
 ### Próximos passos a discutir (anotados em 2026-11-11, não esquecer)
 
+   **Atualização 2026-11-13 (2):** ✅ central de notificações (sino) para equipe e cliente, conversa
+   das tarefas recorrentes no portal ("Enviar documentos" agrupado por tarefa, botão Conversa, cartão
+   "Mensagens do escritório") e aprovação do cliente (pedir, aprovar/pedir ajuste no portal, fechar sem
+   o portal com motivo + observação + dias esperados, conclusão bloqueada com pendente) — branch
+   `feat/notificacoes-conversa-aprovacao`, spec `docs/superpowers/specs/2026-11-13-conversa-e-aprovacao-recorrentes-design.md`,
+   plano `docs/superpowers/plans/2026-11-13-notificacoes-conversa-aprovacao.md`. Próximo: retomar os
+   testes manuais ponto a ponto.
+
    **Atualização 2026-11-13:** ✅ visibilidade por departamento implementada (branch
    `feat/visibilidade-departamento`, plano `docs/superpowers/plans/2026-11-13-visibilidade-por-departamento.md`):
    colaborador pertence a departamentos, opção "ver colegas", filtro Minhas · Meu departamento · Todas,

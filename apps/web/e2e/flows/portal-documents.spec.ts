@@ -39,7 +39,7 @@ test.describe.serial('Portal de documentos', () => {
 
   test('cliente marca "Nada a enviar" no pedido do mês e pode desfazer', async ({ clientPage: page }) => {
     await page.goto('/portal/send')
-    const row = page.locator('div.rounded-lg').filter({ hasText: 'Extrato bancário E2E' })
+    const row = page.locator('section').filter({ hasText: 'Extrato bancário E2E' })
     await expect(row).toContainText('Pendente', { timeout: 10_000 })
 
     await row.getByRole('button', { name: 'Nada a enviar' }).click()

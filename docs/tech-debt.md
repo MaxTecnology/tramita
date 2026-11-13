@@ -579,3 +579,17 @@ Ações fora do código (ainda pendentes, por último na ordem combinada):
 4. **TaskDrawer:** `viewerCanEdit` ausente é tratado como editável (a API responde 403); o aviso diz "está com
    outro colaborador" também em tarefa sem responsável.
 5. **`/document-reader/obrigacoes` e `/metricas`** continuam agregados da organização inteira para o Membro.
+
+## Central de notificações e aprovação — pendências conhecidas (registrado em 2026-11-13)
+
+- **Sino por polling:** o contador atualiza ao voltar para a aba e a cada 60 s. Tempo real por SSE por
+  usuário ficou para depois (decisão da spec). Impacto: até 60 s de atraso no número.
+- **Sem retenção em `in_app_notifications`:** a tabela só cresce (uma linha por destinatário por evento).
+  Quando houver volume, criar purge (ex.: lidas há mais de 180 dias), como o do Leitor de Documentos.
+- **Pedido de aprovação × conclusão simultâneos:** o gate de conclusão conta as pendentes dentro da
+  transação, mas sem lock na tarefa; um pedido criado no mesmo instante em que a tarefa é concluída pode
+  passar. Janela de milissegundos, efeito visível (aprovação pendente numa tarefa concluída) e reversível.
+- **E2E não cobre o upload da prévia:** o pedido de aprovação pela tela enviaria o arquivo ao bucket real
+  do B2; no E2E as aprovações vêm do seed. O upload está coberto no teste de componente e na API (B2 mockado).
+- **Aprovação em processo (OS):** o modelo serve, mas a tela só existe no painel da tarefa; o cartão do
+  Kanban de processo não mostra o selo "Aguardando aprovação". Fora do escopo até o Max pedir.

@@ -200,7 +200,7 @@ async function main() {
   // Monthly document request (portal "Enviar documentos"): recurring task of the current month
   const now = new Date()
   const competence = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
-  await prisma.board.create({
+  const recurringBoard = await prisma.board.create({
     data: {
       title: 'Tarefas Recorrentes (sistema)', organizationId: org.id, clientId: client.id, type: 'RECURRING_SYSTEM',
       columns: {
@@ -219,7 +219,41 @@ async function main() {
         }],
       },
     },
+    include: { columns: true },
   })
+
+  // Conversation and client approval (notification center): "Folha E2E" has an office message the
+  // client has not read and a preview waiting for approval; "Décimo terceiro E2E" has a preview the
+  // office closes without the portal. Approvals are seeded (no upload to the real bucket from E2E).
+  await prisma.inAppNotification.deleteMany({ where: { recipientClientUserId: clientUser.id } })
+  await prisma.inAppNotification.deleteMany({ where: { recipientUserId: admin.id } })
+  const competenceParam = competence.toISOString().slice(0, 7)
+  for (const [title, approvalTitle, comment] of [
+    ['Folha E2E', 'Prévia da folha E2E', 'Segue a prévia da folha, confere por favor?'],
+    ['Décimo terceiro E2E', 'Prévia do 13º E2E', null],
+  ] as const) {
+    const task = await prisma.task.create({
+      data: {
+        title, position: 2, priority: 'MEDIUM', status: 'OPEN', tags: [], creatorId: admin.id, columnId: recurringBoard.columns[0].id,
+        departmentId: department.id, assigneeId: admin.id, visibleToClient: true, competence,
+      },
+    })
+    const file = await prisma.attachment.create({
+      data: { taskId: task.id, filename: 'previa-e2e.pdf', mimeType: 'application/pdf', size: 8, storageKey: `e2e/${task.id}/previa-e2e.pdf`, uploadedBy: admin.id },
+    })
+    await prisma.taskApproval.create({
+      data: { taskId: task.id, organizationId: org.id, title: approvalTitle, attachmentId: file.id, requestedById: admin.id, requestedAt: new Date(Date.now() - 2 * 86_400_000) },
+    })
+    if (comment) {
+      await prisma.comment.create({ data: { taskId: task.id, content: comment, authorType: 'USER', userId: admin.id } })
+      await prisma.inAppNotification.create({
+        data: {
+          organizationId: org.id, recipientClientUserId: clientUser.id, type: 'TASK_COMMENT', title: `Novo comentário do escritório em "${title}"`,
+          body: comment, link: `/portal/send?competence=${competenceParam}&task=${task.id}`, taskId: task.id, clientId: client.id, actorName: 'Admin G2A',
+        },
+      })
+    }
+  }
 
   // Transfer of responsibilities: "Saída E2E" serves two clients and leaves the office
   const leaving = await staff('saida-e2e@g2a.com.br', 'Saída E2E')
