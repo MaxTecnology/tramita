@@ -260,3 +260,39 @@ export async function clientActor(clientUserId: string): Promise<Actor> {
   const u = await prisma.clientUser.findUnique({ where: { id: clientUserId }, select: { name: true } })
   return { clientUserId, name: u?.name ?? 'Cliente' }
 }
+
+async function approvalContext(approvalId: string) {
+  return prisma.taskApproval.findUnique({
+    where: { id: approvalId },
+    select: { id: true, title: true, status: true, decisionNote: true, requestedById: true, taskId: true },
+  })
+}
+
+export function onApprovalRequested(approvalId: string, actor: Actor) {
+  return safe('APPROVAL_REQUESTED', async () => {
+    const a = await approvalContext(approvalId)
+    const t = a && (await taskContext(a.taskId))
+    if (!a || !t) return
+    await notifyInApp({
+      organizationId: t.organizationId, type: 'APPROVAL_REQUESTED', title: `Aguardando sua aprovação: ${a.title}`, body: t.title,
+      link: clientTaskLink(t), refs: { taskId: t.id, boardId: t.boardId, clientId: t.clientId, approvalId: a.id }, actorName: actor.name,
+      to: { clientUserIds: await clientRecipientsForTask(t) },
+    })
+  })
+}
+
+// The client answered: whoever asked and whoever holds the task hear about it
+export function onApprovalDecided(approvalId: string, actor: Actor) {
+  return safe('APPROVAL_DECIDED', async () => {
+    const a = await approvalContext(approvalId)
+    const t = a && (await taskContext(a.taskId))
+    if (!a || !t) return
+    const verdict = a.status === 'APPROVED' ? 'aprovou' : 'pediu ajuste em'
+    await notifyInApp({
+      organizationId: t.organizationId, type: 'APPROVAL_DECIDED', title: `${actor.name} ${verdict} "${a.title}" — ${t.clientName}`,
+      body: a.decisionNote ? excerpt(a.decisionNote) : t.title, link: staffTaskLink(t),
+      refs: { taskId: t.id, boardId: t.boardId, clientId: t.clientId, approvalId: a.id }, actorName: actor.name,
+      to: { userIds: [a.requestedById, ...(t.assigneeId ? [t.assigneeId] : [])] },
+    })
+  })
+}

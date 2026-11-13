@@ -31,6 +31,7 @@ import { documentReaderModelsRoutes } from '@/modules/document-reader/document-r
 import { AppError } from '@/errors/AppError'
 import { buildLoggerOptions } from '@/lib/log-redaction'
 import { inboxRoutes } from '@/modules/inbox/inbox.routes'
+import { approvalsRoutes, portalApprovalsRoutes } from '@/modules/approvals/approvals.routes'
 
 export function buildApp() {
   const app = Fastify({
@@ -70,6 +71,8 @@ export function buildApp() {
   app.register(slaRoutes, { prefix: '/sla' })
   app.register(documentReaderRoutes)
   app.register(inboxRoutes, { prefix: '/notifications' })
+  app.register(approvalsRoutes)
+  app.register(portalApprovalsRoutes, { prefix: '/portal' })
   app.register(documentReaderModelsRoutes)
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {

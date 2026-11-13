@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
 import { onTaskAssigned } from '@/modules/inbox/inbox-events'
+import { assertNoPendingApproval } from '@/modules/approvals/approval-gate'
 import { publishBoardEvent } from '@/lib/sse'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
 import { recalculateTaskStatus, notifyIfBlocked } from '@/modules/task-documents/task-documents.service'
@@ -155,6 +156,7 @@ export async function moveTask(
       await lockClients(tx, [task.column.board.clientId])
       await assertDepartmentServesClient(tx, task.column.board.clientId, task.departmentId)
     }
+    if (nextStatus === 'DONE' && task.status !== 'DONE') await assertNoPendingApproval(tx, taskId)
     const updated = await tx.task.update({
       where: { id: taskId },
       data: { columnId: data.columnId, position: data.position, status: nextStatus, completedAt },
@@ -341,6 +343,7 @@ export async function updateTask(
       await lockClients(tx, [task.column.board.clientId])
       await assertDepartmentServesClient(tx, task.column.board.clientId, task.departmentId)
     }
+    if (data.status === 'DONE' && task.status !== 'DONE') await assertNoPendingApproval(tx, id)
     const result = await tx.task.update({
       where: { id },
       data: {

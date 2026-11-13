@@ -304,6 +304,7 @@ export async function recalculateTaskStatus(taskId: string) {
     include: {
       documentRequirements: true,
       deliverables: true,
+      approvals: { where: { status: 'PENDING' }, select: { id: true } },
       recurringTemplate: { select: { autoCompleteOnAllActivitiesDone: true } },
       column: { select: { board: { select: { clientId: true, organizationId: true } } } },
     },
@@ -319,7 +320,7 @@ export async function recalculateTaskStatus(taskId: string) {
 
   if (hasPendingOrRejected) {
     if (task.status !== 'BLOCKED') nextStatus = 'BLOCKED'
-  } else if (autoComplete && allRequirementsApproved && allDeliverablesDone && task.status !== 'DONE') {
+  } else if (autoComplete && allRequirementsApproved && allDeliverablesDone && task.approvals.length === 0 && task.status !== 'DONE') {
     nextStatus = 'DONE'
   } else if (task.status === 'BLOCKED') {
     // Impedimento resolvido (nada mais pendente/rejeitado) — mesmo sem conclusão automática

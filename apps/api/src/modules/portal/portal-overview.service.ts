@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { utcDayLabel, todayInBRT } from '@/lib/date-only'
 import { getClientAccessScope } from '@/modules/client-users/client-access'
+import { approvalInclude, presentApproval } from '@/modules/approvals/approvals.service'
 
 const OPEN_REQUEST = ['PENDING', 'REJECTED'] as const
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -144,21 +145,21 @@ export async function listDocumentRequestsByMonth(organizationId: string, client
         select: { id: true, name: true, status: true, rejectionReason: true },
         orderBy: { position: 'asc' },
       },
+      approvals: { include: approvalInclude, orderBy: { requestedAt: 'desc' } },
     },
     orderBy: [{ title: 'asc' }, { id: 'asc' }],
   })
   const unread = await unreadByTask(clientUserId, tasks.map((t) => t.id))
   return {
     competence,
-    tasks: tasks.map((t) => ({
+    tasks: await Promise.all(tasks.map(async (t) => ({
       taskId: t.id,
       title: t.title,
       departmentName: t.department.name,
       requests: t.documentRequirements.map((r) => ({ ...r, taskId: t.id, taskTitle: t.title, departmentName: t.department.name })),
-      // Filled by the approvals step (TaskApproval)
-      approvals: [] as never[],
+      approvals: await Promise.all(t.approvals.map(presentApproval)),
       unreadMessages: unread.get(t.id) ?? 0,
-    })),
+    }))),
   }
 }
 
