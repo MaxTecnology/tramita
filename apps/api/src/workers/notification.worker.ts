@@ -27,6 +27,7 @@ const EVENT_FLAG_MAP: Record<string, keyof NotificationConfig> = {
   REQUEST_COMMENT_ADDED: 'requestCommentAdded',
   REQUEST_CANCELLED: 'requestCancelled',
   PROTOCOL_CREATED: 'protocolCreated',
+  TASK_ASSUMED: 'taskAssumed',
 }
 
 export async function processNotificationJob(job: { data: NotificationJob }): Promise<void> {
@@ -209,7 +210,8 @@ async function processUserNotification(
     taskCount: metadata.taskCount,
     criticalCount: metadata.criticalCount,
     taskListText: metadata.taskListText,
-    portalUrl: event === 'TASK_COMMENT_ADDED' ? `${appUrl}/app` : event === 'SLA_DIGEST' ? `${appUrl}/app` : `${appUrl}/app/requests`,
+    assumedByName: metadata.assumedByName,
+    portalUrl: event === 'TASK_COMMENT_ADDED' || event === 'TASK_ASSUMED' ? `${appUrl}/app` : event === 'SLA_DIGEST' ? `${appUrl}/app` : `${appUrl}/app/requests`,
   }
 
   const availableChannels: MessageChannel[] = []

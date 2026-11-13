@@ -63,4 +63,14 @@ export type CreateTaskBody = z.infer<typeof createTaskSchema>
 export type UpdateTaskBody = z.infer<typeof updateTaskSchema>
 export type MoveTaskBody = z.infer<typeof moveTaskSchema>
 export type ReorderTasksBody = z.infer<typeof reorderTasksSchema>
+export const assumeTaskSchema = z.object({
+  // Assignee the screen showed: the write only happens if it is still the same
+  expectedAssigneeId: z.string().cuid().nullable(),
+})
+
+export const assumeBulkSchema = z.object({
+  fromUserId: z.string({ required_error: 'Escolha o colaborador' }).cuid('Escolha o colaborador'),
+  departmentId: z.string().cuid().optional(),
+})
+
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>

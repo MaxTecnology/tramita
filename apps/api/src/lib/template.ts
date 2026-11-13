@@ -22,6 +22,7 @@ export interface TemplateVars {
   criticalCount?: string   // novo — quantidade em nível crítico (SLA_DIGEST)
   taskListText?: string    // novo — lista formatada em texto simples, uma tarefa por linha (SLA_DIGEST)
   protocolTitle?: string   // novo — título do protocolo (PROTOCOL_CREATED)
+  assumedByName?: string   // colleague who took over the task(s) (TASK_ASSUMED)
   paymentInfo?: string     // "\nValor: R$ 1.234,56 — vencimento 20/11/2026" em guia de pagamento, '' nos demais (PROTOCOL_CREATED)
 }
 

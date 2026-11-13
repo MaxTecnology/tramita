@@ -297,6 +297,35 @@ describe('processNotificationJob', () => {
   })
 })
 
+describe('TASK_ASSUMED (aviso à equipe)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.spyOn(encryption, 'decrypt').mockImplementation((encoded) => encoded)
+    vi.spyOn(maximizebot, 'sendWhatsApp').mockResolvedValue(undefined)
+    vi.spyOn(mailer, 'sendEmail').mockResolvedValue(undefined)
+  })
+  it('sends the default text to the previous assignee', async () => {
+    const org = await createTestOrg((await createTestPlan()).id)
+    const carlos = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    await prisma.notificationConfig.create({ data: { organizationId: org.id, emailEnabled: true } })
+
+    await processNotificationJob({ data: { event: 'TASK_ASSUMED', organizationId: org.id, recipientType: 'USER', userId: carlos.id, metadata: { taskTitle: 'DAS', clientName: 'ACME', assumedByName: 'Bruna' } } })
+
+    expect(mailer.sendEmail).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(mailer.sendEmail).mock.calls[0][2]).toContain('Bruna assumiu *DAS* (ACME).')
+  })
+
+  it('does not send when taskAssumed is off', async () => {
+    const org = await createTestOrg((await createTestPlan()).id)
+    const carlos = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    await prisma.notificationConfig.create({ data: { organizationId: org.id, emailEnabled: true, taskAssumed: false } })
+
+    await processNotificationJob({ data: { event: 'TASK_ASSUMED', organizationId: org.id, recipientType: 'USER', userId: carlos.id, metadata: { taskTitle: 'DAS', clientName: 'ACME', assumedByName: 'Bruna' } } })
+
+    expect(mailer.sendEmail).not.toHaveBeenCalled()
+  })
+})
+
 describe('notificação ao cliente por departamento (e-mail e WhatsApp)', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
