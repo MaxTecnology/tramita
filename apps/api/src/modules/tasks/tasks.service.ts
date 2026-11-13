@@ -442,6 +442,44 @@ export async function deleteTask(id: string, organizationId: string) {
 // Lista tarefas de forma flat, atravessando todos os boards da org (inclusive o board de
 // sistema RECURRING_SYSTEM, que é onde moram as tarefas recorrentes) — ver nota em
 // tasks.schema.ts / brief da Task 4 sobre por que não filtramos Board.type aqui.
+// Date window and free-text search of the task list (each needs its own OR, hence AND items).
+// - 'target' (default): targetDate in range (List/Kanban history).
+// - 'effective': targetDate, or dueDate when there is no target (Calendar).
+// - 'period': like 'effective', plus tasks with no date at all — they cannot be placed in a month
+//   and must not vanish from the default "this month" view.
+// Search matches the title and the client name or code.
+function dateAndSearchFilters(query: ListTasksQuery): Prisma.TaskWhereInput[] {
+  const filters: Prisma.TaskWhereInput[] = []
+  if (query.dateFrom || query.dateTo) {
+    const range = {
+      ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+      ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+    }
+    if (query.dateField === 'effective' || query.dateField === 'period') {
+      filters.push({
+        OR: [
+          { targetDate: range },
+          { targetDate: null, dueDate: range },
+          ...(query.dateField === 'period' ? [{ targetDate: null, dueDate: null }] : []),
+        ],
+      })
+    } else {
+      filters.push({ targetDate: range })
+    }
+  }
+  const q = query.q?.trim()
+  if (q) {
+    filters.push({
+      OR: [
+        { title: { contains: q, mode: 'insensitive' } },
+        { column: { board: { client: { name: { contains: q, mode: 'insensitive' } } } } },
+        { column: { board: { client: { codigo: { contains: q, mode: 'insensitive' } } } } },
+      ],
+    })
+  }
+  return filters
+}
+
 export async function listTasks(
   organizationId: string,
   actor: { id: string; role: string },
@@ -463,33 +501,6 @@ export async function listTasks(
         ? { status: { notIn: ['DONE', 'DISREGARDED'] } }
         : {}),
     ...(query.recurringTemplateId ? { recurringTemplateId: query.recurringTemplateId } : {}),
-    ...(query.dateFrom || query.dateTo
-      ? query.dateField === 'effective'
-        ? {
-            OR: [
-              {
-                targetDate: {
-                  ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-                  ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
-                },
-              },
-              {
-                targetDate: null,
-                dueDate: {
-                  ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-                  ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
-                },
-              },
-            ],
-          }
-        : {
-            targetDate: {
-              ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-              ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
-            },
-          }
-      : {}),
-    ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
   }
 
   // Permission (staff scope) + the screen filter (Minhas · Meu departamento · Todas)
@@ -499,7 +510,11 @@ export async function listTasks(
   if (scope.kind === 'LIMITED' && view === 'department' && query.departmentId && !scope.departmentIds.includes(query.departmentId)) {
     return { items: [], nextCursor: null }
   }
-  where.AND = [taskWhere(scope), ...(view === 'mine' ? [mineTaskWhere(actor.id)] : [])]
+  where.AND = [
+    ...dateAndSearchFilters(query),
+    taskWhere(scope),
+    ...(view === 'mine' ? [mineTaskWhere(actor.id)] : []),
+  ]
 
   const limit = Math.min(query.limit ?? DEFAULT_LIST_TASKS_LIMIT, MAX_LIST_TASKS_LIMIT)
 

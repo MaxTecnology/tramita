@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
@@ -19,6 +19,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { TaskDrawer, STATUS_LABEL, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR } from '@/components/shared/TaskDrawer'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { buildCalendarGrid, getCalendarGridRange } from './tasksCalendar'
+import { periodRange, type PeriodKind } from './tasksPeriod'
 import type { Task, User, Department, RecurringTaskTemplate } from '@/types'
 import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
 import { useMyScope } from '@/hooks/useMyScope'
@@ -49,28 +50,42 @@ type ViewMode = 'list' | 'kanban' | 'calendar'
 
 const STATUS_ORDER: Task['status'][] = ['OPEN', 'STARTED', 'BLOCKED', 'DISREGARDED', 'DONE']
 
+// Every filter shows its name above it (the placeholder alone did not say what the select was)
+function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-0.5">
+      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+const selectCls = 'h-8 rounded-md border border-border bg-surface px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent'
+
 function FilterSelect({
+  label,
   value,
   onChange,
   placeholder,
   children,
 }: {
+  label: string
   value: string
   onChange: (v: string) => void
   placeholder: string
   children: React.ReactNode
 }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-8 rounded-md border border-border bg-surface px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-    >
-      <option value="">{placeholder}</option>
-      {children}
-    </select>
+    <FilterField label={label}>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={selectCls}>
+        <option value="">{placeholder}</option>
+        {children}
+      </select>
+    </FilterField>
   )
 }
+
+const PERIOD_LABEL: Record<PeriodKind, string> = { this: 'Este mês', last: 'Mês passado', custom: 'Personalizado' }
 
 function TaskRow({ task, onClick }: { task: TaskListItem; onClick: () => void }) {
   const isOverdue = task.dueDate !== null && task.status !== 'DONE' && isPastDateOnlyUTC(task.dueDate)
@@ -320,7 +335,9 @@ export default function Tasks() {
   const [assigneeId, setAssigneeId] = useState('')
   const [departmentId, setDepartmentId] = useState('')
   const [recurringTemplateId, setRecurringTemplateId] = useState('')
-  const [status, setStatus] = useState('')
+  // Default: open tasks of the current month — with many tasks the list never loads "all time"
+  const [status, setStatus] = useState<Task['status']>('OPEN')
+  const [periodKind, setPeriodKind] = useState<PeriodKind>('this')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [search, setSearch] = useState('')
@@ -343,7 +360,7 @@ export default function Tasks() {
   })
 
   // /users/options (id+name) is open to the whole team; /users is admin-only.
-  const { data: users = [] } = useQuery<{ id: string; name: string }[]>({
+  const { data: users = [] } = useQuery<{ id: string; name: string; departmentIds?: string[] }[]>({
     queryKey: ['user-options'],
     queryFn: () => api.get('/users/options').then((r) => r.data),
   })
@@ -362,15 +379,19 @@ export default function Tasks() {
   // estado dateFrom/dateTo — que permanece sob controle exclusivo dos inputs manuais de Lista/
   // Kanban (ocultos em modo Calendário). Isso também garante que `hasFilters`/"Limpar", abaixo,
   // nunca contem a janela interna do calendário como filtro escolhido pelo usuário.
-  const effectiveDateFrom = calendarRange ? calendarRange.from : dateFrom
-  const effectiveDateTo = calendarRange ? calendarRange.to : dateTo
-  const dateField = calendarRange ? 'effective' : undefined
+  const period = periodRange(periodKind, new Date(), { from: dateFrom, to: dateTo })
+  const effectiveDateFrom = calendarRange ? calendarRange.from : period.from
+  const effectiveDateTo = calendarRange ? calendarRange.to : period.to
+  // 'period' also keeps tasks with no date (OS tasks often have none) in the month view
+  const dateField = calendarRange ? 'effective' : 'period'
+  // Kanban is organized by status columns: the status filter only applies to List and Calendar
+  const statusParam = view === 'kanban' ? '' : status
 
   const me = useMyScope()
   const [scopeFilter, setScopeFilter] = useScopeFilter('tasks', me)
 
   const filters = {
-    clientId, assigneeId, departmentId, recurringTemplateId, status, search,
+    clientId, assigneeId, departmentId, recurringTemplateId, status: statusParam, search,
     dateFrom: effectiveDateFrom, dateTo: effectiveDateTo, dateField, scopeFilter,
   }
 
@@ -389,7 +410,7 @@ export default function Tasks() {
       if (assigneeId) params.assigneeId = assigneeId
       if (departmentId) params.departmentId = departmentId
       if (recurringTemplateId) params.recurringTemplateId = recurringTemplateId
-      if (status) params.status = status
+      if (statusParam) params.status = statusParam
       if (search.trim()) params.q = search.trim()
       if (effectiveDateFrom) params.dateFrom = new Date(`${effectiveDateFrom}T00:00:00Z`).toISOString()
       if (effectiveDateTo) params.dateTo = new Date(`${effectiveDateTo}T23:59:59Z`).toISOString()
@@ -426,18 +447,29 @@ export default function Tasks() {
   const selectedTask = selectedTaskId ? tasks.find((t) => t.id === selectedTaskId) ?? null : null
 
   const hasFilters =
-    !!clientId || !!assigneeId || !!departmentId || !!recurringTemplateId || !!status || !!dateFrom || !!dateTo || !!search.trim()
+    !!clientId || !!assigneeId || !!departmentId || !!recurringTemplateId || status !== 'OPEN' || periodKind !== 'this' || !!search.trim()
 
   function clearFilters() {
     setClientId('')
     setAssigneeId('')
     setDepartmentId('')
     setRecurringTemplateId('')
-    setStatus('')
+    setStatus('OPEN')
+    setPeriodKind('this')
     setDateFrom('')
     setDateTo('')
     setSearch('')
   }
+
+  // "Minhas" has no colleague to pick; in "Meu departamento" only colleagues of my departments
+  const myDepartmentIds = new Set((me?.departments ?? []).map((d) => d.id))
+  const isAdmin = me?.role === 'ORG_ADMIN'
+  const colleagueOptions = isAdmin ? users : users.filter((u) => (u.departmentIds ?? []).some((d) => myDepartmentIds.has(d)))
+  const departmentOptions = isAdmin ? departments : departments.filter((d) => myDepartmentIds.has(d.id))
+  const showColleagueFilter = scopeFilter.scope !== 'mine'
+  useEffect(() => {
+    if (!showColleagueFilter && assigneeId) setAssigneeId('')
+  }, [showColleagueFilter, assigneeId])
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ taskId, newStatus }: { taskId: string; newStatus: Task['status'] }) =>
@@ -531,25 +563,33 @@ export default function Tasks() {
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-2 border-b border-border bg-surface">
-        {me && <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />}
-        <input
-          type="text"
-          placeholder="Buscar por título..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-[160px] h-8 rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-        />
-        <FilterSelect value={clientId} onChange={setClientId} placeholder="Cliente">
+      <div className="flex flex-wrap items-end gap-3 px-4 md:px-6 py-2 border-b border-border bg-surface">
+        {me && (me.role !== 'ORG_MEMBER' || me.seesDepartmentWork) && (
+          <FilterField label="Mostrar">
+            <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />
+          </FilterField>
+        )}
+        <FilterField label="Buscar">
+          <input
+            type="text"
+            placeholder="Título, cliente ou código..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-56 h-8 rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+        </FilterField>
+        <FilterSelect label="Cliente" value={clientId} onChange={setClientId} placeholder="Todos">
           {clients.map((c) => (
             <option key={c.id} value={c.id}>{c.codigo ? `${c.codigo} - ${c.name}` : c.name}</option>
           ))}
         </FilterSelect>
-        <FilterSelect value={assigneeId} onChange={setAssigneeId} placeholder="Colaborador">
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>{u.name}</option>
-          ))}
-        </FilterSelect>
+        {showColleagueFilter && (
+          <FilterSelect label="Colaborador" value={assigneeId} onChange={setAssigneeId} placeholder="Todos">
+            {colleagueOptions.map((u) => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </FilterSelect>
+        )}
         {colleague && colleagueOpenCount > 0 && (
           <button
             type="button"
@@ -557,46 +597,71 @@ export default function Tasks() {
             onClick={() => {
               if (window.confirm(`Assumir ${colleagueOpenCount === 1 ? 'a tarefa aberta' : `as ${colleagueOpenCount} tarefas abertas`} de ${colleague.name}?`)) assumeBulkMutation.mutate()
             }}
-            className="h-8 rounded-md border border-warning-text/40 bg-warning-bg px-3 text-sm font-medium text-warning-text hover:opacity-90 disabled:opacity-50"
+            className="self-end h-8 rounded-md border border-warning-text/40 bg-warning-bg px-3 text-sm font-medium text-warning-text hover:opacity-90 disabled:opacity-50"
           >
             Assumir todas as abertas de {colleague.name}
           </button>
         )}
-        <FilterSelect value={departmentId} onChange={setDepartmentId} placeholder="Departamento">
-          {departments.map((d) => (
+        <FilterSelect label="Departamento" value={departmentId} onChange={setDepartmentId} placeholder="Todos">
+          {departmentOptions.map((d) => (
             <option key={d.id} value={d.id}>{d.name}</option>
           ))}
         </FilterSelect>
-        <FilterSelect value={recurringTemplateId} onChange={setRecurringTemplateId} placeholder="Tipo de tarefa">
+        <FilterSelect label="Tipo de tarefa" value={recurringTemplateId} onChange={setRecurringTemplateId} placeholder="Todos">
           {recurringTemplates.map((t) => (
             <option key={t.id} value={t.id}>{t.title}</option>
           ))}
         </FilterSelect>
-        <FilterSelect value={status} onChange={setStatus} placeholder="Status">
-          {STATUS_ORDER.map((s) => (
-            <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-          ))}
-        </FilterSelect>
+        {view !== 'kanban' && (
+          <FilterField label="Status">
+            <select value={status} onChange={(e) => setStatus(e.target.value as Task['status'])} className={selectCls}>
+              {STATUS_ORDER.map((s) => (
+                <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+              ))}
+            </select>
+          </FilterField>
+        )}
         {view !== 'calendar' && (
-          <>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              title="Meta de"
-              className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-            />
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              title="Meta até"
-              className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-            />
-          </>
+          <FilterField label="Período">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-md border border-border overflow-hidden">
+                {(['this', 'last', 'custom'] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setPeriodKind(k)}
+                    className={cn(
+                      'h-8 px-3 text-sm font-medium transition-colors',
+                      periodKind === k ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
+                    )}
+                  >
+                    {PERIOD_LABEL[k]}
+                  </button>
+                ))}
+              </div>
+              {periodKind === 'custom' && (
+                <>
+                  <input
+                    type="date"
+                    aria-label="De"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                  <input
+                    type="date"
+                    aria-label="Até"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </>
+              )}
+            </div>
+          </FilterField>
         )}
         {hasFilters && (
-          <button type="button" onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground underline">
+          <button type="button" onClick={clearFilters} className="self-end pb-1.5 text-xs text-muted-foreground hover:text-foreground underline">
             Limpar
           </button>
         )}
