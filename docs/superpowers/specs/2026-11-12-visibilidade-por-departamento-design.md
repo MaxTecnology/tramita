@@ -22,7 +22,9 @@ abre filtrada no nome dele**; se precisar cobrir um colega, troca o filtro e **a
   e assumir.
 - Aprovar solicitação de cliente que não é dele: a tarefa criada vai para **quem aprovou**.
 - Assumir: **uma tarefa por vez e em lote** (todas as abertas do colega).
-- Gerente: vê **tudo dos departamentos a que pertence** (não mais o escritório inteiro).
+- Gerente: vê **tudo dos departamentos a que pertence** (não mais o escritório inteiro), sempre.
+- Membro: opção no cadastro de usuário **"Pode ver o trabalho dos colegas do departamento"**, **ligada
+  por padrão** (2026-11-13). Desligada, o Membro fica só com a carteira dele.
 
 ## Modelo
 
@@ -51,7 +53,8 @@ Uma regra só, `staffScope(user)`, usada em todos os pontos que hoje usam `membe
 |---|---|
 | ORG_ADMIN | organização inteira (sem filtro) |
 | ORG_MANAGER | tudo dos clientes atendidos pelos departamentos dele |
-| ORG_MEMBER | a carteira dele (regra atual) **+** tudo dos clientes atendidos pelos departamentos dele |
+| ORG_MEMBER com "ver colegas" ligado (padrão) | a carteira dele (regra atual) **+** tudo dos clientes atendidos pelos departamentos dele |
+| ORG_MEMBER com "ver colegas" desligado | só a carteira dele (regra atual) |
 
 "Tudo dos clientes atendidos pelos departamentos dele", por recurso:
 
@@ -73,12 +76,22 @@ Na prática Membro e Gerente do mesmo departamento **enxergam o mesmo**; a difer
 padrão** e as **ações** que o papel já permite (o gerente continua com o que hoje é `ORG_MANAGER`, como
 excluir tarefa e editar processo, agora limitado ao departamento).
 
+### Opção "Pode ver o trabalho dos colegas do departamento"
+
+Campo `User.seesDepartmentWork Boolean @default(true)`, editado pelo Admin no cadastro de Usuários, só
+para `ORG_MEMBER` (gerente sempre vê o departamento; admin vê tudo — o campo é ignorado para eles).
+Desligada: o Membro não tem o filtro "Meu departamento" nem o botão **Assumir**, e as rotas respondem
+404 para o que estiver fora da carteira dele. A cobertura de falta desse Membro fica com o gerente ou o
+admin, que reatribuem a tarefa — atribuída a ele, ela entra na carteira e ele passa a enxergar.
+Mudar a opção vale na próxima requisição (o escopo é lido do banco, não do token).
+
 ### Filtro padrão
 
 Nas listas de Tarefas, Solicitações, fila do robô e Guias não pagas, um seletor:
 **Minhas · Meu departamento · Todas** (Todas só para admin). Abre em:
 
 - Membro → **Minhas** (atribuídas a mim; solicitações e documentos dos clientes da minha carteira).
+  Com "ver colegas" desligado, o seletor não aparece.
 - Gerente → **Meu departamento**.
 - Admin → **Todas**.
 
@@ -87,7 +100,7 @@ A escolha fica lembrada no navegador (localStorage, por tela).
 ### Assumir
 
 - **Uma tarefa:** botão **Assumir** no painel da tarefa quando ela é de outra pessoa, está aberta e é de
-  um departamento ao qual eu pertenço. Troca o responsável para mim.
+  um departamento ao qual eu pertenço (Membro: só com "ver colegas" ligado). Troca o responsável para mim.
 - **Em lote:** na lista de Tarefas com filtro "Meu departamento", filtrar por colaborador → **Assumir
   todas as abertas de Fulano** (com confirmação mostrando a quantidade). Só tarefas abertas dos meus
   departamentos.
@@ -117,15 +130,16 @@ atual).
 
 1. Documento **não identificado** do robô e o **upload** de documentos: admin e todos os gerentes (alguém
    precisa fazer a triagem; o gerente de um departamento pode identificar algo de outro).
-2. Membro e Gerente do mesmo departamento enxergam o mesmo conjunto; muda o filtro padrão e as ações.
+2. Membro com "ver colegas" ligado e Gerente do mesmo departamento enxergam o mesmo conjunto; muda o
+   filtro padrão e as ações.
 3. Responsável por cliente precisa pertencer ao departamento (consistência: quem cobre a falta dele
    está no mesmo departamento).
 4. Cadastro de clientes fica fora (acima).
 
 ## Como validar
 
-- Testes de API por perfil (admin, gerente do Fiscal, membro do Fiscal, membro da Folha) em cada recurso
-  da tabela: vê / 404.
+- Testes de API por perfil (admin, gerente do Fiscal, membro do Fiscal com e sem "ver colegas", membro
+  da Folha) em cada recurso da tabela: vê / 404. Desligar a opção corta o acesso na requisição seguinte.
 - Assumir: uma, em lote, corrida (dois assumindo ao mesmo tempo → um 409), histórico e aviso.
 - Aprovar por colega → tarefa com o aprovador; por admin fora do departamento → responsável do cliente.
 - E2E: membro abre Tarefas em "Minhas", troca para "Meu departamento", assume a tarefa do colega.
