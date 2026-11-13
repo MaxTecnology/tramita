@@ -28,6 +28,8 @@ const EVENT_FLAG_MAP: Record<string, keyof NotificationConfig> = {
   REQUEST_CANCELLED: 'requestCancelled',
   PROTOCOL_CREATED: 'protocolCreated',
   TASK_ASSUMED: 'taskAssumed',
+  APPROVAL_REQUESTED: 'approvalRequested',
+  APPROVAL_CHANGES_REQUESTED: 'approvalChangesRequested',
 }
 
 export async function processNotificationJob(job: { data: NotificationJob }): Promise<void> {
@@ -112,6 +114,7 @@ async function processClientNotification(
     commentAuthorName: metadata.commentAuthorName,
     protocolTitle: metadata.protocolTitle,
     paymentInfo: metadata.paymentInfo,
+    approvalTitle: metadata.approvalTitle,
   }
 
   // Destinatário por departamento do assunto (tarefa ou solicitação), nos dois canais. O número da
@@ -211,6 +214,7 @@ async function processUserNotification(
     criticalCount: metadata.criticalCount,
     taskListText: metadata.taskListText,
     assumedByName: metadata.assumedByName,
+    approvalTitle: metadata.approvalTitle,
     portalUrl: event === 'TASK_COMMENT_ADDED' || event === 'TASK_ASSUMED' ? `${appUrl}/app` : event === 'SLA_DIGEST' ? `${appUrl}/app` : `${appUrl}/app/requests`,
   }
 

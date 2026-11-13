@@ -42,6 +42,8 @@ afterEach(async () => {
   await prisma.$transaction([
     // ReceivedDocument referencia task/documentModel/attachment/organization/user — precisa sumir
     // antes de todos eles.
+    prisma.inAppNotification.deleteMany(),
+    prisma.taskApproval.deleteMany(), // references attachments: before them
     prisma.receivedDocument.deleteMany(),
     prisma.notificationLog.deleteMany(),
     prisma.requestAttachment.deleteMany(),

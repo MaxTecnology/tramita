@@ -107,6 +107,9 @@ model User {
   responsibleBoards            Board[]                   @relation("BoardResponsible")
   clientAssignments            ClientAssignment[]
   departments                  UserDepartment[]
+  notifications                InAppNotification[]
+  approvalsRequested           TaskApproval[]            @relation("ApprovalRequestedBy")
+  approvalsDecided             TaskApproval[]            @relation("ApprovalDecidedByUser")
   // ORG_MEMBER only: sees the work of department colleagues (spec visibilidade-por-departamento)
   seesDepartmentWork           Boolean                   @default(true)
   reviewedDocumentRequirements TaskDocumentRequirement[]
@@ -199,9 +202,11 @@ model ClientUser {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  accesses      ClientUserAccess[]
-  paidProtocols Protocol[]
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  accesses         ClientUserAccess[]
+  notifications    InAppNotification[]
+  approvalsDecided TaskApproval[]      @relation("ApprovalDecidedByClientUser")
+  paidProtocols    Protocol[]
 
   @@unique([email, organizationId])
   @@map("client_users")
@@ -420,6 +425,7 @@ model Task {
   recurringTemplate    RecurringTaskTemplate?    @relation(fields: [recurringTemplateId], references: [id])
   documentRequirements TaskDocumentRequirement[]
   deliverables         TaskDeliverable[]
+  approvals            TaskApproval[]
   protocols            Protocol[]
   receivedDocuments    ReceivedDocument[]
 
@@ -846,6 +852,8 @@ model Attachment {
   protocol            Protocol?
   receivedDocument    ReceivedDocument?
   paymentProofOf      Protocol?                @relation("ProtocolPaymentProof")
+  approvalFileOf      TaskApproval?            @relation("ApprovalFile")
+  approvalProofOf     TaskApproval?            @relation("ApprovalProof")
 
   @@map("attachments")
 }
@@ -868,6 +876,8 @@ model NotificationConfig {
   requestCancelled          Boolean  @default(true)
   protocolCreated           Boolean  @default(true)
   taskAssumed               Boolean  @default(true)
+  approvalRequested         Boolean  @default(true)
+  approvalChangesRequested  Boolean  @default(true)
   maximizebotToken          String?
   saveOnTicket              Boolean  @default(true)
   startChatbot              Boolean  @default(false)
@@ -922,6 +932,8 @@ enum NotificationEvent {
   REQUEST_CANCELLED
   PROTOCOL_CREATED
   TASK_ASSUMED
+  APPROVAL_REQUESTED
+  APPROVAL_CHANGES_REQUESTED
 }
 
 enum MessageChannel {
@@ -1060,4 +1072,94 @@ model UserDepartment {
   @@unique([userId, departmentId])
   @@index([departmentId])
   @@map("user_departments")
+}
+
+// In-app notification center (bell): one row per recipient, always written regardless of the
+// WhatsApp/e-mail toggles. Exactly one recipient (check constraint in the migration).
+model InAppNotification {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  recipientUserId       String?
+  recipientClientUserId String?
+  type                  InAppType
+  title                 String
+  body                  String
+  link                  String
+  taskId                String?
+  boardId               String?
+  requestId             String?
+  approvalId            String?
+  protocolId            String?
+  clientId              String?
+  actorName             String?
+  readAt                DateTime?
+  createdAt             DateTime  @default(now())
+
+  recipientUser       User?       @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  recipientClientUser ClientUser? @relation(fields: [recipientClientUserId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUserId, readAt, createdAt])
+  @@index([recipientClientUserId, readAt, createdAt])
+  @@index([taskId])
+  @@map("in_app_notifications")
+}
+
+enum InAppType {
+  TASK_COMMENT
+  REQUEST_CREATED
+  REQUEST_COMMENT
+  DOCUMENT_UPLOADED
+  APPROVAL_REQUESTED
+  APPROVAL_DECIDED
+  TASK_ASSUMED
+  TASK_ASSIGNED
+  BOARD_ASSIGNED
+  DOCUMENT_RECEIVED
+  DOCUMENT_REJECTED
+  REQUEST_STATUS
+}
+
+// Client approval of a file inside a task (e.g. payroll preview). The office may close it without the
+// portal, recording why and how long it waited.
+model TaskApproval {
+  id                    String               @id @default(cuid())
+  taskId                String
+  organizationId        String
+  title                 String
+  message               String?
+  attachmentId          String               @unique
+  status                ApprovalStatus       @default(PENDING)
+  requestedById         String
+  requestedAt           DateTime             @default(now())
+  decidedAt             DateTime?
+  decidedByClientUserId String?
+  decidedByUserId       String?
+  decisionNote          String?
+  closeReason           ApprovalCloseReason?
+  proofAttachmentId     String?              @unique
+  waitedDays            Int?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  task                Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  attachment          Attachment  @relation("ApprovalFile", fields: [attachmentId], references: [id])
+  proof               Attachment? @relation("ApprovalProof", fields: [proofAttachmentId], references: [id])
+  requestedBy         User        @relation("ApprovalRequestedBy", fields: [requestedById], references: [id])
+  decidedByUser       User?       @relation("ApprovalDecidedByUser", fields: [decidedByUserId], references: [id])
+  decidedByClientUser ClientUser? @relation("ApprovalDecidedByClientUser", fields: [decidedByClientUserId], references: [id])
+
+  @@index([taskId, status])
+  @@map("task_approvals")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+  CLOSED_BY_OFFICE
+}
+
+enum ApprovalCloseReason {
+  APPROVED_OUTSIDE
+  NO_RESPONSE
 }

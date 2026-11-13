@@ -21,6 +21,8 @@ export const updateConfigSchema = z.object({
   requestCancelled: z.boolean().optional(),
   protocolCreated: z.boolean().optional(),
   taskAssumed: z.boolean().optional(),
+  approvalRequested: z.boolean().optional(),
+  approvalChangesRequested: z.boolean().optional(),
   protocolWarningDays: z.number().int().min(0).max(90).optional(),
   taskBlocked: z.boolean().optional(),
   recurringGenerationFailed: z.boolean().optional(),
