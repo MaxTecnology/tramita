@@ -54,6 +54,10 @@ export default function PortalLayout() {
     if (selectedClientId) localStorage.setItem('portal-client-id', selectedClientId)
   }, [selectedClientId])
 
+  // A stored id from a company the user no longer accesses (or deleted) is never used: pages wait
+  // until the list arrives and the selection is valid (no 404 for a stale company)
+  const validClientId = accessibleClients.some((c) => c.id === selectedClientId) ? selectedClientId : ''
+
   async function handleLogout() {
     const refreshToken = localStorage.getItem('refreshToken')
     if (refreshToken) {
@@ -65,7 +69,7 @@ export default function PortalLayout() {
 
   return (
     <PortalClientContext.Provider
-      value={{ clientId: selectedClientId, setClientId: setSelectedClientId, clients: accessibleClients }}
+      value={{ clientId: validClientId, setClientId: setSelectedClientId, clients: accessibleClients }}
     >
       <div className="flex h-screen bg-background">
         {/* Sidebar — desktop only */}
