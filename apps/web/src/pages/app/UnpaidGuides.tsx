@@ -6,6 +6,8 @@ import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { formatBRL } from '@/lib/money'
 import { formatDateOnlyUTC } from '@/lib/dates'
+import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
+import { useMyScope } from '@/hooks/useMyScope'
 
 export interface UnpaidGuide {
   id: string
@@ -36,10 +38,14 @@ export default function UnpaidGuides() {
   const [competence, setCompetence] = useState('')
   const [situation, setSituation] = useState<Situation>('')
 
+  const me = useMyScope()
+  const [scopeFilter, setScopeFilter] = useScopeFilter('guides', me)
+
   const { data: guides = [], isLoading } = useQuery<UnpaidGuide[]>({
-    queryKey: ['unpaid-guides', clientId, departmentId, competence, situation],
+    queryKey: ['unpaid-guides', clientId, departmentId, competence, situation, scopeFilter],
     queryFn: () => api.get('/protocols/unpaid', {
       params: {
+        ...scopeParams(scopeFilter),
         ...(clientId ? { clientId } : {}),
         ...(departmentId ? { departmentId } : {}),
         ...(competence ? { competence } : {}),
@@ -62,6 +68,8 @@ export default function UnpaidGuides() {
         <h1 className="text-xl font-semibold text-foreground">Guias não pagas</h1>
         <p className="text-sm text-muted-foreground">Guias enviadas aos clientes que eles ainda não marcaram como pagas.</p>
       </div>
+
+      {me && <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />}
 
       <div className="flex flex-wrap gap-2">
         <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={selectCls} aria-label="Cliente">

@@ -12,16 +12,56 @@ import { toast } from 'sonner'
 
 type EditableRole = Exclude<OrgRole, 'ORG_ADMIN'>
 
+type DepartmentAccess = { departmentIds: string[]; seesDepartmentWork: boolean }
+
 type CreateForm = {
   name: string; email: string; password: string; role: EditableRole; phone: string
-}
+} & DepartmentAccess
 
 type EditForm = {
   name: string; email: string; role: EditableRole; phone: string
-}
+} & DepartmentAccess
 
 const EMPTY_CREATE: CreateForm = {
-  name: '', email: '', password: '', role: 'ORG_MEMBER', phone: '',
+  name: '', email: '', password: '', role: 'ORG_MEMBER', phone: '', departmentIds: [], seesDepartmentWork: true,
+}
+
+// Departments the staff member belongs to (defines what they see) and, for collaborators, whether
+// they see the work of department colleagues (cover an absence, "Assumir").
+function DepartmentAccessFields({ idPrefix, role, departments, value, onChange }: {
+  idPrefix: string
+  role: EditableRole
+  departments: { id: string; name: string }[]
+  value: DepartmentAccess
+  onChange: (v: DepartmentAccess) => void
+}) {
+  const toggle = (id: string) => onChange({
+    ...value,
+    departmentIds: value.departmentIds.includes(id) ? value.departmentIds.filter((d) => d !== id) : [...value.departmentIds, id],
+  })
+  return (
+    <div className="space-y-2 sm:col-span-2">
+      <Label>Departamentos *</Label>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {departments.map((d) => (
+          <label key={d.id} className="flex items-center gap-1.5 text-sm text-foreground">
+            <input type="checkbox" checked={value.departmentIds.includes(d.id)} onChange={() => toggle(d.id)} />
+            {d.name}
+          </label>
+        ))}
+      </div>
+      {value.departmentIds.length === 0 && <p className="text-xs text-danger-text">Selecione pelo menos um departamento</p>}
+      {role === 'ORG_MEMBER' && (
+        <label htmlFor={`${idPrefix}-sees`} className="flex items-start gap-2 text-sm text-foreground pt-1">
+          <input id={`${idPrefix}-sees`} type="checkbox" className="mt-0.5" checked={value.seesDepartmentWork} onChange={(e) => onChange({ ...value, seesDepartmentWork: e.target.checked })} />
+          <span>
+            Pode ver o trabalho dos colegas do departamento
+            <span className="block text-xs text-muted-foreground">Permite cobrir a falta de um colega e assumir as tarefas dele.</span>
+          </span>
+        </label>
+      )}
+    </div>
+  )
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -45,7 +85,7 @@ export default function Users() {
 
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [editForm, setEditForm] = useState<EditForm>({
-    name: '', email: '', role: 'ORG_MEMBER', phone: '',
+    name: '', email: '', role: 'ORG_MEMBER', phone: '', departmentIds: [], seesDepartmentWork: true,
   })
 
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -56,6 +96,10 @@ export default function Users() {
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ['users'],
     queryFn: () => api.get('/users').then((r) => r.data),
+  })
+  const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['departments'],
+    queryFn: () => api.get('/departments').then((r) => r.data),
   })
 
   const filtered = useMemo(() => {
@@ -78,6 +122,8 @@ export default function Users() {
         password: createForm.password,
         role: createForm.role,
         phone: createForm.phone || undefined,
+        departmentIds: createForm.departmentIds,
+        seesDepartmentWork: createForm.seesDepartmentWork,
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Usuário cadastrado com sucesso')
@@ -87,7 +133,7 @@ export default function Users() {
       setSearch('')
       setRoleFilter('all')
     },
-    onError: () => toast.error('Erro ao cadastrar usuário'),
+    onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao cadastrar usuário')),
   })
 
   const updateMutation = useMutation({
@@ -97,13 +143,15 @@ export default function Users() {
         email: data.email,
         role: data.role,
         phone: data.phone || null,
+        departmentIds: data.departmentIds,
+        seesDepartmentWork: data.seesDepartmentWork,
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Usuário atualizado')
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setEditingUser(null)
     },
-    onError: () => toast.error('Erro ao salvar alterações'),
+    onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao salvar alterações')),
   })
 
   const deleteMutation = useMutation({
@@ -139,6 +187,8 @@ export default function Users() {
       email: user.email,
       role: user.role === 'ORG_MANAGER' ? 'ORG_MANAGER' : 'ORG_MEMBER',
       phone: user.phone ?? '',
+      departmentIds: (user.departments ?? []).map((d) => d.id),
+      seesDepartmentWork: user.seesDepartmentWork ?? true,
     })
   }
 
@@ -189,6 +239,10 @@ export default function Users() {
               <Label htmlFor="c-phone">Telefone</Label>
               <Input id="c-phone" value={createForm.phone} onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} placeholder="(82) 99999-9999" />
             </div>
+            <DepartmentAccessFields
+              idPrefix="c" role={createForm.role} departments={departments}
+              value={createForm} onChange={(v) => setCreateForm({ ...createForm, ...v })}
+            />
           </div>
           {createMutation.isError && (
             <p className="text-sm text-danger-text">Erro ao cadastrar. Verifique os dados.</p>
@@ -196,7 +250,7 @@ export default function Users() {
           <div className="flex gap-2 pt-1">
             <Button
               onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending || !createForm.name || !createForm.email || !createForm.password}
+              disabled={createMutation.isPending || !createForm.name || !createForm.email || !createForm.password || createForm.departmentIds.length === 0}
               className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
             >
               {createMutation.isPending ? 'Cadastrando...' : 'Cadastrar'}
@@ -263,9 +317,13 @@ export default function Users() {
                 <span className={cn('text-xs px-1.5 py-0.5 rounded flex-shrink-0', ROLE_BADGE[user.role] ?? 'bg-neutral-bg text-muted-foreground')}>
                   {ROLE_LABEL[user.role] ?? user.role}
                 </span>
+                {user.role !== 'ORG_ADMIN' && (user.departments ?? []).length === 0 && (
+                  <span className="text-xs px-1.5 py-0.5 rounded flex-shrink-0 bg-danger-bg text-danger-text">Sem departamento</span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
                 {user.email}{user.phone ? ` · ${user.phone}` : ''}
+                {(user.departments ?? []).length > 0 && ` · ${(user.departments ?? []).map((d) => d.name).join(', ')}`}
               </p>
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
@@ -339,6 +397,10 @@ export default function Users() {
               <Label htmlFor="e-phone">Telefone</Label>
               <Input id="e-phone" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="(82) 99999-9999" />
             </div>
+            <DepartmentAccessFields
+              idPrefix="e" role={editForm.role} departments={departments}
+              value={editForm} onChange={(v) => setEditForm({ ...editForm, ...v })}
+            />
             {updateMutation.isError && (
               <p className="text-sm text-danger-text">Erro ao salvar. Tente novamente.</p>
             )}
@@ -346,7 +408,7 @@ export default function Users() {
               <Button variant="outline" onClick={() => setEditingUser(null)}>Cancelar</Button>
               <Button
                 onClick={() => { if (editingUser) updateMutation.mutate({ ...editForm, id: editingUser.id }) }}
-                disabled={updateMutation.isPending || !editForm.name || !editForm.email}
+                disabled={updateMutation.isPending || !editForm.name || !editForm.email || editForm.departmentIds.length === 0}
                 className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
               >
                 {updateMutation.isPending ? 'Salvando...' : 'Salvar'}

@@ -21,7 +21,7 @@ import {
 type Tab = 'empresa' | 'departamentos' | 'acesso'
 
 interface Department { id: string; name: string }
-interface TeamMember { id: string; name: string }
+interface TeamMember { id: string; name: string; role: string; departmentIds: string[] }
 interface ClientUserSearchResult { id: string; name: string; email: string; phone: string | null }
 
 interface Props {
@@ -40,9 +40,10 @@ export function ClientForm({ initial, submitLabel, isSaving, onSubmit, onCancel 
     queryKey: ['departments'],
     queryFn: () => api.get('/departments').then((r) => r.data),
   })
+  // Responsible of a department must belong to it (admins are exempt)
   const { data: teamMembers = [] } = useQuery<TeamMember[]>({
-    queryKey: ['team-members'],
-    queryFn: () => api.get('/dashboard/team-members').then((r) => r.data),
+    queryKey: ['user-options'],
+    queryFn: () => api.get('/users/options').then((r) => r.data),
   })
 
   const departmentNames = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments])
@@ -327,9 +328,11 @@ function DepartmentsTab({
                 )}
               >
                 <option value="">Escolha o responsável…</option>
-                {teamMembers.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
+                {teamMembers
+                  .filter((m) => m.role === 'ORG_ADMIN' || m.departmentIds.includes(d.id))
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
               </select>
             )}
           </div>

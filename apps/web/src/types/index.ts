@@ -55,6 +55,8 @@ export interface User {
   phone: string | null
   isActive: boolean
   createdAt: string
+  departments?: { id: string; name: string }[]
+  seesDepartmentWork?: boolean
 }
 
 export interface Client {

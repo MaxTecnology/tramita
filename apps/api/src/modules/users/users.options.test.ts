@@ -3,7 +3,7 @@ import { app } from '@/test/setup'
 import { createTestPlan, createTestOrg, createTestUser, getAuthHeader } from '@/test/helpers'
 
 describe('GET /users/options — id+nome dos colaboradores pra filtros', () => {
-  it('ORG_MEMBER recebe só id e nome dos colaboradores ativos da própria organização', async () => {
+  it('ORG_MEMBER recebe só id, nome, perfil e departamentos (sem e-mail/telefone) dos colaboradores ativos da própria organização', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
@@ -20,7 +20,7 @@ describe('GET /users/options — id+nome dos colaboradores pra filtros', () => {
     expect(res.statusCode).toBe(200)
     const body = JSON.parse(res.body) as Record<string, unknown>[]
     expect(body).toHaveLength(2)
-    for (const u of body) expect(Object.keys(u).sort()).toEqual(['id', 'name'])
+    for (const u of body) expect(Object.keys(u).sort()).toEqual(['departmentIds', 'id', 'name', 'role'])
   })
 
   it('a lista completa (/users) continua exclusiva do admin', async () => {

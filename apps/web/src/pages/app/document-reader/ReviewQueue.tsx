@@ -7,6 +7,8 @@ import type { ReceivedDocument, RejectedDocument } from '@/types'
 import { toast } from 'sonner'
 import { mensagemDeErro } from '@/lib/utils'
 import { toApiAmount, toInputAmount } from '@/lib/money'
+import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
+import { useMyScope } from '@/hooks/useMyScope'
 
 function AbaRejeitados() {
   const queryClient = useQueryClient()
@@ -174,9 +176,14 @@ export default function ReviewQueue() {
   const [aba, setAba] = useState<'fila' | 'rejeitados'>('fila')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const me = useMyScope()
+  const [scopeFilter, setScopeFilter] = useScopeFilter('documents', me)
+  // Upload feeds the triage of unidentified documents: admins and managers
+  const canUpload = !!me && me.role !== 'ORG_MEMBER'
+
   const { data: fila = [], isLoading } = useQuery<ReceivedDocument[]>({
-    queryKey: ['document-reader-fila'],
-    queryFn: () => api.get('/document-reader/fila').then((r) => r.data),
+    queryKey: ['document-reader-fila', scopeFilter],
+    queryFn: () => api.get('/document-reader/fila', { params: scopeParams(scopeFilter) }).then((r) => r.data),
   })
 
   const invalidar = () => queryClient.invalidateQueries({ queryKey: ['document-reader-fila'] })
@@ -226,9 +233,11 @@ export default function ReviewQueue() {
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-foreground">Fila de revisão — leitura de documentos</h1>
-        <Button onClick={() => fileInputRef.current?.click()} disabled={uploadMutation.isPending}>
-          Enviar PDF
-        </Button>
+        {canUpload && (
+          <Button onClick={() => fileInputRef.current?.click()} disabled={uploadMutation.isPending}>
+            Enviar PDF
+          </Button>
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -256,6 +265,8 @@ export default function ReviewQueue() {
           Rejeitados
         </button>
       </div>
+
+      {aba === 'fila' && me && <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />}
 
       {aba === 'rejeitados' ? <AbaRejeitados /> : fila.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhum documento pendente.</p>

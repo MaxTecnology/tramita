@@ -34,17 +34,21 @@ export async function listUsers(organizationId: string) {
   return users.map(present)
 }
 
-export async function listUserOptions(organizationId: string, departmentId?: string): Promise<{ id: string; name: string }[]> {
-  return prisma.user.findMany({
+export async function listUserOptions(
+  organizationId: string,
+  departmentId?: string,
+): Promise<{ id: string; name: string; role: string; departmentIds: string[] }[]> {
+  const users = await prisma.user.findMany({
     where: {
       organizationId,
       isActive: true,
       // Responsible pickers: only who belongs to the department (admins are exempt)
       ...(departmentId ? { OR: [{ role: 'ORG_ADMIN' }, { departments: { some: { departmentId } } }] } : {}),
     },
-    select: { id: true, name: true },
+    select: { id: true, name: true, role: true, departments: { select: { departmentId: true } } },
     orderBy: { name: 'asc' },
   })
+  return users.map(({ departments, ...u }) => ({ ...u, departmentIds: departments.map((d) => d.departmentId) }))
 }
 
 export async function createUser(organizationId: string, data: CreateUserBody) {

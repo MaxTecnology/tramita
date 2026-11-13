@@ -19,6 +19,8 @@ import { TaskDrawer, STATUS_LABEL, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR 
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { buildCalendarGrid, getCalendarGridRange } from './tasksCalendar'
 import type { Task, User, Department, RecurringTaskTemplate } from '@/types'
+import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
+import { useMyScope } from '@/hooks/useMyScope'
 
 // GET /tasks retorna uma listagem flat de tarefas cruzando todos os boards da org (inclusive o
 // board de sistema onde moram as recorrentes). O select do backend cobre todos os campos de Task,
@@ -363,9 +365,12 @@ export default function Tasks() {
   const effectiveDateTo = calendarRange ? calendarRange.to : dateTo
   const dateField = calendarRange ? 'effective' : undefined
 
+  const me = useMyScope()
+  const [scopeFilter, setScopeFilter] = useScopeFilter('tasks', me)
+
   const filters = {
     clientId, assigneeId, departmentId, recurringTemplateId, status, search,
-    dateFrom: effectiveDateFrom, dateTo: effectiveDateTo, dateField,
+    dateFrom: effectiveDateFrom, dateTo: effectiveDateTo, dateField, scopeFilter,
   }
 
   const {
@@ -378,7 +383,7 @@ export default function Tasks() {
     queryKey: ['tasks', filters],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) => {
-      const params: Record<string, string> = {}
+      const params: Record<string, string> = { ...scopeParams(scopeFilter) }
       if (clientId) params.clientId = clientId
       if (assigneeId) params.assigneeId = assigneeId
       if (departmentId) params.departmentId = departmentId
@@ -505,6 +510,7 @@ export default function Tasks() {
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-2 border-b border-border bg-surface">
+        {me && <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />}
         <input
           type="text"
           placeholder="Buscar por título..."

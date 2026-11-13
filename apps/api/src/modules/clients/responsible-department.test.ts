@@ -71,4 +71,12 @@ describe('responsável precisa pertencer ao departamento', () => {
     expect(ids).not.toContain(bruna.id)
     void folha
   })
+
+  it('/users/options carries role and department ids so pickers can filter by department', async () => {
+    const { org, admin, fiscal } = await setup()
+    const fiscalMember = await createTestUser(org.id, { role: 'ORG_MEMBER', name: 'Fiscal Member', departmentIds: [fiscal.id] })
+    const res = await app.inject({ method: 'GET', url: '/users/options', headers: { authorization: await getAuthHeader(admin.email, 'Test@1234') } })
+    const row = (JSON.parse(res.body) as { id: string; role: string; departmentIds: string[] }[]).find((u) => u.id === fiscalMember.id)
+    expect(row).toEqual({ id: fiscalMember.id, name: 'Fiscal Member', role: 'ORG_MEMBER', departmentIds: [fiscal.id] })
+  })
 })

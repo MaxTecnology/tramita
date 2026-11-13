@@ -12,6 +12,8 @@ import { Inbox, Search, X, ExternalLink, ChevronDown, ChevronUp } from 'lucide-r
 import type { ClientRequest, Board } from '@/types'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
+import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
+import { useMyScope } from '@/hooks/useMyScope'
 
 const STATUS_LABEL: Record<ClientRequest['status'], string> = {
   PENDING: 'Pendente',
@@ -50,9 +52,14 @@ export default function Requests() {
   const [columnId, setColumnId] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
+  const me = useMyScope()
+  const [scopeFilter, setScopeFilter] = useScopeFilter('requests', me)
+
   const { data: requests = [], isLoading } = useQuery<ClientRequest[]>({
-    queryKey: ['requests', statusFilter],
-    queryFn: () => api.get('/requests', { params: statusFilter ? { status: statusFilter } : {} }).then((r) => r.data),
+    queryKey: ['requests', statusFilter, scopeFilter],
+    queryFn: () => api.get('/requests', {
+      params: { ...scopeParams(scopeFilter), ...(statusFilter ? { status: statusFilter } : {}) },
+    }).then((r) => r.data),
   })
 
   const filtered = useMemo(() => {
@@ -143,6 +150,8 @@ export default function Requests() {
       <div className="flex items-center justify-between">
         <h1 className="text-lg md:text-xl font-bold text-foreground">Solicitações dos Clientes</h1>
       </div>
+
+      {me && <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />}
 
       <div className="flex rounded-md border border-border overflow-hidden w-fit flex-wrap">
         {(['PENDING', 'NEEDS_INFO', 'APPROVED', 'REJECTED', 'CANCELLED', ''] as const).map((s) => (
