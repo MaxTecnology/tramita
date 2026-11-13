@@ -69,7 +69,7 @@ Web (`apps/web`):
 
 **Interfaces:**
 - Produces: `model UserDepartment { id, userId, departmentId, createdAt; @@unique([userId, departmentId]); @@index([departmentId]); @@map("user_departments") }` com `onDelete: Cascade` nos dois lados; `User.departments UserDepartment[]`, `User.seesDepartmentWork Boolean @default(true)`; `Department.members UserDepartment[]`; `NotificationEvent.TASK_ASSUMED`; `NotificationConfig.taskAssumed Boolean @default(true)`.
-- Produces (helpers): `createTestUser(orgId, { ..., departmentIds?: string[], seesDepartmentWork?: boolean })` cria as memberships; `addUserToDepartment(userId, departmentId)`. `serveClientDepartment(clientId, departmentId, userId)` passa a garantir a membership do responsável (upsert) quando ele não é ORG_ADMIN.
+- Produces (helpers): `createTestUser(orgId, { ..., departmentIds?: string[], seesDepartmentWork?: boolean })` cria as memberships; `addUserToDepartment(userId, departmentId)`. `serveClientDepartment(clientId, departmentId, userId)` e `ensureServed(orgId, clientId, departmentId)` passam a garantir a membership do responsável (upsert) quando ele não é ORG_ADMIN.
 
 - [ ] **Step 1: Write the failing test** — `user-departments.model.test.ts`: `createTestUser(org, { role: 'ORG_MEMBER', departmentIds: [fiscal.id] })` → `prisma.userDepartment.count({ where: { userId } })` é 1 e `user.seesDepartmentWork` é `true`; criar a mesma membership de novo lança P2002; excluir o departamento apaga a membership.
 - [ ] **Step 2: Run** `pnpm --filter api exec vitest run src/modules/users/user-departments.model.test.ts` — Expected: FAIL (modelo inexistente).
