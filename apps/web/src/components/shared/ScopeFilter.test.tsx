@@ -67,3 +67,9 @@ it('applies the role default once /users/me arrives after the first render', () 
   view.rerender(<Late me={admin} />)
   expect(screen.getByTestId('late').textContent).toBe('{"scope":"all"}')
 })
+
+it('an admin who belongs to a department gets Minhas and Todas, not "Meu departamento" (it would mean everything)', () => {
+  render(<Harness me={{ role: 'ORG_ADMIN', departments: [fiscal], seesDepartmentWork: true }} />)
+  expect(screen.getByRole('button', { name: 'Todas' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Meu departamento' })).toBeNull()
+})

@@ -93,7 +93,7 @@ export async function boardsRoutes(app: FastifyInstance) {
   })
 
   app.patch('/:id', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription, staffScope((r) => ({ boardIds: param(r, 'id') }), 'write')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const result = updateBoardSchema.safeParse(request.body)

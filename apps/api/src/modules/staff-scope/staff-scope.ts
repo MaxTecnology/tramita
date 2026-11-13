@@ -147,6 +147,12 @@ export function protocolWhere(scope: StaffScope): Prisma.ProtocolWhereInput {
   return { task: taskWhere(scope) }
 }
 
+// Processes a member may change as their portfolio: responsible for the process or for the client.
+// Holding one task in a process is not enough (memberBoardWhere's third clause is visibility only).
+export function memberPortfolioBoardWhere(userId: string): Prisma.BoardWhereInput {
+  return { OR: [{ responsibleUserId: userId }, { client: { clientAssignments: { some: { userId } } } }] }
+}
+
 // Write gate. A member changes only their own tasks or tasks of a process in their portfolio; a
 // colleague's task seen through the department must be assumed first. Managers act on what they see.
 export function actableTaskWhere(scope: StaffScope): Prisma.TaskWhereInput {
@@ -155,7 +161,7 @@ export function actableTaskWhere(scope: StaffScope): Prisma.TaskWhereInput {
   return {
     OR: [
       { assigneeId: scope.userId },
-      { column: { board: { type: 'OS', ...memberBoardWhere(scope.userId) } } },
+      { column: { board: { type: 'OS', ...memberPortfolioBoardWhere(scope.userId) } } },
     ],
   }
 }

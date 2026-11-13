@@ -205,3 +205,8 @@ export async function deleteComment(id: string, actor: CommentActor) {
 
   return { ok: true }
 }
+
+// Task of a comment (route-level scope check before deleting)
+export async function getCommentTaskId(commentId: string): Promise<string | null> {
+  return (await prisma.comment.findUnique({ where: { id: commentId }, select: { taskId: true } }))?.taskId ?? null
+}

@@ -2,9 +2,8 @@ import type { FastifyRequest } from 'fastify'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
-import { memberBoardWhere } from '@/modules/boards/board-visibility'
 import {
-  getStaffScope, boardWhere, taskWhere, protocolWhere, actableTaskWhere, type StaffScope,
+  getStaffScope, boardWhere, taskWhere, protocolWhere, actableTaskWhere, memberPortfolioBoardWhere, type StaffScope,
 } from '@/modules/staff-scope/staff-scope'
 
 export interface ScopeTargets {
@@ -24,7 +23,7 @@ const uniq = (ids: (string | undefined)[] = []) => [...new Set(ids.filter((id): 
 // Boards a user may change: a manager what they see; a member only their portfolio processes.
 function actableBoardWhere(scope: StaffScope): Prisma.BoardWhereInput {
   if (scope.kind === 'ALL' || scope.role === 'ORG_MANAGER') return boardWhere(scope)
-  return memberBoardWhere(scope.userId)
+  return memberPortfolioBoardWhere(scope.userId)
 }
 
 // Ids that do not exist in the organization are left for the service (its usual 404). Ids that

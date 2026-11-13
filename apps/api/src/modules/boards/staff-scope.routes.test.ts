@@ -40,7 +40,7 @@ async function setup() {
   const brunaSem = await createTestUser(org.id, { role: 'ORG_MEMBER', departmentIds: [fiscal.id], seesDepartmentWork: false })
   const outsiderAuth = await getAuthHeader(outsider.email, 'Test@1234')
   return {
-    board, column, other, task, requirement, protocol, bruna,
+    org, folha, board, column, other, task, requirement, protocol, bruna,
     outsiderAuth,
     gerenteAuth: await getAuthHeader(gerenteFiscal.email, 'Test@1234'),
     brunaAuth: await getAuthHeader(bruna.email, 'Test@1234'),
@@ -177,3 +177,44 @@ describe('escopo do colaborador por departamento', () => {
     expect(await list(c.brunaSemAuth)).not.toContain(c.board.id)
   })
 })
+
+describe('revisão final: escrita só com assumir / gerente limitado ao departamento', () => {
+  it('holding one task in a process does not let a member change the colleagues\' tasks or the process', async () => {
+    const c = await setup()
+    const own = await createTestTask(c.column.id, c.bruna.id, { departmentId: c.task.departmentId! })
+    await prisma.task.update({ where: { id: own.id }, data: { assigneeId: c.bruna.id } })
+
+    expect((await call(c, ROUTES['edit task'], c.brunaAuth)).statusCode).toBe(403)
+    expect((await call(c, ROUTES['create column'], c.brunaAuth)).statusCode).toBe(403)
+  })
+
+  it('a Fiscal manager cannot delete a task nor edit a process of a client Fiscal does not serve', async () => {
+    const c = await setup()
+    const dani = await createTestUser(c.org.id, { role: 'ORG_MEMBER' })
+    const folhaClient = await createTestClient(c.org.id)
+    await serveClientDepartment(folhaClient.id, c.folha.id, dani.id)
+    const folhaBoard = await createTestBoard(c.org.id, folhaClient.id)
+    const folhaTask = await createTestTask((await createTestColumn(folhaBoard.id)).id, dani.id, { departmentId: c.folha.id })
+
+    const del = await app.inject({ method: 'DELETE', url: `/tasks/${folhaTask.id}`, headers: { authorization: c.gerenteAuth } })
+    const patch = await app.inject({ method: 'PATCH', url: `/boards/${folhaBoard.id}`, headers: { authorization: c.gerenteAuth }, payload: { title: 'Mudado' } })
+
+    expect([del.statusCode, patch.statusCode]).toEqual([404, 404])
+    expect(await prisma.task.count({ where: { id: folhaTask.id } })).toBe(1)
+  })
+
+  it('a Fiscal manager cannot delete a comment on a task of a client Fiscal does not serve', async () => {
+    const c = await setup()
+    const dani = await createTestUser(c.org.id, { role: 'ORG_MEMBER' })
+    const folhaClient = await createTestClient(c.org.id)
+    await serveClientDepartment(folhaClient.id, c.folha.id, dani.id)
+    const folhaTask = await createTestTask((await createTestColumn((await createTestBoard(c.org.id, folhaClient.id)).id)).id, dani.id, { departmentId: c.folha.id })
+    const comment = await prisma.comment.create({ data: { taskId: folhaTask.id, content: 'oi', authorType: 'USER', userId: dani.id } })
+
+    const res = await app.inject({ method: 'DELETE', url: `/comments/${comment.id}`, headers: { authorization: c.gerenteAuth } })
+
+    expect(res.statusCode).toBe(404)
+    expect(await prisma.comment.count({ where: { id: comment.id, deletedAt: null } })).toBe(1)
+  })
+})
+

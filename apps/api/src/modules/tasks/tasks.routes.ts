@@ -94,7 +94,7 @@ export async function tasksRoutes(app: FastifyInstance) {
   })
 
   app.delete('/tasks/:id', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), staffScope((r) => ({ taskIds: param(r, 'id') }), 'write')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.status(204).send(await deleteTask(id, request.user.organizationId!))

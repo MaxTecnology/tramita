@@ -11,10 +11,12 @@ export interface MyScope {
 export type ScopeView = 'mine' | 'department' | 'all'
 export interface ScopeValue { scope: ScopeView; departmentId?: string }
 
+// Admins see the whole office: for them a "department" view would be the same as "Todas" (the API
+// does not narrow the admin scope), so they get Minhas · Todas.
 export function canFilterDepartment(me: MyScope): boolean {
   if (me.role === 'ORG_MANAGER') return true
   if (me.role === 'ORG_MEMBER') return me.seesDepartmentWork && me.departments.length > 0
-  return me.departments.length > 0
+  return false
 }
 
 function allowedViews(me: MyScope): ScopeView[] {

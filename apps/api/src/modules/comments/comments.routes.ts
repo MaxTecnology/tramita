@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
-import { staffScope, param } from '@/middlewares/staffScope'
+import { staffScope, param, assertStaffSees } from '@/middlewares/staffScope'
+import { getStaffScope } from '@/modules/staff-scope/staff-scope'
 import { AppError } from '@/errors/AppError'
 import { createCommentSchema } from './comments.schema'
-import { listComments, createComment, deleteComment } from './comments.service'
+import { listComments, createComment, deleteComment, getCommentTaskId } from './comments.service'
 
 export async function commentsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
@@ -36,7 +37,17 @@ export async function commentsRoutes(app: FastifyInstance) {
   })
 
   app.delete('/comments/:id', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT')],
+    preHandler: [
+      requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT'),
+      // Moderating comments stays within the staff scope of the comment's task
+      async (request) => {
+        if (request.user.role !== 'ORG_MANAGER' && request.user.role !== 'ORG_MEMBER') return
+        const { id } = request.params as { id: string }
+        const taskId = await getCommentTaskId(id)
+        if (!taskId) return
+        await assertStaffSees(await getStaffScope(request), request.user.organizationId ?? '', { taskIds: [taskId] }, 'read')
+      },
+    ],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(
