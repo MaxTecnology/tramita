@@ -43,6 +43,8 @@ const PortalBoards = lazy(() => import('@/pages/portal/Boards'))
 const PortalBoard = lazy(() => import('@/pages/portal/Board'))
 const PortalProfile = lazy(() => import('@/pages/portal/Profile'))
 const PortalRequests = lazy(() => import('@/pages/portal/Requests'))
+const PortalNotifications = lazy(() => import('@/pages/portal/Notifications'))
+const AppNotifications = lazy(() => import('@/pages/app/Notifications'))
 const PortalHome = lazy(() => import('@/pages/portal/Home'))
 const PortalReceivedDocuments = lazy(() => import('@/pages/portal/ReceivedDocuments'))
 const PortalReceivedDocumentDetail = lazy(() => import('@/pages/portal/ReceivedDocumentDetail'))
@@ -268,6 +270,7 @@ export const router = createBrowserRouter([
         ),
       },
       { path: 'perfil', element: <Profile /> },
+      { path: 'notifications', element: <AppNotifications /> },
     ],
   },
   {
@@ -292,6 +295,7 @@ export const router = createBrowserRouter([
       { path: 'tasks', element: <Navigate to="/portal/documents" replace /> },
       { path: 'protocols', element: <Navigate to="/portal/documents" replace /> },
       { path: 'profile', element: <PortalProfile /> },
+      { path: 'notifications', element: <PortalNotifications /> },
     ],
   },
   { path: '*', element: <Navigate to="/login" replace /> },

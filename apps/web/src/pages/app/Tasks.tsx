@@ -23,6 +23,7 @@ import { periodRange, type PeriodKind } from './tasksPeriod'
 import type { Task, User, Department, RecurringTaskTemplate } from '@/types'
 import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
 import { useMyScope } from '@/hooks/useMyScope'
+import { useLinkedItem } from '@/hooks/useLinkedItem'
 
 // GET /tasks retorna uma listagem flat de tarefas cruzando todos os boards da org (inclusive o
 // board de sistema onde moram as recorrentes). O select do backend cobre todos os campos de Task,
@@ -328,6 +329,7 @@ export default function Tasks() {
   // Guarda só o id — o objeto é derivado ao vivo de `tasks` (abaixo, depois da query), pra que o
   // TaskDrawer sempre reflita a tarefa atual depois de uma edição, não um snapshot do clique.
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const clearLinkedTask = useLinkedItem('task', setSelectedTaskId)
   const [activeTask, setActiveTask] = useState<TaskListItem | null>(null)
   const [calendarMonth, setCalendarMonth] = useState(() => startOfCurrentMonthUTC())
 
@@ -444,7 +446,14 @@ export default function Tasks() {
     onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao assumir as tarefas')),
   })
 
-  const selectedTask = selectedTaskId ? tasks.find((t) => t.id === selectedTaskId) ?? null : null
+  // A task opened from a notification may be outside the current filters: fetched on its own
+  const selectedInList = selectedTaskId ? tasks.find((t) => t.id === selectedTaskId) ?? null : null
+  const { data: linkedTask = null } = useQuery<TaskListItem | null>({
+    queryKey: ['tasks', 'linked', selectedTaskId],
+    queryFn: () => api.get('/tasks', { params: { taskId: selectedTaskId } }).then((r) => r.data.items[0] ?? null),
+    enabled: !!selectedTaskId && !selectedInList && !isLoading,
+  })
+  const selectedTask = selectedInList ?? linkedTask
 
   const hasFilters =
     !!clientId || !!assigneeId || !!departmentId || !!recurringTemplateId || status !== 'OPEN' || periodKind !== 'this' || !!search.trim()
@@ -750,7 +759,7 @@ export default function Tasks() {
           currentUserId={user.id}
           role={user.role as 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'}
           clientId={selectedTask.column.board.clientId}
-          onClose={() => setSelectedTaskId(null)}
+          onClose={() => { setSelectedTaskId(null); clearLinkedTask() }}
         />
       )}
     </div>

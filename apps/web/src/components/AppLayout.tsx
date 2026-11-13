@@ -6,6 +6,7 @@ import { useRequestsBadgeStream } from '@/hooks/useRequestsBadgeStream'
 import { SlaConfigProvider } from '@/hooks/useSlaConfig'
 import { useSlaAlerts } from '@/hooks/useSlaAlerts'
 import { SlaPermissionBanner } from '@/components/SlaPermissionBanner'
+import { NotificationBell } from '@/components/shared/NotificationBell'
 import { api } from '@/lib/api'
 import { LayoutDashboard, Users, UserCheck, Settings, LogOut, ClipboardList, ListChecks, Inbox, Menu, X, UserCircle, FileStack, FileSearch, Receipt } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -79,6 +80,7 @@ export default function AppLayout() {
                 <p className="text-xs text-muted-foreground truncate">{user?.name}</p>
               </div>
             </div>
+            {isOrgRole && <NotificationBell base="/app" className="hidden md:block" />}
             <button
               aria-label="Fechar menu"
               onClick={() => setSidebarOpen(false)}
@@ -164,7 +166,8 @@ export default function AppLayout() {
             >
               <Menu size={22} />
             </button>
-            <h1 className="text-base font-bold text-accent">Tramita</h1>
+            <h1 className="text-base font-bold text-accent flex-1">Tramita</h1>
+            {isOrgRole && <NotificationBell base="/app" align="right" />}
           </header>
 
           <main className="flex-1 overflow-auto">

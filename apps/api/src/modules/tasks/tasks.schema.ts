@@ -55,6 +55,8 @@ export const listTasksQuerySchema = z.object({
   scope: z.enum(['mine', 'department', 'all']).optional(),
   openOnly: z.coerce.boolean().optional(),
   q: z.string().optional(),
+  // Deep link (notification): just this task, ignoring the screen filters (permission still applies)
+  taskId: z.string().cuid().optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
   cursor: z.string().cuid().optional(),
 })

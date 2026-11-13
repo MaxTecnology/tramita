@@ -23,6 +23,7 @@ import { TaskCard } from '@/components/TaskCard'
 import { TaskDrawer } from '@/components/shared/TaskDrawer'
 import { useAuth } from '@/hooks/useAuth'
 import type { Task } from '@/types'
+import { useLinkedItem } from '@/hooks/useLinkedItem'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { toast } from 'sonner'
 
@@ -60,6 +61,7 @@ export default function Board() {
   // (abaixo), pra que o TaskDrawer sempre reflita o estado atual da tarefa depois de uma edição
   // (ex.: título), em vez de um snapshot tirado no momento do clique que nunca se atualiza.
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const clearLinkedTask = useLinkedItem('task', setSelectedTaskId)
   const selectedTask = selectedTaskId
     ? (board?.columns.flatMap((c) => c.tasks).find((t) => t.id === selectedTaskId) ?? null)
     : null
@@ -316,7 +318,7 @@ export default function Board() {
           role={user.role as 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'}
           boardDueDate={board.dueDate}
           clientId={board.clientId}
-          onClose={() => setSelectedTaskId(null)}
+          onClose={() => { setSelectedTaskId(null); clearLinkedTask() }}
         />
       )}
     </div>

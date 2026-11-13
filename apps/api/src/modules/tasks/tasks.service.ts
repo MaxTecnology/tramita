@@ -487,11 +487,46 @@ function dateAndSearchFilters(query: ListTasksQuery): Prisma.TaskWhereInput[] {
   return filters
 }
 
+const LIST_TASK_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  status: true,
+  priority: true,
+  position: true,
+  columnId: true,
+  assigneeId: true,
+  creatorId: true,
+  sourceRequestId: true,
+  departmentId: true,
+  tags: true,
+  competence: true,
+  targetDate: true,
+  dueDate: true,
+  recurringTemplateId: true,
+  visibleToClient: true,
+  createdAt: true,
+  updatedAt: true,
+  department: { select: { id: true, name: true } },
+  assignee: { select: { id: true, name: true } },
+  column: { select: { board: { select: { id: true, clientId: true, client: { select: { id: true, name: true, codigo: true } } } } } },
+} satisfies Prisma.TaskSelect
+
 export async function listTasks(
   organizationId: string,
   actor: { id: string; role: string },
   query: ListTasksQuery,
 ) {
+  if (query.taskId) {
+    const scope = await actorScope(actor, organizationId)
+    const rows = await prisma.task.findMany({
+      where: { id: query.taskId, column: { board: { organizationId } }, AND: [taskWhere(scope)] },
+      select: LIST_TASK_SELECT,
+    })
+    const editable = await actableTaskIds(scope, rows.map((t) => t.id))
+    return { items: rows.map((t) => ({ ...t, viewerCanEdit: editable.has(t.id) })), nextCursor: null }
+  }
+
   const where: Prisma.TaskWhereInput = {
     column: {
       board: {
@@ -531,30 +566,7 @@ export async function listTasks(
   // estável, que é o que o cursor em si (um id único) exige pra funcionar corretamente.
   const rows = await prisma.task.findMany({
     where,
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      status: true,
-      priority: true,
-      position: true,
-      columnId: true,
-      assigneeId: true,
-      creatorId: true,
-      sourceRequestId: true,
-      departmentId: true,
-      tags: true,
-      competence: true,
-      targetDate: true,
-      dueDate: true,
-      recurringTemplateId: true,
-      visibleToClient: true,
-      createdAt: true,
-      updatedAt: true,
-      department: { select: { id: true, name: true } },
-      assignee: { select: { id: true, name: true } },
-      column: { select: { board: { select: { id: true, clientId: true, client: { select: { id: true, name: true, codigo: true } } } } } },
-    },
+    select: LIST_TASK_SELECT,
     orderBy: [{ targetDate: 'asc' }, { id: 'asc' }],
     take: limit + 1,
     ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),

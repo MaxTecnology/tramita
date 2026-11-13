@@ -13,6 +13,7 @@ import { Plus, Inbox, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ClientRequest } from '@/types'
 import { toast } from 'sonner'
 import { usePortalClient } from './Layout'
+import { useLinkedItem } from '@/hooks/useLinkedItem'
 
 const STATUS_LABEL: Record<ClientRequest['status'], string> = {
   PENDING: 'Em análise',
@@ -36,6 +37,10 @@ export default function PortalRequests() {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', departmentId: '', osTemplateId: '' })
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  useLinkedItem('request', setExpandedId)
+  useEffect(() => {
+    if (expandedId) document.getElementById(`request-${expandedId}`)?.scrollIntoView?.({ block: 'center' })
+  })
 
   const { data: requests = [], isLoading } = useQuery<ClientRequest[]>({
     queryKey: ['portal-requests', clientId],
@@ -112,7 +117,7 @@ export default function PortalRequests() {
           {requests.map((r) => {
             const isExpanded = expandedId === r.id
             return (
-              <div key={r.id} className="bg-surface rounded-lg border border-border px-4 py-3">
+              <div key={r.id} id={`request-${r.id}`} className="bg-surface rounded-lg border border-border px-4 py-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground">{r.title}</p>

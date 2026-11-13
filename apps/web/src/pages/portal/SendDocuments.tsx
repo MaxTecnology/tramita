@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Send, Upload } from 'lucide-react'
 import { toast } from 'sonner'
@@ -40,7 +40,12 @@ function currentCompetence(): string {
 // process). Current month opens by default; months without pending items stay collapsed in the picker.
 export function SendDocumentsView({ clientId }: { clientId: string }) {
   const queryClient = useQueryClient()
-  const [competence, setCompetence] = useState('')
+  // A notification link carries the month (?competence=AAAA-MM)
+  const [searchParams] = useSearchParams()
+  const [competence, setCompetence] = useState(() => {
+    const linked = searchParams.get('competence')
+    return linked && /^\d{4}-\d{2}$/.test(linked) ? linked : ''
+  })
 
   const { data: months = [] } = useQuery<MonthSummary[]>({
     queryKey: ['portal-request-months', clientId],

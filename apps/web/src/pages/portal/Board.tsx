@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import type { Board, Task } from '@/types'
+import { useLinkedItem } from '@/hooks/useLinkedItem'
 
 const PRIORITY_LABELS: Record<string, string> = {
   LOW: 'Baixa',
@@ -24,12 +25,21 @@ export default function PortalBoard() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [titleSearch, setTitleSearch] = useState('')
   const { user } = useAuth()
+  const [linkedTaskId, setLinkedTaskId] = useState<string | null>(null)
+  const clearLinkedTask = useLinkedItem('task', setLinkedTaskId)
 
   const { data: board, isLoading } = useQuery<Board>({
     queryKey: ['portal-board', boardId],
     queryFn: () => api.get(`/boards/${boardId}`).then((r) => r.data),
     enabled: !!boardId,
   })
+
+  useEffect(() => {
+    if (!linkedTaskId || !board) return
+    const task = board.columns.flatMap((c) => c.tasks).find((t) => t.id === linkedTaskId)
+    if (task) setSelectedTask(task)
+    setLinkedTaskId(null)
+  }, [linkedTaskId, board])
 
   if (isLoading) return <div className="p-8 text-muted-foreground">Carregando...</div>
   if (!board) return <div className="p-8 text-muted-foreground">Processo não encontrado.</div>
@@ -160,7 +170,7 @@ export default function PortalBoard() {
           task={selectedTask}
           currentUserId={user?.id ?? ''}
           role="CLIENT"
-          onClose={() => setSelectedTask(null)}
+          onClose={() => { setSelectedTask(null); clearLinkedTask() }}
         />
       )}
     </div>

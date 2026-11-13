@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
 import { useMyScope } from '@/hooks/useMyScope'
+import { useLinkedItem } from '@/hooks/useLinkedItem'
 
 const STATUS_LABEL: Record<ClientRequest['status'], string> = {
   PENDING: 'Pendente',
@@ -51,6 +52,8 @@ export default function Requests() {
   const [boardId, setBoardId] = useState('')
   const [columnId, setColumnId] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  // From a notification: every status (the request may have moved on), opened and scrolled to
+  useLinkedItem('request', (id) => { setStatusFilter(''); setExpandedId(id) })
 
   const me = useMyScope()
   const [scopeFilter, setScopeFilter] = useScopeFilter('requests', me)
@@ -77,6 +80,10 @@ export default function Requests() {
   }, [requests, search, dateFrom, dateTo])
 
   const hasActiveFilter = !!search || !!dateFrom || !!dateTo
+
+  useEffect(() => {
+    if (expandedId) document.getElementById(`request-${expandedId}`)?.scrollIntoView?.({ block: 'center' })
+  }, [expandedId, requests])
 
   const { data: clientBoards = [] } = useQuery<Board[]>({
     queryKey: ['boards', 'by-client', approving?.client?.id],
@@ -234,7 +241,7 @@ export default function Requests() {
           {filtered.map((r) => {
             const isExpanded = expandedId === r.id
             return (
-              <div key={r.id} className="bg-surface rounded-lg border border-border px-4 py-3">
+              <div key={r.id} id={`request-${r.id}`} className="bg-surface rounded-lg border border-border px-4 py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground">{r.title}</p>
