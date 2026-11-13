@@ -16,7 +16,14 @@ const TASKS = [
       { id: 'r2', taskId: 't1', name: 'Notas fiscais', status: 'PENDING', rejectionReason: null, taskTitle: 'Apuração', departmentName: 'Fiscal' },
     ],
   },
-  { taskId: 't2', title: 'Folha de outubro', departmentName: 'Departamento Pessoal', approvals: [], unreadMessages: 2, requests: [] },
+  {
+    taskId: 't2', title: 'Folha de outubro', departmentName: 'Departamento Pessoal', unreadMessages: 2, requests: [],
+    approvals: [{
+      id: 'a1', taskId: 't2', title: 'Prévia da folha de outubro', message: null, status: 'PENDING', requestedAt: '2026-11-10T12:00:00.000Z',
+      requestedByName: 'Dani', decidedAt: null, decisionNote: null, closeReason: null, waitedDays: null, decidedByName: null,
+      decidedByClient: false, fileName: 'previa.pdf', fileUrl: 'https://f/previa.pdf', proofName: null, proofUrl: null,
+    }],
+  },
 ]
 
 function setup(initialEntry = '/portal/send') {
@@ -88,4 +95,11 @@ it('"Nada a enviar" calls the not-applicable endpoint for that request', async (
 it('points to the processes when there are document requests inside a process', async () => {
   setup()
   await waitFor(() => expect(screen.getByText(/Há 1 documento pedido dentro de processos/)).toBeInTheDocument())
+})
+
+it('shows the approval request inside its task group with Aprovar and Pedir ajuste', async () => {
+  setup()
+  await waitFor(() => expect(screen.getByText('Prévia da folha de outubro')).toBeInTheDocument())
+  expect(screen.getByRole('button', { name: 'Aprovar' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Pedir ajuste' })).toBeInTheDocument()
 })

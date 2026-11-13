@@ -25,6 +25,8 @@ interface Config {
   requestCancelled?: boolean
   protocolCreated?: boolean
   taskAssumed?: boolean
+  approvalRequested?: boolean
+  approvalChangesRequested?: boolean
   protocolWarningDays?: number
   recurringGenerationFailed?: boolean
   documentRejected?: boolean
@@ -63,6 +65,8 @@ const EVENT_LABEL: Record<string, string> = {
   PROTOCOL_CREATED: 'Protocolo criado',
   SLA_DIGEST: 'Resumo diário de prazos',
   TASK_ASSUMED: 'Tarefa assumida por um colega',
+  APPROVAL_REQUESTED: 'Pedido de aprovação ao cliente',
+  APPROVAL_CHANGES_REQUESTED: 'Cliente pediu ajuste na aprovação',
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -328,6 +332,21 @@ export default function Notifications() {
               description="Notifica o cliente quando uma solicitação já aprovada é cancelada pelo escritório"
               checked={form.requestCancelled ?? false}
               onChange={(v) => setForm({ ...form, requestCancelled: v })}
+            />
+          </Section>
+
+          <Section title="Eventos — Aprovação do cliente">
+            <SwitchRow
+              label="Pedido de aprovação"
+              description="Avisa o cliente quando o escritório pede a aprovação de um arquivo (ex.: prévia da folha)"
+              checked={form.approvalRequested ?? false}
+              onChange={(v) => setForm({ ...form, approvalRequested: v })}
+            />
+            <SwitchRow
+              label="Cliente pediu ajuste"
+              description="Avisa o colaborador que pediu a aprovação quando o cliente pede um ajuste"
+              checked={form.approvalChangesRequested ?? false}
+              onChange={(v) => setForm({ ...form, approvalChangesRequested: v })}
             />
           </Section>
 

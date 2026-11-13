@@ -194,5 +194,16 @@ describe('no portal', () => {
     expect(month.tasks[0].approvals).toEqual([expect.objectContaining({ id, status: 'PENDING', title: 'Prévia da folha de novembro', fileUrl: 'https://signed.example/file' })])
     const home = JSON.parse((await app.inject({ method: 'GET', url: `/portal/home?clientId=${c.acme.id}`, headers: { authorization: c.rhAuth } })).body)
     expect(home.pendingApprovals).toBe(1)
+    expect(home.pendingApprovalLink).toBe(`/portal/send?competence=2026-11&task=${c.task.id}`)
+  })
+})
+
+describe('lista de tarefas', () => {
+  it('flags a task awaiting the client approval', async () => {
+    const c = await setup()
+    const list = async () => JSON.parse((await app.inject({ method: 'GET', url: `/tasks?taskId=${c.task.id}`, headers: { authorization: c.daniAuth } })).body).items[0]
+    expect((await list()).awaitingApproval).toBe(false)
+    await requestApproval(c)
+    expect((await list()).awaitingApproval).toBe(true)
   })
 })

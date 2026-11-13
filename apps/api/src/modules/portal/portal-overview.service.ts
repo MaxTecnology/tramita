@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { utcDayLabel, todayInBRT } from '@/lib/date-only'
 import { getClientAccessScope } from '@/modules/client-users/client-access'
 import { approvalInclude, presentApproval } from '@/modules/approvals/approvals.service'
+import { clientTaskLink } from '@/modules/inbox/inbox-events'
 
 const OPEN_REQUEST = ['PENDING', 'REJECTED'] as const
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -44,7 +45,7 @@ export async function getPortalHome(organizationId: string, clientId: string, cl
   if (departmentIds.length === 0) {
     return {
       unpaidGuides: { count: 0, overdueCount: 0 }, documentsToSend: 0, documentsToSendInProcesses: 0, processesInProgress: 0, dueThisWeek: [],
-      unreadMessages: { count: 0, link: null }, pendingApprovals: 0,
+      unreadMessages: { count: 0, link: null }, pendingApprovals: 0, pendingApprovalLink: null,
     }
   }
   const today = todayInBRT(now)
@@ -77,13 +78,16 @@ export async function getPortalHome(organizationId: string, clientId: string, cl
       select: { taskId: true, link: true },
       orderBy: { createdAt: 'asc' },
     }),
-    prisma.taskApproval.count({
+    prisma.taskApproval.findMany({
       where: {
         status: 'PENDING',
         task: { visibleToClient: true, departmentId: { in: departmentIds }, column: { board: { organizationId, clientId, isActive: true } } },
       },
+      select: { task: { select: { id: true, competence: true, column: { select: { board: { select: { id: true, type: true } } } } } } },
+      orderBy: { requestedAt: 'asc' },
     }),
   ])
+  const oldestApproval = pendingApprovals[0]?.task
   const conversations = new Map<string, string>()
   for (const n of unreadComments) if (n.taskId && !conversations.has(n.taskId)) conversations.set(n.taskId, n.link)
 
@@ -102,7 +106,11 @@ export async function getPortalHome(organizationId: string, clientId: string, cl
     processesInProgress,
     dueThisWeek,
     unreadMessages: { count: conversations.size, link: conversations.values().next().value ?? null },
-    pendingApprovals,
+    pendingApprovals: pendingApprovals.length,
+    // Card "Aguardando sua aprovação" opens the oldest one
+    pendingApprovalLink: oldestApproval
+      ? clientTaskLink({ id: oldestApproval.id, competence: oldestApproval.competence, boardId: oldestApproval.column.board.id, boardType: oldestApproval.column.board.type })
+      : null,
   }
 }
 

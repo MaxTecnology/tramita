@@ -7,7 +7,7 @@ const EVENTS = [
   'TASK_CREATED', 'TASK_MOVED', 'TASK_COMPLETED', 'TASK_COMMENT_ADDED', 'TASK_BLOCKED',
   'DOCUMENT_REJECTED', 'REQUEST_CREATED', 'REQUEST_APPROVED', 'REQUEST_REJECTED',
   'REQUEST_NEEDS_INFO', 'REQUEST_COMMENT_ADDED', 'REQUEST_CANCELLED', 'PROTOCOL_CREATED',
-  'RECURRING_GENERATION_FAILED', 'SLA_DIGEST', 'TASK_ASSUMED',
+  'RECURRING_GENERATION_FAILED', 'SLA_DIGEST', 'TASK_ASSUMED', 'APPROVAL_REQUESTED', 'APPROVAL_CHANGES_REQUESTED',
 ] as const
 const CHANNELS = ['WHATSAPP', 'EMAIL'] as const
 
@@ -28,6 +28,8 @@ const EVENT_LABEL: Record<string, string> = {
   RECURRING_GENERATION_FAILED: 'Falha na geração de tarefa recorrente',
   SLA_DIGEST: 'Resumo diário de prazos',
   TASK_ASSUMED: 'Tarefa assumida por um colega',
+  APPROVAL_REQUESTED: 'Pedido de aprovação ao cliente',
+  APPROVAL_CHANGES_REQUESTED: 'Cliente pediu ajuste na aprovação',
 }
 
 export default function Templates() {

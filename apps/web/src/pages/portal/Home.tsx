@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Receipt, Send, LayoutGrid, CalendarClock, MessageSquare } from 'lucide-react'
+import { Receipt, Send, LayoutGrid, CalendarClock, MessageSquare, FileCheck } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { formatBRL } from '@/lib/money'
@@ -13,6 +13,7 @@ interface PortalHome {
   processesInProgress: number
   unreadMessages: { count: number; link: string | null }
   pendingApprovals: number
+  pendingApprovalLink: string | null
   dueThisWeek: { kind: 'guide' | 'request'; id: string; title: string; dueDate: string; amount?: string }[]
 }
 
@@ -52,6 +53,23 @@ export default function PortalHomePage() {
   return (
     <div className="p-4 md:p-6 space-y-5">
       <h1 className="text-lg md:text-xl font-bold text-foreground">Início</h1>
+
+      {/* Takes priority over the other cards: the office is waiting on the client */}
+      {data.pendingApprovals > 0 && (
+        <Link
+          to={data.pendingApprovalLink ?? '/portal/send'}
+          className="flex items-center gap-3 rounded-lg border-l-4 border-warning-text bg-warning-bg p-4 shadow-sm hover:opacity-90"
+        >
+          <FileCheck size={22} className="text-warning-text flex-shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-warning-text">Aguardando sua aprovação</p>
+            <p className="text-xs text-warning-text">
+              {data.pendingApprovals === 1 ? 'O escritório enviou 1 arquivo para você aprovar' : `O escritório enviou ${data.pendingApprovals} arquivos para você aprovar`}
+            </p>
+          </div>
+          <span className="ml-auto text-3xl font-bold text-warning-text">{data.pendingApprovals}</span>
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {cards.map(({ to, icon: Icon, label, value, hint, tone, hintTone }) => (

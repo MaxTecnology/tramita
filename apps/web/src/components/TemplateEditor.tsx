@@ -19,6 +19,7 @@ const TEMPLATE_VARS: { key: string; label: string }[] = [
   { key: 'criticalCount',     label: 'Qtd. de tarefas críticas' },
   { key: 'taskListText',      label: 'Lista de tarefas em alerta' },
   { key: 'assumedByName',     label: 'Quem assumiu a tarefa' },
+  { key: 'approvalTitle',     label: 'Título da aprovação' },
 ]
 
 interface Props {

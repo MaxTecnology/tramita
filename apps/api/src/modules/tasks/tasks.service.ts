@@ -513,7 +513,15 @@ const LIST_TASK_SELECT = {
   department: { select: { id: true, name: true } },
   assignee: { select: { id: true, name: true } },
   column: { select: { board: { select: { id: true, clientId: true, client: { select: { id: true, name: true, codigo: true } } } } } },
+  approvals: { where: { status: 'PENDING' }, select: { id: true }, take: 1 },
 } satisfies Prisma.TaskSelect
+
+type ListTaskRow = Prisma.TaskGetPayload<{ select: typeof LIST_TASK_SELECT }>
+
+// "Aguardando aprovação do cliente" flag; the approvals themselves are not part of the list
+function toListItem({ approvals, ...t }: ListTaskRow, editable: Set<string>) {
+  return { ...t, viewerCanEdit: editable.has(t.id), awaitingApproval: approvals.length > 0 }
+}
 
 export async function listTasks(
   organizationId: string,
@@ -527,7 +535,7 @@ export async function listTasks(
       select: LIST_TASK_SELECT,
     })
     const editable = await actableTaskIds(scope, rows.map((t) => t.id))
-    return { items: rows.map((t) => ({ ...t, viewerCanEdit: editable.has(t.id) })), nextCursor: null }
+    return { items: rows.map((t) => toListItem(t, editable)), nextCursor: null }
   }
 
   const where: Prisma.TaskWhereInput = {
@@ -580,7 +588,7 @@ export async function listTasks(
   const nextCursor = hasMore ? page[page.length - 1].id : null
   // Read-only for the viewer until they assume it (colleague's task seen through the department)
   const editable = await actableTaskIds(scope, page.map((t) => t.id))
-  const items = page.map((t) => ({ ...t, viewerCanEdit: editable.has(t.id) }))
+  const items = page.map((t) => toListItem(t, editable))
 
   return { items, nextCursor }
 }

@@ -11,6 +11,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { useLinkedItem } from '@/hooks/useLinkedItem'
 import { Comments } from '@/components/shared/Comments'
 import { notificationsApi, UNREAD_KEY, LIST_KEY } from '@/components/shared/notifications'
+import { PortalApproval } from '@/components/portal/PortalApproval'
+import type { Approval } from '@/components/shared/approvals'
 
 interface MonthSummary { competence: string; pending: number; total: number }
 type RequestStatus = 'PENDING' | 'UPLOADED' | 'APPROVED' | 'REJECTED' | 'NOT_APPLICABLE'
@@ -28,6 +30,7 @@ interface TaskGroup {
   title: string
   departmentName: string
   requests: DocumentRequest[]
+  approvals: Approval[]
   unreadMessages: number
 }
 
@@ -192,6 +195,11 @@ export function SendDocumentsView({ clientId }: { clientId: string }) {
                       )}
                     </button>
                   </div>
+                  {g.approvals.length > 0 && (
+                    <div className="divide-y divide-border border-b border-border">
+                      {g.approvals.map((a) => <PortalApproval key={a.id} approval={a} onChanged={refresh} />)}
+                    </div>
+                  )}
                   {g.requests.length > 0 && (
                     <div className="divide-y divide-border">
                       {g.requests.map((r) => (

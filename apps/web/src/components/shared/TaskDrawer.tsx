@@ -16,6 +16,7 @@ import { formatBRL, toApiAmount } from '@/lib/money'
 import { PaymentFields, type PaymentValues } from './task-documents/PaymentFields'
 import { ProtocolOfficeCard } from './task-documents/ProtocolOfficeCard'
 import { AddDeliverableForm } from './task-documents/AddDeliverableForm'
+import { ApprovalsSection, useTaskApprovals } from './task-documents/ApprovalsSection'
 
 function isValidAmount(value: string): boolean {
   try { toApiAmount(value); return true } catch { return false }
@@ -45,12 +46,23 @@ const ACTION_LABELS: Record<string, string> = {
   priority_changed: 'alterou prioridade para',
   assigned_to: 'alterou responsável para',
   department_changed: 'alterou departamento para',
+  approval_requested: 'pediu aprovação do cliente:',
+  approval_approved: 'aprovou',
+  approval_changes_requested: 'pediu ajuste:',
+  approval_closed_by_office: 'fechou a aprovação sem o portal',
+}
+
+const CLOSE_REASON_HISTORY: Record<string, string> = {
+  APPROVED_OUTSIDE: 'cliente aprovou fora da plataforma',
+  NO_RESPONSE: 'sem resposta do cliente',
 }
 
 function formatHistoryAction(h: TaskHistory): string {
   const label = ACTION_LABELS[h.action] ?? h.action
   if (h.action === 'attachment_deleted' && h.fromValue) return `${label} "${h.fromValue}"`
   if (h.action === 'attachment_added' && h.toValue) return `${label} "${h.toValue}"`
+  if (h.action === 'approval_approved' && h.fromValue) return `${label} "${h.fromValue}"`
+  if (h.action === 'approval_closed_by_office') return `${label} (${CLOSE_REASON_HISTORY[h.toValue ?? ''] ?? h.toValue ?? ''})`
   if (h.toValue) return `${label} ${h.toValue}`
   return label
 }
@@ -107,6 +119,8 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   const [descValue, setDescValue] = useState(task.description ?? '')
 
   const isStaff = isOrgRole(role)
+  const { data: approvals = [] } = useTaskApprovals(task.id, isStaff)
+  const awaitingApproval = approvals.some((a) => a.status === 'PENDING')
   // Office staff sees everything in the drawer; changing it needs the task to be theirs (or their
   // portfolio / manager scope). A colleague's task seen through the department must be assumed first.
   const canEdit = isStaff && task.viewerCanEdit !== false
@@ -373,6 +387,11 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                 </Button>
               )}
             </div>
+          )}
+          {awaitingApproval && (
+            <p className="mb-3 inline-flex rounded-full bg-warning-bg px-2.5 py-0.5 text-xs font-medium text-warning-text">
+              Aguardando aprovação do cliente
+            </p>
           )}
           <div className="flex items-start justify-between mb-3">
             {canEdit && editingTitle ? (
@@ -774,6 +793,8 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                   </button>
                 ))}
               </div>
+
+              {isStaff && <ApprovalsSection taskId={task.id} canEdit={canEdit} visibleToClient={task.visibleToClient} />}
             </div>
           )}
 

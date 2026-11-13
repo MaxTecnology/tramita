@@ -30,6 +30,7 @@ import { useLinkedItem } from '@/hooks/useLinkedItem'
 // mais os relacionamentos abaixo — ou seja, cada item já satisfaz a interface Task e pode ser
 // passado direto para o TaskDrawer, sem mapeamento.
 interface TaskListItem extends Task {
+  awaitingApproval?: boolean
   department: { id: string; name: string } | null
   assignee: { id: string; name: string } | null
   column: {
@@ -39,6 +40,14 @@ interface TaskListItem extends Task {
       client: { id: string; name: string; codigo: string | null }
     }
   }
+}
+
+function AwaitingApprovalBadge({ className }: { className?: string }) {
+  return (
+    <span className={cn('inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full bg-warning-bg text-warning-text whitespace-nowrap', className)}>
+      Aguardando aprovação
+    </span>
+  )
 }
 
 interface ClientOption {
@@ -101,7 +110,10 @@ function TaskRow({ task, onClick }: { task: TaskListItem; onClick: () => void })
           <span className="text-muted-foreground text-xs ml-1.5">#{task.column.board.client.codigo}</span>
         )}
       </td>
-      <td className="px-3 py-2.5 text-sm text-foreground">{task.title}</td>
+      <td className="px-3 py-2.5 text-sm text-foreground">
+        {task.title}
+        {task.awaitingApproval && <AwaitingApprovalBadge className="ml-2" />}
+      </td>
       <td className="px-3 py-2.5 text-sm text-muted-foreground">{task.department?.name ?? '—'}</td>
       <td className="px-3 py-2.5 text-sm text-muted-foreground">{task.assignee?.name ?? '—'}</td>
       <td className="px-3 py-2.5">
@@ -157,6 +169,7 @@ function DraggableTaskCard({ task, onClick }: { task: TaskListItem; onClick: () 
         {task.column.board.client.codigo && <span className="ml-1">#{task.column.board.client.codigo}</span>}
       </p>
       <div className="flex items-center gap-1.5 flex-wrap">
+        {task.awaitingApproval && <AwaitingApprovalBadge />}
         {task.sourceRequestId && (
           <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-highlight-bg text-highlight-text" title="Originado de uma solicitação do cliente">
             <Inbox size={11} />
