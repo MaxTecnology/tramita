@@ -101,6 +101,7 @@ async function runSlaDigestForOrg(
       title: true,
       targetDate: true,
       dueDate: true,
+      departmentId: true,
       assignee: { select: { id: true, isActive: true } },
       column: { select: { board: { select: { client: { select: { name: true } } } } } },
     },
@@ -122,14 +123,17 @@ async function runSlaDigestForOrg(
     select: {
       id: true, title: true, dueDate: true, status: true,
       client: { select: { name: true } },
-      task: { select: { assignee: { select: { id: true, isActive: true } } } },
+      task: { select: { departmentId: true, assignee: { select: { id: true, isActive: true } } } },
     },
   })
 
   const admins = await prisma.user.findMany({
     where: { organizationId: org.id, role: { in: ['ORG_ADMIN', 'ORG_MANAGER'] }, isActive: true },
-    select: { id: true },
+    select: { id: true, role: true, departments: { select: { departmentId: true } } },
   })
+  // Without an active assignee: admins + managers of the task's department (spec: visibilidade por departamento)
+  const fallbackFor = (departmentId: string | null) =>
+    admins.filter((u) => u.role === 'ORG_ADMIN' || (!!departmentId && u.departments.some((d) => d.departmentId === departmentId)))
 
   const byUserId = new Map<string, DigestEntry[]>()
 
@@ -151,7 +155,7 @@ async function runSlaDigestForOrg(
     }
 
     // Assignee desativado (ex-funcionário) nunca é destinatário — mesma regra de "sem assignee".
-    const recipientIds = task.assignee?.isActive ? [task.assignee.id] : admins.map((a) => a.id)
+    const recipientIds = task.assignee?.isActive ? [task.assignee.id] : fallbackFor(task.departmentId).map((a) => a.id)
     for (const userId of recipientIds) {
       const bucket = byUserId.get(userId) ?? []
       bucket.push(entry)
@@ -167,7 +171,7 @@ async function runSlaDigestForOrg(
       level: protocol.status === 'EXPIRED' ? 'EXPIRED' : 'TARGET_WARNING',
       dateLabel: `vence ${protocol.dueDate!.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`,
     }
-    const recipientIds = protocol.task.assignee?.isActive ? [protocol.task.assignee.id] : admins.map((a) => a.id)
+    const recipientIds = protocol.task.assignee?.isActive ? [protocol.task.assignee.id] : fallbackFor(protocol.task.departmentId).map((a) => a.id)
     for (const userId of recipientIds) {
       const bucket = byUserId.get(userId) ?? []
       bucket.push(entry)

@@ -107,6 +107,26 @@ describe('runSlaDigest', () => {
     )
   })
 
+  it('sem responsável ativo, vai para os admins e só para os gerentes do departamento da tarefa', async () => {
+    const { enqueueNotification } = await import('@/lib/queue')
+    const org = await createTestOrg((await createTestPlan()).id)
+    const fiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
+    const folha = await createTestDepartment(org.id, { name: 'Folha' })
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const gerenteFiscal = await createTestUser(org.id, { role: 'ORG_MANAGER', departmentIds: [fiscal.id] })
+    const gerenteFolha = await createTestUser(org.id, { role: 'ORG_MANAGER', departmentIds: [folha.id] })
+    const client = await createTestClient(org.id)
+    const column = await createTestColumn((await createTestBoard(org.id, client.id)).id)
+    const task = await createTestTask(column.id, admin.id, { departmentId: fiscal.id }) // sem assignee
+    await prisma.task.update({ where: { id: task.id }, data: { dueDate: new Date() } })
+
+    await runSlaDigest(new Date())
+
+    const recipients = vi.mocked(enqueueNotification).mock.calls.map((c) => c[0].userId)
+    expect(recipients).toEqual(expect.arrayContaining([admin.id, gerenteFiscal.id]))
+    expect(recipients).not.toContain(gerenteFolha.id)
+  })
+
   it('não enfileira pro assignee desativado — cai pro fallback de admins ativos', async () => {
     const { enqueueNotification } = await import('@/lib/queue')
     const plan = await createTestPlan()

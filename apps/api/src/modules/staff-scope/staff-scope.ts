@@ -74,6 +74,19 @@ function departmentReach(scope: Limited): string[] | null {
   return scope.seesDepartment && scope.departmentIds.length > 0 ? scope.departmentIds : null
 }
 
+// Clients the user may open a process for: served by one of their departments (with reach) or in
+// their own portfolio.
+export function clientWhere(scope: StaffScope): Prisma.ClientWhereInput {
+  if (scope.kind === 'ALL') return {}
+  const reach = departmentReach(scope)
+  return {
+    OR: [
+      { clientAssignments: { some: { userId: scope.userId } } },
+      ...(reach ? [{ clientAssignments: { some: { departmentId: { in: reach } } } }] : []),
+    ],
+  }
+}
+
 export function boardWhere(scope: StaffScope): Prisma.BoardWhereInput {
   if (scope.kind === 'ALL') return {}
   const reach = departmentReach(scope)

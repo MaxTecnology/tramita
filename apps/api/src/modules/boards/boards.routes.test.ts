@@ -22,6 +22,7 @@ describe('POST /boards', () => {
     const org = await createTestOrg(plan.id)
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
     const client = await createTestClient(org.id)
+    await serveClientDepartment(client.id, (await createTestDepartment(org.id)).id, member.id) // client in their portfolio
 
     const auth = await getAuthHeader(member.email, 'Test@1234')
     const res = await app.inject({
@@ -46,6 +47,7 @@ describe('POST /boards', () => {
     const org = await createTestOrg(plan.id)
     const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
     const client = await createTestClient(org.id)
+    await serveClientDepartment(client.id, (await createTestDepartment(org.id)).id, manager.id)
 
     const auth = await getAuthHeader(manager.email, 'Test@1234')
     const res = await app.inject({
@@ -67,6 +69,7 @@ describe('POST /boards', () => {
     const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
     const client = await createTestClient(org.id)
+    await serveClientDepartment(client.id, (await createTestDepartment(org.id)).id, manager.id)
 
     const auth = await getAuthHeader(manager.email, 'Test@1234')
     const res = await app.inject({
@@ -83,12 +86,14 @@ describe('POST /boards', () => {
 })
 
 describe('GET /boards', () => {
-  it('ORG_MEMBER vê apenas boards onde é responsável', async () => {
+  it('ORG_MEMBER vê apenas os boards da sua carteira', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER', seesDepartmentWork: false })
     const client = await createTestClient(org.id)
+    const otherClient = await createTestClient(org.id)
+    await serveClientDepartment(client.id, (await createTestDepartment(org.id)).id, member.id)
 
     const authMember = await getAuthHeader(member.email, 'Test@1234')
     const authAdmin = await getAuthHeader(admin.email, 'Test@1234')
@@ -106,7 +111,7 @@ describe('GET /boards', () => {
       method: 'POST',
       url: '/boards',
       headers: { authorization: authAdmin },
-      payload: { title: 'Board do Admin', clientId: client.id },
+      payload: { title: 'Board do Admin', clientId: otherClient.id },
     })
 
     // Member vê só o seu
@@ -127,7 +132,7 @@ describe('GET /boards', () => {
     const org = await createTestOrg(plan.id)
     const dept = await createTestDepartment(org.id)
     const manager = await createTestUser(org.id, { role: 'ORG_MANAGER', departmentIds: [dept.id] })
-    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER', departmentIds: [dept.id] })
     const client = await createTestClient(org.id)
     await serveClientDepartment(client.id, dept.id, manager.id)
 

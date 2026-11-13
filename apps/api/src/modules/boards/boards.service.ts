@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { CreateBoardBody, UpdateBoardBody, SearchQuery } from './boards.schema'
 import { todayInBRT, startOfTodayInBRT } from '@/lib/date-only'
-import { boardWhere, type StaffScope } from '@/modules/staff-scope/staff-scope'
+import { boardWhere, clientWhere, loadStaffScope, type StaffScope } from '@/modules/staff-scope/staff-scope'
 
 const DEFAULT_COLUMNS = [
   { title: 'Pendente', position: 0, color: '#6B7280', statusEffect: 'NONE' as const },
@@ -125,8 +125,9 @@ export async function createBoard(
   userRole: string,
   data: CreateBoardBody,
 ) {
+  const scope = await loadStaffScope({ sub: userId, role: userRole, organizationId })
   const client = await prisma.client.findFirst({
-    where: { id: data.clientId, organizationId, isActive: true },
+    where: { id: data.clientId, organizationId, isActive: true, ...clientWhere(scope) },
   })
   if (!client) throw new AppError(404, 'Cliente não encontrado')
 
