@@ -6,6 +6,9 @@ export const createUserSchema = z.object({
   password: z.string().min(8),
   role: z.enum(['ORG_MANAGER', 'ORG_MEMBER']),
   phone: z.string().optional(),
+  // Required for managers and members (checked with a pt-BR message below the schema)
+  departmentIds: z.array(z.string().cuid()).optional(),
+  seesDepartmentWork: z.boolean().optional(),
 })
 
 export const updateUserSchema = z.object({
@@ -13,6 +16,8 @@ export const updateUserSchema = z.object({
   email: z.string().email().optional(),
   role: z.enum(['ORG_MANAGER', 'ORG_MEMBER']).optional(),
   phone: z.string().nullable().optional(),
+  departmentIds: z.array(z.string().cuid()).min(1, 'Selecione pelo menos um departamento').optional(),
+  seesDepartmentWork: z.boolean().optional(),
 })
 
 export const updateMyProfileSchema = z.object({

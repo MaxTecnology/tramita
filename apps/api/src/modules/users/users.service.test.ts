@@ -56,12 +56,14 @@ describe('createUser', () => {
   it('creates a user with hashed password, scoped to the organization', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
+    const fiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
 
     const result = await createUser(org.id, {
       name: 'Novo Membro',
       email: `novo-${Date.now()}@test.com`,
       password: 'Senha@1234',
       role: 'ORG_MEMBER',
+      departmentIds: [fiscal.id],
     })
 
     expect(result.role).toBe('ORG_MEMBER')
