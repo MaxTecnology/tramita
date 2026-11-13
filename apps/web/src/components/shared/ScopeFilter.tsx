@@ -44,19 +44,26 @@ function read(screen: string): ScopeValue | null {
 // Filter state for one screen, remembered in the browser. A stored value the user can no longer
 // use (role or option changed) falls back to the default of their role.
 export function useScopeFilter(screen: string, me: MyScope | undefined): [ScopeValue, (v: ScopeValue) => void] {
-  const [value, setValue] = useState<ScopeValue>(() => {
-    if (!me) return { scope: 'mine' }
+  const initial = (who: MyScope): ScopeValue => {
     const stored = read(screen)
-    const ok = stored && allowedViews(me).includes(stored.scope)
-      && (!stored.departmentId || me.departments.some((d) => d.id === stored.departmentId))
-    return ok ? stored : { scope: defaultView(me) }
-  })
-
-  // `me` arrives after the first render: settle on the role default once it is known
+    const ok = stored && allowedViews(who).includes(stored.scope)
+      && (!stored.departmentId || who.departments.some((d) => d.id === stored.departmentId))
+    return ok ? stored : { scope: defaultView(who) }
+  }
+  const [value, setValue] = useState<ScopeValue>(() => (me ? initial(me) : { scope: 'mine' }))
+  // `me` usually arrives after the first render: settle once on the stored value or the role
+  // default, then only correct a value the user can no longer use (role/option changed)
+  const [settled, setSettled] = useState(!!me)
   useEffect(() => {
     if (!me) return
-    if (!allowedViews(me).includes(value.scope)) setValue({ scope: defaultView(me) })
-  }, [me, value.scope])
+    if (!settled) {
+      setValue(initial(me))
+      setSettled(true)
+    } else if (!allowedViews(me).includes(value.scope)) {
+      setValue({ scope: defaultView(me) })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me, settled, value.scope])
 
   const update = (next: ScopeValue) => {
     setValue(next)

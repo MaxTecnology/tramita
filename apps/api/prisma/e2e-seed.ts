@@ -178,6 +178,25 @@ async function main() {
     },
   })
 
+  // Staff of the office belongs to departments (visibility by department). Every E2E staff member is
+  // in "Geral"; reruns keep them active, back in Geral, seeing their colleagues.
+  const staff = async (email: string, name: string) => {
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: { isActive: true, name, organizationId: org.id, role: 'ORG_MEMBER', seesDepartmentWork: true },
+      create: { name, email, passwordHash: await bcrypt.hash('Equipe@2025', 10), role: 'ORG_MEMBER', organizationId: org.id },
+    })
+    await prisma.userDepartment.upsert({
+      where: { userId_departmentId: { userId: user.id, departmentId: department.id } },
+      update: {},
+      create: { userId: user.id, departmentId: department.id },
+    })
+    return user
+  }
+  // "Assumir": Ausente E2E has an open task, Cobertura E2E covers the absence
+  const ausente = await staff('ausente-e2e@g2a.com.br', 'Ausente E2E')
+  await staff('cobertura-e2e@g2a.com.br', 'Cobertura E2E')
+
   // Monthly document request (portal "Enviar documentos"): recurring task of the current month
   const now = new Date()
   const competence = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
@@ -192,6 +211,9 @@ async function main() {
               title: 'Apuração E2E', position: 0, priority: 'MEDIUM', status: 'BLOCKED', tags: [], creatorId: admin.id,
               departmentId: department.id, assigneeId: admin.id, visibleToClient: true, competence,
               documentRequirements: { create: [{ name: 'Extrato bancário E2E', position: 0 }] },
+            }, {
+              title: 'Conferência E2E', position: 1, priority: 'MEDIUM', status: 'OPEN', tags: [], creatorId: admin.id,
+              departmentId: department.id, assigneeId: ausente.id, visibleToClient: false, competence,
             }],
           },
         }],
@@ -200,11 +222,6 @@ async function main() {
   })
 
   // Transfer of responsibilities: "Saída E2E" serves two clients and leaves the office
-  const staff = async (email: string, name: string) => prisma.user.upsert({
-    where: { email },
-    update: { isActive: true, name, organizationId: org.id, role: 'ORG_MEMBER' },
-    create: { name, email, passwordHash: await bcrypt.hash('Equipe@2025', 10), role: 'ORG_MEMBER', organizationId: org.id },
-  })
   const leaving = await staff('saida-e2e@g2a.com.br', 'Saída E2E')
   await staff('destino-e2e@g2a.com.br', 'Destino E2E')
   const portfolioUser = await prisma.clientUser.upsert({

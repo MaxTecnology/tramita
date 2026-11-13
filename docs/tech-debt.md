@@ -538,7 +538,7 @@ portal aceitavam qualquer arquivo. **Resolvido:** política única (`src/lib/upl
 imagens, Office, TXT, CSV, XML, OFX, ZIP) — nunca pelo Content-Type do navegador —, e XML/Office/ZIP
 gravados no B2 com `Content-Disposition: attachment`. O web filtra o seletor de arquivo com `accept`.
 
-## Auditoria de segurança de 2026-11-12 — pendências que dependem de decisão de produto
+## Auditoria de segurança de 2026-11-12 — pendências que dependem de decisão de produto ✅ (decididas e implementadas em 2026-11-13)
 
 A auditoria (security-auditor) da rodada de débitos achou 0 crítico, 1 alto, 3 médios e 5 baixos. Foram
 corrigidos (commit `cfb6348`): webhook Asaas (header, comparação em tempo constante, segredo fora do
@@ -555,7 +555,11 @@ Ficam abertos, aguardando decisão do Max:
   qualquer Membro vê e comenta todas as solicitações da organização. Pode ser intencional (pedido ainda
   não virou processo); se a regra for "só a carteira dele", filtrar por cliente que ele atende.
 
-Ações fora do código:
+**Implementado (2026-11-13):** fila do robô e solicitações seguem o escopo por departamento (o Membro vê o
+dele e, com "ver colegas", o do departamento; admin vê tudo; não identificados só admin e gerente) — ver
+`docs/superpowers/specs/2026-11-12-visibilidade-por-departamento-design.md`.
+
+Ações fora do código (ainda pendentes, por último na ordem combinada):
 - Conferir no Dokploy se o webhook do Asaas está cadastrado com `?accessToken=` na URL; se sim, trocar
   para o header (o Asaas envia `asaas-access-token`) e **rotacionar o `ASAAS_WEBHOOK_SECRET`**, que pode
   ter ido para os logs antigos.

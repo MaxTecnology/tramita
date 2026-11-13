@@ -408,6 +408,12 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
 
 ### Próximos passos a discutir (anotados em 2026-11-11, não esquecer)
 
+   **Atualização 2026-11-13:** ✅ visibilidade por departamento implementada (branch
+   `feat/visibilidade-departamento`, plano `docs/superpowers/plans/2026-11-13-visibilidade-por-departamento.md`):
+   colaborador pertence a departamentos, opção "ver colegas", filtro Minhas · Meu departamento · Todas,
+   Assumir (uma e em lote), solicitação aprovada vai para quem aprovou. Pendente desta trilha só as ações
+   fora do código abaixo.
+
    **Atualização 2026-11-12 (após a rodada de débitos e a auditoria de segurança):** ordem combinada
    com o Max — **primeiro** a visibilidade do Membro (fila do robô e solicitações, com filtro "minhas"
    por padrão e acesso ao departamento para cobrir colega ausente — ver `docs/tech-debt.md`, seção da

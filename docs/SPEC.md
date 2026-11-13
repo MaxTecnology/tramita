@@ -11,10 +11,34 @@
   pela **extensão** numa lista permitida — PDF, JPG/JPEG, PNG, GIF, WEBP, DOC/DOCX, XLS/XLSX, TXT, CSV,
   XML, OFX, ZIP — e nunca pelo `Content-Type` do navegador; fora da lista → 422. XML, Office e ZIP são
   gravados no B2 com `Content-Disposition: attachment` (baixam, não abrem no navegador).
-- **ORG_MEMBER** só lê e age em processo que enxerga (responsável pelo processo, responsável por
-  departamento que atende o cliente, ou com tarefa atribuída). Rotas por id de processo, coluna, tarefa ou
-  protocolo respondem **404** fora desse escopo — inclusive o SSE do processo.
+- **Escopo do colaborador** (2026-11-13, `src/modules/staff-scope/`): o colaborador pertence a
+  departamentos (`UserDepartment`). **ORG_ADMIN** vê tudo; **ORG_MANAGER** vê tudo dos clientes
+  atendidos pelos departamentos dele; **ORG_MEMBER** vê a carteira (responsável pelo processo, pelo
+  cliente, ou com tarefa atribuída) **+** o mesmo que o gerente quando `seesDepartmentWork` está ligado
+  (padrão). Vale para processos, tarefas, solicitações (e comentários), fila do robô, protocolos, guias,
+  dashboard, contador de pendentes e SSE. Fora do escopo → **404**. Visível mas não é do colaborador
+  (tarefa de colega vista pelo departamento) → só ver e comentar; mexer → **403** `Assuma a tarefa para
+  alterá-la`. Listas aceitam `?scope=mine|department|all` (+ `departmentId`); sem `scope`: `department`
+  para a equipe, `all` para o admin; `all` só vale para o admin.
+- **Responsável** por cliente/departamento precisa pertencer ao departamento (admin isento); tirar alguém
+  de um departamento onde é responsável → 409.
 - **Rate limit** global por IP: `RATE_LIMIT_MAX` requisições/minuto (padrão 100).
+
+## Assumir tarefa e escopo (2026-11-13)
+
+- `POST /tasks/:id/assume` `{ expectedAssigneeId: string | null }` — staff do departamento da tarefa
+  (Membro com "ver colegas"); só se o responsável ainda for o esperado (409 `Essa tarefa já foi assumida
+  por outra pessoa`); tarefa concluída → 409; histórico `assumed`; aviso `TASK_ASSUMED` ao anterior.
+- `POST /tasks/assume-bulk` `{ fromUserId, departmentId? }` → `{ count }` — todas as abertas do colega
+  nos meus departamentos; um aviso só.
+- `PATCH /tasks/:id` com `assigneeId` por Membro: só para alguém do departamento da tarefa (400).
+- `GET /tasks`, `GET /boards/:id`: cada tarefa traz `viewerCanEdit`.
+- `GET /users/me`: `role`, `departments[]`, `seesDepartmentWork`. `POST/PATCH /users`: `departmentIds`
+  (obrigatório para gerente/colaborador) e `seesDepartmentWork`. `GET /users/options?departmentId=`:
+  `{ id, name, role, departmentIds }`.
+- Solicitações: Membro aprova/recusa/pede informação dentro do escopo; quem aprova e pertence ao
+  departamento recebe a tarefa.
+- Leitor de documentos: upload e documentos não identificados só para admin e gerente.
 
 ## Autenticação
 

@@ -56,3 +56,14 @@ it('an admin opens on "Todas"', () => {
   render(<Harness me={{ role: 'ORG_ADMIN', departments: [], seesDepartmentWork: true }} />)
   expect(screen.getByTestId('value').textContent).toBe('{"scope":"all"}')
 })
+
+it('applies the role default once /users/me arrives after the first render', () => {
+  const admin: MyScope = { role: 'ORG_ADMIN', departments: [], seesDepartmentWork: true }
+  function Late({ me }: { me?: MyScope }) {
+    const [value] = useScopeFilter('guides', me)
+    return <output data-testid="late">{JSON.stringify(value)}</output>
+  }
+  const view = render(<Late />)
+  view.rerender(<Late me={admin} />)
+  expect(screen.getByTestId('late').textContent).toBe('{"scope":"all"}')
+})
