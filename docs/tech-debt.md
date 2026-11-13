@@ -564,3 +564,18 @@ Ações fora do código (ainda pendentes, por último na ordem combinada):
   para o header (o Asaas envia `asaas-access-token`) e **rotacionar o `ASAAS_WEBHOOK_SECRET`**, que pode
   ter ido para os logs antigos.
 - Conferir se o access log do Traefik está desligado (hoje só apareceria um ticket de SSE já consumido).
+
+## Visibilidade por departamento — menores da revisão final (2026-11-13), não corrigidos
+
+1. **Corrida no "assumir em lote":** `findMany` + `updateMany` em READ COMMITTED — se um "assumir" individual
+   concorrente vencer no meio, o histórico, a contagem e o aviso incluem uma tarefa que não mudou de mãos.
+   Correção: `updateManyAndReturn` (ou `UPDATE … RETURNING`) e histórico a partir dos ids devolvidos; guardar
+   também `status notIn (DONE, DISREGARDED)` no `where` das duas escritas.
+2. **Dashboard: contagens de tarefas usam o escopo do processo**, não o da tarefa — o processo de recorrentes de
+   um cliente atendido pelo Fiscal conta as recorrentes da Folha. Correção: `{ AND: [taskWhere(scope)] }` nos
+   agregados de tarefa.
+3. **SSE do processo só confere o escopo ao conectar** — após desligar "ver colegas", até 15 min de eventos
+   (grossos: id/título/coluna) ainda chegam.
+4. **TaskDrawer:** `viewerCanEdit` ausente é tratado como editável (a API responde 403); o aviso diz "está com
+   outro colaborador" também em tarefa sem responsável.
+5. **`/document-reader/obrigacoes` e `/metricas`** continuam agregados da organização inteira para o Membro.
