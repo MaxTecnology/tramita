@@ -1,16 +1,16 @@
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import type { ProductivityQuery, ProductivityMetrics, MetricsBreakdown } from './dashboard.types'
-import { memberBoardWhere } from '@/modules/boards/board-visibility'
+import { boardWhere, type StaffScope } from '@/modules/staff-scope/staff-scope'
 import { utcDayLabel, todayInBRT, startOfTodayInBRT, startOfMonthInBRT } from '@/lib/date-only'
 
 export async function getDashboardMetrics(
   organizationId: string,
   now: Date = new Date(),
-  visibleToMemberId?: string,
+  staffScope?: StaffScope,
 ) {
   // ORG_MEMBER: same visibility as the process list, so the numbers match what they can open.
-  const scope: Prisma.BoardWhereInput = visibleToMemberId ? { AND: [memberBoardWhere(visibleToMemberId)] } : {}
+  const scope: Prisma.BoardWhereInput = staffScope ? { AND: [boardWhere(staffScope)] } : {}
   // startOfMonth usava getters locais do processo (now.getFullYear()/getMonth()) — em produção
   // o container normalmente roda em UTC, não BRT, então "este mês" virava até 3h adiantado perto
   // da troca de mês. startOfTodayInBRT/startOfMonthInBRT convertem de verdade pro fuso da org.

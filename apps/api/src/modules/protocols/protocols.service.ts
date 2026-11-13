@@ -7,7 +7,7 @@ import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-
 import { getSignedDownloadUrl } from '@/lib/b2'
 import { utcDayLabel, todayInBRT } from '@/lib/date-only'
 import { formatBRL, parseMoney } from '@/lib/money'
-import { memberBoardWhere } from '@/modules/boards/board-visibility'
+import { actorScope, protocolWhere } from '@/modules/staff-scope/staff-scope'
 import type { CreateProtocolBody } from './protocols.schema'
 import type { ProtocolStatus } from '@prisma/client'
 
@@ -165,13 +165,12 @@ export async function listProtocolsForOrg(
   actor: { id: string; role: string },
   filters: { status?: ProtocolStatus; clientId?: string; from?: Date; to?: Date },
 ) {
+  const scope = await actorScope(actor, organizationId)
   const protocols = await prisma.protocol.findMany({
     where: {
       organizationId,
-      // Mesma restrição já aplicada em listTasks: ORG_MEMBER só vê o que é dele — sem isso,
-      // qualquer membro via a lista org-wide de protocolos (de todos os clientes/departamentos),
-      // inclusive os que não tem nenhuma relação com a tarefa.
-      ...(actor.role === 'ORG_MEMBER' ? { task: { column: { board: memberBoardWhere(actor.id) } } } : {}),
+      // Staff scope (role + department): the same documents the user can open
+      ...protocolWhere(scope),
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.clientId ? { clientId: filters.clientId } : {}),
       ...(filters.from || filters.to ? { createdAt: { gte: filters.from, lte: filters.to } } : {}),
@@ -270,12 +269,13 @@ export async function getProtocolById(id: string, organizationId: string): Promi
 }
 
 export async function getProtocolsSummary(organizationId: string, actor: { id: string; role: string }) {
+  const scope = await actorScope(actor, organizationId)
   const counts = await prisma.protocol.groupBy({
     by: ['status'],
     // Mesmo escopo de listProtocolsForOrg — sem isso, o resumo (cards do Dashboard) mostraria
     // contagem org-wide pro ORG_MEMBER mesmo com a lista abaixo restrita, uma inconsistência.
     // Cancelled documents leave every indicator (spec 7.10)
-    where: { organizationId, cancelledAt: null, ...(actor.role === 'ORG_MEMBER' ? { task: { column: { board: memberBoardWhere(actor.id) } } } : {}) },
+    where: { organizationId, cancelledAt: null, ...protocolWhere(scope) },
     _count: { _all: true },
   })
   const summary: Record<ProtocolStatus, number> = { SENT: 0, VIEWED: 0, DOWNLOADED: 0, EXPIRED: 0 }

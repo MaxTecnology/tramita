@@ -8,6 +8,7 @@ import {
   createTestClient,
   createTestClientUser,
   createTestDepartment,
+  serveClientDepartment,
   grantClientAccess,
   createTestBoard,
   createTestColumn,
@@ -121,12 +122,14 @@ describe('GET /boards', () => {
     expect(boards[0].title).toBe('Board do Member')
   })
 
-  it('ORG_MANAGER vê todos os boards da org', async () => {
+  it('ORG_MANAGER vê os boards dos clientes atendidos pelo seu departamento', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const manager = await createTestUser(org.id, { role: 'ORG_MANAGER' })
+    const dept = await createTestDepartment(org.id)
+    const manager = await createTestUser(org.id, { role: 'ORG_MANAGER', departmentIds: [dept.id] })
     const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
     const client = await createTestClient(org.id)
+    await serveClientDepartment(client.id, dept.id, manager.id)
 
     const authManager = await getAuthHeader(manager.email, 'Test@1234')
     const authMember = await getAuthHeader(member.email, 'Test@1234')

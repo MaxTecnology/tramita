@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { utcDayLabel, todayInBRT } from '@/lib/date-only'
-import { memberBoardWhere } from '@/modules/boards/board-visibility'
+import { actorScope, protocolWhere } from '@/modules/staff-scope/staff-scope'
 
 export interface UnpaidGuidesFilters {
   clientId?: string
@@ -12,12 +12,12 @@ export interface UnpaidGuidesFilters {
 
 type Actor = { id: string; role: string }
 
-function scopeWhere(organizationId: string, actor: Actor): Prisma.ProtocolWhereInput {
+async function scopeWhere(organizationId: string, actor: Actor): Promise<Prisma.ProtocolWhereInput> {
   return {
     organizationId,
     requiresPayment: true,
     cancelledAt: null,
-    ...(actor.role === 'ORG_MEMBER' ? { task: { column: { board: memberBoardWhere(actor.id) } } } : {}),
+    ...protocolWhere(await actorScope(actor, organizationId)),
   }
 }
 
@@ -38,7 +38,7 @@ export async function listUnpaidGuides(organizationId: string, actor: Actor, fil
     where: {
       // AND: the member scope and the department filter both constrain `task`
       AND: [
-        scopeWhere(organizationId, actor),
+        await scopeWhere(organizationId, actor),
         { paidAt: paidView ? { not: null } : null },
         ...(filters.clientId ? [{ clientId: filters.clientId }] : []),
         ...(filters.departmentId ? [{ task: { departmentId: filters.departmentId } }] : []),
@@ -79,7 +79,7 @@ export async function listUnpaidGuides(organizationId: string, actor: Actor, fil
 
 export async function getUnpaidGuidesSummary(organizationId: string, actor: Actor, now: Date = new Date()) {
   const rows = await prisma.protocol.findMany({
-    where: { ...scopeWhere(organizationId, actor), paidAt: null },
+    where: { ...(await scopeWhere(organizationId, actor)), paidAt: null },
     select: { amount: true, dueDate: true },
   })
   let unpaidTotal = new Prisma.Decimal(0)

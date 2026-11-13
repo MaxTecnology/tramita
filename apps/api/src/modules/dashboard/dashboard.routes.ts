@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { getStaffScope } from '@/modules/staff-scope/staff-scope'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { AppError } from '@/errors/AppError'
@@ -11,8 +12,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
   app.get('/metrics', {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
   }, async (request, reply) => {
-    const visibleToMemberId = request.user.role === 'ORG_MEMBER' ? request.user.sub : undefined
-    return reply.send(await getDashboardMetrics(request.user.organizationId!, new Date(), visibleToMemberId))
+    return reply.send(await getDashboardMetrics(request.user.organizationId!, new Date(), await getStaffScope(request)))
   })
 
   // Lista leve (só id+name) pro seletor de pessoa da tela de Produtividade — deliberadamente mais

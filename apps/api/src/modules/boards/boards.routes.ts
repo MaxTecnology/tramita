@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
-import { memberScope, param } from '@/middlewares/memberScope'
+import { getStaffScope } from '@/modules/staff-scope/staff-scope'
+import { staffScope, param } from '@/middlewares/staffScope'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createBoardSchema, updateBoardSchema, searchQuerySchema, listBoardsQuerySchema } from './boards.schema'
@@ -40,12 +41,8 @@ export async function boardsRoutes(app: FastifyInstance) {
       return reply.send(boards.map((board) => filterBoardTasksForClient(board, scope)))
     }
 
-    // ORG_MEMBER sees only processes tied to them (see board-visibility.ts)
-    if (role === 'ORG_MEMBER') {
-      return reply.send(await listBoards(organizationId!, { ...query, visibleToMemberId: sub }))
-    }
-
-    return reply.send(await listBoards(organizationId!, query))
+    // Office staff: scope by role and department (staff-scope)
+    return reply.send(await listBoards(organizationId!, { ...query, staffScope: await getStaffScope(request) }))
   })
 
   app.get('/:id', {
@@ -55,8 +52,7 @@ export async function boardsRoutes(app: FastifyInstance) {
     const isClient = request.user.role === 'CLIENT'
 
     if (!isClient) {
-      const visibleToMemberId = request.user.role === 'ORG_MEMBER' ? request.user.sub : undefined
-      return reply.send(await getBoardById(id, request.user.organizationId!, false, undefined, visibleToMemberId))
+      return reply.send(await getBoardById(id, request.user.organizationId!, false, undefined, await getStaffScope(request)))
     }
 
     const scope = await getClientAccessScope(request.user.sub)
@@ -66,7 +62,7 @@ export async function boardsRoutes(app: FastifyInstance) {
   })
 
   app.get('/:id/tasks/search', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), memberScope((r) => ({ boardIds: param(r, 'id') }))],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), staffScope((r) => ({ boardIds: param(r, 'id') }), 'read')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const result = searchQuerySchema.safeParse(request.query)

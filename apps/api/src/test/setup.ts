@@ -6,6 +6,10 @@ import { buildApp } from '@/server'
 // 32 bytes of zeros in hex — test-only encryption key
 process.env.ENCRYPTION_KEY = '0'.repeat(64)
 
+// One app instance, every request from the same IP: the production limit (100/min) would trip
+// within big test files. The plugin itself is covered by its env parsing.
+process.env.RATE_LIMIT_MAX = '100000'
+
 // Dummy key — Resend real API is never called in tests (mocked via vi.spyOn on Resend.prototype.post)
 process.env.RESEND_API_KEY = process.env.RESEND_API_KEY ?? 're_test_dummy_key'
 

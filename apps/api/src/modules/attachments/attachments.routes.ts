@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import multipart from '@fastify/multipart'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
-import { memberScope, param } from '@/middlewares/memberScope'
+import { staffScope, byMethod, param } from '@/middlewares/staffScope'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { readUpload, DEFAULT_MAX_UPLOAD_BYTES } from '@/lib/read-upload'
@@ -14,7 +14,7 @@ export async function attachmentsRoutes(app: FastifyInstance) {
   await app.register(multipart, { limits: { fileSize: MAX_FILE_SIZE } })
 
   app.addHook('preHandler', verifyJWT)
-  app.addHook('preHandler', memberScope((r) => ({ taskIds: param(r, 'id') })))
+  app.addHook('preHandler', staffScope((r) => ({ taskIds: param(r, 'id') }), byMethod))
 
   app.post('/tasks/:id/attachments', {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT'), checkSubscription],

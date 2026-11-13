@@ -11,7 +11,8 @@ import { createAttachment } from '@/modules/attachments/attachments.service'
 import { deliverDocument } from '@/modules/task-documents/task-documents.service'
 import { extrairEInterpretar, decidir, type Modelo, type Base } from './engine/pipeline'
 import { soDigitos, moedaNormalizada } from './engine/validadores'
-import { assertMemberSeesTargets } from '@/middlewares/memberScope'
+import { assertStaffSees } from '@/middlewares/staffScope'
+import { actorScope } from '@/modules/staff-scope/staff-scope'
 
 // Estados em que um ReceivedDocument ainda aguarda decisão humana — único momento em que o worker
 // (processarDocumento) ou uma ação da fila de revisão têm permissão de mudar o status.
@@ -350,7 +351,7 @@ async function anexarDocumento(
   const daOrg = await prisma.task.findFirst({ where: { id: taskId, column: { board: { organizationId } } }, select: { id: true } })
   if (!daOrg) throw new AppError(404, 'Tarefa não encontrada')
   // ORG_MEMBER only attaches to processes they can see (same 404, never reveals the task)
-  await assertMemberSeesTargets({ sub: actor.id, role: actor.role, organizationId }, { taskIds: [taskId] })
+  await assertStaffSees(await actorScope(actor, organizationId), organizationId, { taskIds: [taskId] }, 'write')
   // Barreira em toda anexação (não só na troca): documento errado nunca chega ao cliente
   await assertCnpjBateComTarefa(doc, taskId)
   await assertCompetenciaBateComTarefa(doc, taskId)

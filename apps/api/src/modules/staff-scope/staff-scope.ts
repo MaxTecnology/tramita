@@ -47,6 +47,11 @@ export async function loadStaffScope(user: ScopeUser): Promise<StaffScope> {
   }
 }
 
+// Services that receive an actor instead of the request
+export function actorScope(actor: { id: string; role: string }, organizationId: string): Promise<StaffScope> {
+  return loadStaffScope({ sub: actor.id, role: actor.role, organizationId })
+}
+
 // One database read per request, shared by every check of that request.
 const perRequest = new WeakMap<FastifyRequest, Promise<StaffScope>>()
 export function getStaffScope(request: FastifyRequest): Promise<StaffScope> {

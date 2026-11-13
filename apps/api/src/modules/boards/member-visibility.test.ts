@@ -14,13 +14,15 @@ import {
   getAuthHeader,
 } from '@/test/helpers'
 
-// Membro vê um processo quando: é o responsável do processo, OU é responsável por algum
-// departamento que atende o cliente (ClientAssignment), OU tem tarefa atribuída nele.
+// Carteira do Membro (com "ver colegas" desligado — sem o alcance do departamento): vê um processo
+// quando é o responsável do processo, OU é responsável por algum departamento que atende o cliente
+// (ClientAssignment), OU tem tarefa atribuída nele. O alcance do departamento está em
+// staff-scope.routes.test.ts.
 async function setup() {
   const plan = await createTestPlan()
   const org = await createTestOrg(plan.id)
   const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
-  const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+  const member = await createTestUser(org.id, { role: 'ORG_MEMBER', seesDepartmentWork: false })
   const other = await createTestUser(org.id, { role: 'ORG_MEMBER' })
   const dept = await createTestDepartment(org.id)
 

@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import multipart from '@fastify/multipart'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
-import { memberScope, param } from '@/middlewares/memberScope'
+import { staffScope, param } from '@/middlewares/staffScope'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { readUpload, DEFAULT_MAX_UPLOAD_BYTES } from '@/lib/read-upload'
@@ -25,7 +25,7 @@ export async function protocolsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
 
   app.post('/tasks/:taskId/protocols', {
-    preHandler: [requireRole(...ORG_ROLES), checkSubscription, memberScope((r) => ({ taskIds: param(r, 'taskId') }))],
+    preHandler: [requireRole(...ORG_ROLES), checkSubscription, staffScope((r) => ({ taskIds: param(r, 'taskId') }), 'write')],
   }, async (request, reply) => {
     const { taskId } = request.params as { taskId: string }
     const result = createProtocolSchema.safeParse(request.body)
@@ -40,7 +40,7 @@ export async function protocolsRoutes(app: FastifyInstance) {
   })
 
   app.get('/tasks/:taskId/protocols', {
-    preHandler: [requireRole(...ORG_ROLES), memberScope((r) => ({ taskIds: param(r, 'taskId') }))],
+    preHandler: [requireRole(...ORG_ROLES), staffScope((r) => ({ taskIds: param(r, 'taskId') }), 'read')],
   }, async (request, reply) => {
     const { taskId } = request.params as { taskId: string }
     return reply.send(await listProtocolsForTask(taskId, request.user.organizationId!))
@@ -81,7 +81,7 @@ export async function protocolsRoutes(app: FastifyInstance) {
   })
 
   app.get('/protocols/:id', {
-    preHandler: [requireRole(...ORG_ROLES), memberScope((r) => ({ protocolIds: param(r, 'id') }))],
+    preHandler: [requireRole(...ORG_ROLES), staffScope((r) => ({ protocolIds: param(r, 'id') }), 'read')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(await getProtocolById(id, request.user.organizationId!))
@@ -118,7 +118,7 @@ export async function protocolsRoutes(app: FastifyInstance) {
   })
 
   app.get('/protocols/:id/receipt', {
-    preHandler: [requireRole(...ORG_ROLES), memberScope((r) => ({ protocolIds: param(r, 'id') }))],
+    preHandler: [requireRole(...ORG_ROLES), staffScope((r) => ({ protocolIds: param(r, 'id') }), 'read')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const protocol = await getProtocolById(id, request.user.organizationId!)

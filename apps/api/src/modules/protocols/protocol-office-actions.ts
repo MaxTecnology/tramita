@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { formatBRL, parseMoney } from '@/lib/money'
-import { memberBoardWhere } from '@/modules/boards/board-visibility'
+import { actorScope, protocolWhere, actableTaskWhere } from '@/modules/staff-scope/staff-scope'
+import { MUST_ASSUME } from '@/middlewares/staffScope'
 import { createAttachment } from '@/modules/attachments/attachments.service'
 import type { UploadPayload } from '@/modules/task-documents/task-documents.service'
 import { assertProtocolEditable, replaceProtocolFileCore, lockedProtocolError, discardUploadedAttachment } from './protocol-from-deliverable'
@@ -21,17 +22,16 @@ export function parseDueDate(value: string): Date {
 
 const fmtDate = (d: Date | null) => (d ? d.toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—')
 
-// Protocol as the office user sees it: same organization and, for ORG_MEMBER, a process visible to
-// them (board-visibility). Outside the scope answers 404 like "not found".
+// Protocol the office user is about to change: visible in their scope (else 404, like "not found")
+// and changeable — a member must have assumed the task first (403).
 export async function findProtocolForStaff(protocolId: string, organizationId: string, actor: StaffActor) {
-  const protocol = await prisma.protocol.findFirst({
-    where: {
-      id: protocolId,
-      organizationId,
-      ...(actor.role === 'ORG_MEMBER' ? { task: { column: { board: memberBoardWhere(actor.id) } } } : {}),
-    },
-  })
+  const scope = await actorScope(actor, organizationId)
+  const protocol = await prisma.protocol.findFirst({ where: { id: protocolId, organizationId, ...protocolWhere(scope) } })
   if (!protocol) throw new AppError(404, 'Protocolo não encontrado')
+  if (scope.kind === 'LIMITED') {
+    const actable = await prisma.protocol.count({ where: { id: protocolId, task: actableTaskWhere(scope) } })
+    if (!actable) throw new AppError(403, MUST_ASSUME)
+  }
   return protocol
 }
 
