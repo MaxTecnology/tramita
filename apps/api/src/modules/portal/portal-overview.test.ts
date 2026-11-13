@@ -98,7 +98,8 @@ describe('portal — início e enviar documentos', () => {
 
     expect(res.statusCode).toBe(200)
     const body = JSON.parse(res.body)
-    expect(body.requests.map((r: { name: string; departmentName: string }) => [r.name, r.departmentName])).toEqual([['Extrato', 'Fiscal']])
+    const requests = body.tasks.flatMap((t: { requests: { name: string; departmentName: string }[] }) => t.requests)
+    expect(requests.map((r: { name: string; departmentName: string }) => [r.name, r.departmentName])).toEqual([['Extrato', 'Fiscal']])
     expect(JSON.parse(months.body)).toEqual([{ competence, pending: 1, total: 1 }])
   })
 

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Receipt, Send, LayoutGrid, CalendarClock } from 'lucide-react'
+import { Receipt, Send, LayoutGrid, CalendarClock, MessageSquare } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { formatBRL } from '@/lib/money'
@@ -11,6 +11,8 @@ interface PortalHome {
   unpaidGuides: { count: number; overdueCount: number }
   documentsToSend: number
   processesInProgress: number
+  unreadMessages: { count: number; link: string | null }
+  pendingApprovals: number
   dueThisWeek: { kind: 'guide' | 'request'; id: string; title: string; dueDate: string; amount?: string }[]
 }
 
@@ -24,7 +26,7 @@ export default function PortalHomePage() {
 
   if (isLoading || !data) return <div className="p-6 text-sm text-muted-foreground">Carregando...</div>
 
-  const cards = [
+  const cards: { to: string; icon: typeof Receipt; label: string; value: number; hint: string | null; tone: string; hintTone?: string }[] = [
     {
       to: '/portal/documents?situacao=a-pagar',
       icon: Receipt,
@@ -35,21 +37,31 @@ export default function PortalHomePage() {
     },
     { to: '/portal/send', icon: Send, label: 'Documentos a enviar', value: data.documentsToSend, hint: null, tone: 'border-accent-hover' },
     { to: '/portal/board', icon: LayoutGrid, label: 'Processos em andamento', value: data.processesInProgress, hint: null, tone: 'border-success-text' },
+    // Goes straight to the oldest unread conversation
+    {
+      to: data.unreadMessages.link ?? '/portal/send',
+      icon: MessageSquare,
+      label: 'Mensagens do escritório',
+      value: data.unreadMessages.count,
+      hint: data.unreadMessages.count > 0 ? (data.unreadMessages.count > 1 ? 'conversas não lidas' : 'conversa não lida') : null,
+      tone: data.unreadMessages.count > 0 ? 'border-info-text' : 'border-border',
+      hintTone: 'text-info-text',
+    },
   ]
 
   return (
     <div className="p-4 md:p-6 space-y-5">
       <h1 className="text-lg md:text-xl font-bold text-foreground">Início</h1>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {cards.map(({ to, icon: Icon, label, value, hint, tone }) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {cards.map(({ to, icon: Icon, label, value, hint, tone, hintTone }) => (
           <Link key={to} to={to} className={cn('rounded-lg border-l-4 bg-surface p-4 shadow-sm hover:bg-neutral-bg', tone)}>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Icon size={16} />
               {label}
             </div>
             <p className="mt-1 text-3xl font-bold text-foreground">{value}</p>
-            {hint && <p className="text-xs font-medium text-danger-text">{hint}</p>}
+            {hint && <p className={cn('text-xs font-medium', hintTone ?? 'text-danger-text')}>{hint}</p>}
           </Link>
         ))}
       </div>

@@ -10,6 +10,7 @@ import { wrapEmailHtml } from '@/lib/email-template'
 import type { NotificationConfig, NotificationEvent, MessageChannel } from '@prisma/client'
 import type { NotificationJob } from '@/lib/queue'
 import { resolveClientRecipients, type ClientRecipient } from '@/modules/notifications/client-recipients'
+import { clientTaskLink } from '@/modules/inbox/inbox-events'
 
 const EVENT_FLAG_MAP: Record<string, keyof NotificationConfig> = {
   TASK_CREATED: 'taskCreated',
@@ -84,7 +85,7 @@ async function processClientNotification(
     taskId
       ? prisma.task.findUnique({
           where: { id: taskId },
-          include: { column: { include: { board: { select: { organizationId: true } } } } },
+          include: { column: { include: { board: { select: { id: true, type: true, organizationId: true } } } } },
         })
       : Promise.resolve(null),
     requestId
@@ -109,7 +110,7 @@ async function processClientNotification(
     fromColumn: metadata.fromColumn,
     toColumn: metadata.toColumn,
     dueDate: metadata.dueDate,
-    portalUrl: `${process.env.APP_URL ?? 'https://tramita.autohubs.com.br'}/portal`,
+    portalUrl: clientPortalUrl(event, task),
     commentText: metadata.commentText,
     commentAuthorName: metadata.commentAuthorName,
     protocolTitle: metadata.protocolTitle,
@@ -177,6 +178,19 @@ async function processClientNotification(
       })
     }
   }
+}
+
+// Events about one task open that task in the portal (a recurring task's conversation lives in
+// "Enviar documentos" for its month); everything else opens the portal home.
+const TASK_DEEP_LINK_EVENTS = new Set(['TASK_COMMENT_ADDED', 'DOCUMENT_REJECTED', 'APPROVAL_REQUESTED'])
+
+function clientPortalUrl(
+  event: string,
+  task: { id: string; competence: Date | null; column: { board: { id: string; type: 'OS' | 'RECURRING_SYSTEM' } } } | null,
+): string {
+  const appUrl = process.env.APP_URL ?? 'https://tramita.autohubs.com.br'
+  if (!task || !TASK_DEEP_LINK_EVENTS.has(event)) return `${appUrl}/portal`
+  return `${appUrl}${clientTaskLink({ id: task.id, competence: task.competence, boardId: task.column.board.id, boardType: task.column.board.type })}`
 }
 
 async function processUserNotification(

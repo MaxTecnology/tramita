@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Send, Upload } from 'lucide-react'
+import { MessageSquare, Send, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { UPLOAD_ACCEPT } from '@/lib/upload'
 import { cn, mensagemDeErro } from '@/lib/utils'
 import { usePortalClient } from './Layout'
+import { useAuth } from '@/hooks/useAuth'
+import { useLinkedItem } from '@/hooks/useLinkedItem'
+import { Comments } from '@/components/shared/Comments'
+import { notificationsApi, UNREAD_KEY, LIST_KEY } from '@/components/shared/notifications'
 
 interface MonthSummary { competence: string; pending: number; total: number }
 type RequestStatus = 'PENDING' | 'UPLOADED' | 'APPROVED' | 'REJECTED' | 'NOT_APPLICABLE'
@@ -18,6 +22,13 @@ interface DocumentRequest {
   rejectionReason: string | null
   taskTitle: string
   departmentName: string
+}
+interface TaskGroup {
+  taskId: string
+  title: string
+  departmentName: string
+  requests: DocumentRequest[]
+  unreadMessages: number
 }
 
 const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
@@ -59,7 +70,11 @@ export function SendDocumentsView({ clientId }: { clientId: string }) {
     setCompetence((current ?? months.find((m) => m.pending > 0) ?? months[0]).competence)
   }, [months, competence])
 
-  const { data, isLoading } = useQuery<{ competence: string; requests: DocumentRequest[] }>({
+  const { user } = useAuth()
+  const [conversationTaskId, setConversationTaskId] = useState<string | null>(null)
+  const clearLinkedTask = useLinkedItem('task', setConversationTaskId)
+
+  const { data, isLoading } = useQuery<{ competence: string; tasks: TaskGroup[] }>({
     queryKey: ['portal-requests-month', clientId, competence],
     queryFn: () => api.get('/portal/document-requests', { params: { clientId, competence } }).then((r) => r.data),
     enabled: !!clientId && !!competence,
@@ -89,7 +104,25 @@ export function SendDocumentsView({ clientId }: { clientId: string }) {
     onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao atualizar documento')),
   })
 
-  const requests = data?.requests ?? []
+  const groups = data?.tasks ?? []
+
+  // Opening a conversation marks its office messages as read (the bell is the source of "unread")
+  useEffect(() => {
+    if (!conversationTaskId) return
+    notificationsApi.readByTask(conversationTaskId)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['portal-requests-month', clientId] })
+        queryClient.invalidateQueries({ queryKey: ['portal-home', clientId] })
+        queryClient.invalidateQueries({ queryKey: UNREAD_KEY })
+        queryClient.invalidateQueries({ queryKey: LIST_KEY })
+      })
+      .catch(() => undefined)
+    document.getElementById(`task-${conversationTaskId}`)?.scrollIntoView?.({ block: 'start' })
+  }, [conversationTaskId])
+
+  const toggleConversation = (taskId: string) => {
+    if (conversationTaskId === taskId) { setConversationTaskId(null); clearLinkedTask() } else setConversationTaskId(taskId)
+  }
   const { data: home } = useQuery<{ documentsToSendInProcesses: number }>({
     queryKey: ['portal-home', clientId],
     queryFn: () => api.get('/portal/home', { params: { clientId } }).then((r) => r.data),
@@ -132,67 +165,107 @@ export function SendDocumentsView({ clientId }: { clientId: string }) {
         <p className="text-sm text-muted-foreground">Carregando...</p>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground">Documentos que o escritório precisa, referentes a {competence && monthLabel(competence)}.</p>
-          <div className="space-y-2">
-            {requests.map((r) => {
-              const st = STATUS[r.status]
-              const open = r.status === 'PENDING' || r.status === 'REJECTED'
+          <p className="text-sm text-muted-foreground">Documentos e conversas do escritório referentes a {competence && monthLabel(competence)}.</p>
+          <div className="space-y-3">
+            {groups.map((g) => {
+              const talking = conversationTaskId === g.taskId
               return (
-                <div key={r.id} className="rounded-lg border border-border bg-surface px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">{r.name}</p>
-                      <p className="text-xs text-muted-foreground">{r.departmentName} · {r.taskTitle}</p>
+                <section key={g.taskId} id={`task-${g.taskId}`} className="rounded-lg border border-border bg-surface">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-border">
+                    <h2 className="text-sm font-semibold text-foreground">{g.title} — {g.departmentName}</h2>
+                    <button
+                      type="button"
+                      aria-expanded={talking}
+                      aria-label={g.unreadMessages > 0 ? `Conversa (${g.unreadMessages} não lida${g.unreadMessages > 1 ? 's' : ''})` : 'Conversa'}
+                      onClick={() => toggleConversation(g.taskId)}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium',
+                        talking ? 'bg-neutral-bg text-accent' : 'text-accent-hover hover:bg-neutral-bg',
+                      )}
+                    >
+                      <MessageSquare size={13} />
+                      Conversa
+                      {g.unreadMessages > 0 && (
+                        <span className="min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-danger-text text-danger-foreground text-[10px] font-semibold flex items-center justify-center">
+                          {g.unreadMessages}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                  {g.requests.length > 0 && (
+                    <div className="divide-y divide-border">
+                      {g.requests.map((r) => (
+                        <RequestRow
+                          key={r.id}
+                          r={r}
+                          onUpload={(file) => uploadMutation.mutate({ r, file })}
+                          onNotApplicable={(value) => notApplicableMutation.mutate({ r, value })}
+                          busy={notApplicableMutation.isPending}
+                        />
+                      ))}
                     </div>
-                    <span className={cn('flex items-center gap-1.5 text-xs font-medium whitespace-nowrap', st.text)}>
-                      <span className={cn('h-2 w-2 rounded-full', st.dot)} />
-                      {st.label}
-                    </span>
-                  </div>
-                  {r.status === 'REJECTED' && r.rejectionReason && (
-                    <p className="mt-1 text-xs text-danger-text">{r.rejectionReason}</p>
                   )}
-                  <div className="mt-2 flex flex-wrap gap-3">
-                    {open && (
-                      <>
-                        <label className="inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-accent-hover hover:underline">
-                          <Upload size={12} />
-                          Anexar
-                          <input
-                            type="file" accept={UPLOAD_ACCEPT} className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0]
-                              e.target.value = ''
-                              if (file) uploadMutation.mutate({ r, file })
-                            }}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => notApplicableMutation.mutate({ r, value: true })}
-                          disabled={notApplicableMutation.isPending}
-                          className="text-xs text-muted-foreground hover:underline"
-                        >
-                          Nada a enviar
-                        </button>
-                      </>
-                    )}
-                    {r.status === 'NOT_APPLICABLE' && (
-                      <button
-                        type="button"
-                        onClick={() => notApplicableMutation.mutate({ r, value: false })}
-                        className="text-xs text-muted-foreground hover:underline"
-                      >
-                        Desfazer
-                      </button>
-                    )}
-                  </div>
-                </div>
+                  {talking && user && (
+                    <div className="border-t border-border px-4 py-3">
+                      <Comments entityType="task" entityId={g.taskId} currentUserId={user.id} role="CLIENT" />
+                    </div>
+                  )}
+                </section>
               )
             })}
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+function RequestRow({ r, onUpload, onNotApplicable, busy }: {
+  r: DocumentRequest
+  onUpload: (file: File) => void
+  onNotApplicable: (value: boolean) => void
+  busy: boolean
+}) {
+  const st = STATUS[r.status]
+  const open = r.status === 'PENDING' || r.status === 'REJECTED'
+  return (
+    <div className="px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-foreground min-w-0">{r.name}</p>
+        <span className={cn('flex items-center gap-1.5 text-xs font-medium whitespace-nowrap', st.text)}>
+          <span className={cn('h-2 w-2 rounded-full', st.dot)} />
+          {st.label}
+        </span>
+      </div>
+      {r.status === 'REJECTED' && r.rejectionReason && (
+        <p className="mt-1 text-xs text-danger-text">{r.rejectionReason}</p>
+      )}
+      <div className="mt-2 flex flex-wrap gap-3">
+        {open && (
+          <>
+            <label className="inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-accent-hover hover:underline">
+              <Upload size={12} />
+              Anexar
+              <input
+                type="file" accept={UPLOAD_ACCEPT} className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) onUpload(file)
+                }}
+              />
+            </label>
+            <button type="button" onClick={() => onNotApplicable(true)} disabled={busy} className="text-xs text-muted-foreground hover:underline">
+              Nada a enviar
+            </button>
+          </>
+        )}
+        {r.status === 'NOT_APPLICABLE' && (
+          <button type="button" onClick={() => onNotApplicable(false)} className="text-xs text-muted-foreground hover:underline">
+            Desfazer
+          </button>
+        )}
+      </div>
     </div>
   )
 }

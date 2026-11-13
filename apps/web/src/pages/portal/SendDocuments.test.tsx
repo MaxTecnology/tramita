@@ -8,30 +8,66 @@ import { SendDocumentsView } from './SendDocuments'
 
 const API = 'http://localhost:3000'
 
-function setup() {
+const TASKS = [
+  {
+    taskId: 't1', title: 'Apuração', departmentName: 'Fiscal', approvals: [], unreadMessages: 0,
+    requests: [
+      { id: 'r1', taskId: 't1', name: 'Extrato bancário', status: 'REJECTED', rejectionReason: 'Faltou a página 2', taskTitle: 'Apuração', departmentName: 'Fiscal' },
+      { id: 'r2', taskId: 't1', name: 'Notas fiscais', status: 'PENDING', rejectionReason: null, taskTitle: 'Apuração', departmentName: 'Fiscal' },
+    ],
+  },
+  { taskId: 't2', title: 'Folha de outubro', departmentName: 'Departamento Pessoal', approvals: [], unreadMessages: 2, requests: [] },
+]
+
+function setup(initialEntry = '/portal/send') {
   const posted: string[] = []
+  const readByTask: string[] = []
   server.use(
     http.get(`${API}/portal/document-requests/months`, () => HttpResponse.json([{ competence: '2026-10', pending: 2, total: 2 }])),
     http.get(`${API}/portal/home`, () => HttpResponse.json({ documentsToSendInProcesses: 1 })),
-    http.get(`${API}/portal/document-requests`, () => HttpResponse.json({
-      competence: '2026-10',
-      requests: [
-        { id: 'r1', taskId: 't1', name: 'Extrato bancário', status: 'REJECTED', rejectionReason: 'Faltou a página 2', taskTitle: 'Apuração', departmentName: 'Fiscal' },
-        { id: 'r2', taskId: 't1', name: 'Notas fiscais', status: 'PENDING', rejectionReason: null, taskTitle: 'Apuração', departmentName: 'Fiscal' },
-      ],
-    })),
+    http.get(`${API}/portal/document-requests`, () => HttpResponse.json({ competence: '2026-10', tasks: TASKS })),
+    http.get(`${API}/tasks/:taskId/comments`, () => HttpResponse.json([
+      { id: 'c1', content: 'Confere a prévia, por favor', authorType: 'USER', createdAt: '2026-11-10T12:00:00.000Z', user: { id: 'u1', name: 'Dani' }, client: null, deletedAt: null },
+    ])),
+    http.post(`${API}/notifications/read-by-task`, async ({ request }) => {
+      readByTask.push(((await request.json()) as { taskId: string }).taskId)
+      return HttpResponse.json({ count: 2 })
+    }),
     http.post(`${API}/portal/tasks/:taskId/documents/requests/:reqId/not-applicable`, ({ params }) => {
       posted.push(String(params.reqId))
       return HttpResponse.json({})
     }),
   )
+  localStorage.setItem('user', JSON.stringify({ id: 'cu1', name: 'Financeiro', role: 'CLIENT', organizationId: 'o1', orgName: 'G2A' }))
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter><SendDocumentsView clientId="c1" /></MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}><SendDocumentsView clientId="c1" /></MemoryRouter>
     </QueryClientProvider>,
   )
-  return { posted }
+  return { posted, readByTask }
 }
+
+afterEach(() => localStorage.clear())
+
+it('groups the month by task, with the department, including a task that only has a conversation', async () => {
+  setup()
+  await waitFor(() => expect(screen.getByText('Apuração — Fiscal')).toBeInTheDocument())
+  expect(screen.getByText('Folha de outubro — Departamento Pessoal')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Conversa (2 não lidas)' })).toBeInTheDocument()
+})
+
+it('opening the conversation shows the comments and marks them as read', async () => {
+  const { readByTask } = setup()
+  await userEvent.click(await screen.findByRole('button', { name: 'Conversa (2 não lidas)' }))
+  await waitFor(() => expect(screen.getByText('Confere a prévia, por favor')).toBeInTheDocument())
+  await waitFor(() => expect(readByTask).toEqual(['t2']))
+})
+
+it('a notification link (?task=) opens that conversation directly', async () => {
+  const { readByTask } = setup('/portal/send?competence=2026-10&task=t2')
+  await waitFor(() => expect(screen.getByText('Confere a prévia, por favor')).toBeInTheDocument())
+  expect(readByTask).toEqual(['t2'])
+})
 
 it('shows the rejection reason of a refused document', async () => {
   setup()

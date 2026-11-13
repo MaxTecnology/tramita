@@ -41,12 +41,15 @@ const toLabel = (d: Date) => utcDayLabel(d)
 export async function getPortalHome(organizationId: string, clientId: string, clientUserId: string, now: Date = new Date()) {
   const departmentIds = await departmentsInScope(clientId, clientUserId)
   if (departmentIds.length === 0) {
-    return { unpaidGuides: { count: 0, overdueCount: 0 }, documentsToSend: 0, documentsToSendInProcesses: 0, processesInProgress: 0, dueThisWeek: [] }
+    return {
+      unpaidGuides: { count: 0, overdueCount: 0 }, documentsToSend: 0, documentsToSendInProcesses: 0, processesInProgress: 0, dueThisWeek: [],
+      unreadMessages: { count: 0, link: null }, pendingApprovals: 0,
+    }
   }
   const today = todayInBRT(now)
   const weekEnd = new Date(today + 7 * DAY_MS)
 
-  const [guides, documentsToSend, documentsToSendInProcesses, processesInProgress, requestsDue] = await Promise.all([
+  const [guides, documentsToSend, documentsToSendInProcesses, processesInProgress, requestsDue, unreadComments, pendingApprovals] = await Promise.all([
     prisma.protocol.findMany({
       where: unpaidGuidesWhere(organizationId, clientId, departmentIds),
       select: { id: true, title: true, dueDate: true, amount: true },
@@ -67,7 +70,21 @@ export async function getPortalHome(organizationId: string, clientId: string, cl
       where: openRequestsWhere(organizationId, clientId, departmentIds, { dueDate: { not: null, lte: weekEnd } }),
       select: { id: true, name: true, task: { select: { dueDate: true } } },
     }),
+    // Office messages not read yet: one entry per conversation (task), oldest first
+    prisma.inAppNotification.findMany({
+      where: { recipientClientUserId: clientUserId, clientId, type: 'TASK_COMMENT', readAt: null, taskId: { not: null } },
+      select: { taskId: true, link: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.taskApproval.count({
+      where: {
+        status: 'PENDING',
+        task: { visibleToClient: true, departmentId: { in: departmentIds }, column: { board: { organizationId, clientId, isActive: true } } },
+      },
+    }),
   ])
+  const conversations = new Map<string, string>()
+  for (const n of unreadComments) if (n.taskId && !conversations.has(n.taskId)) conversations.set(n.taskId, n.link)
 
   const overdueCount = guides.filter((g) => g.dueDate && toLabel(g.dueDate) < today).length
   const dueThisWeek = [
@@ -83,47 +100,64 @@ export async function getPortalHome(organizationId: string, clientId: string, cl
     documentsToSendInProcesses,
     processesInProgress,
     dueThisWeek,
+    unreadMessages: { count: conversations.size, link: conversations.values().next().value ?? null },
+    pendingApprovals,
   }
 }
 
-function competenceRange(competence: string) {
-  const [y, m] = competence.split('-').map(Number)
-  return { gte: new Date(Date.UTC(y, m - 1, 1)), lt: new Date(Date.UTC(y, m, 1)) }
-}
-
-// Monthly requests come only from recurring tasks (board RECURRING_SYSTEM); requests of a process
-// (OS) live inside the process screen.
-function recurringRequestsWhere(
+// Month view of "Enviar documentos": one group per recurring task visible to the client that has
+// something for them — a document request, a conversation or an approval. Nothing → not shown.
+function monthTasksWhere(
   organizationId: string,
   clientId: string,
   departmentIds: string[],
   competence: Prisma.DateTimeNullableFilter = { not: null },
-): Prisma.TaskDocumentRequirementWhereInput {
+): Prisma.TaskWhereInput {
   return {
-    task: {
-      visibleToClient: true,
-      departmentId: { in: departmentIds },
-      competence,
-      column: { board: { organizationId, clientId, isActive: true, type: 'RECURRING_SYSTEM' } },
-    },
+    visibleToClient: true,
+    departmentId: { in: departmentIds },
+    competence,
+    column: { board: { organizationId, clientId, isActive: true, type: 'RECURRING_SYSTEM' } },
+    OR: [{ documentRequirements: { some: {} } }, { comments: { some: { deletedAt: null } } }, { approvals: { some: {} } }],
   }
+}
+
+// Unread office comments per task for this client user (the bell is the source of "unread")
+async function unreadByTask(clientUserId: string, taskIds: string[]): Promise<Map<string, number>> {
+  if (taskIds.length === 0) return new Map()
+  const rows = await prisma.inAppNotification.groupBy({
+    by: ['taskId'],
+    where: { recipientClientUserId: clientUserId, type: 'TASK_COMMENT', readAt: null, taskId: { in: taskIds } },
+    _count: { _all: true },
+  })
+  return new Map(rows.map((r) => [r.taskId ?? '', r._count._all]))
 }
 
 export async function listDocumentRequestsByMonth(organizationId: string, clientId: string, clientUserId: string, competence: string) {
   const departmentIds = await departmentsInScope(clientId, clientUserId)
-  const rows = departmentIds.length === 0 ? [] : await prisma.taskDocumentRequirement.findMany({
-    where: recurringRequestsWhere(organizationId, clientId, departmentIds, competenceRange(competence)),
+  const tasks = departmentIds.length === 0 ? [] : await prisma.task.findMany({
+    where: monthTasksWhere(organizationId, clientId, departmentIds, competenceRange(competence)),
     select: {
-      id: true, taskId: true, name: true, status: true, rejectionReason: true,
-      task: { select: { title: true, department: { select: { name: true } } } },
+      id: true, title: true,
+      department: { select: { name: true } },
+      documentRequirements: {
+        select: { id: true, name: true, status: true, rejectionReason: true },
+        orderBy: { position: 'asc' },
+      },
     },
-    orderBy: [{ task: { title: 'asc' } }, { position: 'asc' }],
+    orderBy: [{ title: 'asc' }, { id: 'asc' }],
   })
+  const unread = await unreadByTask(clientUserId, tasks.map((t) => t.id))
   return {
     competence,
-    requests: rows.map((r) => ({
-      id: r.id, taskId: r.taskId, name: r.name, status: r.status, rejectionReason: r.rejectionReason,
-      taskTitle: r.task.title, departmentName: r.task.department.name,
+    tasks: tasks.map((t) => ({
+      taskId: t.id,
+      title: t.title,
+      departmentName: t.department.name,
+      requests: t.documentRequirements.map((r) => ({ ...r, taskId: t.id, taskTitle: t.title, departmentName: t.department.name })),
+      // Filled by the approvals step (TaskApproval)
+      approvals: [] as never[],
+      unreadMessages: unread.get(t.id) ?? 0,
     })),
   }
 }
@@ -131,19 +165,26 @@ export async function listDocumentRequestsByMonth(organizationId: string, client
 export async function listDocumentRequestMonths(organizationId: string, clientId: string, clientUserId: string) {
   const departmentIds = await departmentsInScope(clientId, clientUserId)
   if (departmentIds.length === 0) return []
-  const rows = await prisma.taskDocumentRequirement.findMany({
-    where: recurringRequestsWhere(organizationId, clientId, departmentIds),
-    select: { status: true, task: { select: { competence: true } } },
+  const rows = await prisma.task.findMany({
+    where: monthTasksWhere(organizationId, clientId, departmentIds),
+    select: { competence: true, documentRequirements: { select: { status: true } } },
   })
   const months = new Map<string, { pending: number; total: number }>()
-  for (const r of rows) {
-    const key = r.task.competence!.toISOString().slice(0, 7)
+  for (const t of rows) {
+    const key = t.competence!.toISOString().slice(0, 7)
     const m = months.get(key) ?? { pending: 0, total: 0 }
-    m.total++
-    if (r.status === 'PENDING' || r.status === 'REJECTED') m.pending++
+    for (const r of t.documentRequirements) {
+      m.total++
+      if (r.status === 'PENDING' || r.status === 'REJECTED') m.pending++
+    }
     months.set(key, m)
   }
   return [...months.entries()]
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([competence, m]) => ({ competence, ...m }))
+}
+
+function competenceRange(competence: string) {
+  const [y, m] = competence.split('-').map(Number)
+  return { gte: new Date(Date.UTC(y, m - 1, 1)), lt: new Date(Date.UTC(y, m, 1)) }
 }
