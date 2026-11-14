@@ -41,13 +41,17 @@ export async function notifyInApp(input: NotifyInput): Promise<number> {
     ...clientUserIds.map((recipientClientUserId) => ({ ...common, recipientClientUserId })),
   ]
   if (data.length === 0) return 0
-  const { count } = await prisma.inAppNotification.createMany({ data })
-  // Bell updates in real time for whoever has the app open
-  await Promise.all([
-    ...userIds.map((id) => publishInboxEvent({ kind: 'user', id })),
-    ...clientUserIds.map((id) => publishInboxEvent({ kind: 'clientUser', id })),
-  ])
-  return count
+  const created = await prisma.inAppNotification.createManyAndReturn({
+    data,
+    select: { id: true, recipientUserId: true, recipientClientUserId: true },
+  })
+  // Bell rings in real time for whoever has the app open
+  const notice = { title: input.title, body: input.body, link: input.link }
+  await Promise.all(created.map((n) => publishInboxEvent(
+    n.recipientUserId ? { kind: 'user', id: n.recipientUserId } : { kind: 'clientUser', id: n.recipientClientUserId ?? '' },
+    { id: n.id, ...notice },
+  )))
+  return created.length
 }
 
 // Active client users with access to the company AND the department of the item

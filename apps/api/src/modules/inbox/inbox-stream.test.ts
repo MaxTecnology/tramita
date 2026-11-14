@@ -19,7 +19,7 @@ describe('sino em tempo real', () => {
     const channels = publish.mock.calls.map(([ch]) => ch)
     expect(channels).toContain(`inbox:user:${carla.id}`)
     expect(channels).toContain(`inbox:client:${clientUser.id}`)
-    expect(publish).toHaveBeenCalledWith(`inbox:user:${carla.id}`, expect.stringContaining('"inbox:changed"'))
+    expect(publish).toHaveBeenCalledWith(`inbox:user:${carla.id}`, expect.stringContaining('"inbox:new"'))
   })
 
   it('reading in one tab tells the other tabs of the same person', async () => {
@@ -35,5 +35,19 @@ describe('sino em tempo real', () => {
     const { issueStreamTicket } = await import('@/modules/stream/stream-ticket')
     const ticket = await issueStreamTicket({ sub: 'master-id', role: 'MASTER', organizationId: null })
     expect((await app.inject({ method: 'GET', url: `/notifications/stream?ticket=${ticket}` })).statusCode).toBe(403)
+  })
+})
+
+describe('sino em tempo real — conteúdo da notificação nova', () => {
+  it('a new notification travels with its id, title, body and link (sound and browser notice)', async () => {
+    const publish = vi.spyOn(redis, 'publish').mockResolvedValue(0)
+    const org = await createTestOrg((await createTestPlan()).id)
+    const carla = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    await notifyInApp({ organizationId: org.id, type: 'TASK_COMMENT', title: 'Novo comentário', body: 'Falta o extrato', link: '/app/tasks?task=x', to: { userIds: [carla.id] } })
+    const call = publish.mock.calls.find(([ch, msg]) => ch === `inbox:user:${carla.id}` && String(msg).includes('"inbox:new"'))
+    expect(call).toBeDefined()
+    const parsed = JSON.parse(String(call![1]))
+    expect(parsed.data).toMatchObject({ title: 'Novo comentário', body: 'Falta o extrato', link: '/app/tasks?task=x' })
+    expect(typeof parsed.data.id).toBe('string')
   })
 })

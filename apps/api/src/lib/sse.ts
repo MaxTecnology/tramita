@@ -3,7 +3,7 @@ import type { OutgoingHttpHeaders } from 'node:http'
 import { redis } from '@/lib/redis'
 
 export interface SSEEvent {
-  event: 'task:moved' | 'task:created' | 'task:updated' | 'comment:added' | 'request:changed' | 'inbox:changed'
+  event: 'task:moved' | 'task:created' | 'task:updated' | 'comment:added' | 'request:changed' | 'inbox:changed' | 'inbox:new'
   data: Record<string, unknown>
 }
 
@@ -23,9 +23,15 @@ export async function publishOrgEvent(organizationId: string, payload: SSEEvent)
 export const inboxChannel = (r: { kind: 'user' | 'clientUser'; id: string }) =>
   r.kind === 'user' ? `inbox:user:${r.id}` : `inbox:client:${r.id}`
 
-export async function publishInboxEvent(r: { kind: 'user' | 'clientUser'; id: string }): Promise<void> {
+// 'inbox:changed' = something was read (other tabs refresh quietly); 'inbox:new' carries the new
+// notice so the screen can ring and show a browser notification
+export async function publishInboxEvent(
+  r: { kind: 'user' | 'clientUser'; id: string },
+  notice?: { id: string; title: string; body: string; link: string },
+): Promise<void> {
+  const payload: SSEEvent = notice ? { event: 'inbox:new', data: notice } : { event: 'inbox:changed', data: {} }
   try {
-    await redis.publish(inboxChannel(r), JSON.stringify({ event: 'inbox:changed', data: {} } satisfies SSEEvent))
+    await redis.publish(inboxChannel(r), JSON.stringify(payload))
   } catch { /* ignore in test/offline environments */ }
 }
 

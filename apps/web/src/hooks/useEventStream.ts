@@ -4,7 +4,7 @@ import { openStreamUrl, StreamAuthError } from '@/lib/stream-ticket'
 
 // One SSE connection (ticket auth, exponential back-off, heartbeat resets the back-off).
 // `listeners` is read through a ref, so callers can pass a fresh object every render.
-export function useEventStream(path: string, listeners: Record<string, () => void>, enabled = true): void {
+export function useEventStream(path: string, listeners: Record<string, (data: string) => void>, enabled = true): void {
   const listenersRef = useRef(listeners)
   listenersRef.current = listeners
   const esRef = useRef<EventSource | null>(null)
@@ -44,7 +44,7 @@ export function useEventStream(path: string, listeners: Record<string, () => voi
         const es = new EventSource(url)
         esRef.current = es
         for (const name of Object.keys(listenersRef.current)) {
-          es.addEventListener(name, () => listenersRef.current[name]?.())
+          es.addEventListener(name, (e) => listenersRef.current[name]?.(String((e as MessageEvent).data ?? '')))
         }
         es.addEventListener('heartbeat', () => { retryDelay.current = 1000 })
         es.onerror = () => {

@@ -36,6 +36,7 @@ export default defineConfig({
         DATABASE_URL: process.env.DATABASE_URL_TEST ?? '',
         PORT: '3001',
         RATE_LIMIT_MAX: '5000', // all specs share 127.0.0.1
+        RATE_LIMIT_USER_MAX: '5000',
       },
     },
     {

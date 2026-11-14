@@ -58,3 +58,21 @@ it('"Marcar todas como lidas" chama a API', async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Marcar todas como lidas' }))
   await waitFor(() => expect(called).toBe(true))
 })
+
+it('the bell menu turns the sound off and asks for browser notifications', async () => {
+  const ask = vi.fn().mockResolvedValue('granted')
+  vi.stubGlobal('Notification', Object.assign(function FakeN() {}, { permission: 'default', requestPermission: ask }))
+  server.use(
+    http.get(`${API}/notifications/unread-count`, () => HttpResponse.json({ count: 0 })),
+    http.get(`${API}/notifications`, () => HttpResponse.json({ items: [], nextCursor: null })),
+  )
+  localStorage.clear()
+  renderBell()
+  fireEvent.click(await screen.findByRole('button', { name: /Notificações/ }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Desligar som das notificações' }))
+  expect(localStorage.getItem('inbox-sound')).toBe('off')
+  expect(screen.getByRole('button', { name: 'Ligar som das notificações' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Ativar notificações do navegador' }))
+  await waitFor(() => expect(ask).toHaveBeenCalled())
+  vi.unstubAllGlobals()
+})

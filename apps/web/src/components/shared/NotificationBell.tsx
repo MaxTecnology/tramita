@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell } from 'lucide-react'
+import { Bell, BellRing, Volume2, VolumeX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { NotificationList } from './NotificationList'
 import { notificationsApi, UNREAD_KEY, LIST_KEY, type InAppNotification } from './notifications'
+import { inboxSoundOn, setInboxSound, browserNoticePermission, askBrowserNoticePermission } from '@/lib/inbox-alert'
 
 interface Props {
   base: '/app' | '/portal'
@@ -16,6 +17,8 @@ interface Props {
 
 export function NotificationBell({ base, onOpen, align = 'left', className }: Props) {
   const [open, setOpen] = useState(false)
+  const [soundOn, setSoundOn] = useState(inboxSoundOn)
+  const [permission, setPermission] = useState(browserNoticePermission)
   const ref = useRef<HTMLDivElement>(null)
   const qc = useQueryClient()
 
@@ -84,6 +87,32 @@ export function NotificationBell({ base, onOpen, align = 'left', className }: Pr
             >
               Marcar todas como lidas
             </button>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b border-border text-xs">
+            <button
+              type="button"
+              onClick={() => { setInboxSound(!soundOn); setSoundOn(!soundOn) }}
+              aria-label={soundOn ? 'Desligar som das notificações' : 'Ligar som das notificações'}
+              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+            >
+              {soundOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
+              {soundOn ? 'Som ligado' : 'Som desligado'}
+            </button>
+            {permission === 'default' && (
+              <button
+                type="button"
+                onClick={() => { void askBrowserNoticePermission().then(setPermission) }}
+                className="inline-flex items-center gap-1.5 text-accent hover:underline"
+              >
+                <BellRing size={14} />
+                Ativar notificações do navegador
+              </button>
+            )}
+            {permission === 'denied' && (
+              <span className="text-muted-foreground" title="Libere nas configurações do site, no cadeado da barra de endereço">
+                Notificações do navegador bloqueadas
+              </span>
+            )}
           </div>
           <div className="max-h-[60vh] overflow-y-auto">
             {latest ? (
