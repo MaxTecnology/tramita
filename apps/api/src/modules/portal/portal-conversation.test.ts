@@ -3,6 +3,8 @@ import { app } from '@/test/setup'
 import * as queue from '@/lib/queue'
 import * as sse from '@/lib/sse'
 import * as mailer from '@/lib/mailer'
+import * as b2 from '@/lib/b2'
+import { multipartBody } from '@/test/multipart'
 import { prisma } from '@/lib/prisma'
 import { processNotificationJob } from '@/workers/notification.worker'
 import {
@@ -106,5 +108,29 @@ describe('link do aviso de comentário', () => {
     })
     const html = send.mock.calls[0][3]
     expect(html).toContain(`/portal/send?competence=2026-11&task=${c.folha.id}`)
+  })
+})
+
+describe('arquivo enviado visível para o cliente', () => {
+  it('a refused document still shows the file the client sent; after a new upload only the new one', async () => {
+    const c = await setup()
+    vi.spyOn(b2, 'uploadFile').mockResolvedValue(undefined)
+    vi.spyOn(b2, 'getSignedDownloadUrl').mockImplementation(async (key: string) => `https://signed/${key.split('/').pop()}`)
+    await prisma.task.update({ where: { id: c.apuracao.id }, data: { assigneeId: c.carla.id } })
+    const req = await prisma.taskDocumentRequirement.findFirstOrThrow({ where: { taskId: c.apuracao.id } })
+    const upload = async (filename: string) => {
+      const mp = multipartBody({}, { filename })
+      return app.inject({ method: 'POST', url: `/portal/tasks/${c.apuracao.id}/documents/requests/${req.id}/upload`, headers: { authorization: c.finAuth, ...mp.headers }, body: mp.body })
+    }
+    await upload('extrato-errado.pdf')
+    await app.inject({ method: 'PATCH', url: `/tasks/${c.apuracao.id}/documents/requests/${req.id}`, headers: { authorization: c.carlaAuth }, payload: { decision: 'REJECTED', rejectionReason: 'Ilegível' } })
+
+    const refused = JSON.parse((await getMonth(c, c.finAuth)).body).tasks[0].requests[0]
+    expect(refused).toMatchObject({ status: 'REJECTED', rejectionReason: 'Ilegível', fileName: 'extrato-errado.pdf' })
+    expect(refused.fileUrl).toMatch(/extrato-errado\.pdf$/)
+
+    await upload('extrato-certo.pdf')
+    const resent = JSON.parse((await getMonth(c, c.finAuth)).body).tasks[0].requests[0]
+    expect(resent).toMatchObject({ status: 'UPLOADED', fileName: 'extrato-certo.pdf' })
   })
 })

@@ -1,3 +1,4 @@
+import { getSignedDownloadUrl } from '@/lib/b2'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { utcDayLabel, todayInBRT } from '@/lib/date-only'
@@ -157,7 +158,7 @@ export async function listDocumentRequestsByMonth(organizationId: string, client
       id: true, title: true,
       department: { select: { name: true } },
       documentRequirements: {
-        select: { id: true, name: true, status: true, rejectionReason: true },
+        select: { id: true, name: true, status: true, rejectionReason: true, attachment: { select: { filename: true, storageKey: true } } },
         orderBy: { position: 'asc' },
       },
       approvals: { include: approvalInclude, orderBy: { requestedAt: 'desc' } },
@@ -171,7 +172,13 @@ export async function listDocumentRequestsByMonth(organizationId: string, client
       taskId: t.id,
       title: t.title,
       departmentName: t.department.name,
-      requests: t.documentRequirements.map((r) => ({ ...r, taskId: t.id, taskTitle: t.title, departmentName: t.department.name })),
+      // The client sees the file they sent (also when refused — what they can point to); a new
+      // upload replaces it. Older versions stay with the office (task attachments).
+      requests: await Promise.all(t.documentRequirements.map(async ({ attachment, ...r }) => ({
+        ...r, taskId: t.id, taskTitle: t.title, departmentName: t.department.name,
+        fileName: attachment?.filename ?? null,
+        fileUrl: attachment ? await getSignedDownloadUrl(attachment.storageKey) : null,
+      }))),
       approvals: await Promise.all(t.approvals.map(presentApproval)),
       unreadMessages: unread.get(t.id) ?? 0,
     }))),

@@ -24,6 +24,8 @@ interface DocumentRequest {
   rejectionReason: string | null
   taskTitle: string
   departmentName: string
+  fileName?: string | null
+  fileUrl?: string | null
 }
 interface TaskGroup {
   taskId: string
@@ -256,6 +258,12 @@ function RequestRow({ r, onUpload, onNotApplicable, busy }: {
       </div>
       {r.status === 'REJECTED' && r.rejectionReason && (
         <p className="mt-1 text-xs text-danger-text">{r.rejectionReason}</p>
+      )}
+      {r.fileUrl && r.status !== 'NOT_APPLICABLE' && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {r.status === 'REJECTED' ? 'Arquivo recusado: ' : 'Arquivo enviado: '}
+          <a href={r.fileUrl} target="_blank" rel="noopener noreferrer" className="text-accent-hover hover:underline">{r.fileName}</a>
+        </p>
       )}
       <div className="mt-2 flex flex-wrap gap-3">
         {open && (

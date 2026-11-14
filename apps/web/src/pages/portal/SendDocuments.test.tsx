@@ -12,7 +12,7 @@ const TASKS = [
   {
     taskId: 't1', title: 'Apuração', departmentName: 'Fiscal', approvals: [], unreadMessages: 0,
     requests: [
-      { id: 'r1', taskId: 't1', name: 'Extrato bancário', status: 'REJECTED', rejectionReason: 'Faltou a página 2', taskTitle: 'Apuração', departmentName: 'Fiscal' },
+      { id: 'r1', taskId: 't1', name: 'Extrato bancário', status: 'REJECTED', rejectionReason: 'Faltou a página 2', taskTitle: 'Apuração', departmentName: 'Fiscal', fileName: 'extrato.pdf', fileUrl: 'https://f/extrato.pdf' },
       { id: 'r2', taskId: 't1', name: 'Notas fiscais', status: 'PENDING', rejectionReason: null, taskTitle: 'Apuração', departmentName: 'Fiscal' },
     ],
   },
@@ -139,4 +139,11 @@ it('a notification for another month, clicked while already on the page, switche
   await userEvent.click(screen.getByText('abrir notificação'))
   await waitFor(() => expect(screen.getByText('Mensagem de setembro')).toBeInTheDocument())
   expect(readByTask).toEqual(['t9'])
+})
+
+it('a refused document shows the file the client sent, so they can check it', async () => {
+  setup()
+  const link = await screen.findByRole('link', { name: 'extrato.pdf' })
+  expect(link).toHaveAttribute('href', 'https://f/extrato.pdf')
+  expect(screen.getByText(/Arquivo recusado/)).toBeInTheDocument()
 })
