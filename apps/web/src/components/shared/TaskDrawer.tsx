@@ -57,8 +57,12 @@ const CLOSE_REASON_HISTORY: Record<string, string> = {
   NO_RESPONSE: 'sem resposta do cliente',
 }
 
-function formatHistoryAction(h: TaskHistory): string {
+// History values are stored raw (status enum, user ids): shown with the screen's words and names
+function formatHistoryAction(h: TaskHistory, userName: (id: string) => string): string {
   const label = ACTION_LABELS[h.action] ?? h.action
+  if (h.action === 'status_changed' && h.toValue) return `${label} ${STATUS_LABEL[h.toValue as Task['status']] ?? h.toValue}`
+  if ((h.action === 'assigned_to' || h.action === 'updated_assignee') && h.toValue) return `${label} ${userName(h.toValue)}`
+  if (h.action === 'assumed') return h.fromValue ? `${label} (era de ${userName(h.fromValue)})` : label
   if (h.action === 'attachment_deleted' && h.fromValue) return `${label} "${h.fromValue}"`
   if (h.action === 'attachment_added' && h.toValue) return `${label} "${h.toValue}"`
   if (h.action === 'approval_approved' && h.fromValue) return `${label} "${h.fromValue}"`
@@ -119,6 +123,15 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   const [descValue, setDescValue] = useState(task.description ?? '')
 
   const isStaff = isOrgRole(role)
+  // Same list the Tasks screen uses (id, name, departments): who can receive the task and names in the history
+  const { data: userOptions = [] } = useQuery<{ id: string; name: string; departmentIds?: string[] }[]>({
+    queryKey: ['user-options'],
+    queryFn: () => api.get('/users/options').then((r) => r.data),
+    enabled: isStaff,
+  })
+  const userName = (id: string) => userOptions.find((u) => u.id === id)?.name ?? 'outro colaborador'
+  // The task goes to someone of its department (the API refuses anyone else for a member)
+  const assigneeChoices = userOptions.filter((u) => u.id === task.assigneeId || (!!task.departmentId && u.departmentIds?.includes(task.departmentId)))
   const { data: approvals = [] } = useTaskApprovals(task.id, isStaff)
   const awaitingApproval = approvals.some((a) => a.status === 'PENDING')
   // Office staff sees everything in the drawer; changing it needs the task to be theirs (or their
@@ -134,7 +147,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   const { departments } = useServedDepartments(isStaff ? clientId : undefined)
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<Pick<Task, 'title' | 'priority' | 'status' | 'description' | 'dueDate' | 'departmentId' | 'visibleToClient' | 'targetDate' | 'competence'>>) =>
+    mutationFn: (data: Partial<Pick<Task, 'title' | 'priority' | 'status' | 'description' | 'dueDate' | 'departmentId' | 'visibleToClient' | 'targetDate' | 'competence' | 'assigneeId'>>) =>
       api.patch(`/tasks/${task.id}`, data).then((r) => r.data),
     onSuccess: () => {
       toast.success('Tarefa atualizada')
@@ -473,6 +486,27 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
               </select>
             )}
 
+            {isStaff && (canEdit ? (
+              <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span className="sr-only">Responsável</span>
+                <select
+                  aria-label="Responsável"
+                  value={task.assigneeId ?? ''}
+                  onChange={(e) => e.target.value && e.target.value !== task.assigneeId && updateMutation.mutate({ assigneeId: e.target.value })}
+                  className="text-xs font-medium px-2 py-0.5 rounded-full border border-border text-foreground cursor-pointer bg-surface"
+                >
+                  {!task.assigneeId && <option value="">Sem responsável</option>}
+                  {assigneeChoices.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </label>
+            ) : task.assigneeId && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground">
+                {userName(task.assigneeId)}
+              </span>
+            ))}
+
             {canEditDates ? (
               <div className="flex flex-col gap-1">
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -593,14 +627,14 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
           )}
         </div>
 
-        {/* Abas */}
-        <div className="flex border-b border-border flex-shrink-0">
+        {/* Abas — rolam na horizontal se não couberem (celular), nunca cortam a última */}
+        <div className="flex border-b border-border flex-shrink-0 overflow-x-auto">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                'flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+                'flex flex-shrink-0 items-center gap-1.5 px-3 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
                 tab === t.id
                   ? 'border-accent text-accent'
                   : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -998,7 +1032,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                   <p className="text-xs text-muted-foreground">
                     <span className="font-medium text-foreground">{h.actorName}</span>
                     {' — '}
-                    {formatHistoryAction(h)}
+                    {formatHistoryAction(h, userName)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {new Date(h.createdAt).toLocaleString('pt-BR')}
