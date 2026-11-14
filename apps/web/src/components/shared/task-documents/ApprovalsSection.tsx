@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
-import { UPLOAD_ACCEPT } from '@/lib/upload'
+import { FilePicker } from '@/components/ui/file-picker'
 import { cn, mensagemDeErro } from '@/lib/utils'
 import { APPROVAL_BADGE, CLOSE_REASON_LABEL, decisionText, type Approval, type CloseReason } from '@/components/shared/approvals'
 
@@ -80,10 +80,7 @@ function RequestForm({ taskId, onDone, onCancel }: { taskId: string; onDone: () 
         Mensagem (opcional)
         <textarea aria-label="Mensagem (opcional)" value={message} onChange={(e) => setMessage(e.target.value)} rows={2} className={cn(field, 'mt-1')} />
       </label>
-      <label className="block text-xs text-muted-foreground">
-        Arquivo
-        <input aria-label="Arquivo" type="file" accept={UPLOAD_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-1 block w-full text-xs text-foreground" />
-      </label>
+      <FilePicker label="Arquivo" file={file} onChange={setFile} />
       <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="outline" onClick={onCancel}>Cancelar</Button>
         <Button type="submit" size="sm" disabled={!title.trim() || !file || send.isPending}>
@@ -160,10 +157,7 @@ function CloseForm({ approvalId, onDone, onCancel }: { approvalId: string; onDon
           className={cn(field, 'mt-1')}
         />
       </label>
-      <label className="block text-xs text-muted-foreground">
-        Print ou comprovante (opcional)
-        <input aria-label="Print ou comprovante (opcional)" type="file" accept={UPLOAD_ACCEPT} onChange={(e) => setProof(e.target.files?.[0] ?? null)} className="mt-1 block w-full text-xs text-foreground" />
-      </label>
+      <FilePicker label="Print ou comprovante (opcional)" file={proof} onChange={setProof} />
       <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="outline" onClick={onCancel}>Cancelar</Button>
         <Button type="submit" size="sm" disabled={!reason || !note.trim() || close.isPending}>Registrar fechamento</Button>

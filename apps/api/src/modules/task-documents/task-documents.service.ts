@@ -314,11 +314,12 @@ export async function deliverDocument(
     },
   })
 
+  const statusBefore = (await prisma.task.findUniqueOrThrow({ where: { id: taskId }, select: { status: true } })).status
   await upsertProtocolForDeliverable(deliverableId, actor)
   await trail(taskId, 'deliverable_delivered', { type: 'user', id: actor.id }, deliverable.name, payload.filename)
   await recalculateTaskStatus(taskId)
 
-  return updated
+  return { ...updated, completion: await completionAfterDelivery(taskId, statusBefore) }
 }
 
 // Ponto único de disparo da notificação TASK_BLOCKED — chamado por recalculateTaskStatus (abaixo,
@@ -349,6 +350,28 @@ export async function notifyIfBlocked(
     taskId,
     metadata: {},
   })
+}
+
+// After a delivery: did it finish the task? AUTO_COMPLETED (the template completes it by itself),
+// READY (everything resolved — the screen offers to complete it) or PENDING (something still missing)
+export type DeliveryCompletion = 'AUTO_COMPLETED' | 'READY' | 'PENDING'
+
+async function completionAfterDelivery(taskId: string, statusBefore: TaskStatus): Promise<DeliveryCompletion> {
+  const task = await prisma.task.findUniqueOrThrow({
+    where: { id: taskId },
+    select: {
+      status: true,
+      documentRequirements: { select: { status: true } },
+      deliverables: { select: { deliveredAt: true } },
+      approvals: { where: { status: 'PENDING' }, select: { id: true } },
+    },
+  })
+  if (task.status === 'DONE') return statusBefore === 'DONE' ? 'PENDING' : 'AUTO_COMPLETED'
+  if (task.status === 'DISREGARDED') return 'PENDING'
+  const resolved = task.documentRequirements.every((r) => r.status === 'APPROVED' || r.status === 'NOT_APPLICABLE')
+    && task.deliverables.every((d) => d.deliveredAt !== null)
+    && task.approvals.length === 0
+  return resolved ? 'READY' : 'PENDING'
 }
 
 export async function recalculateTaskStatus(taskId: string) {

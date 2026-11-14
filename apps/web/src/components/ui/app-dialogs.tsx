@@ -5,7 +5,7 @@ import { Button } from './button'
 // The app's own confirm/prompt (instead of the browser's "localhost diz"): call askConfirm/askText
 // from anywhere; <AppDialogs /> (mounted once in App) shows them with the app look.
 
-interface Base { title: string; description?: string; confirmLabel?: string; danger?: boolean }
+interface Base { title: string; description?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }
 export type ConfirmOptions = Base
 export interface TextOptions extends Base { label: string; placeholder?: string; optional?: boolean }
 
@@ -82,7 +82,7 @@ export function AppDialogs() {
             </label>
           )}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={cancel}>Cancelar</Button>
+            <Button type="button" variant="outline" onClick={cancel}>{options.cancelLabel ?? 'Cancelar'}</Button>
             <Button type="submit" variant={options.danger ? 'destructive' : 'default'} disabled={!canConfirm} autoFocus={pending.kind === 'confirm'}>
               {options.confirmLabel ?? 'Confirmar'}
             </Button>

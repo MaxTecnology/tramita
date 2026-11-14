@@ -326,11 +326,24 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
       form.append('file', file)
       return api.post(`/tasks/${task.id}/documents/deliveries/${reqId}/upload`, form)
     },
-    onSuccess: () => {
-      toast.success('Documento entregue')
+    onSuccess: async (res) => {
       setPendingDelivery(null)
       queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] })
       queryClient.invalidateQueries({ queryKey: ['protocols', task.id] })
+      // The delivery may have finished the task: the template completes it, or the office is asked
+      const completion = (res.data as { completion?: 'AUTO_COMPLETED' | 'READY' | 'PENDING' }).completion
+      if (completion === 'AUTO_COMPLETED') {
+        toast.success('Tudo entregue — tarefa concluída automaticamente')
+        queryClient.invalidateQueries({ queryKey: ['tasks'] })
+        queryClient.invalidateQueries({ queryKey: ['board'] })
+        return
+      }
+      toast.success('Documento entregue')
+      if (completion === 'READY' && await askConfirm({
+        title: 'Tudo entregue. Concluir a tarefa agora?',
+        description: 'Os documentos do cliente estão resolvidos e todas as entregas foram feitas.',
+        confirmLabel: 'Concluir', cancelLabel: 'Agora não',
+      })) updateMutation.mutate({ status: 'DONE' })
     },
     onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao entregar documento')),
   })
