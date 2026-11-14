@@ -86,16 +86,17 @@ model SubscriptionHistory {
 }
 
 model User {
-  id             String   @id @default(cuid())
-  name           String
-  email          String   @unique
-  passwordHash   String
-  role           UserRole @default(ORG_MEMBER)
-  phone          String?
-  organizationId String
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  reviewedAttachments Attachment[] @relation("AttachmentReviewer")
+  id                  String       @id @default(cuid())
+  name                String
+  email               String       @unique
+  passwordHash        String
+  role                UserRole     @default(ORG_MEMBER)
+  phone               String?
+  organizationId      String
+  isActive            Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   organization                 Organization              @relation(fields: [organizationId], references: [id])
   assignedTasks                Task[]                    @relation("TaskAssignee")
@@ -194,15 +195,16 @@ model Client {
 }
 
 model ClientUser {
-  id             String   @id @default(cuid())
-  organizationId String
-  name           String
-  email          String
-  passwordHash   String
-  phone          String?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  uploadedAttachments Attachment[] @relation("AttachmentClientUploader")
+  id                  String       @id @default(cuid())
+  organizationId      String
+  name                String
+  email               String
+  passwordHash        String
+  phone               String?
+  isActive            Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   accesses         ClientUserAccess[]
@@ -644,9 +646,11 @@ model TaskDocumentRequirement {
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
 
-  task       Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  attachment Attachment? @relation(fields: [attachmentId], references: [id])
-  reviewedBy User?       @relation(fields: [reviewedById], references: [id])
+  task       Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  attachment Attachment?  @relation("RequirementCurrentFile", fields: [attachmentId], references: [id])
+  reviewedBy User?        @relation(fields: [reviewedById], references: [id])
+  // Every file ever sent for this request (current one included), with how each was reviewed
+  versions   Attachment[] @relation("RequirementVersions")
 
   @@map("task_document_requirements")
 }
@@ -849,17 +853,28 @@ model Attachment {
   deletedByClient  String?
   deletedByName    String?
 
-  task                Task                     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  uploader            User?                    @relation(fields: [uploadedBy], references: [id])
-  uploaderClient      Client?                  @relation(fields: [uploadedByClient], references: [id])
-  documentRequirement TaskDocumentRequirement?
-  deliverable         TaskDeliverable?
-  protocol            Protocol?
-  receivedDocument    ReceivedDocument?
-  paymentProofOf      Protocol?                @relation("ProtocolPaymentProof")
-  approvalFileOf      TaskApproval?            @relation("ApprovalFile")
-  approvalProofOf     TaskApproval?            @relation("ApprovalProof")
+  task                   Task                     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader               User?                    @relation(fields: [uploadedBy], references: [id])
+  uploaderClient         Client?                  @relation(fields: [uploadedByClient], references: [id])
+  documentRequirement    TaskDocumentRequirement? @relation("RequirementCurrentFile")
+  // Document trail: which request this file answered, who sent it (person) and how it was reviewed
+  requirementId          String?
+  reviewStatus           AttachmentReview?
+  rejectionReason        String?
+  reviewedAt             DateTime?
+  reviewedById           String?
+  uploadedByClientUserId String?
+  requirement            TaskDocumentRequirement? @relation("RequirementVersions", fields: [requirementId], references: [id], onDelete: SetNull)
+  reviewedBy             User?                    @relation("AttachmentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  uploaderClientUser     ClientUser?              @relation("AttachmentClientUploader", fields: [uploadedByClientUserId], references: [id], onDelete: SetNull)
+  deliverable            TaskDeliverable?
+  protocol               Protocol?
+  receivedDocument       ReceivedDocument?
+  paymentProofOf         Protocol?                @relation("ProtocolPaymentProof")
+  approvalFileOf         TaskApproval?            @relation("ApprovalFile")
+  approvalProofOf        TaskApproval?            @relation("ApprovalProof")
 
+  @@index([requirementId])
   @@map("attachments")
 }
 
@@ -1176,4 +1191,12 @@ enum ApprovalStatus {
 enum ApprovalCloseReason {
   APPROVED_OUTSIDE
   NO_RESPONSE
+}
+
+// How the office reviewed a file sent for a document request. REPLACED = a newer file came before review
+enum AttachmentReview {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  REPLACED
 }

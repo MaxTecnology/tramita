@@ -38,7 +38,7 @@ export async function taskDocumentsRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const result = addDocumentItemSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
-    return reply.status(201).send(await addDocumentRequirement(id, request.user.organizationId!, result.data.name))
+    return reply.status(201).send(await addDocumentRequirement(id, request.user.organizationId!, result.data.name, request.user.sub))
   })
 
   app.post('/tasks/:id/documents/deliveries', {
@@ -47,7 +47,7 @@ export async function taskDocumentsRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const result = addDeliverableSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
-    return reply.status(201).send(await addDeliverable(id, request.user.organizationId!, result.data.name, result.data.requiresPayment))
+    return reply.status(201).send(await addDeliverable(id, request.user.organizationId!, result.data.name, request.user.sub, result.data.requiresPayment))
   })
 
   app.patch('/tasks/:id/documents/requests/:reqId', {

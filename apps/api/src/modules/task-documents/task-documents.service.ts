@@ -30,6 +30,28 @@ async function getOrgSlug(organizationId: string): Promise<string> {
   return org?.slug ?? organizationId
 }
 
+// --- Document trail (task history) ------------------------------------------------------------
+// Every step of a requested/delivered document is a history line with the person and the file.
+type TrailActor = { type: 'user'; id: string } | { type: 'client'; clientUserId: string }
+
+async function trailActorName(actor: TrailActor, taskId: string): Promise<{ actorType: string; actorId: string; actorName: string }> {
+  if (actor.type === 'user') {
+    const user = await prisma.user.findUnique({ where: { id: actor.id }, select: { name: true } })
+    return { actorType: 'user', actorId: actor.id, actorName: user?.name ?? 'Escritório' }
+  }
+  // The client is a person of a company: "RH (ACME)"
+  const [cu, task] = await Promise.all([
+    prisma.clientUser.findUnique({ where: { id: actor.clientUserId }, select: { name: true } }),
+    prisma.task.findUnique({ where: { id: taskId }, select: { column: { select: { board: { select: { client: { select: { name: true } } } } } } } }),
+  ])
+  const company = task?.column.board.client.name
+  return { actorType: 'client', actorId: actor.clientUserId, actorName: company ? `${cu?.name ?? 'Cliente'} (${company})` : (cu?.name ?? 'Cliente') }
+}
+
+async function trail(taskId: string, action: string, actor: TrailActor, fromValue: string | null, toValue: string | null): Promise<void> {
+  await prisma.taskHistory.create({ data: { taskId, action, fromValue, toValue, ...(await trailActorName(actor, taskId)) } })
+}
+
 export async function verifyTaskAccess(taskId: string, organizationId: string, clientUserId?: string) {
   const scope = clientUserId ? await getClientAccessScope(clientUserId) : undefined
   const boardWhere = scope ? { organizationId, clientId: { in: scope.clientIds } } : { organizationId }
@@ -68,20 +90,23 @@ export async function listTaskDocuments(taskId: string, organizationId: string, 
   }
 }
 
-export async function addDocumentRequirement(taskId: string, organizationId: string, name: string) {
+export async function addDocumentRequirement(taskId: string, organizationId: string, name: string, actorId: string) {
   await verifyTaskAccess(taskId, organizationId)
   const position = await prisma.taskDocumentRequirement.count({ where: { taskId } })
   const requirement = await prisma.taskDocumentRequirement.create({ data: { taskId, name, position } })
+  await trail(taskId, 'document_requested', { type: 'user', id: actorId }, null, name)
 
   await recalculateTaskStatus(taskId)
 
   return requirement
 }
 
-export async function addDeliverable(taskId: string, organizationId: string, name: string, requiresPayment = false) {
+export async function addDeliverable(taskId: string, organizationId: string, name: string, actorId: string, requiresPayment = false) {
   await verifyTaskAccess(taskId, organizationId)
   const position = await prisma.taskDeliverable.count({ where: { taskId } })
-  return prisma.taskDeliverable.create({ data: { taskId, name, position, requiresPayment } })
+  const deliverable = await prisma.taskDeliverable.create({ data: { taskId, name, position, requiresPayment } })
+  await trail(taskId, 'deliverable_requested', { type: 'user', id: actorId }, null, name)
+  return deliverable
 }
 
 export async function uploadForRequirement(
@@ -109,13 +134,21 @@ export async function uploadForRequirement(
       storageKey,
       uploadedBy: actor.type === 'user' ? actor.id : undefined,
       uploadedByClient: actor.type === 'client' ? task.column.board.clientId : undefined,
+      uploadedByClientUserId: actor.type === 'client' ? clientUserId : undefined,
+      requirementId,
+      reviewStatus: 'PENDING_REVIEW',
     },
   })
 
+  // A previous file the office never reviewed is now superseded (refused/approved ones keep their result)
+  if (requirement.attachmentId) {
+    await prisma.attachment.updateMany({ where: { id: requirement.attachmentId, reviewStatus: 'PENDING_REVIEW' }, data: { reviewStatus: 'REPLACED' } })
+  }
   await prisma.taskDocumentRequirement.update({
     where: { id: requirementId },
     data: { status: 'UPLOADED', attachmentId: attachment.id, rejectionReason: null },
   })
+  await trail(taskId, 'document_uploaded', actor.type === 'client' && clientUserId ? { type: 'client', clientUserId } : { type: 'user', id: actor.id }, requirement.name, payload.filename)
 
   await recalculateTaskStatus(taskId)
   if (actor.type === 'client' && clientUserId) {
@@ -145,10 +178,12 @@ export async function setNotApplicable(
       where: { id: requirementId },
       data: { status: 'NOT_APPLICABLE', rejectionReason: null, reviewedById: null, reviewedAt: null },
     })
+    await trail(taskId, 'document_not_applicable', { type: 'client', clientUserId }, null, requirement.name)
   } else {
     if (requirement.status !== 'NOT_APPLICABLE') throw new AppError(409, 'Esse documento não está marcado como "Nada a enviar"')
     if (task.status === 'DONE') throw new AppError(409, 'A tarefa já foi concluída')
     await prisma.taskDocumentRequirement.update({ where: { id: requirementId }, data: { status: 'PENDING' } })
+    await trail(taskId, 'document_not_applicable_undone', { type: 'client', clientUserId }, null, requirement.name)
   }
 
   await recalculateTaskStatus(taskId)
@@ -175,15 +210,32 @@ export async function reviewDocumentRequirement(
     throw new AppError(422, 'Motivo da rejeição é obrigatório')
   }
 
+  const reviewedAt = new Date()
   const updated = await prisma.taskDocumentRequirement.update({
     where: { id: requirementId },
     data: {
       status: decision,
       rejectionReason: decision === 'REJECTED' ? rejectionReason : null,
       reviewedById: reviewerId,
-      reviewedAt: new Date(),
+      reviewedAt,
     },
   })
+
+  // The file keeps its own result (the request moves on with the next file)
+  const reviewer: TrailActor = { type: 'user', id: reviewerId }
+  if (contestingNotApplicable) {
+    await trail(taskId, 'document_contested', reviewer, requirement.name, rejectionReason ?? null)
+  } else {
+    const file = requirement.attachmentId
+      ? await prisma.attachment.update({
+          where: { id: requirement.attachmentId },
+          data: { reviewStatus: decision, rejectionReason: decision === 'REJECTED' ? rejectionReason : null, reviewedAt, reviewedById: reviewerId },
+          select: { filename: true },
+        })
+      : null
+    if (decision === 'APPROVED') await trail(taskId, 'document_approved', reviewer, requirement.name, file?.filename ?? null)
+    else await trail(taskId, 'document_rejected', reviewer, file ? `${requirement.name} — ${file.filename}` : requirement.name, rejectionReason ?? null)
+  }
 
   await recalculateTaskStatus(taskId)
 
@@ -263,6 +315,7 @@ export async function deliverDocument(
   })
 
   await upsertProtocolForDeliverable(deliverableId, actor)
+  await trail(taskId, 'deliverable_delivered', { type: 'user', id: actor.id }, deliverable.name, payload.filename)
   await recalculateTaskStatus(taskId)
 
   return updated

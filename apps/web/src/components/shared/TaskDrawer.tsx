@@ -10,7 +10,7 @@ import { Comments } from '@/components/shared/Comments'
 import { useServedDepartments } from '@/hooks/useServedDepartments'
 import { useMyScope } from '@/hooks/useMyScope'
 import { hasUnseenClientReply } from '@/lib/request-comments'
-import type { Task, Attachment, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable, Protocol, Comment } from '@/types'
+import type { Task, Attachment, AttachmentPurpose, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable, Protocol, Comment } from '@/types'
 import { toast } from 'sonner'
 import { formatBRL, toApiAmount } from '@/lib/money'
 import { PaymentFields, type PaymentValues } from './task-documents/PaymentFields'
@@ -67,6 +67,18 @@ function formatHistoryAction(h: TaskHistory, userName: (id: string) => string): 
   if (h.action === 'attachment_deleted' && h.fromValue) return `${label} "${h.fromValue}"`
   if (h.action === 'attachment_added' && h.toValue) return `${label} "${h.toValue}"`
   if (h.action === 'approval_approved' && h.fromValue) return `${label} "${h.fromValue}"`
+  // Document trail
+  switch (h.action) {
+    case 'document_requested': return `adicionou documento a cobrar "${h.toValue ?? ''}"`
+    case 'document_uploaded': return `enviou "${h.fromValue ?? ''}" (${h.toValue ?? ''})`
+    case 'document_approved': return `aprovou "${h.fromValue ?? ''}"${h.toValue ? ` (${h.toValue})` : ''}`
+    case 'document_rejected': return `recusou "${h.fromValue ?? ''}" — motivo: ${h.toValue ?? ''}`
+    case 'document_contested': return `contestou "Nada a enviar" em "${h.fromValue ?? ''}" — motivo: ${h.toValue ?? ''}`
+    case 'document_not_applicable': return `marcou "Nada a enviar" em "${h.toValue ?? ''}"`
+    case 'document_not_applicable_undone': return `desfez "Nada a enviar" em "${h.toValue ?? ''}"`
+    case 'deliverable_requested': return `adicionou documento a entregar "${h.toValue ?? ''}"`
+    case 'deliverable_delivered': return `entregou "${h.fromValue ?? ''}" (${h.toValue ?? ''})`
+  }
   if (h.action === 'approval_closed_by_office') return `${label} (${CLOSE_REASON_HISTORY[h.toValue ?? ''] ?? h.toValue ?? ''})`
   if (h.toValue) return `${label} ${h.toValue}`
   return label
@@ -892,6 +904,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                           {' · '}
                           {new Date(a.createdAt).toLocaleString('pt-BR')}
                         </p>
+                        <AttachmentPurposeLine purpose={a.purpose ?? null} />
                         {isDeleted && (
                           <p className="text-xs text-danger-text mt-0.5">
                             Removido por {a.deletedByName} · {new Date(a.deletedAt!).toLocaleString('pt-BR')}
@@ -1066,4 +1079,42 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
       </aside>
     </>
   )
+}
+
+const REVIEW_LABEL: Record<string, { text: string; className: string }> = {
+  PENDING_REVIEW: { text: 'Em conferência', className: 'text-warning-text' },
+  APPROVED: { text: 'Aprovado', className: 'text-success-text' },
+  REJECTED: { text: 'Recusado', className: 'text-danger-text' },
+  REPLACED: { text: 'Substituído antes da conferência', className: 'text-muted-foreground' },
+}
+
+// "Ponto do mês · Recusado" / "Holerites · Entregue ao cliente" under each attachment
+function AttachmentPurposeLine({ purpose }: { purpose: AttachmentPurpose | null }) {
+  if (!purpose) return null
+  if (purpose.kind === 'REQUIREMENT') {
+    const review = purpose.review ? REVIEW_LABEL[purpose.review] : null
+    return (
+      <div className="mt-0.5 text-xs">
+        <p className={cn('font-medium', review?.className)}>
+          {purpose.name}{review && ` · ${review.text}`}{purpose.current && ' · versão atual'}
+        </p>
+        {purpose.review === 'REJECTED' && purpose.rejectionReason && (
+          <p className="text-muted-foreground">
+            {purpose.rejectionReason}{purpose.reviewedByName && ` — por ${purpose.reviewedByName}`}
+            {purpose.reviewedAt && ` em ${new Date(purpose.reviewedAt).toLocaleDateString('pt-BR')}`}
+          </p>
+        )}
+        {purpose.review === 'APPROVED' && purpose.reviewedByName && (
+          <p className="text-muted-foreground">por {purpose.reviewedByName}{purpose.reviewedAt && ` em ${new Date(purpose.reviewedAt).toLocaleDateString('pt-BR')}`}</p>
+        )}
+      </div>
+    )
+  }
+  const text = {
+    DELIVERABLE: `${purpose.name} · Entregue ao cliente`,
+    APPROVAL_FILE: `Aprovação do cliente: ${purpose.name}`,
+    APPROVAL_PROOF: `Comprovante da aprovação fora da plataforma: ${purpose.name}`,
+    PROTOCOL: `Documento enviado ao cliente: ${purpose.name}`,
+  }[purpose.kind]
+  return <p className="mt-0.5 text-xs font-medium text-info-text">{text}</p>
 }

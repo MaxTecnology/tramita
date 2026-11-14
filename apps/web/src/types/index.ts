@@ -113,7 +113,16 @@ export interface Attachment {
   createdAt: string
   deletedAt: string | null
   deletedByName: string | null
+  // What the file was for and how it ended (document trail)
+  purpose?: AttachmentPurpose | null
 }
+
+export type AttachmentPurpose =
+  | { kind: 'REQUIREMENT'; name: string; review: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'REPLACED' | null; rejectionReason: string | null; reviewedByName: string | null; reviewedAt: string | null; current: boolean }
+  | { kind: 'DELIVERABLE'; name: string }
+  | { kind: 'APPROVAL_FILE'; name: string; review: string }
+  | { kind: 'APPROVAL_PROOF'; name: string }
+  | { kind: 'PROTOCOL'; name: string }
 
 export interface TaskHistory {
   id: string

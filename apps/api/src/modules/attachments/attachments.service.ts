@@ -91,6 +91,34 @@ export async function createAttachment(
   return attachment
 }
 
+// What a file was for and how it ended — the "Anexos" tab tells the document trail at a glance
+type PurposeSource = {
+  id: string
+  reviewStatus: string | null
+  rejectionReason: string | null
+  reviewedAt: Date | null
+  reviewedBy: { name: string } | null
+  requirement: { name: string; attachmentId: string | null } | null
+  deliverable: { name: string } | null
+  approvalFileOf: { title: string; status: string } | null
+  approvalProofOf: { title: string } | null
+  protocol: { title: string } | null
+}
+
+function attachmentPurpose(a: PurposeSource) {
+  if (a.requirement) {
+    return {
+      kind: 'REQUIREMENT' as const, name: a.requirement.name, review: a.reviewStatus, rejectionReason: a.rejectionReason,
+      reviewedByName: a.reviewedBy?.name ?? null, reviewedAt: a.reviewedAt, current: a.requirement.attachmentId === a.id,
+    }
+  }
+  if (a.deliverable) return { kind: 'DELIVERABLE' as const, name: a.deliverable.name }
+  if (a.approvalFileOf) return { kind: 'APPROVAL_FILE' as const, name: a.approvalFileOf.title, review: a.approvalFileOf.status }
+  if (a.approvalProofOf) return { kind: 'APPROVAL_PROOF' as const, name: a.approvalProofOf.title }
+  if (a.protocol) return { kind: 'PROTOCOL' as const, name: a.protocol.title }
+  return null
+}
+
 export async function listAttachments(
   taskId: string,
   organizationId: string,
@@ -104,6 +132,13 @@ export async function listAttachments(
     include: {
       uploader: { select: { name: true } },
       uploaderClient: { select: { name: true } },
+      uploaderClientUser: { select: { name: true } },
+      reviewedBy: { select: { name: true } },
+      requirement: { select: { name: true, attachmentId: true } },
+      deliverable: { select: { name: true } },
+      approvalFileOf: { select: { title: true, status: true } },
+      approvalProofOf: { select: { title: true } },
+      protocol: { select: { title: true } },
     },
   })
 
@@ -113,7 +148,11 @@ export async function listAttachments(
       filename: a.filename,
       mimeType: a.mimeType,
       size: a.size,
-      uploaderName: a.uploader?.name ?? a.uploaderClient?.name ?? 'Desconhecido',
+      // The person who sent it; for the client, the person and the company ("RH (ACME)")
+      uploaderName: a.uploader?.name
+        ?? (a.uploaderClientUser ? `${a.uploaderClientUser.name}${a.uploaderClient ? ` (${a.uploaderClient.name})` : ''}` : a.uploaderClient?.name)
+        ?? 'Desconhecido',
+      purpose: attachmentPurpose(a),
       createdAt: a.createdAt,
       deletedAt: a.deletedAt,
       deletedByName: a.deletedByName,
