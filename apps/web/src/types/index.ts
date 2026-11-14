@@ -192,6 +192,8 @@ export interface Protocol {
   attachment?: { filename: string } | null
   events?: ProtocolEvent[]
   boardId?: string   // só presente em GET /protocols (listagem da org) — ver protocols.service.ts
+  // Where its task opens (Tarefas for a recurring task, the board for a process)
+  link?: string
 }
 
 export interface ProtocolSummary {

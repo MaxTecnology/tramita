@@ -38,7 +38,8 @@ export type ListProtocolsQuery = z.infer<typeof listProtocolsQuerySchema>
 export const unpaidGuidesQuerySchema = z.object({
   clientId: z.string().cuid().optional(),
   departmentId: z.string().cuid().optional(),
-  competence: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Competência inválida (use AAAA-MM)').optional(),
+  // Month the guide falls due (what matters to pay it); the competence is shown on each row
+  dueMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Mês inválido (use AAAA-MM)').optional(),
   situation: z.enum(['overdue', 'upcoming', 'paid']).optional(),
   scope: z.enum(['mine', 'department', 'all']).optional(),
 })

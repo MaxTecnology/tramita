@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { uploadFile, getSignedDownloadUrl } from '@/lib/b2'
 import { enqueueNotification } from '@/lib/queue'
+import { publishBoardEvent } from '@/lib/sse'
 import { onDocumentUploaded, onDocumentRejected, staffActor, clientActor } from '@/modules/inbox/inbox-events'
 import { resolveCompletedAt } from '@/lib/task-completion'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
@@ -50,6 +51,9 @@ async function trailActorName(actor: TrailActor, taskId: string): Promise<{ acto
 
 async function trail(taskId: string, action: string, actor: TrailActor, fromValue: string | null, toValue: string | null): Promise<void> {
   await prisma.taskHistory.create({ data: { taskId, action, fromValue, toValue, ...(await trailActorName(actor, taskId)) } })
+  // Every document step changes what an open panel shows (office or portal): refresh it in real time
+  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { column: { select: { boardId: true } } } })
+  if (task) await publishBoardEvent(task.column.boardId, { event: 'task:updated', data: { taskId } })
 }
 
 export async function verifyTaskAccess(taskId: string, organizationId: string, clientUserId?: string) {

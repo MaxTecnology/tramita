@@ -462,7 +462,7 @@ function ProtocolsTab() {
           sorted.map((p) => (
             <Link
               key={p.id}
-              to={`/app/board/${p.boardId}`}
+              to={p.link ?? `/app/board/${p.boardId}`}
               className="flex items-center justify-between gap-3 px-5 py-3 border-b border-border last:border-0 hover:bg-neutral-bg transition-colors"
             >
               <div className="min-w-0">

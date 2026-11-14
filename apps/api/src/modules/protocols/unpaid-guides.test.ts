@@ -33,7 +33,7 @@ async function setup() {
       requiresPayment: extra.requiresPayment ?? true, amount: (extra.requiresPayment ?? true) ? amount : null,
     })
   const auth = await getAuthHeader(admin.email, 'Test@1234')
-  return { org, admin, client, task, guide, auth }
+  return { org, admin, client, task, board, guide, auth }
 }
 
 describe('guias não pagas no escritório', () => {
@@ -88,6 +88,36 @@ describe('guias não pagas no escritório', () => {
     expect(JSON.parse(summary.body).unpaidCount).toBe(0)
     const paidItems = JSON.parse(paid.body) as { title: string; paidByName: string; paidAmount: string }[]
     expect(paidItems.map((p) => [p.title, p.paidByName, p.paidAmount])).toEqual([['DAS', 'Financeiro ACME', '1234.56']])
+  })
+
+  it('the month filter is the due month (a DAS of October that falls due in November is in November)', async () => {
+    vi.useFakeTimers({ now: NOW, toFake: ['Date'] })
+    try {
+      const { guide, auth } = await setup()
+      await guide('DAS outubro', '100.00', '2026-11-20')
+      await guide('DAS setembro', '80.00', '2026-10-20')
+      const res = await app.inject({ method: 'GET', url: '/protocols/unpaid?dueMonth=2026-11', headers: { authorization: auth } })
+      expect((JSON.parse(res.body) as { title: string }[]).map((g) => g.title)).toEqual(['DAS outubro'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('each guide and protocol carries the screen link of its task (a recurring task opens in Tarefas, a process on its board)', async () => {
+    vi.useFakeTimers({ now: NOW, toFake: ['Date'] })
+    try {
+      const { guide, auth, task, board } = await setup()
+      await guide('DAS', '100.00', '2026-11-20')
+      const [g] = JSON.parse((await app.inject({ method: 'GET', url: '/protocols/unpaid', headers: { authorization: auth } })).body)
+      expect(g.link).toBe(`/app/board/${board.id}?task=${task.id}`)
+      await prisma.board.update({ where: { id: board.id }, data: { type: 'RECURRING_SYSTEM' } })
+      const [r] = JSON.parse((await app.inject({ method: 'GET', url: '/protocols/unpaid', headers: { authorization: auth } })).body)
+      expect(r.link).toBe(`/app/tasks?task=${task.id}`)
+      const [p] = JSON.parse((await app.inject({ method: 'GET', url: '/protocols', headers: { authorization: auth } })).body)
+      expect(p.link).toBe(`/app/tasks?task=${task.id}`)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('ORG_MEMBER only sees guides of processes visible to them', async () => {

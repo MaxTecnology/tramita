@@ -33,7 +33,8 @@ export async function streamRoutes(app: FastifyInstance) {
 
     // Verify board exists and belongs to the user's org
     const board = await prisma.board.findFirst({
-      where: { id, organizationId: user.organizationId!, isActive: true, type: 'OS' },
+      // Processes and the recurring board: both have open panels that refresh in real time
+      where: { id, organizationId: user.organizationId!, isActive: true },
     })
     if (!board) throw new AppError(404, 'Board não encontrado')
     if (user.role === 'ORG_MEMBER' || user.role === 'ORG_MANAGER') {

@@ -1,3 +1,4 @@
+import { staffTaskLink } from '@/modules/inbox/inbox-events'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { utcDayLabel, todayInBRT } from '@/lib/date-only'
@@ -6,7 +7,7 @@ import { actorScope, protocolWhere } from '@/modules/staff-scope/staff-scope'
 export interface UnpaidGuidesFilters {
   clientId?: string
   departmentId?: string
-  competence?: string // 'YYYY-MM'
+  dueMonth?: string // 'YYYY-MM' — month the guide falls due
   situation?: 'overdue' | 'upcoming' | 'paid'
   scope?: 'mine' | 'department' | 'all'
 }
@@ -26,8 +27,8 @@ function isOverdue(dueDate: Date | null, now: Date): boolean {
   return !!dueDate && utcDayLabel(dueDate) < todayInBRT(now)
 }
 
-function competenceRange(competence: string): { gte: Date; lt: Date } {
-  const [y, m] = competence.split('-').map(Number)
+function monthRange(month: string): { gte: Date; lt: Date } {
+  const [y, m] = month.split('-').map(Number)
   return { gte: new Date(Date.UTC(y, m - 1, 1)), lt: new Date(Date.UTC(y, m, 1)) }
 }
 
@@ -48,7 +49,7 @@ export async function listUnpaidGuides(organizationId: string, actor: Actor, fil
         { paidAt: paidView ? { not: null } : null },
         ...(filters.clientId ? [{ clientId: filters.clientId }] : []),
         ...(filters.departmentId ? [{ task: { departmentId: filters.departmentId } }] : []),
-        ...(filters.competence ? [{ competence: competenceRange(filters.competence) }] : []),
+        ...(filters.dueMonth ? [{ dueDate: monthRange(filters.dueMonth) }] : []),
       ],
     },
     select: {
@@ -56,7 +57,7 @@ export async function listUnpaidGuides(organizationId: string, actor: Actor, fil
       amount: true, paidAt: true, paidAmount: true,
       client: { select: { name: true } },
       paidBy: { select: { name: true } },
-      task: { select: { department: { select: { name: true } }, column: { select: { boardId: true } } } },
+      task: { select: { id: true, department: { select: { name: true } }, column: { select: { boardId: true, board: { select: { type: true } } } } } },
     },
     orderBy: paidView ? { paidAt: 'desc' } : [{ dueDate: 'asc' }, { createdAt: 'asc' }],
   })
@@ -76,6 +77,8 @@ export async function listUnpaidGuides(organizationId: string, actor: Actor, fil
     paidAmount: r.paidAmount?.toString() ?? null,
     paidByName: r.paidBy?.name ?? null,
     boardId: r.task.column.boardId,
+    // Where the task opens: Tarefas for a recurring one, the board for a process
+    link: staffTaskLink({ id: r.task.id, boardId: r.task.column.boardId, boardType: r.task.column.board.type }),
   }))
 
   if (filters.situation === 'overdue') return items.filter((i) => i.overdue)

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
-import { onProtocolCreated } from '@/modules/inbox/inbox-events'
+import { onProtocolCreated, staffTaskLink } from '@/modules/inbox/inbox-events'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 import { getSignedDownloadUrl } from '@/lib/b2'
 import { utcDayLabel, todayInBRT } from '@/lib/date-only'
@@ -179,13 +179,16 @@ export async function listProtocolsForOrg(
     },
     include: {
       client: { select: { id: true, name: true } },
-      // boardId achatado abaixo — o Dashboard (Task 11) linka pro board, não existe rota de
-      // task isolada no app (mesmo padrão já resolvido na feature de Solicitações).
-      task: { select: { column: { select: { boardId: true } } } },
+      task: { select: { id: true, column: { select: { boardId: true, board: { select: { type: true } } } } } },
     },
     orderBy: { createdAt: 'desc' },
   })
-  return protocols.map(({ task, ...rest }) => ({ ...rest, boardId: task.column.boardId }))
+  // link: where the task opens (Tarefas for a recurring one, the board for a process)
+  return protocols.map(({ task, ...rest }) => ({
+    ...rest,
+    boardId: task.column.boardId,
+    link: staffTaskLink({ id: task.id, boardId: task.column.boardId, boardType: task.column.board.type }),
+  }))
 }
 
 export async function listProtocolsForTask(taskId: string, organizationId: string) {

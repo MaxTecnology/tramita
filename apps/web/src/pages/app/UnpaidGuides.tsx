@@ -24,6 +24,7 @@ export interface UnpaidGuide {
   paidAmount: string | null
   paidByName: string | null
   boardId: string
+  link?: string
 }
 
 type Situation = '' | 'overdue' | 'upcoming' | 'paid'
@@ -35,20 +36,20 @@ const selectCls = 'h-8 rounded-md border border-border bg-surface px-2 text-sm t
 export default function UnpaidGuides() {
   const [clientId, setClientId] = useState('')
   const [departmentId, setDepartmentId] = useState('')
-  const [competence, setCompetence] = useState('')
+  const [dueMonth, setDueMonth] = useState('')
   const [situation, setSituation] = useState<Situation>('')
 
   const me = useMyScope()
   const [scopeFilter, setScopeFilter] = useScopeFilter('guides', me)
 
   const { data: guides = [], isLoading } = useQuery<UnpaidGuide[]>({
-    queryKey: ['unpaid-guides', clientId, departmentId, competence, situation, scopeFilter],
+    queryKey: ['unpaid-guides', clientId, departmentId, dueMonth, situation, scopeFilter],
     queryFn: () => api.get('/protocols/unpaid', {
       params: {
         ...scopeParams(scopeFilter),
         ...(clientId ? { clientId } : {}),
         ...(departmentId ? { departmentId } : {}),
-        ...(competence ? { competence } : {}),
+        ...(dueMonth ? { dueMonth } : {}),
         ...(situation ? { situation } : {}),
       },
     }).then((r) => r.data),
@@ -80,7 +81,11 @@ export default function UnpaidGuides() {
           <option value="">Todos os departamentos</option>
           {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
-        <input type="month" value={competence} onChange={(e) => setCompetence(e.target.value)} className={selectCls} aria-label="Competência" />
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          Vencimento em
+          <input type="month" value={dueMonth} onChange={(e) => setDueMonth(e.target.value)} className={selectCls} aria-label="Vencimento em" />
+          {dueMonth && <button type="button" onClick={() => setDueMonth('')} className="text-accent-hover hover:underline">limpar</button>}
+        </label>
         <select value={situation} onChange={(e) => setSituation(e.target.value as Situation)} className={selectCls} aria-label="Situação">
           <option value="">Não pagas</option>
           <option value="overdue">Vencidas</option>
@@ -101,7 +106,7 @@ export default function UnpaidGuides() {
           {guides.map((g) => (
             <Link
               key={g.id}
-              to={`/app/board/${g.boardId}`}
+              to={g.link ?? `/app/board/${g.boardId}`}
               data-testid="guide-row"
               className={cn(
                 'flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 rounded-lg border bg-surface p-3 hover:bg-neutral-bg',

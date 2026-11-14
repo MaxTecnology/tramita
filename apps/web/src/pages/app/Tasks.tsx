@@ -25,6 +25,7 @@ import type { Task, User, Department, RecurringTaskTemplate } from '@/types'
 import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
 import { useMyScope } from '@/hooks/useMyScope'
 import { useLinkedItem } from '@/hooks/useLinkedItem'
+import { useBoardStream } from '@/hooks/useBoardStream'
 import { askConfirm } from '@/components/ui/app-dialogs'
 
 // GET /tasks retorna uma listagem flat de tarefas cruzando todos os boards da org (inclusive o
@@ -478,6 +479,8 @@ export default function Tasks() {
     enabled: !!selectedTaskId && !selectedInList && !isLoading,
   })
   const selectedTask = selectedInList ?? linkedTask
+  // The open task's board in real time: what the client sends shows up in the panel without reload
+  useBoardStream(selectedTask?.column.board.id)
 
   const hasFilters =
     !!clientId || !!assigneeId || !!departmentId || !!recurringTemplateId || status !== DEFAULT_STATUS_FILTER || periodKind !== 'this' || !!search.trim()

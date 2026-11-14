@@ -139,3 +139,37 @@ describe('stream ticket', () => {
     expect([board.statusCode, requests.statusCode]).toEqual([401, 401])
   })
 })
+
+describe('tempo real nas tarefas recorrentes', () => {
+  it('a client upload on a recurring task is published to its board (the office panel refreshes)', async () => {
+    const publishSpy = vi.spyOn(redis, 'publish').mockResolvedValue(0 as unknown as number)
+    const b2 = await import('@/lib/b2')
+    vi.spyOn(b2, 'uploadFile').mockResolvedValue(undefined)
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await (await import('@/lib/prisma')).prisma.board.create({ data: { title: 'Rec', organizationId: org.id, clientId: client.id, type: 'RECURRING_SYSTEM', columns: { create: [{ title: 'R', position: 0 }] } }, include: { columns: true } })
+    const task = await createTestTask(board.columns[0].id, user.id)
+    const { addDocumentRequirement, uploadForRequirement } = await import('@/modules/task-documents/task-documents.service')
+    const req = await addDocumentRequirement(task.id, org.id, 'Extrato', user.id)
+    publishSpy.mockClear()
+    await uploadForRequirement(task.id, req.id, org.id, { id: user.id, type: 'user' }, undefined, { filename: 'e.pdf', mimeType: 'application/pdf', size: 1, buffer: Buffer.from('x') })
+    expect(publishSpy).toHaveBeenCalledWith(`board:${board.id}`, expect.stringContaining('"task:updated"'))
+  })
+
+  it('the stream of a recurring board is open to the office (not only processes)', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const board = await (await import('@/lib/prisma')).prisma.board.create({ data: { title: 'Rec', organizationId: org.id, clientId: client.id, type: 'RECURRING_SYSTEM' } })
+    const ticket = await getStreamTicket(await getAuthHeader(user.email, 'Test@1234'))
+    // The open stream never resolves under inject: a fast "not found" is what must not happen
+    const res = await Promise.race([
+      app.inject({ method: 'GET', url: `/boards/${board.id}/stream?ticket=${ticket}` }).then((r) => r.statusCode),
+      new Promise<'open'>((resolve) => setTimeout(() => resolve('open'), 300)),
+    ])
+    expect(res).toBe('open')
+  })
+})
