@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Plus, Pencil, Trash2, UserCog, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ClientUser } from '@/types'
+import { askConfirm } from '@/components/ui/app-dialogs'
 
 export default function ClientUsers() {
   const qc = useQueryClient()
@@ -66,7 +67,7 @@ export default function ClientUsers() {
                   <Pencil size={14} />
                 </Link>
                 <button
-                  onClick={() => { if (window.confirm(`Desativar "${u.name}"?`)) deleteMutation.mutate(u.id) }}
+                  onClick={async () => { if (await askConfirm({ title: `Desativar "${u.name}"?`, description: 'O acesso ao portal é bloqueado.', confirmLabel: 'Desativar', danger: true })) deleteMutation.mutate(u.id) }}
                   className="p-1.5 rounded-md text-muted-foreground hover:bg-danger-bg hover:text-danger-text"
                   aria-label="Excluir"
                 >

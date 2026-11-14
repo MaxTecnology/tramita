@@ -9,6 +9,7 @@ import { formatDateOnlyUTC } from '@/lib/dates'
 import { Button } from '@/components/ui/button'
 import type { Protocol } from '@/types'
 import { PaymentFields, type PaymentValues } from './PaymentFields'
+import { askText } from '@/components/ui/app-dialogs'
 
 const STATUS_LABEL: Record<Protocol['status'], string> = {
   SENT: 'Não visto',
@@ -96,9 +97,12 @@ export function ProtocolOfficeCard({ protocol: p, taskId, onReceipt }: {
             )}
             <Button
               type="button" variant="ghost" size="sm" className="h-auto px-0 text-xs text-danger-text hover:underline"
-              onClick={() => {
-                const reason = window.prompt('Motivo do cancelamento (o documento sai da visão do cliente):')
-                if (reason && reason.trim().length >= 3) cancelMutation.mutate(reason.trim())
+              onClick={async () => {
+                const reason = await askText({
+                  title: 'Cancelar o envio do documento', label: 'Motivo do cancelamento',
+                  description: 'O documento sai da visão do cliente.', confirmLabel: 'Cancelar envio', danger: true,
+                })
+                if (reason && reason.length >= 3) cancelMutation.mutate(reason)
               }}
             >
               Cancelar envio

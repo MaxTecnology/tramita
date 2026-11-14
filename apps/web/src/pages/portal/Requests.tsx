@@ -14,6 +14,7 @@ import type { ClientRequest } from '@/types'
 import { toast } from 'sonner'
 import { usePortalClient } from './Layout'
 import { useLinkedItem } from '@/hooks/useLinkedItem'
+import { askConfirm } from '@/components/ui/app-dialogs'
 
 const STATUS_LABEL: Record<ClientRequest['status'], string> = {
   PENDING: 'Em análise',
@@ -144,7 +145,7 @@ export default function PortalRequests() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => { if (window.confirm('Cancelar esta solicitação?')) cancelMutation.mutate(r.id) }}
+                      onClick={async () => { if (await askConfirm({ title: 'Cancelar esta solicitação?', confirmLabel: 'Cancelar solicitação', danger: true })) cancelMutation.mutate(r.id) }}
                       className="text-danger-text hover:text-danger-hover hover:bg-danger-bg -ml-2"
                     >
                       Cancelar

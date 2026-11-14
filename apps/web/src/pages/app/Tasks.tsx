@@ -25,6 +25,7 @@ import type { Task, User, Department, RecurringTaskTemplate } from '@/types'
 import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
 import { useMyScope } from '@/hooks/useMyScope'
 import { useLinkedItem } from '@/hooks/useLinkedItem'
+import { askConfirm } from '@/components/ui/app-dialogs'
 
 // GET /tasks retorna uma listagem flat de tarefas cruzando todos os boards da org (inclusive o
 // board de sistema onde moram as recorrentes). O select do backend cobre todos os campos de Task,
@@ -626,8 +627,12 @@ export default function Tasks() {
           <button
             type="button"
             disabled={assumeBulkMutation.isPending}
-            onClick={() => {
-              if (window.confirm(`Assumir ${colleagueOpenCount === 1 ? 'a tarefa aberta' : `as ${colleagueOpenCount} tarefas abertas`} de ${colleague.name}?`)) assumeBulkMutation.mutate()
+            onClick={async () => {
+              if (await askConfirm({
+                title: `Assumir ${colleagueOpenCount === 1 ? 'a tarefa aberta' : `as ${colleagueOpenCount} tarefas abertas`} de ${colleague.name}?`,
+                description: `${colleague.name} recebe um aviso. A carteira de clientes não muda.`,
+                confirmLabel: 'Assumir',
+              })) assumeBulkMutation.mutate()
             }}
             className="self-end h-8 rounded-md border border-warning-text/40 bg-warning-bg px-3 text-sm font-medium text-warning-text hover:opacity-90 disabled:opacity-50"
           >

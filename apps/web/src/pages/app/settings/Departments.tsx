@@ -10,6 +10,7 @@ import { Plus, Pencil, Trash2, Building2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
 import type { Department } from '@/types'
+import { askConfirm } from '@/components/ui/app-dialogs'
 
 export default function Departments() {
   const qc = useQueryClient()
@@ -105,7 +106,7 @@ export default function Departments() {
                   <Pencil size={14} />
                 </button>
                 <button
-                  onClick={() => { if (window.confirm(`Excluir o departamento "${d.name}"?`)) deleteMutation.mutate(d.id) }}
+                  onClick={async () => { if (await askConfirm({ title: `Excluir o departamento "${d.name}"?`, confirmLabel: 'Excluir', danger: true })) deleteMutation.mutate(d.id) }}
                   className="p-1.5 rounded-md text-muted-foreground hover:bg-danger-bg hover:text-danger-text"
                   aria-label="Excluir"
                 >

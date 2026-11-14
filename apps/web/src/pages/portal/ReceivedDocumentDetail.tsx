@@ -10,6 +10,7 @@ import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { Button } from '@/components/ui/button'
 import { MarkPaidDialog } from '@/components/portal/MarkPaidDialog'
 import { documentState, STATE_UI, type ReceivedDocument } from './receivedDocuments'
+import { askConfirm } from '@/components/ui/app-dialogs'
 
 interface DocumentDetail extends ReceivedDocument {
   content: string | null
@@ -111,7 +112,7 @@ export default function ReceivedDocumentDetail() {
                 </p>
                 <Button
                   variant="ghost" size="sm" disabled={unpay.isPending}
-                  onClick={() => { if (window.confirm('Desfazer o pagamento desta guia?')) unpay.mutate() }}
+                  onClick={async () => { if (await askConfirm({ title: 'Desfazer o pagamento desta guia?', description: 'A guia volta para "a pagar".', confirmLabel: 'Desfazer pagamento', danger: true })) unpay.mutate() }}
                 >
                   Desfazer
                 </Button>

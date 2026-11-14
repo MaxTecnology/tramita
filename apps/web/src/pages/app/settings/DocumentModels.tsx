@@ -8,6 +8,7 @@ import { Plus, Pencil, Trash2, FileText, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { mensagemDeErro } from '@/lib/utils'
 import type { DocumentModelListItem } from '@/types'
+import { askConfirm } from '@/components/ui/app-dialogs'
 
 export default function DocumentModels() {
   const qc = useQueryClient()
@@ -64,7 +65,7 @@ export default function DocumentModels() {
                     <Pencil size={14} />
                   </Link>
                   <button
-                    onClick={() => { if (window.confirm(`Arquivar o modelo "${m.nome}"?`)) deleteMutation.mutate(m.id) }}
+                    onClick={async () => { if (await askConfirm({ title: `Arquivar o modelo "${m.nome}"?`, confirmLabel: 'Arquivar', danger: true })) deleteMutation.mutate(m.id) }}
                     className="p-1.5 rounded-md text-muted-foreground hover:bg-danger-bg hover:text-danger-text"
                     aria-label="Arquivar"
                   >

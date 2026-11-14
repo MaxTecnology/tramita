@@ -8,6 +8,7 @@ import { mensagemDeErro } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { User } from '@/types'
+import { askConfirm } from '@/components/ui/app-dialogs'
 
 interface PortfolioEntry {
   clientId: string
@@ -142,7 +143,7 @@ export default function UserTransfer() {
               variant="outline"
               className="text-danger-text hover:text-danger-hover"
               disabled={deactivateMutation.isPending}
-              onClick={() => { if (window.confirm(`Desativar ${source.name}?`)) deactivateMutation.mutate() }}
+              onClick={async () => { if (await askConfirm({ title: `Desativar ${source.name}?`, description: 'A pessoa perde o acesso ao Tramita. O histórico dela continua registrado.', confirmLabel: 'Desativar', danger: true })) deactivateMutation.mutate() }}
             >
               Desativar colaborador
             </Button>

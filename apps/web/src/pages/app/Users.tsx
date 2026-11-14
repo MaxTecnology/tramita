@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { cn, mensagemDeErro } from '@/lib/utils'
 import type { User, OrgRole } from '@/types'
 import { toast } from 'sonner'
+import { askConfirm } from '@/components/ui/app-dialogs'
 
 type EditableRole = Exclude<OrgRole, 'ORG_ADMIN'>
 
@@ -349,8 +350,8 @@ export default function Users() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    if (!window.confirm(`Desativar o usuário "${user.name}"?`)) return
+                  onClick={async () => {
+                    if (!(await askConfirm({ title: `Desativar o usuário "${user.name}"?`, description: 'A pessoa perde o acesso ao Tramita. O histórico dela continua registrado.', confirmLabel: 'Desativar', danger: true }))) return
                     setDeletingId(user.id)
                     deleteMutation.mutate(user.id)
                   }}

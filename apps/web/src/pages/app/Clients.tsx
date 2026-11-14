@@ -9,6 +9,7 @@ import type { Client } from '@/types'
 import { toast } from 'sonner'
 import { ClientForm } from './clients/ClientForm'
 import { EMPTY_COMPANY, type ClientFormState, type CompanyForm } from './clients/clientFormStatus'
+import { askConfirm } from '@/components/ui/app-dialogs'
 
 const EMPTY_FORM: ClientFormState = { company: EMPTY_COMPANY, departments: [], clientUsers: [] }
 
@@ -264,8 +265,8 @@ export default function Clients() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  if (!window.confirm(`Desativar o cliente "${client.name}"?`)) return
+                onClick={async () => {
+                  if (!(await askConfirm({ title: `Desativar o cliente "${client.name}"?`, description: 'O cliente sai das listas e o portal dele é bloqueado. O histórico continua registrado.', confirmLabel: 'Desativar', danger: true }))) return
                   setDeletingId(client.id)
                   deleteMutation.mutate(client.id)
                 }}

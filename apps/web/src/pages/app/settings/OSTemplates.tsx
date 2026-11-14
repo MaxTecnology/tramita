@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Plus, Pencil, Trash2, ClipboardList, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import type { OSTemplate } from '@/types'
+import { askConfirm } from '@/components/ui/app-dialogs'
 
 export default function OSTemplates() {
   const qc = useQueryClient()
@@ -70,7 +71,7 @@ export default function OSTemplates() {
                   <Pencil size={14} />
                 </Link>
                 <button
-                  onClick={() => { if (window.confirm(`Excluir o template "${t.name}"?`)) deleteMutation.mutate(t.id) }}
+                  onClick={async () => { if (await askConfirm({ title: `Excluir o template "${t.name}"?`, confirmLabel: 'Excluir', danger: true })) deleteMutation.mutate(t.id) }}
                   className="p-1.5 rounded-md text-muted-foreground hover:bg-danger-bg hover:text-danger-text"
                   aria-label="Excluir"
                 >

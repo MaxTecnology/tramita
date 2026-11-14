@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Plus, Pencil, Trash2, Repeat, Users, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import type { RecurringTaskTemplate } from '@/types'
+import { askConfirm } from '@/components/ui/app-dialogs'
 
 const PERIODICITY_LABEL: Record<RecurringTaskTemplate['periodicity'], string> = {
   WEEKLY: 'Semanal',
@@ -77,7 +78,7 @@ export default function RecurringTemplates() {
                   <Pencil size={14} />
                 </Link>
                 <button
-                  onClick={() => { if (window.confirm(`Excluir o template "${t.title}"?`)) deleteMutation.mutate(t.id) }}
+                  onClick={async () => { if (await askConfirm({ title: `Excluir o template "${t.title}"?`, confirmLabel: 'Excluir', danger: true })) deleteMutation.mutate(t.id) }}
                   className="p-1.5 rounded-md text-muted-foreground hover:bg-danger-bg hover:text-danger-text"
                   aria-label="Excluir"
                 >

@@ -25,8 +25,8 @@ test('transfere a carteira em dois lotes e desativa o colaborador', async ({ org
   await page.getByRole('button', { name: 'Transferir 1 cliente(s)' }).click()
 
   await expect(page.getByText('Este colaborador não tem mais clientes, processos nem tarefas abertas.')).toBeVisible({ timeout: 8_000 })
-  page.once('dialog', (d) => d.accept())
   await page.getByRole('button', { name: 'Desativar colaborador' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Desativar' }).click()
 
   await expect(page).toHaveURL(/\/app\/users$/, { timeout: 8_000 })
   await expect(page.getByText('saida-e2e@g2a.com.br')).toBeHidden()

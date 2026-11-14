@@ -17,6 +17,7 @@ import { PaymentFields, type PaymentValues } from './task-documents/PaymentField
 import { ProtocolOfficeCard } from './task-documents/ProtocolOfficeCard'
 import { AddDeliverableForm } from './task-documents/AddDeliverableForm'
 import { ApprovalsSection, useTaskApprovals } from './task-documents/ApprovalsSection'
+import { askConfirm, askText } from '@/components/ui/app-dialogs'
 
 function isValidAmount(value: string): boolean {
   try { toApiAmount(value); return true } catch { return false }
@@ -582,10 +583,12 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
               <button
                 type="button"
                 disabled={regenerateMutation.isPending}
-                onClick={() => {
-                  if (window.confirm('Isso apaga essa tarefa e gera uma nova pra mesma competência, usando a configuração atual do template. Só funciona se a tarefa ainda não teve nenhuma movimentação (sem comentário, anexo ou mudança de coluna). Continuar?')) {
-                    regenerateMutation.mutate()
-                  }
+                onClick={async () => {
+                  if (await askConfirm({
+                    title: 'Gerar a tarefa de novo?',
+                    description: 'Isso apaga essa tarefa e gera uma nova pra mesma competência, usando a configuração atual do template. Só funciona se a tarefa ainda não teve nenhuma movimentação (sem comentário, anexo ou mudança de coluna).',
+                    confirmLabel: 'Gerar de novo',
+                  })) regenerateMutation.mutate()
                 }}
                 className="text-xs px-2 py-0.5 rounded-full border border-accent text-accent hover:bg-accent/10 disabled:opacity-50"
                 title="Apaga e gera de novo com a config atual do template — só funciona se a tarefa não teve movimentação"
@@ -719,9 +722,13 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                             Aprovar
                           </button>
                           <button
-                            onClick={() => {
-                              const reason = window.prompt('Motivo da rejeição:')
-                              if (reason?.trim()) reviewRequirementMutation.mutate({ reqId: r.id, decision: 'REJECTED', rejectionReason: reason.trim() })
+                            onClick={async () => {
+                              const reason = await askText({
+                                title: `Rejeitar "${r.name}"`, label: 'Motivo da rejeição',
+                                description: 'O cliente vê o motivo e envia o documento de novo.',
+                                placeholder: 'Ex.: arquivo ilegível, falta a página 2', confirmLabel: 'Rejeitar documento', danger: true,
+                              })
+                              if (reason) reviewRequirementMutation.mutate({ reqId: r.id, decision: 'REJECTED', rejectionReason: reason })
                             }}
                             className="text-xs text-danger-text hover:underline"
                           >
@@ -731,9 +738,12 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                       )}
                       {canEdit && r.status === 'NOT_APPLICABLE' && (
                         <button
-                          onClick={() => {
-                            const reason = window.prompt('Por que o cliente precisa enviar este documento?')
-                            if (reason?.trim()) reviewRequirementMutation.mutate({ reqId: r.id, decision: 'REJECTED', rejectionReason: reason.trim() })
+                          onClick={async () => {
+                            const reason = await askText({
+                              title: `Contestar "Nada a enviar" — ${r.name}`, label: 'Por que o cliente precisa enviar este documento?',
+                              confirmLabel: 'Contestar', danger: true,
+                            })
+                            if (reason) reviewRequirementMutation.mutate({ reqId: r.id, decision: 'REJECTED', rejectionReason: reason })
                           }}
                           className="text-xs text-danger-text hover:underline mt-2"
                         >
@@ -765,7 +775,10 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                 </div>
                 {canEdit && (
                   <button
-                    onClick={() => { const name = window.prompt('Nome do documento a cobrar:'); if (name?.trim()) addRequirementMutation.mutate(name.trim()) }}
+                    onClick={async () => {
+                      const name = await askText({ title: 'Documento a cobrar do cliente', label: 'Nome do documento', placeholder: 'Ex.: Extrato bancário de outubro', confirmLabel: 'Adicionar' })
+                      if (name) addRequirementMutation.mutate(name)
+                    }}
                     className="text-xs text-info-text hover:underline mt-2"
                   >
                     + Adicionar documento a cobrar
