@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { notifyInApp, clientUsersFor } from './inbox.service'
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClient, createTestDepartment,
-  createTestClientUser, grantClientAccess, getAuthHeader,
+  createTestClientUser, grantClientAccess, getAuthHeader, createTestBoard, createTestColumn, createTestTask,
 } from '@/test/helpers'
 
 async function clientLogin(email: string, password: string) {
@@ -87,13 +87,16 @@ describe('/notifications', () => {
 
   it('read, unread, read-all and read-by-task change only my notifications', async () => {
     const c = await setup()
-    await note(c.org.id, { to: { userIds: [c.bruna.id, c.carla.id] }, refs: { taskId: 't1' } })
-    await note(c.org.id, { to: { userIds: [c.bruna.id] }, refs: { taskId: 't2' } })
-    const mine = await prisma.inAppNotification.findFirstOrThrow({ where: { recipientUserId: c.bruna.id, taskId: 't1' } })
+    const column = await createTestColumn((await createTestBoard(c.org.id, c.acme.id)).id)
+    const t1 = (await createTestTask(column.id, c.bruna.id, { departmentId: c.fiscal.id })).id
+    const t2 = (await createTestTask(column.id, c.bruna.id, { departmentId: c.fiscal.id })).id
+    await note(c.org.id, { to: { userIds: [c.bruna.id, c.carla.id] }, refs: { taskId: t1 } })
+    await note(c.org.id, { to: { userIds: [c.bruna.id] }, refs: { taskId: t2 } })
+    const mine = await prisma.inAppNotification.findFirstOrThrow({ where: { recipientUserId: c.bruna.id, taskId: t1 } })
 
     expect((await post(`/notifications/${mine.id}/read`, c.brunaAuth)).statusCode).toBe(200)
     expect((await post(`/notifications/${mine.id}/unread`, c.brunaAuth)).statusCode).toBe(200)
-    expect((await post('/notifications/read-by-task', c.brunaAuth, { taskId: 't1' })).statusCode).toBe(200)
+    expect((await post('/notifications/read-by-task', c.brunaAuth, { taskId: t1 })).statusCode).toBe(200)
     expect(JSON.parse((await get('/notifications/unread-count', c.brunaAuth)).body)).toEqual({ count: 1 })
     expect(JSON.parse((await get('/notifications/unread-count', c.carlaAuth)).body)).toEqual({ count: 1 })
     await post('/notifications/read-all', c.brunaAuth)

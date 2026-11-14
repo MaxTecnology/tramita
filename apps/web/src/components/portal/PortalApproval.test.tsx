@@ -10,7 +10,7 @@ const API = 'http://localhost:3000'
 const pending: Approval = {
   id: 'a1', taskId: 't1', title: 'Prévia da folha de outubro', message: 'Confere os valores?', status: 'PENDING',
   requestedAt: '2026-11-10T12:00:00.000Z', requestedByName: 'Dani', decidedAt: null, decisionNote: null, closeReason: null,
-  waitedDays: null, decidedByName: null, decidedByClient: false, fileName: 'previa.pdf', fileUrl: 'https://f/previa.pdf', proofName: null, proofUrl: null,
+  waitedDays: null, decidedByName: null, decidedByClient: false, taskClosed: false, fileName: 'previa.pdf', fileUrl: 'https://f/previa.pdf', proofName: null, proofUrl: null,
 }
 
 function renderIt(a: Approval) {
@@ -49,5 +49,11 @@ it('asking for changes needs a comment', async () => {
 it('a decided approval shows the result and no buttons', () => {
   renderIt({ ...pending, status: 'APPROVED', decidedAt: '2026-11-13T12:00:00.000Z', decidedByName: 'RH' })
   expect(screen.getByText(/Aprovado por RH em/)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Aprovar' })).not.toBeInTheDocument()
+})
+
+it('a pending request on a task the office already closed shows that, without buttons', () => {
+  renderIt({ ...pending, taskClosed: true })
+  expect(screen.getByText(/A tarefa foi encerrada pelo escritório/)).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Aprovar' })).not.toBeInTheDocument()
 })

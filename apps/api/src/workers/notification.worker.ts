@@ -10,7 +10,7 @@ import { wrapEmailHtml } from '@/lib/email-template'
 import type { NotificationConfig, NotificationEvent, MessageChannel } from '@prisma/client'
 import type { NotificationJob } from '@/lib/queue'
 import { resolveClientRecipients, type ClientRecipient } from '@/modules/notifications/client-recipients'
-import { clientTaskLink } from '@/modules/inbox/inbox-events'
+import { clientTaskLink, staffTaskLink } from '@/modules/inbox/inbox-events'
 
 const EVENT_FLAG_MAP: Record<string, keyof NotificationConfig> = {
   TASK_CREATED: 'taskCreated',
@@ -193,6 +193,19 @@ function clientPortalUrl(
   return `${appUrl}${clientTaskLink({ id: task.id, competence: task.competence, boardId: task.column.board.id, boardType: task.column.board.type })}`
 }
 
+// Events about one task open that task in the panel; requests open Requests; the rest the panel home
+const STAFF_TASK_EVENTS = new Set(['TASK_COMMENT_ADDED', 'TASK_ASSUMED', 'APPROVAL_CHANGES_REQUESTED'])
+
+async function staffPortalUrl(appUrl: string, event: string, taskId?: string): Promise<string> {
+  if (STAFF_TASK_EVENTS.has(event)) {
+    const task = taskId
+      ? await prisma.task.findUnique({ where: { id: taskId }, select: { id: true, column: { select: { board: { select: { id: true, type: true } } } } } })
+      : null
+    return task ? `${appUrl}${staffTaskLink({ id: task.id, boardId: task.column.board.id, boardType: task.column.board.type })}` : `${appUrl}/app`
+  }
+  return event === 'SLA_DIGEST' ? `${appUrl}/app` : `${appUrl}/app/requests`
+}
+
 async function processUserNotification(
   config: NotificationConfig,
   params: {
@@ -229,7 +242,7 @@ async function processUserNotification(
     taskListText: metadata.taskListText,
     assumedByName: metadata.assumedByName,
     approvalTitle: metadata.approvalTitle,
-    portalUrl: event === 'TASK_COMMENT_ADDED' || event === 'TASK_ASSUMED' ? `${appUrl}/app` : event === 'SLA_DIGEST' ? `${appUrl}/app` : `${appUrl}/app/requests`,
+    portalUrl: await staffPortalUrl(appUrl, event, taskId),
   }
 
   const availableChannels: MessageChannel[] = []

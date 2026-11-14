@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -38,15 +38,20 @@ export default function PortalRequests() {
   const [form, setForm] = useState({ title: '', description: '', departmentId: '', osTemplateId: '' })
   const [expandedId, setExpandedId] = useState<string | null>(null)
   useLinkedItem('request', setExpandedId)
-  useEffect(() => {
-    if (expandedId) document.getElementById(`request-${expandedId}`)?.scrollIntoView?.({ block: 'center' })
-  })
 
   const { data: requests = [], isLoading } = useQuery<ClientRequest[]>({
     queryKey: ['portal-requests', clientId],
     queryFn: () => api.get('/portal/requests', { params: { clientId } }).then((r) => r.data),
     enabled: !!clientId,
   })
+
+  // Scroll once to the request opened from a notification, after the list has it
+  const scrolledTo = useRef<string | null>(null)
+  useEffect(() => {
+    if (!expandedId || scrolledTo.current === expandedId || !requests.some((r) => r.id === expandedId)) return
+    scrolledTo.current = expandedId
+    document.getElementById(`request-${expandedId}`)?.scrollIntoView?.({ block: 'center' })
+  }, [expandedId, requests])
 
   // Só os departamentos a que este usuário tem acesso na empresa selecionada.
   const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({

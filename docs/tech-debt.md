@@ -580,27 +580,25 @@ Ações fora do código (ainda pendentes, por último na ordem combinada):
    outro colaborador" também em tarefa sem responsável.
 5. **`/document-reader/obrigacoes` e `/metricas`** continuam agregados da organização inteira para o Membro.
 
-## Central de notificações e aprovação — pendências conhecidas (registrado em 2026-11-13)
+## Central de notificações e aprovação — pendências (registrado em 2026-11-13, resolvido em 2026-11-14) ✅
 
-- **Sino por polling:** o contador atualiza ao voltar para a aba e a cada 60 s. Tempo real por SSE por
-  usuário ficou para depois (decisão da spec). Impacto: até 60 s de atraso no número.
-- **Sem retenção em `in_app_notifications`:** a tabela só cresce (uma linha por destinatário por evento).
-  Quando houver volume, criar purge (ex.: lidas há mais de 180 dias), como o do Leitor de Documentos.
-- **Pedido de aprovação × conclusão simultâneos:** o gate de conclusão conta as pendentes dentro da
-  transação, mas sem lock na tarefa; um pedido criado no mesmo instante em que a tarefa é concluída pode
-  passar. Janela de milissegundos, efeito visível (aprovação pendente numa tarefa concluída) e reversível.
-- **E2E não cobre o upload da prévia:** o pedido de aprovação pela tela enviaria o arquivo ao bucket real
-  do B2; no E2E as aprovações vêm do seed. O upload está coberto no teste de componente e na API (B2 mockado).
-- **Aprovação em processo (OS):** o modelo serve, mas a tela só existe no painel da tarefa; o cartão do
-  Kanban de processo não mostra o selo "Aguardando aprovação". Fora do escopo até o Max pedir.
-- **Achados menores da revisão final (2026-11-13), adiados:**
-  - `read-by-task` marca como lidas também as notificações de aprovação/documento daquela tarefa (a spec fala só de comentário); filtrar `type: 'TASK_COMMENT'`.
-  - Comprovante do "fechar sem o portal" é gravado antes da escrita protegida: num 409 fica anexo órfão. Arquivos da aprovação aparecem (e podem ser apagados) na aba Anexos.
-  - E-mail `APPROVAL_CHANGES_REQUESTED` para a equipe aponta para `/app/requests` em vez da tarefa.
-  - Pedido de ajuste: WhatsApp/e-mail vai só para quem pediu; o sino vai também para o responsável atual.
-  - Destinatários da equipe no sino não filtram `isActive` (linhas mortas, sem vazamento).
-  - Aprovação pendente continua pendente em tarefa desconsiderada (conta no Início do cliente).
-  - "Mensagens do escritório" não revalida se a tarefa continua visível / no departamento do usuário.
-  - Portal → Solicitações re-rola até o item aberto a cada render.
-  - API aceita duas aprovações `PENDING` na mesma tarefa (só a tela impede).
-  - `in_app_notifications` / `task_approvals` sem FK para `organizations`; `taskId` da notificação sem FK.
+Resolvido na branch `fix/debitos-notificacoes` (cada item com teste):
+- Retenção: cron `inbox-purge` (3h30 BRT) apaga notificações **lidas** com mais de 180 dias; não lidas ficam.
+- Corrida pedido de aprovação × conclusão: as duas operações travam a linha da tarefa (`FOR UPDATE`) — nunca fica aprovação pendente em tarefa concluída.
+- `read-by-task` marca só comentários (aviso de aprovação/documento da tarefa continua não lido).
+- Comprovante/arquivo recusado pela escrita protegida (409) é removido (linha + B2) — sem anexo órfão.
+- Arquivo e comprovante de aprovação não podem ser apagados pela aba Anexos (409).
+- E-mail de "ajuste pedido" para a equipe abre a tarefa (o de comentário e "tarefa assumida" também).
+- Pedido de ajuste avisa por WhatsApp/e-mail quem pediu **e** o responsável atual (igual ao sino).
+- Destinatários da equipe no sino filtram `isActive`.
+- Tarefa encerrada (concluída/desconsiderada): o cliente não decide mais (409, tela mostra "encerrada pelo escritório") e o Início não conta.
+- "Mensagens do escritório" ignora tarefa que ficou interna ou saiu do departamento do usuário.
+- Solicitações (portal e equipe) rolam até o item do link uma vez só.
+- API recusa segunda aprovação pendente na mesma tarefa (409).
+- FKs: `in_app_notifications` → organizations/tasks/boards/requests e `task_approvals` → organizations, com cascata (migration `20261114100000_inbox_foreign_keys`, limpa órfãos antes).
+
+Continua pendente:
+- **Sino por polling (60 s):** SSE por usuário fica para depois (decisão da spec).
+- **Aprovação em processo (OS):** fora do escopo até o Max pedir.
+- **E2E sem upload da prévia** (evita o bucket real do B2); upload coberto em teste de componente e API.
+- **Índice `organizationId` em `in_app_notifications`:** irrelevante hoje; criar quando o volume crescer (cascata de org faz seq scan).

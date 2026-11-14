@@ -23,21 +23,23 @@ model Plan {
 }
 
 model Organization {
-  id                  String             @id @default(cuid())
+  inAppNotifications  InAppNotification[]
+  taskApprovals       TaskApproval[]
+  id                  String              @id @default(cuid())
   name                String
-  slug                String             @unique
-  cnpj                String?            @unique
-  email               String             @unique
+  slug                String              @unique
+  cnpj                String?             @unique
+  email               String              @unique
   phone               String?
   planId              String
-  subscriptionStatus  SubscriptionStatus @default(TRIAL)
+  subscriptionStatus  SubscriptionStatus  @default(TRIAL)
   trialEndsAt         DateTime?
   gracePeriodEndsAt   DateTime?
   asaasCustomerId     String?
   asaasSubscriptionId String?
-  isActive            Boolean            @default(true)
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  isActive            Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   plan                   Plan                    @relation(fields: [planId], references: [id])
   users                  User[]
@@ -263,18 +265,19 @@ model ClientAssignment {
 }
 
 model Board {
-  id                String    @id @default(cuid())
-  title             String
-  description       String?
-  organizationId    String
-  clientId          String
-  responsibleUserId String?
-  isActive          Boolean   @default(true)
-  dueDate           DateTime?
-  type              BoardType @default(OS)
-  osTemplateId      String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  inAppNotifications InAppNotification[]
+  id                 String              @id @default(cuid())
+  title              String
+  description        String?
+  organizationId     String
+  clientId           String
+  responsibleUserId  String?
+  isActive           Boolean             @default(true)
+  dueDate            DateTime?
+  type               BoardType           @default(OS)
+  osTemplateId       String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   organization    Organization @relation(fields: [organizationId], references: [id])
   client          Client       @relation(fields: [clientId], references: [id])
@@ -286,13 +289,14 @@ model Board {
 }
 
 model Request {
-  id                 String             @id @default(cuid())
+  inAppNotifications InAppNotification[]
+  id                 String              @id @default(cuid())
   organizationId     String
   clientId           String
   title              String
   description        String?
-  status             RequestStatus      @default(PENDING)
-  taskId             String?            @unique
+  status             RequestStatus       @default(PENDING)
+  taskId             String?             @unique
   departmentId       String
   rejectionReason    String?
   reviewedById       String?
@@ -301,8 +305,8 @@ model Request {
   cancelledByType    CommentAuthorType?
   cancelledById      String?
   cancellationReason String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   organization Organization        @relation(fields: [organizationId], references: [id])
   client       Client              @relation(fields: [clientId], references: [id])
@@ -393,12 +397,13 @@ model ColumnDocument {
 }
 
 model Task {
-  id                  String     @id @default(cuid())
+  inAppNotifications  InAppNotification[]
+  id                  String              @id @default(cuid())
   title               String
   description         String?
   position            Int
-  priority            Priority   @default(MEDIUM)
-  status              TaskStatus @default(OPEN)
+  priority            Priority            @default(MEDIUM)
+  status              TaskStatus          @default(OPEN)
   dueDate             DateTime?
   columnId            String
   assigneeId          String?
@@ -410,9 +415,9 @@ model Task {
   targetDate          DateTime?
   completedAt         DateTime?
   recurringTemplateId String?
-  visibleToClient     Boolean    @default(true)
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  visibleToClient     Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   column               Column                    @relation(fields: [columnId], references: [id], onDelete: Cascade)
   assignee             User?                     @relation("TaskAssignee", fields: [assigneeId], references: [id])
@@ -1095,12 +1100,19 @@ model InAppNotification {
   readAt                DateTime?
   createdAt             DateTime  @default(now())
 
-  recipientUser       User?       @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
-  recipientClientUser ClientUser? @relation(fields: [recipientClientUserId], references: [id], onDelete: Cascade)
+  recipientUser       User?        @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  recipientClientUser ClientUser?  @relation(fields: [recipientClientUserId], references: [id], onDelete: Cascade)
+  // A deleted task/request/process takes its notifications along (no dead links)
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  task                Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  board               Board?       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  request             Request?     @relation(fields: [requestId], references: [id], onDelete: Cascade)
 
   @@index([recipientUserId, readAt, createdAt])
   @@index([recipientClientUserId, readAt, createdAt])
   @@index([taskId])
+  @@index([boardId])
+  @@index([requestId])
   @@map("in_app_notifications")
 }
 
@@ -1141,12 +1153,13 @@ model TaskApproval {
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
 
-  task                Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  attachment          Attachment  @relation("ApprovalFile", fields: [attachmentId], references: [id])
-  proof               Attachment? @relation("ApprovalProof", fields: [proofAttachmentId], references: [id])
-  requestedBy         User        @relation("ApprovalRequestedBy", fields: [requestedById], references: [id])
-  decidedByUser       User?       @relation("ApprovalDecidedByUser", fields: [decidedByUserId], references: [id])
-  decidedByClientUser ClientUser? @relation("ApprovalDecidedByClientUser", fields: [decidedByClientUserId], references: [id])
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  task                Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  attachment          Attachment   @relation("ApprovalFile", fields: [attachmentId], references: [id])
+  proof               Attachment?  @relation("ApprovalProof", fields: [proofAttachmentId], references: [id])
+  requestedBy         User         @relation("ApprovalRequestedBy", fields: [requestedById], references: [id])
+  decidedByUser       User?        @relation("ApprovalDecidedByUser", fields: [decidedByUserId], references: [id])
+  decidedByClientUser ClientUser?  @relation("ApprovalDecidedByClientUser", fields: [decidedByClientUserId], references: [id])
 
   @@index([taskId, status])
   @@map("task_approvals")

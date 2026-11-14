@@ -5,6 +5,7 @@ import { startSlaDigestCronWorker } from '@/workers/sla-digest.cron'
 import { startRecurringTasksCronWorker } from '@/workers/recurring-tasks.cron'
 import { startDocumentReaderWorker } from '@/workers/document-reader.worker'
 import { startDocumentReaderPurgeCronWorker } from '@/workers/document-reader-purge.cron'
+import { startInboxPurgeCronWorker } from '@/workers/inbox-purge.cron'
 
 async function main() {
   startNotificationWorker()
@@ -12,7 +13,8 @@ async function main() {
   await startRecurringTasksCronWorker()
   startDocumentReaderWorker()
   await startDocumentReaderPurgeCronWorker()
-  console.log('[worker] Notification worker + SLA digest cron + recurring tasks cron + document reader worker + document reader purge cron iniciados')
+  await startInboxPurgeCronWorker()
+  console.log('[worker] Notification worker + SLA digest cron + recurring tasks cron + document reader worker + document reader purge cron + inbox purge cron iniciados')
 }
 
 main().catch((err) => {

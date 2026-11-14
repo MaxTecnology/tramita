@@ -3,7 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
 import { publishBoardEvent } from '@/lib/sse'
-import { uploadFile, getSignedDownloadUrl } from '@/lib/b2'
+import { uploadFile, getSignedDownloadUrl, deleteFile } from '@/lib/b2'
+import { logger } from '@/lib/logger'
+import { lockTask } from './approval-gate'
 import { getOrgSlug } from '@/lib/org-slug'
 import { storageSafeName } from '@/lib/upload-policy'
 import type { UploadedFile } from '@/lib/read-upload'
@@ -33,6 +35,7 @@ async function decide(tx: Prisma.TransactionClient, id: string, data: Prisma.Tas
 }
 
 export const approvalInclude = {
+  task: { select: { status: true } },
   attachment: { select: { filename: true, storageKey: true } },
   proof: { select: { filename: true, storageKey: true } },
   requestedBy: { select: { name: true } },
@@ -49,6 +52,8 @@ export async function presentApproval(a: ApprovalRow) {
     decidedAt: a.decidedAt, decisionNote: a.decisionNote, closeReason: a.closeReason, waitedDays: a.waitedDays,
     decidedByName: a.decidedByClientUser?.name ?? a.decidedByUser?.name ?? null,
     decidedByClient: !!a.decidedByClientUserId,
+    // A pending request on a task the office already closed can no longer be answered
+    taskClosed: a.task.status === 'DONE' || a.task.status === 'DISREGARDED',
     fileName: a.attachment.filename,
     fileUrl: await getSignedDownloadUrl(a.attachment.storageKey),
     proofName: a.proof?.filename ?? null,
@@ -62,6 +67,19 @@ async function storeFile(organizationId: string, taskId: string, file: UploadedF
   return prisma.attachment.create({
     data: { taskId, filename: file.filename, mimeType: file.mimeType, size: file.size, storageKey, uploadedBy },
   })
+}
+
+// The file goes to storage before the guarded write; when that write is refused, nothing stays behind
+async function withStoredFile<T>(stored: { id: string; storageKey: string } | null, write: () => Promise<T>): Promise<T> {
+  try {
+    return await write()
+  } catch (err) {
+    if (stored) {
+      await prisma.attachment.delete({ where: { id: stored.id } }).catch(() => undefined)
+      await deleteFile(stored.storageKey).catch((e: unknown) => logger.warn({ storageKey: stored.storageKey, reason: String(e) }, 'Falha ao remover arquivo de aprovação recusada'))
+    }
+    throw err
+  }
 }
 
 async function actorName(userId: string) {
@@ -85,10 +103,20 @@ export async function requestApproval(taskId: string, organizationId: string, ac
   if (!(await canActOnTask(scope, task))) throw new AppError(403, MUST_ASSUME)
   if (!task.visibleToClient) throw new AppError(422, 'Só tarefas visíveis ao cliente podem pedir aprovação')
   if (task.status === 'DONE' || task.status === 'DISREGARDED') throw new AppError(409, 'A tarefa já foi encerrada')
+  if (await prisma.taskApproval.count({ where: { taskId, status: 'PENDING' } })) {
+    throw new AppError(409, 'Já existe uma aprovação aguardando o cliente nesta tarefa')
+  }
 
   const attachment = await storeFile(organizationId, taskId, file, 'approvals', actor.id)
   const name = await actorName(actor.id)
-  const approval = await prisma.$transaction(async (tx) => {
+  const approval = await withStoredFile(attachment, () => prisma.$transaction(async (tx) => {
+    // Locked like the completion gate: a request and a completion never interleave
+    await lockTask(tx, taskId)
+    const current = await tx.task.findUniqueOrThrow({ where: { id: taskId }, select: { status: true } })
+    if (current.status === 'DONE' || current.status === 'DISREGARDED') throw new AppError(409, 'A tarefa já foi encerrada')
+    if (await tx.taskApproval.count({ where: { taskId, status: 'PENDING' } })) {
+      throw new AppError(409, 'Já existe uma aprovação aguardando o cliente nesta tarefa')
+    }
     const created = await tx.taskApproval.create({
       data: { taskId, organizationId, title: body.title, message: body.message, attachmentId: attachment.id, requestedById: actor.id },
       include: approvalInclude,
@@ -97,7 +125,7 @@ export async function requestApproval(taskId: string, organizationId: string, ac
       data: { taskId, action: 'approval_requested', toValue: body.title, actorType: 'user', actorId: actor.id, actorName: name },
     })
     return created
-  })
+  }))
 
   await enqueueNotification({
     event: 'APPROVAL_REQUESTED', organizationId, clientId: task.column.board.clientId, taskId,
@@ -123,7 +151,7 @@ export async function closeApproval(id: string, organizationId: string, actor: S
   const proofAttachment = proof ? await storeFile(organizationId, task.id, proof, 'approval-proofs', actor.id) : null
   const name = await actorName(actor.id)
   const now = new Date()
-  await prisma.$transaction(async (tx) => {
+  await withStoredFile(proofAttachment, () => prisma.$transaction(async (tx) => {
     await decide(tx, id, {
       status: 'CLOSED_BY_OFFICE', closeReason: body.reason, decisionNote: body.note, decidedAt: now, decidedByUserId: actor.id,
       proofAttachmentId: proofAttachment?.id ?? null,
@@ -132,7 +160,7 @@ export async function closeApproval(id: string, organizationId: string, actor: S
     await tx.taskHistory.create({
       data: { taskId: task.id, action: 'approval_closed_by_office', fromValue: approval.title, toValue: body.reason, actorType: 'user', actorId: actor.id, actorName: name },
     })
-  })
+  }))
   await recalculateTaskStatus(task.id)
   await publishBoardEvent(task.column.board.id, { event: 'task:updated', data: { taskId: task.id } })
   return presentApproval(await prisma.taskApproval.findUniqueOrThrow({ where: { id }, include: approvalInclude }))
@@ -164,6 +192,7 @@ export async function decideAsClient(id: string, organizationId: string, clientU
   const task = await clientTask(approval.taskId, organizationId, clientUserId).catch(() => {
     throw new AppError(404, 'Aprovação não encontrada')
   })
+  if (task.status === 'DONE' || task.status === 'DISREGARDED') throw new AppError(409, 'A tarefa já foi encerrada pelo escritório')
   const clientUser = await prisma.clientUser.findUniqueOrThrow({ where: { id: clientUserId }, select: { name: true } })
 
   await prisma.$transaction(async (tx) => {
@@ -177,10 +206,13 @@ export async function decideAsClient(id: string, organizationId: string, clientU
   })
 
   if (decision === 'CHANGES_REQUESTED') {
-    await enqueueNotification({
-      event: 'APPROVAL_CHANGES_REQUESTED', organizationId, recipientType: 'USER', userId: approval.requestedById, taskId: task.id,
-      metadata: { taskTitle: task.title, approvalTitle: approval.title, commentText: note, commentAuthorName: clientUser.name },
-    })
+    // Same people as the bell: whoever asked and whoever holds the task now
+    for (const userId of new Set([approval.requestedById, ...(task.assigneeId ? [task.assigneeId] : [])])) {
+      await enqueueNotification({
+        event: 'APPROVAL_CHANGES_REQUESTED', organizationId, recipientType: 'USER', userId, taskId: task.id,
+        metadata: { taskTitle: task.title, approvalTitle: approval.title, commentText: note, commentAuthorName: clientUser.name },
+      })
+    }
   }
   await onApprovalDecided(id, { clientUserId, name: clientUser.name })
   // A change request means work is still to be done: never let the checklist auto-complete it

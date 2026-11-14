@@ -24,7 +24,12 @@ export interface NotifyInput {
 // One row per recipient, always written (independent of the WhatsApp/e-mail toggles). Whoever caused
 // the event is never notified about it.
 export async function notifyInApp(input: NotifyInput): Promise<number> {
-  const userIds = [...new Set(input.to.userIds ?? [])].filter((id) => id && id !== input.exclude?.userId)
+  const wanted = [...new Set(input.to.userIds ?? [])].filter((id) => id && id !== input.exclude?.userId)
+  // Former staff (deactivated) never get new notifications
+  const userIds = wanted.length === 0 ? [] : (await prisma.user.findMany({
+    where: { id: { in: wanted }, organizationId: input.organizationId, isActive: true },
+    select: { id: true },
+  })).map((u) => u.id)
   const clientUserIds = [...new Set(input.to.clientUserIds ?? [])].filter((id) => id && id !== input.exclude?.clientUserId)
   const common = {
     organizationId: input.organizationId, type: input.type, title: input.title, body: input.body, link: input.link,
@@ -89,5 +94,9 @@ export async function readAll(recipient: Recipient): Promise<number> {
 }
 
 export async function readByTask(recipient: Recipient, taskId: string): Promise<number> {
-  return (await prisma.inAppNotification.updateMany({ where: { ...recipientWhere(recipient), taskId, readAt: null }, data: { readAt: new Date() } })).count
+  // Opening a conversation reads its messages — not the approval/document notices of that task
+  return (await prisma.inAppNotification.updateMany({
+    where: { ...recipientWhere(recipient), taskId, type: 'TASK_COMMENT', readAt: null },
+    data: { readAt: new Date() },
+  })).count
 }

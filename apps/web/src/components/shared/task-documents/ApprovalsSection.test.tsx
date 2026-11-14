@@ -10,7 +10,7 @@ const API = 'http://localhost:3000'
 const pending = {
   id: 'a1', taskId: 't1', title: 'Prévia da folha', message: 'Confere?', status: 'PENDING', requestedAt: '2026-11-10T12:00:00.000Z',
   requestedByName: 'Dani', decidedAt: null, decisionNote: null, closeReason: null, waitedDays: null, decidedByName: null,
-  decidedByClient: false, fileName: 'previa.pdf', fileUrl: 'https://f/previa.pdf', proofName: null, proofUrl: null,
+  decidedByClient: false, taskClosed: false, fileName: 'previa.pdf', fileUrl: 'https://f/previa.pdf', proofName: null, proofUrl: null,
 }
 
 function renderSection(approvals: unknown[], props: Partial<{ canEdit: boolean; visibleToClient: boolean }> = {}) {

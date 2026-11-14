@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -81,8 +81,12 @@ export default function Requests() {
 
   const hasActiveFilter = !!search || !!dateFrom || !!dateTo
 
+  // Scroll once to the request opened from a notification (not again on every list refresh)
+  const scrolledTo = useRef<string | null>(null)
   useEffect(() => {
-    if (expandedId) document.getElementById(`request-${expandedId}`)?.scrollIntoView?.({ block: 'center' })
+    if (!expandedId || scrolledTo.current === expandedId || !requests.some((r) => r.id === expandedId)) return
+    scrolledTo.current = expandedId
+    document.getElementById(`request-${expandedId}`)?.scrollIntoView?.({ block: 'center' })
   }, [expandedId, requests])
 
   const { data: clientBoards = [] } = useQuery<Board[]>({

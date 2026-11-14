@@ -21,7 +21,7 @@ const TASKS = [
     approvals: [{
       id: 'a1', taskId: 't2', title: 'Prévia da folha de outubro', message: null, status: 'PENDING', requestedAt: '2026-11-10T12:00:00.000Z',
       requestedByName: 'Dani', decidedAt: null, decisionNote: null, closeReason: null, waitedDays: null, decidedByName: null,
-      decidedByClient: false, fileName: 'previa.pdf', fileUrl: 'https://f/previa.pdf', proofName: null, proofUrl: null,
+      decidedByClient: false, taskClosed: false, fileName: 'previa.pdf', fileUrl: 'https://f/previa.pdf', proofName: null, proofUrl: null,
     }],
   },
 ]

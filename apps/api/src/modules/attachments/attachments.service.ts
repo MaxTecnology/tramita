@@ -134,8 +134,13 @@ export async function deleteAttachment(
 
   const attachment = await prisma.attachment.findFirst({
     where: { id: attachmentId, taskId, deletedAt: null },
+    include: { approvalFileOf: { select: { id: true } }, approvalProofOf: { select: { id: true } } },
   })
   if (!attachment) throw new AppError(404, 'Anexo não encontrado')
+  // It is the record of a client approval (file sent or proof of the outside approval)
+  if (attachment.approvalFileOf || attachment.approvalProofOf) {
+    throw new AppError(409, 'Esse arquivo faz parte de uma aprovação do cliente e não pode ser removido')
+  }
 
   // An attachment uploaded by "the client" is attributed to the company, not to a single
   // ClientUser — any ClientUser with access to that company (and department, enforced above

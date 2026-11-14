@@ -40,13 +40,16 @@ export function PortalApproval({ approval: a, onChanged }: { approval: Approval;
       {decided && <p className="text-xs text-foreground">{decided}</p>}
       {a.decisionNote && <p className="text-xs text-muted-foreground italic">"{a.decisionNote}"</p>}
 
-      {a.status === 'PENDING' && !askingChanges && (
+      {a.status === 'PENDING' && a.taskClosed && (
+        <p className="text-xs text-muted-foreground">A tarefa foi encerrada pelo escritório — não é mais preciso responder.</p>
+      )}
+      {a.status === 'PENDING' && !a.taskClosed && !askingChanges && (
         <div className="flex flex-wrap gap-2 pt-1">
           <Button size="sm" onClick={() => approve.mutate()} disabled={busy}>Aprovar</Button>
           <Button size="sm" variant="outline" onClick={() => setAskingChanges(true)} disabled={busy}>Pedir ajuste</Button>
         </div>
       )}
-      {a.status === 'PENDING' && askingChanges && (
+      {a.status === 'PENDING' && !a.taskClosed && askingChanges && (
         <form onSubmit={(e) => { e.preventDefault(); requestChanges.mutate() }} className="space-y-2 pt-1">
           <label className="block text-xs text-muted-foreground">
             O que precisa ser ajustado

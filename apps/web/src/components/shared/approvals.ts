@@ -15,6 +15,7 @@ export interface Approval {
   waitedDays: number | null
   decidedByName: string | null
   decidedByClient: boolean
+  taskClosed: boolean
   fileName: string
   fileUrl: string
   proofName: string | null

@@ -607,7 +607,9 @@ Destinatário pelo papel do token (CLIENT → usuário do cliente; equipe → us
 ### GET `/notifications/unread-count` → `{ count }`
 ### POST `/notifications/:id/read` · POST `/notifications/:id/unread` → `{ ok: true }`
 ### POST `/notifications/read-all` → `{ count }`
-### POST `/notifications/read-by-task` `{ taskId }` → `{ count }` — usado ao abrir a conversa da tarefa no portal
+### POST `/notifications/read-by-task` `{ taskId }` → `{ count }` — usado ao abrir a conversa da tarefa no portal; marca só as `TASK_COMMENT` daquela tarefa
+
+Retenção: notificações lidas com mais de 180 dias são apagadas pelo cron `inbox-purge` (3h30 BRT). Destinatários da equipe inativos são ignorados.
 
 **Tipos (`InAppType`) e destinatários:**
 | Tipo | Quem recebe | Link |
@@ -634,13 +636,15 @@ Destinatário pelo papel do token (CLIENT → usuário do cliente; equipe → us
 `Approval = { id, taskId, title, message, status: PENDING|APPROVED|CHANGES_REQUESTED|CLOSED_BY_OFFICE, requestedAt, requestedByName, decidedAt, decisionNote, closeReason: APPROVED_OUTSIDE|NO_RESPONSE|null, waitedDays, decidedByName, decidedByClient, fileName, fileUrl (assinada), proofName, proofUrl }`
 
 ### POST `/tasks/:id/approvals` _(equipe, multipart: `title`, `message?` antes do arquivo `file`)_ → 201 `Approval`
-Tarefa fora do escopo → 404; tarefa interna → 422 `Só tarefas visíveis ao cliente podem pedir aprovação`; encerrada → 409. Histórico `approval_requested`; aviso `APPROVAL_REQUESTED` (WhatsApp/e-mail, toggle `approvalRequested`) + sino.
+Tarefa fora do escopo → 404; só vê (não pode mexer) → 403 `Assuma a tarefa para alterá-la`; tarefa interna → 422 `Só tarefas visíveis ao cliente podem pedir aprovação`; encerrada → 409; já existe pendente → 409 `Já existe uma aprovação aguardando o cliente nesta tarefa`. Trava a linha da tarefa (mesmo lock do gate de conclusão). Histórico `approval_requested`; aviso `APPROVAL_REQUESTED` (WhatsApp/e-mail, toggle `approvalRequested`) + sino.
 ### GET `/tasks/:id/approvals` _(equipe)_ → `Approval[]`
 ### POST `/approvals/:id/close` _(equipe)_ — JSON `{ reason, note }` ou multipart com os mesmos campos antes do `file` (print opcional)
 `note` obrigatória nos dois motivos. Exige poder mexer na tarefa (fora do escopo 404; só vê → 403 `Assuma a tarefa para alterá-la`). Grava `decidedByUserId`, `decidedAt`, `waitedDays` (dias inteiros desde o pedido). Histórico `approval_closed_by_office`.
 ### GET `/portal/tasks/:taskId/approvals` _(CLIENT)_ → `Approval[]` (fora da empresa/departamento → 404)
 ### POST `/portal/approvals/:id/approve` _(CLIENT)_ `{ note? }` · POST `/portal/approvals/:id/request-changes` _(CLIENT)_ `{ note }` (obrigatória)
-Histórico `approval_approved` / `approval_changes_requested`; pedido de ajuste avisa quem pediu (`APPROVAL_CHANGES_REQUESTED`, toggle `approvalChangesRequested`); sino `APPROVAL_DECIDED`.
+Histórico `approval_approved` / `approval_changes_requested`; pedido de ajuste avisa quem pediu e o responsável atual (`APPROVAL_CHANGES_REQUESTED`, toggle `approvalChangesRequested`, link para a tarefa); sino `APPROVAL_DECIDED`. Pedido de ajuste não dispara a conclusão automática. Tarefa encerrada → 409 (`Approval.taskClosed = true` no portal).
+
+Arquivo e comprovante de uma aprovação não podem ser removidos em `DELETE /tasks/:id/attachments/:id` (409). Comprovante enviado num fechamento recusado (409) é descartado.
 
 **Regras:** decisão e fechamento são escritas protegidas (`updateMany` com `status: PENDING`) — quem chega depois recebe 409 `Essa aprovação já foi <aprovada pelo cliente | respondida com pedido de ajuste | fechada pelo escritório>`. Com aprovação `PENDING` a tarefa não conclui (409 `Há aprovação do cliente pendente`) por `PATCH /tasks/:id`, por mover para coluna `DONE` nem pela conclusão automática do checklist. Decidir/fechar recalcula o status (a conclusão automática pode acontecer em seguida).
 

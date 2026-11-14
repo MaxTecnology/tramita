@@ -74,14 +74,21 @@ export async function getPortalHome(organizationId: string, clientId: string, cl
     }),
     // Office messages not read yet: one entry per conversation (task), oldest first
     prisma.inAppNotification.findMany({
-      where: { recipientClientUserId: clientUserId, clientId, type: 'TASK_COMMENT', readAt: null, taskId: { not: null } },
+      where: {
+        recipientClientUserId: clientUserId, clientId, type: 'TASK_COMMENT', readAt: null,
+        // The task may have been hidden or moved to a department this user no longer accesses
+        task: { visibleToClient: true, departmentId: { in: departmentIds } },
+      },
       select: { taskId: true, link: true },
       orderBy: { createdAt: 'asc' },
     }),
     prisma.taskApproval.findMany({
       where: {
         status: 'PENDING',
-        task: { visibleToClient: true, departmentId: { in: departmentIds }, column: { board: { organizationId, clientId, isActive: true } } },
+        task: {
+          visibleToClient: true, departmentId: { in: departmentIds }, status: { notIn: ['DONE', 'DISREGARDED'] },
+          column: { board: { organizationId, clientId, isActive: true } },
+        },
       },
       select: { task: { select: { id: true, competence: true, column: { select: { board: { select: { id: true, type: true } } } } } } },
       orderBy: { requestedAt: 'asc' },
