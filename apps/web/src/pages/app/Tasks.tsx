@@ -20,6 +20,7 @@ import { TaskDrawer, STATUS_LABEL, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR 
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { buildCalendarGrid, getCalendarGridRange } from './tasksCalendar'
 import { periodRange, type PeriodKind } from './tasksPeriod'
+import { STATUS_FILTER_OPTIONS, DEFAULT_STATUS_FILTER, statusFilterParams, type StatusFilter } from './tasksStatus'
 import type { Task, User, Department, RecurringTaskTemplate } from '@/types'
 import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
 import { useMyScope } from '@/hooks/useMyScope'
@@ -360,7 +361,7 @@ export default function Tasks() {
   const [departmentId, setDepartmentId] = useState('')
   const [recurringTemplateId, setRecurringTemplateId] = useState('')
   // Default: open tasks of the current month — with many tasks the list never loads "all time"
-  const [status, setStatus] = useState<Task['status']>('OPEN')
+  const [status, setStatus] = useState<StatusFilter>(DEFAULT_STATUS_FILTER)
   const [periodKind, setPeriodKind] = useState<PeriodKind>('this')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -409,7 +410,7 @@ export default function Tasks() {
   // 'period' also keeps tasks with no date (OS tasks often have none) in the month view
   const dateField = calendarRange ? 'effective' : 'period'
   // Kanban is organized by status columns: the status filter only applies to List and Calendar
-  const statusParam = view === 'kanban' ? '' : status
+  const statusParam: StatusFilter = view === 'kanban' ? 'ALL' : status
 
   const me = useMyScope()
   const [scopeFilter, setScopeFilter] = useScopeFilter('tasks', me)
@@ -434,7 +435,7 @@ export default function Tasks() {
       if (assigneeId) params.assigneeId = assigneeId
       if (departmentId) params.departmentId = departmentId
       if (recurringTemplateId) params.recurringTemplateId = recurringTemplateId
-      if (statusParam) params.status = statusParam
+      Object.assign(params, statusFilterParams(statusParam))
       if (search.trim()) params.q = search.trim()
       if (effectiveDateFrom) params.dateFrom = new Date(`${effectiveDateFrom}T00:00:00Z`).toISOString()
       if (effectiveDateTo) params.dateTo = new Date(`${effectiveDateTo}T23:59:59Z`).toISOString()
@@ -478,14 +479,14 @@ export default function Tasks() {
   const selectedTask = selectedInList ?? linkedTask
 
   const hasFilters =
-    !!clientId || !!assigneeId || !!departmentId || !!recurringTemplateId || status !== 'OPEN' || periodKind !== 'this' || !!search.trim()
+    !!clientId || !!assigneeId || !!departmentId || !!recurringTemplateId || status !== DEFAULT_STATUS_FILTER || periodKind !== 'this' || !!search.trim()
 
   function clearFilters() {
     setClientId('')
     setAssigneeId('')
     setDepartmentId('')
     setRecurringTemplateId('')
-    setStatus('OPEN')
+    setStatus(DEFAULT_STATUS_FILTER)
     setPeriodKind('this')
     setDateFrom('')
     setDateTo('')
@@ -645,9 +646,13 @@ export default function Tasks() {
         </FilterSelect>
         {view !== 'kanban' && (
           <FilterField label="Status">
-            <select value={status} onChange={(e) => setStatus(e.target.value as Task['status'])} className={selectCls}>
-              {STATUS_ORDER.map((s) => (
-                <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+            <select
+              value={status}
+              onChange={(e) => setStatus(STATUS_FILTER_OPTIONS.find((o) => o.value === e.target.value)?.value ?? DEFAULT_STATUS_FILTER)}
+              className={selectCls}
+            >
+              {STATUS_FILTER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
           </FilterField>
