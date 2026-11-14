@@ -1,3 +1,5 @@
+import axios from 'axios'
+import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { hashPassword, generateRandomPassword } from '@/modules/auth/auth.service'
@@ -99,7 +101,14 @@ export async function register(data: RegisterOrgBody) {
     if (err instanceof AppError) throw err
     await prisma.user.delete({ where: { id: user.id } })
     await prisma.organization.delete({ where: { id: organization.id } })
-    throw new AppError(502, 'Erro ao integrar com sistema de cobrança. Tente novamente.')
+    // The billing's own reasons go to the log (no API key, no personal data) and to the person
+    const asaasErrors = asaas.asaasErrorReasons(err)
+    logger.error(
+      { asaasErrors, status: axios.isAxiosError(err) ? err.response?.status : undefined, reason: err instanceof Error ? err.message : String(err) },
+      'Cadastro do escritório: Asaas recusou a criação do cliente/assinatura',
+    )
+    const detail = asaasErrors.map((e) => e.slice(e.indexOf(': ') + 2)).filter(Boolean).join(' ')
+    throw new AppError(502, detail ? `Erro ao integrar com sistema de cobrança: ${detail}` : 'Erro ao integrar com sistema de cobrança. Tente novamente.')
   }
 
   return { organization, user }

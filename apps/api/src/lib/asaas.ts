@@ -39,3 +39,13 @@ export async function createSubscription(data: {
 export async function cancelSubscription(subscriptionId: string): Promise<void> {
   await asaasHttp.delete(`/subscriptions/${subscriptionId}`)
 }
+
+// Reasons the billing gave for refusing a call ("code: description"), for logs and the user message
+export function asaasErrorReasons(err: unknown): string[] {
+  if (!axios.isAxiosError(err)) return []
+  const data: unknown = err.response?.data
+  if (!data || typeof data !== 'object' || !('errors' in data) || !Array.isArray(data.errors)) return []
+  return data.errors
+    .filter((e): e is { code?: unknown; description?: unknown } => !!e && typeof e === 'object')
+    .map((e) => `${String(e.code ?? 'erro')}: ${String(e.description ?? '')}`)
+}

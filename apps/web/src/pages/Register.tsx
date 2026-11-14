@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft } from 'lucide-react'
+import { cnpjValido } from '@/lib/documento'
 
 interface Plan { id: string; name: string; maxClients: number; priceMonthly: number }
 type Step = 'plan' | 'form'
@@ -22,6 +23,8 @@ export default function Register() {
     name: '', cnpj: '', email: '', phone: '', adminName: '', adminPassword: '',
   })
 
+  const cnpjRequired = selectedPlan?.id !== 'trial'
+
   const { data: plans = [], isLoading } = useQuery<Plan[]>({
     queryKey: ['public', 'plans'],
     queryFn: () => api.get('/organizations/plans').then((r) => r.data as Plan[]),
@@ -30,6 +33,9 @@ export default function Register() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!selectedPlan) return
+    // The billing (Asaas) refuses a paid subscription without a valid CNPJ
+    if (cnpjRequired && !form.cnpj.trim()) { setError('Informe o CNPJ do escritório'); return }
+    if (form.cnpj.trim() && !cnpjValido(form.cnpj)) { setError('CNPJ inválido'); return }
     setError('')
     setLoading(true)
     try {
@@ -131,12 +137,15 @@ export default function Register() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="cnpj">
-                CNPJ <span className="text-muted-foreground font-normal">(opcional)</span>
+                CNPJ {!cnpjRequired && <span className="text-muted-foreground font-normal">(opcional)</span>}
               </Label>
               <Input
                 id="cnpj"
+                inputMode="numeric"
+                placeholder="00.000.000/0000-00"
                 value={form.cnpj}
                 onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
+                required={cnpjRequired}
               />
             </div>
             <div className="space-y-1.5">
