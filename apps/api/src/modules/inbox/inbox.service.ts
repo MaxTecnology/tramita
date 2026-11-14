@@ -1,6 +1,7 @@
 import type { InAppType, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
+import { publishInboxEvent } from '@/lib/sse'
 import type { ListNotificationsQuery } from './inbox.schema'
 
 // Whose inbox: an office user or a client user (from the token role)
@@ -41,6 +42,11 @@ export async function notifyInApp(input: NotifyInput): Promise<number> {
   ]
   if (data.length === 0) return 0
   const { count } = await prisma.inAppNotification.createMany({ data })
+  // Bell updates in real time for whoever has the app open
+  await Promise.all([
+    ...userIds.map((id) => publishInboxEvent({ kind: 'user', id })),
+    ...clientUserIds.map((id) => publishInboxEvent({ kind: 'clientUser', id })),
+  ])
   return count
 }
 
@@ -87,16 +93,21 @@ export async function setRead(recipient: Recipient, id: string, read: boolean) {
     data: { readAt: read ? new Date() : null },
   })
   if (count === 0) throw new AppError(404, 'Notificação não encontrada')
+  await publishInboxEvent(recipient) // other open tabs of the same person
 }
 
 export async function readAll(recipient: Recipient): Promise<number> {
-  return (await prisma.inAppNotification.updateMany({ where: { ...recipientWhere(recipient), readAt: null }, data: { readAt: new Date() } })).count
+  const { count } = await prisma.inAppNotification.updateMany({ where: { ...recipientWhere(recipient), readAt: null }, data: { readAt: new Date() } })
+  await publishInboxEvent(recipient)
+  return count
 }
 
 export async function readByTask(recipient: Recipient, taskId: string): Promise<number> {
   // Opening a conversation reads its messages — not the approval/document notices of that task
-  return (await prisma.inAppNotification.updateMany({
+  const { count } = await prisma.inAppNotification.updateMany({
     where: { ...recipientWhere(recipient), taskId, type: 'TASK_COMMENT', readAt: null },
     data: { readAt: new Date() },
-  })).count
+  })
+  if (count > 0) await publishInboxEvent(recipient)
+  return count
 }

@@ -606,6 +606,8 @@ Destinatário pelo papel do token (CLIENT → usuário do cliente; equipe → us
 **Query:** `?status=all|read|unread&type=<InAppType>&clientId=&from=AAAA-MM-DD&to=AAAA-MM-DD&q=&cursor=&limit≤50` → `{ items: InAppNotification[], nextCursor|null }` (mais recente primeiro)
 ### GET `/notifications/unread-count` → `{ count }`
 ### POST `/notifications/:id/read` · POST `/notifications/:id/unread` → `{ ok: true }`
+### GET `/notifications/stream?ticket=` _(equipe | CLIENT, SSE)_
+Ticket de `POST /stream/ticket`. Canal da própria pessoa (`inbox:user:<id>` / `inbox:client:<id>`), evento `inbox:changed` (sem payload) a cada notificação nova e a cada leitura — o front recarrega contador, lista e conversas abertas. MASTER → 403.
 ### POST `/notifications/read-all` → `{ count }`
 ### POST `/notifications/read-by-task` `{ taskId }` → `{ count }` — usado ao abrir a conversa da tarefa no portal; marca só as `TASK_COMMENT` daquela tarefa
 

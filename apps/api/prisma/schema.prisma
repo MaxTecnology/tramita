@@ -1113,6 +1113,7 @@ model InAppNotification {
   @@index([taskId])
   @@index([boardId])
   @@index([requestId])
+  @@index([organizationId])
   @@map("in_app_notifications")
 }
 

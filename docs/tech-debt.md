@@ -597,8 +597,7 @@ Resolvido na branch `fix/debitos-notificacoes` (cada item com teste):
 - API recusa segunda aprovação pendente na mesma tarefa (409).
 - FKs: `in_app_notifications` → organizations/tasks/boards/requests e `task_approvals` → organizations, com cascata (migration `20261114100000_inbox_foreign_keys`, limpa órfãos antes).
 
-Continua pendente:
-- **Sino por polling (60 s):** SSE por usuário fica para depois (decisão da spec).
-- **Aprovação em processo (OS):** fora do escopo até o Max pedir.
-- **E2E sem upload da prévia** (evita o bucket real do B2); upload coberto em teste de componente e API.
-- **Índice `organizationId` em `in_app_notifications`:** irrelevante hoje; criar quando o volume crescer (cascata de org faz seq scan).
+- Sino em tempo real: canal SSE por pessoa (`GET /notifications/stream?ticket=`), publicado a cada notificação nova e a cada leitura (sincroniza abas); polling ficou só como reserva (5 min + foco).
+- Índice `organizationId` em `in_app_notifications` (migration `20261114110000_inbox_organization_index`).
+
+Fora do escopo (não é débito, é decisão): aprovação em processo (OS) até o Max pedir; E2E sem upload da prévia (evita o bucket real do B2 — upload coberto em teste de componente e API).

@@ -3,7 +3,7 @@ import type { OutgoingHttpHeaders } from 'node:http'
 import { redis } from '@/lib/redis'
 
 export interface SSEEvent {
-  event: 'task:moved' | 'task:created' | 'task:updated' | 'comment:added' | 'request:changed'
+  event: 'task:moved' | 'task:created' | 'task:updated' | 'comment:added' | 'request:changed' | 'inbox:changed'
   data: Record<string, unknown>
 }
 
@@ -16,6 +16,16 @@ export async function publishBoardEvent(boardId: string, payload: SSEEvent): Pro
 export async function publishOrgEvent(organizationId: string, payload: SSEEvent): Promise<void> {
   try {
     await redis.publish(`org:${organizationId}:requests`, JSON.stringify(payload))
+  } catch { /* ignore in test/offline environments */ }
+}
+
+// Per-person bell channel (office user or client user)
+export const inboxChannel = (r: { kind: 'user' | 'clientUser'; id: string }) =>
+  r.kind === 'user' ? `inbox:user:${r.id}` : `inbox:client:${r.id}`
+
+export async function publishInboxEvent(r: { kind: 'user' | 'clientUser'; id: string }): Promise<void> {
+  try {
+    await redis.publish(inboxChannel(r), JSON.stringify({ event: 'inbox:changed', data: {} } satisfies SSEEvent))
   } catch { /* ignore in test/offline environments */ }
 }
 

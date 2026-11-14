@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { useRequestsBadgeStream } from '@/hooks/useRequestsBadgeStream'
+import { useInboxStream } from '@/hooks/useInboxStream'
 import { SlaConfigProvider } from '@/hooks/useSlaConfig'
 import { useSlaAlerts } from '@/hooks/useSlaAlerts'
 import { SlaPermissionBanner } from '@/components/SlaPermissionBanner'
@@ -51,6 +52,7 @@ export default function AppLayout() {
   const failedGenerationsCount = failedGenerations?.length ?? 0
 
   useRequestsBadgeStream()
+  useInboxStream(isOrgRole)
 
   return (
     <SlaConfigProvider>

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { LayoutGrid, User, LogOut, Inbox, Home, FileText, Send } from 'lucide-react'
 import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 import { NotificationBell } from '@/components/shared/NotificationBell'
+import { useInboxStream } from '@/hooks/useInboxStream'
 import type { InAppNotification } from '@/components/shared/notifications'
 
 // Document-centric portal: what the client received, what they must send, processes in progress.
@@ -37,6 +38,7 @@ export function usePortalClient(): PortalClientContextValue {
 export default function PortalLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  useInboxStream()
 
   const { data: accessibleClients = [] } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['portal-clients'],

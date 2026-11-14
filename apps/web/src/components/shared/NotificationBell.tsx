@@ -19,12 +19,13 @@ export function NotificationBell({ base, onOpen, align = 'left', className }: Pr
   const ref = useRef<HTMLDivElement>(null)
   const qc = useQueryClient()
 
-  // Refreshed on returning to the tab and every 60 s (real time via SSE is a later step)
+  // Real time comes from the bell stream (useInboxStream in the layouts); focus and a slow poll
+  // are only the fallback for a dropped connection
   const { data: unread } = useQuery({
     queryKey: UNREAD_KEY,
     queryFn: notificationsApi.unreadCount,
     refetchOnWindowFocus: true,
-    refetchInterval: 60_000,
+    refetchInterval: 5 * 60_000,
   })
   const { data: latest } = useQuery({
     queryKey: [...LIST_KEY, 'latest'],
