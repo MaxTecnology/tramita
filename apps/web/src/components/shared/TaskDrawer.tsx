@@ -627,12 +627,13 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
           )}
         </div>
 
-        {/* Abas em grade de tamanhos iguais: 5 (equipe) = 3 em cima + 2 embaixo; 4 (cliente) = uma linha */}
+        {/* Abas em grade fechada: 5 (equipe) = 3 em cima (1/3 cada) + 2 embaixo (1/2 cada), sem célula vazia;
+            4 (cliente) = uma linha */}
         <div
           role="tablist"
-          className={cn('grid gap-px bg-border border-b border-border flex-shrink-0', TABS.length > 4 ? 'grid-cols-3' : 'grid-cols-4')}
+          className={cn('grid gap-px bg-border border-b border-border flex-shrink-0', TABS.length > 4 ? 'grid-cols-6' : 'grid-cols-4')}
         >
-          {TABS.map((t) => (
+          {TABS.map((t, i) => (
             <button
               key={t.id}
               role="tab"
@@ -640,6 +641,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
               onClick={() => setTab(t.id)}
               className={cn(
                 'flex items-center justify-center gap-1.5 px-2 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                TABS.length > 4 && (i < 3 ? 'col-span-2' : 'col-span-3'),
                 tab === t.id
                   ? 'border-accent text-accent bg-neutral-bg'
                   : 'border-transparent text-muted-foreground bg-surface hover:text-foreground hover:bg-neutral-bg/60',
