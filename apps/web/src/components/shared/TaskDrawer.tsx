@@ -627,17 +627,22 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
           )}
         </div>
 
-        {/* Abas — rolam na horizontal se não couberem (celular), nunca cortam a última */}
-        <div className="flex border-b border-border flex-shrink-0 overflow-x-auto">
+        {/* Abas em grade de tamanhos iguais: 5 (equipe) = 3 em cima + 2 embaixo; 4 (cliente) = uma linha */}
+        <div
+          role="tablist"
+          className={cn('grid gap-px bg-border border-b border-border flex-shrink-0', TABS.length > 4 ? 'grid-cols-3' : 'grid-cols-4')}
+        >
           {TABS.map((t) => (
             <button
               key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                'flex flex-shrink-0 items-center gap-1.5 px-3 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                'flex items-center justify-center gap-1.5 px-2 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
                 tab === t.id
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
+                  ? 'border-accent text-accent bg-neutral-bg'
+                  : 'border-transparent text-muted-foreground bg-surface hover:text-foreground hover:bg-neutral-bg/60',
               )}
             >
               {t.icon}

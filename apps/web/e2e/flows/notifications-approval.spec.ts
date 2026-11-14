@@ -67,7 +67,7 @@ test.describe.serial('Central de notificações, conversa e aprovação', () => 
     await statusSelect(page, 'Décimo terceiro E2E').selectOption('DONE')
     await expect(page.getByText('Há aprovação do cliente pendente')).toBeVisible({ timeout: 8_000 })
 
-    await drawer(page, 'Décimo terceiro E2E').getByRole('button', { name: 'Documentos' }).click()
+    await drawer(page, 'Décimo terceiro E2E').getByRole('tab', { name: 'Documentos' }).click()
     await page.getByRole('button', { name: 'Fechar sem o portal' }).click()
     await page.getByLabel('Sem resposta do cliente').check()
     await page.getByLabel('Observação').fill('Cobrado por WhatsApp duas vezes, sem retorno')

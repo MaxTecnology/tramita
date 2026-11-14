@@ -53,7 +53,7 @@ it('the owner passes the task to a colleague of the same department', async () =
 
 it('the history speaks the user language: status label and people names', async () => {
   render(<TaskDrawer task={task} currentUserId="ingrite" role="ORG_MANAGER" onClose={() => {}} />, { wrapper })
-  fireEvent.click(await screen.findByRole('button', { name: /Histórico/ }))
+  fireEvent.click(await screen.findByRole('tab', { name: /Histórico/ }))
   expect(await screen.findByText(/alterou status para Com Impedimento/)).toBeInTheDocument()
   expect(await screen.findByText(/alterou responsável para Bruna/)).toBeInTheDocument()
 })
