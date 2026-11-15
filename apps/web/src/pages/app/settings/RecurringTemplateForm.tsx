@@ -1,101 +1,63 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { ArrowLeft, Trash2 } from 'lucide-react'
+import { ArrowLeft, Trash2, Download, Upload, CalendarClock, FileText, Settings2, Tag, DollarSign, Plus } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import type { RecurringTaskTemplate, Department, ObligationType } from '@/types'
 import { PRIORITY_LABEL } from '@/components/shared/TaskDrawer'
+import { nextOccurrences, describeRule } from './recurringPreview'
 
 const PERIODICITY_LABEL: Record<RecurringTaskTemplate['periodicity'], string> = {
-  WEEKLY: 'Semanal',
   MONTHLY: 'Mensal',
   QUARTERLY: 'Trimestral',
   ANNUAL: 'Anual',
+  WEEKLY: 'Semanal',
 }
-
-const GENERATION_MONTH_OFFSET_OPTIONS = [0, 1, 2, 3]
-const COMPETENCE_MONTH_OFFSET_OPTIONS = [0, 1, 2, 3]
 const WEEKDAY_LABEL: Record<number, string> = { 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado', 7: 'Domingo' }
-
 const QUARTERLY_ANCHOR_OPTIONS = [
   { value: 1, label: 'Jan, Abr, Jul, Out' },
   { value: 2, label: 'Fev, Mai, Ago, Nov' },
   { value: 3, label: 'Mar, Jun, Set, Dez' },
 ]
 const MONTH_LABEL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-
-const BUSINESS_DAY_ROLL_LABEL: Record<RecurringTaskTemplate['dueBusinessDayRoll'], string> = {
-  NONE: 'Não ajustar',
-  FORWARD: 'Empurrar pro próximo dia útil',
-  BACKWARD: 'Antecipar pro dia útil anterior',
-}
-
-function isWeekendUTC(d: Date): boolean {
-  const day = d.getUTCDay()
-  return day === 0 || day === 6
-}
-
-function rollToBusinessDayUTC(d: Date, direction: RecurringTaskTemplate['dueBusinessDayRoll']): Date {
-  if (direction === 'NONE') return d
-  const step = direction === 'FORWARD' ? 1 : -1
-  const result = new Date(d)
-  while (isWeekendUTC(result)) result.setUTCDate(result.getUTCDate() + step)
-  return result
-}
-
-function clampDayOfMonthUTC(year: number, monthIndex: number, day: number): number {
-  const daysInMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate()
-  return Math.min(day, daysInMonth)
-}
-
-/**
- * Preview "se gerasse hoje" — mesma cadeia de cálculo do backend (recurrence-dates.ts), espelhada
- * no cliente pra dar feedback imediato enquanto o usuário ajusta a config, sem round-trip à API.
- * WEEKLY fica fora (não participa do redesenho vencimento-como-âncora, ver spec).
- */
-function computePreview(form: FormState): { dueDate: Date; competence: Date } | null {
-  if (form.periodicity === 'WEEKLY') return null
-
-  const today = new Date()
-  let candidate = new Date(Date.UTC(today.getFullYear(), today.getMonth() + form.generationMonthOffset, 1))
-
-  if (form.periodicity !== 'MONTHLY') {
-    const matchesAnchor = (d: Date): boolean =>
-      form.periodicity === 'QUARTERLY'
-        ? d.getUTCMonth() % 3 === (form.dueMonthAnchor - 1) % 3
-        : d.getUTCMonth() === form.dueMonthAnchor - 1
-    while (!matchesAnchor(candidate)) {
-      candidate = new Date(Date.UTC(candidate.getUTCFullYear(), candidate.getUTCMonth() + 1, 1))
-    }
-  }
-
-  const dueDay = clampDayOfMonthUTC(candidate.getUTCFullYear(), candidate.getUTCMonth(), form.dueDayOfPeriod)
-  const dueDateRaw = new Date(Date.UTC(candidate.getUTCFullYear(), candidate.getUTCMonth(), dueDay))
-  const dueDate = rollToBusinessDayUTC(dueDateRaw, form.dueBusinessDayRoll)
-  const competence = new Date(Date.UTC(candidate.getUTCFullYear(), candidate.getUTCMonth() - form.competenceMonthOffset, 1))
-
-  return { dueDate, competence }
-}
+type Roll = RecurringTaskTemplate['dueBusinessDayRoll']
+const ROLL_OPTIONS: { value: Roll; label: string }[] = [
+  { value: 'NONE', label: 'Manter' },
+  { value: 'BACKWARD', label: 'Antecipar' },
+  { value: 'FORWARD', label: 'Adiar' },
+]
+const COMPETENCE_OPTIONS = [
+  { value: 0, label: 'Mesmo mês' },
+  { value: 1, label: 'Mês anterior' },
+  { value: 2, label: '2 meses antes' },
+  { value: 3, label: '3 meses antes' },
+]
+const GENERATION_OFFSET_OPTIONS = [
+  { value: 0, label: 'mesmo mês do vencimento' },
+  { value: 1, label: 'mês anterior ao vencimento' },
+  { value: 2, label: '2 meses antes do vencimento' },
+  { value: 3, label: '3 meses antes do vencimento' },
+]
 
 interface FormState {
   departmentId: string
-  // Só preenchido quando o template representa uma obrigação fiscal — permite ao robô de leitura
-  // de documentos (document-reader) casar o documento lido com a tarefa aberta certa.
+  // Only when the template is a tax obligation the document reader recognizes (DAS, PGDAS-D...): lets
+  // it match a read document with the right open task.
   obligationTypeId: string
   title: string
   description: string
   periodicity: RecurringTaskTemplate['periodicity']
   priority: RecurringTaskTemplate['priority']
   dueDayOfPeriod: number
-  dueBusinessDayRoll: RecurringTaskTemplate['dueBusinessDayRoll']
+  dueBusinessDayRoll: Roll
   dueMonthAnchor: number
   competenceMonthOffset: number
   targetOffsetDays: number
-  targetBusinessDayRoll: RecurringTaskTemplate['targetBusinessDayRoll']
+  targetBusinessDayRoll: Roll
   generationMonthOffset: number
   generationDayOfPeriod: number
   autoCompleteOnAllActivitiesDone: boolean
@@ -116,50 +78,142 @@ const EMPTY_FORM: FormState = {
   visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
 }
 
+const fieldCls = 'h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+const fmtDay = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' })
+const fmtMonth = (d: Date) => {
+  const text = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  return text.charAt(0).toUpperCase() + text.slice(1) // "Novembro de 2026"
+}
+
+// --- Building blocks --------------------------------------------------------------------------
+
+function Section({ step, icon, title, hint, children }: { step: number; icon: ReactNode; title: string; hint?: string; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-border bg-surface p-4 md:p-5 space-y-4">
+      <header className="flex items-start gap-3">
+        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-neutral-bg text-accent">{icon}</span>
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">{step}. {title}</h2>
+          {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
+        </div>
+      </header>
+      {children}
+    </section>
+  )
+}
+
+function Field({ label, children, hint }: { label: string; children: (id: string) => ReactNode; hint?: ReactNode }) {
+  const id = useId()
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="text-sm font-medium text-foreground">{label}</label>
+      {children(id)}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  )
+}
+
+// Buttons in a row instead of a select: every choice is visible at a glance
+function Segmented<T extends string | number>({ label, value, options, onChange, disabled }: {
+  label: string
+  value: T
+  options: { value: T; label: string }[]
+  onChange: (v: T) => void
+  disabled?: boolean
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className={cn('inline-flex flex-wrap rounded-md border border-border bg-surface p-0.5', disabled && 'opacity-50')}>
+      {options.map((o) => (
+        <button
+          key={String(o.value)}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          disabled={disabled}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            'rounded px-3 py-1.5 text-sm transition-colors',
+            value === o.value ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-neutral-bg',
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint: string }) {
+  return (
+    <label className="flex cursor-pointer items-start justify-between gap-4 py-2">
+      <span>
+        <span className="block text-sm font-medium text-foreground">{label}</span>
+        <span className="block text-xs text-muted-foreground">{hint}</span>
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={cn('relative mt-0.5 h-5 w-9 flex-shrink-0 rounded-full transition-colors', checked ? 'bg-accent' : 'bg-border')}
+      >
+        <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all', checked ? 'left-[1.125rem]' : 'left-0.5')} />
+      </button>
+    </label>
+  )
+}
+
 type DocumentListItem = { name: string; requiresPayment?: boolean }
 
-// withPaymentToggle: delivery rows get "Exige pagamento" (guia → tracked as paid/unpaid in the
-// client portal; extrato/declaração → not)
-function DocumentListEditor({ label, items, onChange, withPaymentToggle = false }: {
-  label: string
+// Delivery rows get the "guia" marker (tracked as paid/unpaid in the client portal)
+function DocumentList({ title, icon, placeholder, items, onChange, withPaymentToggle = false }: {
+  title: string
+  icon: ReactNode
+  placeholder: string
   items: DocumentListItem[]
   onChange: (items: DocumentListItem[]) => void
   withPaymentToggle?: boolean
 }) {
   const [draft, setDraft] = useState('')
+  const add = () => { if (draft.trim()) { onChange([...items, { name: draft.trim() }]); setDraft('') } }
   return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
+    <div className="rounded-lg border border-border bg-neutral-bg/40 p-3 space-y-2">
+      <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">{icon}{title}</p>
       <div className="flex gap-2">
         <Input
+          aria-label={title}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Nome do documento"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') { e.preventDefault(); if (draft.trim()) { onChange([...items, { name: draft.trim() }]); setDraft('') } }
-          }}
+          placeholder={placeholder}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
         />
-        <Button type="button" variant="outline" onClick={() => { if (draft.trim()) { onChange([...items, { name: draft.trim() }]); setDraft('') } }}>
-          Adicionar
-        </Button>
+        <Button type="button" variant="outline" onClick={add} aria-label={`Adicionar em ${title}`}><Plus size={14} /></Button>
       </div>
-      {items.length > 0 && (
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Nenhum documento.</p>
+      ) : (
         <ul className="space-y-1">
           {items.map((item, i) => (
-            <li key={i} className="flex items-center justify-between gap-2 text-sm bg-neutral-bg rounded px-2 py-1">
-              <span className="flex-1 truncate">{item.name}</span>
+            <li key={i} className="flex items-center gap-2 rounded-md bg-surface px-2 py-1.5 text-sm">
+              <FileText size={13} className="flex-shrink-0 text-muted-foreground" />
+              <span className="flex-1 truncate text-foreground">{item.name}</span>
               {withPaymentToggle && (
-                <label className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
-                  <input
-                    type="checkbox"
-                    checked={!!item.requiresPayment}
-                    onChange={(e) => onChange(items.map((it, idx) => (idx === i ? { ...it, requiresPayment: e.target.checked } : it)))}
-                  />
-                  Exige pagamento
-                </label>
+                <button
+                  type="button"
+                  onClick={() => onChange(items.map((it, idx) => (idx === i ? { ...it, requiresPayment: !it.requiresPayment } : it)))}
+                  aria-pressed={!!item.requiresPayment}
+                  title="Guia de pagamento: o cliente marca como paga no portal"
+                  className={cn(
+                    'inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                    item.requiresPayment ? 'bg-success-bg text-success-text' : 'border border-border text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <DollarSign size={11} />guia
+                </button>
               )}
-              <button type="button" onClick={() => onChange(items.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-danger-text">
-                <Trash2 size={12} />
+              <button type="button" aria-label={`Remover ${item.name}`} onClick={() => onChange(items.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-danger-text">
+                <Trash2 size={13} />
               </button>
             </li>
           ))}
@@ -169,24 +223,25 @@ function DocumentListEditor({ label, items, onChange, withPaymentToggle = false 
   )
 }
 
+// --- Page ---------------------------------------------------------------------------------------
+
 export default function RecurringTemplateForm() {
   const { id } = useParams<{ id: string }>()
   const isEditing = !!id
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }))
 
   const { data: template, isLoading } = useQuery<RecurringTaskTemplate>({
     queryKey: ['recurring-template', id],
     queryFn: () => api.get(`/recurring-templates/${id}`).then((r) => r.data),
     enabled: isEditing,
   })
-
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ['departments'],
     queryFn: () => api.get('/departments').then((r) => r.data),
   })
-
   const { data: obrigacoes = [] } = useQuery<ObligationType[]>({
     queryKey: ['document-reader-obrigacoes'],
     queryFn: () => api.get('/document-reader/obrigacoes').then((r) => r.data),
@@ -210,7 +265,7 @@ export default function RecurringTemplateForm() {
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      // obligationTypeId é cuid().nullable() na API — string vazia não é um cuid válido.
+      // obligationTypeId is cuid().nullable() in the API: an empty string is not a valid cuid
       const payload = { ...form, obligationTypeId: form.obligationTypeId || null }
       return isEditing
         ? api.patch(`/recurring-templates/${id}`, payload).then((r) => r.data)
@@ -228,238 +283,246 @@ export default function RecurringTemplateForm() {
   })
 
   const isWeekly = form.periodicity === 'WEEKLY'
-  const isQuarterlyOrAnnual = form.periodicity === 'QUARTERLY' || form.periodicity === 'ANNUAL'
   const dayOptions = isWeekly ? [1, 2, 3, 4, 5, 6, 7] : Array.from({ length: 31 }, (_, i) => i + 1)
-  const preview = computePreview(form)
+  const occurrences = nextOccurrences(form, new Date(), 3)
+  const sentence = describeRule(form)
+  const departmentName = departments.find((d) => d.id === form.departmentId)?.name
+  const canSave = !!form.title.trim() && !!form.departmentId && !saveMutation.isPending
 
   if (isEditing && isLoading) return <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl">
-      <div className="flex items-center gap-3 mb-6">
+    <div className="p-4 md:p-6 max-w-6xl">
+      <div className="flex items-center gap-3 mb-5">
         <Link to="/app/settings/recurring-templates" aria-label="Voltar" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft size={18} />
         </Link>
-        <h1 className="text-lg md:text-xl font-bold text-foreground">
-          {isEditing ? 'Editar template' : 'Novo template'}
-        </h1>
+        <div>
+          <h1 className="text-lg md:text-xl font-bold text-foreground">{isEditing ? 'Editar tarefa recorrente' : 'Nova tarefa recorrente'}</h1>
+          <p className="text-xs text-muted-foreground">Um modelo que gera a tarefa automaticamente para cada cliente vinculado.</p>
+        </div>
       </div>
 
-      <form
-        onSubmit={(e) => { e.preventDefault(); saveMutation.mutate() }}
-        className="space-y-4"
-      >
-        <div className="space-y-1.5">
-          <Label>Título</Label>
-          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex: Folha de pagamento" required />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>Departamento</Label>
-          <select
-            value={form.departmentId}
-            onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
-            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-            required
-          >
-            <option value="">Selecione</option>
-            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>Obrigação (opcional)</Label>
-          <select
-            value={form.obligationTypeId}
-            onChange={(e) => setForm({ ...form, obligationTypeId: e.target.value })}
-            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-          >
-            <option value="">Nenhuma — tarefa interna comum</option>
-            {obrigacoes.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </select>
-          <p className="text-xs text-muted-foreground">
-            Só preencha se este template gera uma obrigação que o robô de leitura de documentos lê
-            (DAS, PGDAS-D, IRPJ...) — permite que ele sugira o anexo automaticamente na tarefa certa.
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>Periodicidade</Label>
-          <select
-            value={form.periodicity}
-            onChange={(e) => setForm({ ...form, periodicity: e.target.value as FormState['periodicity'] })}
-            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-          >
-            {Object.entries(PERIODICITY_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>Prioridade</Label>
-          <select
-            value={form.priority}
-            onChange={(e) => setForm({ ...form, priority: e.target.value as FormState['priority'] })}
-            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-          >
-            {Object.entries(PRIORITY_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </div>
-
-        <div className={isQuarterlyOrAnnual ? 'grid grid-cols-2 gap-3' : 'space-y-1.5'}>
-          <div className="space-y-1.5">
-            <Label>{isWeekly ? 'Dia da semana do vencimento' : 'Dia do vencimento'}</Label>
-            <select
-              value={form.dueDayOfPeriod}
-              onChange={(e) => setForm({ ...form, dueDayOfPeriod: Number(e.target.value) })}
-              className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-            >
-              {dayOptions.map((d) => <option key={d} value={d}>{isWeekly ? WEEKDAY_LABEL[d] : d}</option>)}
-            </select>
-          </div>
-          {form.periodicity === 'QUARTERLY' && (
-            <div className="space-y-1.5">
-              <Label>Mês</Label>
-              <select
-                value={form.dueMonthAnchor}
-                onChange={(e) => setForm({ ...form, dueMonthAnchor: Number(e.target.value) })}
-                className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-              >
-                {QUARTERLY_ANCHOR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+      <form onSubmit={(e) => { e.preventDefault(); if (canSave) saveMutation.mutate() }} className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] items-start">
+        <div className="space-y-5 min-w-0">
+          <Section step={1} icon={<Tag size={14} />} title="Identificação" hint="O que é a tarefa e quem cuida dela.">
+            <Field label="Título">
+              {(fid) => <Input id={fid} value={form.title} onChange={(e) => set('title', e.target.value)} placeholder="Ex.: Folha de pagamento" required />}
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Departamento">
+                {(fid) => (
+                  <select id={fid} value={form.departmentId} onChange={(e) => set('departmentId', e.target.value)} className={fieldCls} required>
+                    <option value="">Selecione</option>
+                    {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                )}
+              </Field>
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-foreground">Prioridade</p>
+                <Segmented
+                  label="Prioridade"
+                  value={form.priority}
+                  options={(Object.keys(PRIORITY_LABEL) as FormState['priority'][]).map((p) => ({ value: p, label: PRIORITY_LABEL[p] }))}
+                  onChange={(v) => set('priority', v)}
+                />
+              </div>
             </div>
-          )}
-          {form.periodicity === 'ANNUAL' && (
-            <div className="space-y-1.5">
-              <Label>Mês</Label>
-              <select
-                value={form.dueMonthAnchor}
-                onChange={(e) => setForm({ ...form, dueMonthAnchor: Number(e.target.value) })}
-                className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-              >
-                {MONTH_LABEL.map((label, i) => <option key={i} value={i + 1}>{label}</option>)}
-              </select>
+            <Field label="Instruções para a equipe" hint="Aparece na descrição de cada tarefa gerada.">
+              {(fid) => (
+                <textarea
+                  id={fid}
+                  value={form.description}
+                  onChange={(e) => set('description', e.target.value)}
+                  rows={3}
+                  placeholder="Ex.: conferir horas extras e faltas antes de fechar a folha"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-y"
+                />
+              )}
+            </Field>
+            <details className="group rounded-md border border-border px-3 py-2">
+              <summary className="cursor-pointer text-sm text-muted-foreground group-open:text-foreground">Avançado: obrigação do robô de leitura</summary>
+              <div className="pt-3">
+                <Field label="Obrigação" hint="Só preencha se o robô de leitura de documentos lê essa obrigação (DAS, PGDAS-D, IRPJ...): ele sugere o anexo na tarefa certa.">
+                  {(fid) => (
+                    <select id={fid} value={form.obligationTypeId} onChange={(e) => set('obligationTypeId', e.target.value)} className={fieldCls}>
+                      <option value="">Nenhuma — tarefa interna comum</option>
+                      {obrigacoes.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                  )}
+                </Field>
+              </div>
+            </details>
+          </Section>
+
+          <Section step={2} icon={<CalendarClock size={14} />} title="Calendário" hint="Quando vence, a que mês se refere e quando a tarefa aparece para a equipe.">
+            <Segmented
+              label="Periodicidade"
+              value={form.periodicity}
+              options={(Object.keys(PERIODICITY_LABEL) as FormState['periodicity'][]).map((p) => ({ value: p, label: PERIODICITY_LABEL[p] }))}
+              onChange={(v) => set('periodicity', v)}
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={isWeekly ? 'Vence toda' : 'Vence todo dia'}>
+                {(fid) => (
+                  <select id={fid} value={form.dueDayOfPeriod} onChange={(e) => set('dueDayOfPeriod', Number(e.target.value))} className={fieldCls}>
+                    {dayOptions.map((d) => <option key={d} value={d}>{isWeekly ? WEEKDAY_LABEL[d] : d}</option>)}
+                  </select>
+                )}
+              </Field>
+              {form.periodicity === 'QUARTERLY' && (
+                <Field label="Nos meses">
+                  {(fid) => (
+                    <select id={fid} value={form.dueMonthAnchor} onChange={(e) => set('dueMonthAnchor', Number(e.target.value))} className={fieldCls}>
+                      {QUARTERLY_ANCHOR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  )}
+                </Field>
+              )}
+              {form.periodicity === 'ANNUAL' && (
+                <Field label="No mês">
+                  {(fid) => (
+                    <select id={fid} value={form.dueMonthAnchor} onChange={(e) => set('dueMonthAnchor', Number(e.target.value))} className={fieldCls}>
+                      {MONTH_LABEL.map((label, i) => <option key={i} value={i + 1}>{label}</option>)}
+                    </select>
+                  )}
+                </Field>
+              )}
             </div>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label>Se o vencimento cair em fim de semana</Label>
-          <select
-            value={form.dueBusinessDayRoll}
-            onChange={(e) => setForm({ ...form, dueBusinessDayRoll: e.target.value as FormState['dueBusinessDayRoll'] })}
-            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-          >
-            {(['NONE', 'FORWARD', 'BACKWARD'] as const).map((v) => <option key={v} value={v}>{BUSINESS_DAY_ROLL_LABEL[v]}</option>)}
-          </select>
-        </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium text-foreground">Se o vencimento cair no fim de semana</p>
+              <Segmented label="Se o vencimento cair no fim de semana" value={form.dueBusinessDayRoll} options={ROLL_OPTIONS} onChange={(v) => set('dueBusinessDayRoll', v)} />
+            </div>
 
-        <div className="space-y-1.5">
-          <Label>Competência — meses antes do vencimento</Label>
-          <select
-            value={form.competenceMonthOffset}
-            onChange={(e) => setForm({ ...form, competenceMonthOffset: Number(e.target.value) })}
-            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-            disabled={isWeekly}
-          >
-            {COMPETENCE_MONTH_OFFSET_OPTIONS.map((o) => <option key={o} value={o}>{o === 0 ? 'Mesmo mês do vencimento' : `${o} ${o === 1 ? 'mês' : 'meses'} antes do vencimento`}</option>)}
-          </select>
-        </div>
+            {!isWeekly && (
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-foreground">Refere-se a (competência)</p>
+                <Segmented label="Competência" value={form.competenceMonthOffset} options={COMPETENCE_OPTIONS} onChange={(v) => set('competenceMonthOffset', v)} />
+                <p className="text-xs text-muted-foreground">Ex.: a folha de outubro vence em novembro → "Mês anterior".</p>
+              </div>
+            )}
 
-        <div className="space-y-1.5">
-          <Label>Meta interna — dias em relação ao vencimento (negativo = antes)</Label>
-          <Input
-            type="number"
-            value={form.targetOffsetDays}
-            onChange={(e) => setForm({ ...form, targetOffsetDays: Number(e.target.value) })}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Se a meta cair em fim de semana</Label>
-          <select
-            value={form.targetBusinessDayRoll}
-            onChange={(e) => setForm({ ...form, targetBusinessDayRoll: e.target.value as FormState['targetBusinessDayRoll'] })}
-            className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-          >
-            {(['NONE', 'FORWARD', 'BACKWARD'] as const).map((v) => <option key={v} value={v}>{BUSINESS_DAY_ROLL_LABEL[v]}</option>)}
-          </select>
-        </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Meta interna (dias em relação ao vencimento)" hint="Negativo = antes do vencimento. Ex.: -2 = dois dias antes.">
+                {(fid) => <Input id={fid} type="number" value={form.targetOffsetDays} onChange={(e) => set('targetOffsetDays', Number(e.target.value))} />}
+              </Field>
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-foreground">Se a meta cair no fim de semana</p>
+                <Segmented label="Se a meta cair no fim de semana" value={form.targetBusinessDayRoll} options={ROLL_OPTIONS} onChange={(v) => set('targetBusinessDayRoll', v)} />
+              </div>
+            </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label>Geração — meses antes do vencimento</Label>
-            <select
-              value={form.generationMonthOffset}
-              onChange={(e) => setForm({ ...form, generationMonthOffset: Number(e.target.value) })}
-              className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-            >
-              {GENERATION_MONTH_OFFSET_OPTIONS.map((o) => <option key={o} value={o}>{o === 0 ? 'Mesmo mês' : `${o} ${o === 1 ? 'mês' : 'meses'} antes`}</option>)}
-            </select>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Criar a tarefa no dia">
+                {(fid) => (
+                  <select id={fid} value={form.generationDayOfPeriod} onChange={(e) => set('generationDayOfPeriod', Number(e.target.value))} className={fieldCls}>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                )}
+              </Field>
+              <Field label="Do">
+                {(fid) => (
+                  <select id={fid} value={form.generationMonthOffset} onChange={(e) => set('generationMonthOffset', Number(e.target.value))} className={fieldCls}>
+                    {GENERATION_OFFSET_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                )}
+              </Field>
+            </div>
             {form.generationMonthOffset === 0 && (
-              <p className="text-xs text-danger-text mt-1">
-                ⚠ Com 0 mês de antecedência, a tarefa é gerada no mesmo mês do vencimento — se o dia do vencimento já tiver passado quando o cron disparar, ela nasce vencida.
+              <p className="rounded-md bg-warning-bg px-3 py-2 text-xs text-warning-text">
+                Criada no mesmo mês do vencimento: se o dia de criação for depois do vencimento, a tarefa já nasce vencida.
               </p>
             )}
-          </div>
-          <div className="space-y-1.5">
-            <Label>Dia da geração</Label>
-            <select
-              value={form.generationDayOfPeriod}
-              onChange={(e) => setForm({ ...form, generationDayOfPeriod: Number(e.target.value) })}
-              className="h-9 w-full rounded-md border border-border bg-surface text-foreground px-2 text-sm"
-            >
-              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
+
+            {occurrences[0] && (
+              <div className="rounded-lg border border-border bg-neutral-bg/40 px-3 py-3">
+                <ol className="flex items-start justify-between gap-2 text-center">
+                  {[
+                    { label: 'Criada', date: occurrences[0].createdOn },
+                    { label: 'Meta', date: occurrences[0].target },
+                    { label: 'Vence', date: occurrences[0].due },
+                  ].map((step, i) => (
+                    <li key={step.label} className="flex flex-1 flex-col items-center gap-1">
+                      <span className={cn('h-2.5 w-2.5 rounded-full', i === 2 ? 'bg-danger-text' : i === 1 ? 'bg-warning-text' : 'bg-accent')} />
+                      <span className="text-xs text-muted-foreground">{step.label}</span>
+                      <span className="text-sm font-semibold text-foreground">{fmtDay(step.date)}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+            <p className="rounded-md border-l-2 border-accent bg-neutral-bg/40 px-3 py-2 text-sm text-foreground">{sentence}</p>
+          </Section>
+
+          <Section step={3} icon={<FileText size={14} />} title="Documentos" hint="O que o cliente envia e o que o escritório entrega em cada mês.">
+            <div className="grid gap-3 md:grid-cols-2">
+              <DocumentList
+                title="A cobrar do cliente"
+                icon={<Download size={14} className="text-info-text" />}
+                placeholder="Ex.: Ponto do mês"
+                items={form.documentRequests}
+                onChange={(items) => set('documentRequests', items)}
+              />
+              <DocumentList
+                title="A entregar ao cliente"
+                icon={<Upload size={14} className="text-success-text" />}
+                placeholder="Ex.: Holerites, Guia FGTS"
+                items={form.documentDeliveries}
+                onChange={(items) => set('documentDeliveries', items)}
+                withPaymentToggle
+              />
+            </div>
+          </Section>
+
+          <Section step={4} icon={<Settings2 size={14} />} title="Comportamento">
+            <div className="divide-y divide-border">
+              <Toggle checked={form.visibleToClient} onChange={(v) => set('visibleToClient', v)} label="O cliente pode ver esta tarefa" hint="Aparece no portal com os documentos e a conversa." />
+              <Toggle checked={form.autoCompleteOnAllActivitiesDone} onChange={(v) => set('autoCompleteOnAllActivitiesDone', v)} label="Concluir automaticamente" hint="Quando todos os documentos forem resolvidos e entregues." />
+              <Toggle checked={form.notifyViaWhatsapp} onChange={(v) => set('notifyViaWhatsapp', v)} label="Avisar o cliente por WhatsApp" hint="Mensagens desta tarefa também vão pelo WhatsApp." />
+              <Toggle checked={form.notifyViaEmail} onChange={(v) => set('notifyViaEmail', v)} label="Avisar o cliente por e-mail" hint="Mensagens desta tarefa também vão por e-mail." />
+              <Toggle checked={form.isActive} onChange={(v) => set('isActive', v)} label="Template ativo" hint="Desligado, para de gerar tarefas novas (as existentes continuam)." />
+            </div>
+          </Section>
+
         </div>
 
-        {preview && (
-          <div className="rounded-md border border-border bg-neutral-bg px-3 py-2 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">Preview — se gerasse hoje:</span>{' '}
-            vence em {preview.dueDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}, competência{' '}
-            {preview.competence.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })}
+        {/* Summary: what will be generated, always in view while editing */}
+        <aside className="lg:sticky lg:top-4 space-y-3">
+          <div className="rounded-xl border border-border bg-surface p-4 space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground truncate">{form.title.trim() || 'Sem título'}</p>
+              <p className="text-xs text-muted-foreground">{departmentName ?? 'Sem departamento'} · {PERIODICITY_LABEL[form.periodicity]} · {PRIORITY_LABEL[form.priority]}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Próximas gerações</p>
+              {occurrences.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Semanal: uma tarefa por semana, sem prévia mensal.</p>
+              ) : (
+                <ol className="space-y-2">
+                  {occurrences.map((o) => (
+                    <li key={o.due.toISOString()} className="rounded-md bg-neutral-bg/50 px-2.5 py-2 text-xs">
+                      <p className="font-medium text-foreground">{fmtMonth(o.competence)}</p>
+                      <p className="text-muted-foreground">criada {fmtDay(o.createdOn)} · meta {fmtDay(o.target)} · vence <span className="font-medium text-foreground">{fmtDay(o.due)}</span></p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5 text-[11px]">
+              <span className="rounded-full bg-info-bg px-2 py-0.5 text-info-text">{form.documentRequests.length} a cobrar</span>
+              <span className="rounded-full bg-success-bg px-2 py-0.5 text-success-text">{form.documentDeliveries.length} a entregar</span>
+              {form.visibleToClient && <span className="rounded-full bg-neutral-bg px-2 py-0.5 text-muted-foreground">cliente vê</span>}
+              {form.autoCompleteOnAllActivitiesDone && <span className="rounded-full bg-neutral-bg px-2 py-0.5 text-muted-foreground">conclui sozinha</span>}
+              {!form.isActive && <span className="rounded-full bg-warning-bg px-2 py-0.5 text-warning-text">inativo</span>}
+            </div>
           </div>
-        )}
-
-        <DocumentListEditor
-          label="Documentos a cobrar do cliente"
-          items={form.documentRequests}
-          onChange={(items) => setForm({ ...form, documentRequests: items })}
-        />
-        <DocumentListEditor
-          label="Documentos a entregar ao cliente"
-          items={form.documentDeliveries}
-          onChange={(items) => setForm({ ...form, documentDeliveries: items })}
-          withPaymentToggle
-        />
-
-        <label className="flex items-center gap-2 text-sm text-foreground">
-          <input type="checkbox" checked={form.autoCompleteOnAllActivitiesDone} onChange={(e) => setForm({ ...form, autoCompleteOnAllActivitiesDone: e.target.checked })} />
-          Concluir automaticamente quando todas as atividades forem resolvidas
-        </label>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2 text-sm text-foreground">
-            <input type="checkbox" checked={form.notifyViaWhatsapp} onChange={(e) => setForm({ ...form, notifyViaWhatsapp: e.target.checked })} />
-            Notificar via WhatsApp
-          </label>
-          <label className="flex items-center gap-2 text-sm text-foreground">
-            <input type="checkbox" checked={form.notifyViaEmail} onChange={(e) => setForm({ ...form, notifyViaEmail: e.target.checked })} />
-            Notificar via e-mail
-          </label>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-foreground">
-          <input type="checkbox" checked={form.visibleToClient} onChange={(e) => setForm({ ...form, visibleToClient: e.target.checked })} />
-          O cliente pode ver esta tarefa
-        </label>
-        <label className="flex items-center gap-2 text-sm text-foreground">
-          <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
-          Ativo
-        </label>
-
-        <div className="flex justify-end gap-2 pt-4 border-t border-border">
-          <Button type="button" variant="outline" onClick={() => navigate('/app/settings/recurring-templates')}>Cancelar</Button>
-          <Button type="submit" disabled={saveMutation.isPending || !form.title.trim() || !form.departmentId}>
-            {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
-          </Button>
-        </div>
+          {/* On phones the summary sits below the sections, so the buttons end the page */}
+          <div className="flex flex-col gap-2">
+            <Button type="submit" disabled={!canSave}>{saveMutation.isPending ? 'Salvando...' : 'Salvar template'}</Button>
+            <Button type="button" variant="outline" onClick={() => navigate('/app/settings/recurring-templates')}>Cancelar</Button>
+          </div>
+        </aside>
       </form>
     </div>
   )
