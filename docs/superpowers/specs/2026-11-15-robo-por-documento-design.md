@@ -105,8 +105,11 @@ de leitura" sai.
 
 ## Fora do escopo
 
-- Entrega automática sem confirmação.
-- Robô em entregas avulsas e em processos (OS).
+- **Entrega automática sem confirmação** — decisão do Max (2026-11-15): arriscada por enquanto;
+  toda entrega pelo robô passa pela confirmação de uma pessoa.
+- **Processos (OS)** — fica para depois, por ser mais complexo. A ideia é a mesma: a tela de
+  conferência também identificar documentos de processos (entrega do processo com obrigação de robô).
+- Robô em entregas avulsas criadas na tela da tarefa.
 - Novos modelos de leitura (o catálogo atual continua).
 
 ## Como validar
