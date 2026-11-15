@@ -8,6 +8,7 @@ import { SlaConfigProvider } from '@/hooks/useSlaConfig'
 import { useSlaAlerts } from '@/hooks/useSlaAlerts'
 import { SlaPermissionBanner } from '@/components/SlaPermissionBanner'
 import { NotificationBell } from '@/components/shared/NotificationBell'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { api } from '@/lib/api'
 import { LayoutDashboard, Users, UserCheck, Settings, LogOut, ClipboardList, ListChecks, Inbox, Menu, X, UserCircle, FileStack, FileSearch, Receipt } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -145,6 +146,7 @@ export default function AppLayout() {
           </nav>
 
           <div className="p-3 border-t border-border space-y-1">
+            <ThemeToggle className="mb-2" />
             <SidebarLink to="/app/perfil" icon={<UserCircle size={16} />} label="Meu Perfil" onClick={handleNavClick} />
             <button
               onClick={handleLogout}

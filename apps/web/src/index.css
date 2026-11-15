@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* `dark:` utilities follow the same switch as the theme tokens */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
 @theme {
   --font-sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
 
@@ -27,32 +30,32 @@
   --color-highlight-text: #7E22CE;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --color-background: #0B1220;
-    --color-surface: #131B2E;
-    --color-border: #263449;
-    --color-foreground: #F1F5F9;
-    --color-muted-foreground: #94A3B8;
-    --color-accent: #3B82F6;
-    --color-accent-hover: #93C5FD;
-    --color-warning-bg: #452C0A;
-    --color-warning-text: #FBBF24;
-    --color-success-bg: #0F2E2A;
-    --color-success-text: #2DD4BF;
-    --color-neutral-bg: #1E293B;
-    --color-neutral-text: #94A3B8;
-    --color-danger-bg: #450A0A;
-    --color-danger-text: #F87171;
-    --color-danger-hover: #FCA5A5;
-    --color-accent-foreground: #0B1220;
-    --color-danger-foreground: #0B1220;
-    --color-info-bg: #172554;
-    --color-info-text: #93C5FD;
-    --color-highlight-bg: #3B0764;
-    --color-highlight-text: #D8B4FE;
-  }
+/* Dark theme: <html data-theme="dark"> — set before the app loads (index.html) from the user's
+   choice (Claro/Escuro) or, in Automático, from the operating system */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-background: #0B1220;
+  --color-surface: #131B2E;
+  --color-border: #263449;
+  --color-foreground: #F1F5F9;
+  --color-muted-foreground: #94A3B8;
+  --color-accent: #3B82F6;
+  --color-accent-hover: #93C5FD;
+  --color-warning-bg: #452C0A;
+  --color-warning-text: #FBBF24;
+  --color-success-bg: #0F2E2A;
+  --color-success-text: #2DD4BF;
+  --color-neutral-bg: #1E293B;
+  --color-neutral-text: #94A3B8;
+  --color-danger-bg: #450A0A;
+  --color-danger-text: #F87171;
+  --color-danger-hover: #FCA5A5;
+  --color-accent-foreground: #0B1220;
+  --color-danger-foreground: #0B1220;
+  --color-info-bg: #172554;
+  --color-info-text: #93C5FD;
+  --color-highlight-bg: #3B0764;
+  --color-highlight-text: #D8B4FE;
 }
 
 body {

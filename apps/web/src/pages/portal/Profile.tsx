@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/useAuth'
 import { Lock, Mail } from 'lucide-react'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
 
 interface Profile {
   id: string; name: string; email: string; phone: string | null
@@ -73,6 +74,13 @@ export default function PortalProfile() {
       <div>
         <h1 className="text-lg md:text-xl font-bold text-foreground">Meu Perfil</h1>
         <p className="text-sm text-muted-foreground mt-1">Gerencie suas informações pessoais e senha.</p>
+      </div>
+
+      {/* Tema (no celular o menu lateral não aparece: a escolha fica aqui) */}
+      <div className="bg-surface rounded-xl border border-border shadow-sm p-4 space-y-2">
+        <p className="text-sm font-semibold text-foreground">Aparência</p>
+        <p className="text-xs text-muted-foreground">Claro, escuro ou automático (segue o seu aparelho).</p>
+        <ThemeToggle className="max-w-xs" />
       </div>
 
       {/* Dados pessoais */}

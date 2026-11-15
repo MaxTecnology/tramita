@@ -8,6 +8,7 @@ import { LayoutGrid, User, LogOut, Inbox, Home, FileText, Send } from 'lucide-re
 import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 import { NotificationBell } from '@/components/shared/NotificationBell'
 import { useInboxStream } from '@/hooks/useInboxStream'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import type { InAppNotification } from '@/components/shared/notifications'
 
 // Document-centric portal: what the client received, what they must send, processes in progress.
@@ -122,6 +123,7 @@ export default function PortalLayout() {
           </nav>
 
           <div className="p-3 border-t border-border space-y-1">
+            <ThemeToggle className="mb-2" />
             <ChangePasswordDialog triggerClassName="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-neutral-bg" />
             <button
               onClick={handleLogout}
