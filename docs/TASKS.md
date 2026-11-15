@@ -406,6 +406,52 @@ Visão do usuário: crescer o Tramita se inspirando no **Nibo Contador Plus** (a
     `docs/superpowers/specs/2026-11-11-cobertura-departamentos-cliente-design.md` e
     `docs/superpowers/plans/2026-11-11-cobertura-departamentos-cliente.md`.
 
+### Roteiro de testes manuais (atualizado em 2026-11-15)
+
+Rodada feita com o banco local zerado (todas as migrations do zero), fase por fase, com o Max testando
+na tela e o Claude conferindo banco e logs.
+
+**✅ Já testado e validado:**
+- Fase 1 — cadastro do escritório (CNPJ obrigatório no plano pago; chave do Asaas sandbox reativada)
+- Fase 2 — departamentos e usuários (membro com/sem "ver colegas", gerente)
+- Fase 3 — cliente, responsáveis por departamento, acessos ao portal por departamento
+- Fase 4 — templates recorrentes e geração (sem aviso "tarefa atribuída" na geração automática)
+- Fase 5 — tela Tarefas: filtro "Pendentes", Minhas/Meu departamento, busca, passar a tarefa (Responsável)
+- Fase 6 — conversa da recorrente no portal, isolamento por departamento, comentário apagado (admin vê)
+- Documentos — envio, recusa (cliente vê o arquivo recusado), rastro no Histórico e situação nos Anexos
+- Fase 7 — aprovação do cliente (pedir, ajuste, aprovar, fechar sem o portal, conclusão bloqueada)
+- Sino em tempo real, som e notificação do navegador; guia paga pelo cliente (vista/baixada/paga)
+
+**⏳ Falta testar (ordem sugerida):**
+1. **Processos (OS)** — criar com template de OS (colunas, documentos), mover no Kanban (coluna que avisa
+   o cliente), responsável do processo e aviso "processo atribuído"; portal: acompanhar, comentar e
+   enviar documento dentro do processo.
+2. **Solicitações** — cliente abre (sino do responsável); escritório pede mais informação, cliente
+   responde e volta para a fila; aprovar (gera tarefa/processo), recusar, cancelar; isolamento por
+   departamento.
+3. **Guias e documentos enviados** — filtro "Vencimento em" e situação; desfazer pagamento no portal;
+   protocolo: substituir arquivo e cancelar envio.
+4. **Equipe e carteira** — transferir carteira, desativar usuário, assumir em lote (colega ausente).
+5. **Recorrentes avançado** — "Gerar de novo" e alerta de falha de geração.
+6. **Canais externos** — WhatsApp (MaximizeBot) e e-mail (SMTP) reais, toggles e modelos de mensagem;
+   resumo diário de prazos (SLA).
+7. **Leitura de Documentos (robô)** — fila e identificação do cliente.
+8. **Portal e celular** — usuário do cliente com várias empresas (seletor), layout no celular,
+   troca de senha e perfil.
+9. **Smoke test no online** — login, fluxo curto e sino em tempo real no domínio real (SSE atrás do
+   Traefik pode se comportar diferente do local).
+
+**Em aberto (decisões e propostas):**
+- Proposta "Lembrar cliente": situação vista/baixada por documento enviado, filtro "cliente ainda não
+  viu", botão de lembrete (WhatsApp/e-mail, registrado no histórico), aviso no sino quando o cliente
+  marca como pago, lembrete automático opcional. Aguardando o Max.
+- Decisões pendentes da revisão de visibilidade: membro pode recusar/pedir informação em solicitação de
+  colega? membro pode recusar documento do robô na tarefa de um colega sem assumir?
+- Segurança (sugestão): limite próprio para `/auth/login` (ex.: 20/min por IP) e bloqueio após várias
+  senhas erradas no mesmo e-mail.
+- Itens externos: rotacionar `DOKPLOY_API_KEY`; conferir webhook do Asaas (`ASAAS_WEBHOOK_SECRET`,
+  header em vez de `?accessToken=`); conferir access log do Traefik.
+
 ### Próximos passos a discutir (anotados em 2026-11-11, não esquecer)
 
    **Atualização 2026-11-13 (2):** ✅ central de notificações (sino) para equipe e cliente, conversa
