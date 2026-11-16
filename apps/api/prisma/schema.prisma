@@ -300,6 +300,7 @@ model Board {
   processTemplate ProcessTemplate? @relation(fields: [processTemplateId], references: [id])
   columns         Column[]
   pauses          BoardPause[]
+  requests        Request[]        @relation("RequestBoard")
   delayReason     DelayReason?     @relation(fields: [delayReasonId], references: [id], onDelete: SetNull)
 
   @@index([processTemplateId])
@@ -321,6 +322,10 @@ model Request {
   reviewedById       String?
   reviewedAt         DateTime?
   processTemplateId  String?
+  // Client asked for a standalone OS (model) of a period (competence), or the approval opened a process (boardId)
+  osModelId          String?
+  competence         DateTime?
+  boardId            String?
   cancelledByType    CommentAuthorType?
   cancelledById      String?
   cancellationReason String?
@@ -333,12 +338,16 @@ model Request {
   department   Department          @relation(fields: [departmentId], references: [id])
   reviewedBy   User?               @relation("RequestReviewer", fields: [reviewedById], references: [id])
   processTemplate ProcessTemplate? @relation(fields: [processTemplateId], references: [id])
+  osModel         OSModel?         @relation(fields: [osModelId], references: [id], onDelete: SetNull)
+  board           Board?           @relation("RequestBoard", fields: [boardId], references: [id], onDelete: SetNull)
   attachments  RequestAttachment[]
   comments     RequestComment[]
 
   @@index([organizationId, status])
   @@index([departmentId])
   @@index([processTemplateId])
+  @@index([osModelId])
+  @@index([boardId])
   @@map("requests")
 }
 
@@ -1298,6 +1307,7 @@ model OSModel {
   documentDeliveries OSModelDocument[] @relation("OSModelDocumentDeliveries")
   tasks              Task[]
   processItems       ProcessTemplateItem[]
+  requests           Request[]
 
   @@index([organizationId, isActive])
   @@index([departmentId])

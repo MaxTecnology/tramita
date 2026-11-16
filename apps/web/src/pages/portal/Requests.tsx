@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Comments } from '@/components/shared/Comments'
 import { cn, mensagemDeErro } from '@/lib/utils'
 import { Plus, Inbox, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
-import type { ClientRequest } from '@/types'
+import type { ClientRequest, PortalService } from '@/types'
 import { toast } from 'sonner'
 import { usePortalClient } from './Layout'
 import { useLinkedItem } from '@/hooks/useLinkedItem'
@@ -36,7 +36,8 @@ export default function PortalRequests() {
   const qc = useQueryClient()
   const { clientId } = usePortalClient()
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ title: '', description: '', departmentId: '', processTemplateId: '' })
+const EMPTY = { title: '', description: '', departmentId: '', service: '', competence: '' }
+  const [form, setForm] = useState(EMPTY)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   useLinkedItem('request', setExpandedId)
 
@@ -69,24 +70,29 @@ export default function PortalRequests() {
     })
   }, [departments])
 
-  const { data: processTemplates = [] } = useQuery<{ id: string; name: string }[]>({
-    queryKey: ['portal-process-templates'],
-    queryFn: () => api.get('/portal/process-templates').then((r) => r.data),
+  // "Solicitar serviço": standalone OS and processes the office lets the client ask for
+  const { data: services = [] } = useQuery<PortalService[]>({
+    queryKey: ['portal-services', clientId],
+    queryFn: () => api.get('/portal/services', { params: { clientId } }).then((r) => r.data),
+    enabled: !!clientId,
   })
+  const service = services.find((s) => `${s.kind}:${s.id}` === form.service) ?? null
 
   const createMutation = useMutation({
     mutationFn: () => api.post('/portal/requests', {
       clientId,
       title: form.title,
       description: form.description,
-      departmentId: form.departmentId,
-      processTemplateId: form.processTemplateId || undefined,
+      // A service brings its own department; a free request names one
+      ...(service
+        ? { [service.kind === 'OS' ? 'osModelId' : 'processTemplateId']: service.id, ...(service.requiresCompetence ? { competence: form.competence } : {}) }
+        : { departmentId: form.departmentId }),
     }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Solicitação enviada')
       qc.invalidateQueries({ queryKey: ['portal-requests'] })
       setOpen(false)
-      setForm({ title: '', description: '', departmentId: '', processTemplateId: '' })
+      setForm(EMPTY)
     },
     onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao enviar solicitação')),
   })
@@ -191,19 +197,30 @@ export default function PortalRequests() {
             className="space-y-4 mt-2"
           >
             <div className="space-y-1.5">
-              <Label htmlFor="req-os-template">Tipo de solicitação</Label>
+              <Label htmlFor="req-service">Serviço</Label>
               <select
-                id="req-os-template"
-                value={form.processTemplateId}
-                onChange={(e) => setForm({ ...form, processTemplateId: e.target.value })}
+                id="req-service"
+                value={form.service}
+                onChange={(e) => {
+                  const next = services.find((s) => `${s.kind}:${s.id}` === e.target.value)
+                  // The service name becomes the title when none was typed yet
+                  setForm((f) => ({ ...f, service: e.target.value, title: next && (!f.title.trim() || services.some((s) => s.name === f.title)) ? next.name : f.title }))
+                }}
                 className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
-                <option value="">Outro</option>
-                {processTemplates.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
+                <option value="">Outro (descrever o pedido)</option>
+                {services.map((s) => (
+                  <option key={`${s.kind}:${s.id}`} value={`${s.kind}:${s.id}`}>{s.name}{s.kind === 'PROCESS' ? ' (processo)' : ''}</option>
                 ))}
               </select>
+              {service?.description && <p className="text-xs text-muted-foreground">{service.description}</p>}
             </div>
+            {service?.requiresCompetence && (
+              <div className="space-y-1.5">
+                <Label htmlFor="req-competence">Competência</Label>
+                <Input id="req-competence" type="month" value={form.competence} onChange={(e) => setForm({ ...form, competence: e.target.value })} required />
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="req-title">Título</Label>
               <Input
@@ -225,6 +242,7 @@ export default function PortalRequests() {
                 className="flex w-full rounded-md border border-border bg-surface text-foreground px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-none"
               />
             </div>
+            {!service && (
             <div className="space-y-1.5">
               <Label htmlFor="req-department">Departamento</Label>
               <select
@@ -239,10 +257,11 @@ export default function PortalRequests() {
                 ))}
               </select>
             </div>
+            )}
             {createMutation.isError && <p className="text-sm text-danger-text">Erro ao enviar. Tente novamente.</p>}
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={createMutation.isPending || !form.title.trim() || !form.departmentId} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+              <Button type="submit" disabled={createMutation.isPending || !form.title.trim() || (!service && !form.departmentId) || (!!service?.requiresCompetence && !form.competence)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
                 {createMutation.isPending ? 'Enviando...' : 'Enviar'}
               </Button>
             </div>

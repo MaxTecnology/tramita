@@ -7,7 +7,8 @@ import { AppError } from '@/errors/AppError'
 import { readUpload, DEFAULT_MAX_UPLOAD_BYTES, type UploadedFile } from '@/lib/read-upload'
 import { prisma } from '@/lib/prisma'
 import { canSeeTask, getClientAccessScope } from '@/modules/client-users/client-access'
-import { getTaskHistory, listAccessibleClients, listPortalTasks } from './portal.service'
+import { getTaskHistory, listAccessibleClients, listPortalTasks, listRequestableServices } from './portal.service'
+import { z } from 'zod'
 import { createRequestSchema } from '@/modules/requests/requests.schema'
 import {
   createRequest,
@@ -89,6 +90,16 @@ export async function portalRoutes(app: FastifyInstance) {
         orderBy: { name: 'asc' },
       }),
     )
+  })
+
+  // "Solicitar serviço": standalone OS and requestable processes of the departments this client user
+  // reaches in the company
+  app.get('/services', async (request, reply) => {
+    const q = z.object({ clientId: z.string().cuid() }).safeParse(request.query)
+    if (!q.success) throw new AppError(400, 'Empresa inválida')
+    const scope = await getClientAccessScope(request.user.sub)
+    if (!scope.clientIds.includes(q.data.clientId)) throw new AppError(404, 'Empresa não encontrada')
+    return reply.send(await listRequestableServices(request.user.organizationId!, request.user.sub, q.data.clientId))
   })
 
   app.get('/process-templates', async (request, reply) => {

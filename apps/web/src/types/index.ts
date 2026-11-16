@@ -153,6 +153,10 @@ export interface ClientRequest {
   cancelledByType: 'USER' | 'CLIENT' | null
   cancellationReason: string | null
   createdAt: string
+  // Service of the catalog the client asked for (standalone OS model or process) and its period
+  osModelId?: string | null
+  processTemplateId?: string | null
+  competence?: string | null
   attachments?: RequestAttachment[]
   client?: { id: string; name: string }
 }
@@ -359,6 +363,9 @@ export interface ProcessTemplate {
   columns: ProcessTemplateColumn[]
   items: ProcessTemplateItem[]
 }
+
+// Catalog of "Solicitar serviço" in the portal
+export interface PortalService { kind: 'OS' | 'PROCESS'; id: string; name: string; description: string | null; departmentId: string; requiresCompetence: boolean }
 
 export interface DelayReason { id: string; name: string; requiresNote: boolean; isActive: boolean; position: number }
 

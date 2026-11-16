@@ -32,7 +32,7 @@ const STATUS_STYLE: Record<ClientRequest['status'], string> = {
   NEEDS_INFO: 'bg-info-bg text-info-text',
 }
 
-type Mode = 'NEW_BOARD' | 'EXISTING_BOARD'
+type Mode = 'NEW_BOARD' | 'EXISTING_BOARD' | 'OS'
 
 export default function Requests() {
   const qc = useQueryClient()
@@ -51,6 +51,7 @@ export default function Requests() {
   const [mode, setMode] = useState<Mode>('NEW_BOARD')
   const [boardId, setBoardId] = useState('')
   const [columnId, setColumnId] = useState('')
+  const [osModelId, setOsModelId] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   // From a notification: every status (the request may have moved on), opened and scrolled to
   useLinkedItem('request', (id) => { setStatusFilter(''); setExpandedId(id) })
@@ -97,11 +98,25 @@ export default function Requests() {
 
   const selectedBoard = clientBoards.find((b) => b.id === boardId)
 
+  // Standalone OS models: a request for an OS opens as it; a free one can be turned into one
+  const { data: standaloneModels = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['os-models', 'standalone'],
+    queryFn: () => api.get('/os-models', { params: { usage: 'standalone' } }).then((r) => r.data),
+    enabled: !!approving,
+  })
+
+  function openApproval(req: ClientRequest) {
+    setApproving(req)
+    setMode(req.osModelId ? 'OS' : 'NEW_BOARD')
+    setOsModelId(req.osModelId ?? '')
+  }
+
   const approveMutation = useMutation({
     mutationFn: () =>
       api.post(
         `/requests/${approving!.id}/approve`,
-        mode === 'NEW_BOARD' ? { mode: 'NEW_BOARD' } : { mode: 'EXISTING_BOARD', boardId, columnId },
+        mode === 'OS' ? { mode: 'OS', osModelId }
+          : mode === 'NEW_BOARD' ? { mode: 'NEW_BOARD' } : { mode: 'EXISTING_BOARD', boardId, columnId },
       ),
     onSuccess: () => {
       toast.success('Solicitação aprovada')
@@ -263,7 +278,7 @@ export default function Requests() {
                 <div className="flex gap-2 mt-2 items-center flex-wrap">
                   {r.status === 'PENDING' && (
                     <>
-                      <Button size="sm" onClick={() => setApproving(r)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+                      <Button size="sm" onClick={() => openApproval(r)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
                         Aprovar
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setRejecting(r)} className="text-danger-text border-danger-text/30 hover:bg-danger-bg">
@@ -276,7 +291,7 @@ export default function Requests() {
                   )}
                   {r.status === 'NEEDS_INFO' && (
                     <>
-                      <Button size="sm" onClick={() => setApproving(r)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+                      <Button size="sm" onClick={() => openApproval(r)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
                         Aprovar
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setRejecting(r)} className="text-danger-text border-danger-text/30 hover:bg-danger-bg">
@@ -334,6 +349,7 @@ export default function Requests() {
             <div className="flex rounded-md border border-border overflow-hidden w-fit">
               <button
                 type="button"
+                aria-pressed={mode === 'NEW_BOARD'}
                 onClick={() => setMode('NEW_BOARD')}
                 className={cn('px-3 py-1.5 text-sm font-medium', mode === 'NEW_BOARD' ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}
               >
@@ -341,10 +357,19 @@ export default function Requests() {
               </button>
               <button
                 type="button"
+                aria-pressed={mode === 'EXISTING_BOARD'}
                 onClick={() => setMode('EXISTING_BOARD')}
                 className={cn('px-3 py-1.5 text-sm font-medium', mode === 'EXISTING_BOARD' ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}
               >
                 Anexar a processo existente
+              </button>
+              <button
+                type="button"
+                aria-pressed={mode === 'OS'}
+                onClick={() => setMode('OS')}
+                className={cn('px-3 py-1.5 text-sm font-medium', mode === 'OS' ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}
+              >
+                Abrir como OS
               </button>
             </div>
 
@@ -352,6 +377,18 @@ export default function Requests() {
               <p className="text-xs text-muted-foreground">
                 Será criado um novo processo "{approving?.title}" com 3 colunas padrão (Pendente → Em andamento → Concluído).
               </p>
+            )}
+
+            {mode === 'OS' && (
+              <div className="space-y-1.5">
+                <Label htmlFor="approve-os-model">Modelo de OS</Label>
+                <select id="approve-os-model" value={osModelId} onChange={(e) => setOsModelId(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 text-sm">
+                  <option value="">Selecione o modelo</option>
+                  {standaloneModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+                <p className="text-xs text-muted-foreground">A OS nasce com os documentos, o robô e o prazo do modelo{approving?.competence ? `, competência ${approving.competence.slice(5, 7)}/${approving.competence.slice(0, 4)}` : ''}.</p>
+              </div>
             )}
 
             {mode === 'EXISTING_BOARD' && (
@@ -387,7 +424,7 @@ export default function Requests() {
               <Button variant="outline" onClick={() => setApproving(null)}>Cancelar</Button>
               <Button
                 onClick={() => approveMutation.mutate()}
-                disabled={approveMutation.isPending || (mode === 'EXISTING_BOARD' && (!boardId || !columnId))}
+                disabled={approveMutation.isPending || (mode === 'EXISTING_BOARD' && (!boardId || !columnId)) || (mode === 'OS' && !osModelId)}
                 className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
               >
                 {approveMutation.isPending ? 'Aprovando...' : 'Aprovar'}

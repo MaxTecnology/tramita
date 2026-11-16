@@ -1,21 +1,36 @@
 import { z } from 'zod'
 
+// A request is free (department + description) or for a service of the catalog: a standalone OS
+// model (with the competence when it asks for one) or a requestable process; the department then
+// comes from the model
 export const createRequestSchema = z.object({
   clientId: z.string().cuid(),
   title: z.string().min(1),
   description: z.string().optional(),
-  departmentId: z.string({ required_error: 'Selecione o departamento' }).cuid('Selecione o departamento'),
+  departmentId: z.string().cuid('Selecione o departamento').optional(),
   processTemplateId: z.string().cuid().optional(),
-})
+  osModelId: z.string().cuid().optional(),
+  competence: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Competência inválida (use AAAA-MM)').optional(),
+}).refine((b) => !(b.processTemplateId && b.osModelId), { message: 'Escolha um serviço só' })
+  .refine((b) => b.departmentId || b.processTemplateId || b.osModelId, { message: 'Selecione o departamento' })
 
 export const approveRequestSchema = z.discriminatedUnion('mode', [
+  // Into an existing process: a free task, or an OS of a model (optionally waiting for other OS)
   z.object({
     mode: z.literal('EXISTING_BOARD'),
     boardId: z.string().cuid(),
     columnId: z.string().cuid(),
+    osModelId: z.string().cuid().optional(),
+    dependsOnTaskIds: z.array(z.string().cuid()).max(50).optional(),
   }),
+  // A new process (with the requested template, its OS are created) or a plain board
   z.object({
     mode: z.literal('NEW_BOARD'),
+  }),
+  // A standalone OS (the model requested, or the one the office picks)
+  z.object({
+    mode: z.literal('OS'),
+    osModelId: z.string().cuid().optional(),
   }),
 ])
 
