@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft } from 'lucide-react'
 import { cnpjValido } from '@/lib/documento'
+import { TramitaLogo } from '@/components/brand/TramitaLogo'
 
 interface Plan { id: string; name: string; maxClients: number; priceMonthly: number }
 type Step = 'plan' | 'form'
@@ -70,8 +71,7 @@ export default function Register() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <header className="bg-surface border-b border-border px-6 py-4 flex items-center gap-3">
-          <HubIcon />
-          <span className="font-bold text-[#185FA5]">Tramita</span>
+          <TramitaLogo className="h-6 w-auto text-brand" />
         </header>
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Fale com a gente</h1>
@@ -91,8 +91,7 @@ export default function Register() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <header className="bg-surface border-b border-border px-6 py-4 flex items-center gap-3">
-          <HubIcon />
-          <span className="font-bold text-[#185FA5]">Tramita</span>
+          <TramitaLogo className="h-6 w-auto text-brand" />
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-center p-8">
@@ -237,20 +236,5 @@ export default function Register() {
         </div>
       </div>
     </div>
-  )
-}
-
-function HubIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="72" height="72" rx="16" fill="#185FA5" />
-      <circle cx="36" cy="36" r="10" fill="white" />
-      <circle cx="36" cy="10" r="5" fill="white" opacity="0.85" />
-      <circle cx="60" cy="51" r="5" fill="white" opacity="0.85" />
-      <circle cx="12" cy="51" r="5" fill="white" opacity="0.85" />
-      <line x1="36" y1="26" x2="36" y2="15" stroke="white" strokeWidth="2" opacity="0.7" />
-      <line x1="46" y1="42" x2="55" y2="46" stroke="white" strokeWidth="2" opacity="0.7" />
-      <line x1="26" y1="42" x2="17" y2="46" stroke="white" strokeWidth="2" opacity="0.7" />
-    </svg>
   )
 }

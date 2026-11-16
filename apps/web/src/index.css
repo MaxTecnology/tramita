@@ -28,6 +28,8 @@
   --color-info-text: #1D4ED8;
   --color-highlight-bg: #F3E8FF;
   --color-highlight-text: #7E22CE;
+  /* Tramita mark (BRAND.md navy); white on the dark theme */
+  --color-brand: #0B1F3F;
 }
 
 /* Dark theme: <html data-theme="dark"> — set before the app loads (index.html) from the user's
@@ -36,6 +38,7 @@
   color-scheme: dark;
   --color-background: #0B1220;
   --color-surface: #131B2E;
+  --color-brand: #FFFFFF;
   --color-border: #263449;
   --color-foreground: #F1F5F9;
   --color-muted-foreground: #94A3B8;

@@ -12,6 +12,7 @@ import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { api } from '@/lib/api'
 import { LayoutDashboard, Users, UserCheck, Settings, LogOut, ClipboardList, ListChecks, Inbox, Menu, X, UserCircle, FileStack, FileSearch, Receipt } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { TramitaLogo } from '@/components/brand/TramitaLogo'
 
 const ORG_ROLES = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER']
 const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
@@ -85,10 +86,9 @@ export default function AppLayout() {
         >
           <div className="p-4 border-b border-border flex items-center justify-between">
             <div className="min-w-0 flex items-center gap-2">
-              <div className="w-6 h-6 rounded-md bg-gradient-to-br from-accent to-accent-hover flex-shrink-0" />
               <div className="min-w-0">
-                <h1 className="text-lg font-bold text-foreground leading-none">Tramita</h1>
-                <p className="text-xs text-muted-foreground truncate">{user?.name}</p>
+                <h1><TramitaLogo className="h-7 w-auto text-brand" /></h1>
+                <p className="mt-1 text-xs text-muted-foreground truncate">{user?.name}</p>
               </div>
             </div>
             {isOrgRole && <NotificationBell base="/app" className="hidden md:block" />}
@@ -178,7 +178,7 @@ export default function AppLayout() {
             >
               <Menu size={22} />
             </button>
-            <h1 className="text-base font-bold text-accent flex-1">Tramita</h1>
+            <h1 className="flex-1"><TramitaLogo className="h-5 w-auto text-brand" /></h1>
             {isOrgRole && <NotificationBell base="/app" align="right" />}
           </header>
 

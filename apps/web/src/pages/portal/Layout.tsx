@@ -10,6 +10,7 @@ import { NotificationBell } from '@/components/shared/NotificationBell'
 import { useInboxStream } from '@/hooks/useInboxStream'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import type { InAppNotification } from '@/components/shared/notifications'
+import { TramitaLogo } from '@/components/brand/TramitaLogo'
 
 // Document-centric portal: what the client received, what they must send, processes in progress.
 // shortLabel fits the 6-tab bottom bar on phones.
@@ -86,7 +87,7 @@ export default function PortalLayout() {
         <aside className="hidden md:flex w-52 bg-surface border-r border-border flex-col">
           <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between">
-              <h1 className="text-lg font-bold text-accent">Tramita</h1>
+              <h1><TramitaLogo className="h-7 w-auto text-brand" /></h1>
               <NotificationBell base="/portal" onOpen={openNotification} />
             </div>
             <p className="text-xs text-foreground font-medium truncate mt-0.5">{user?.orgName}</p>
@@ -150,7 +151,7 @@ export default function PortalLayout() {
                 ))}
               </select>
             ) : (
-              <h1 className="flex-1 text-base font-bold text-accent">Tramita</h1>
+              <h1 className="flex-1"><TramitaLogo className="h-5 w-auto text-brand" /></h1>
             )}
             <NotificationBell base="/portal" onOpen={openNotification} align="right" />
           </div>
