@@ -1,12 +1,12 @@
 import { z } from 'zod'
 
-const documentRequestItemSchema = z.object({
+export const documentRequestItemSchema = z.object({
   name: z.string().trim().min(1, 'Nome do documento obrigatório'),
 })
 
 // Delivery = document the office sends to the client; a payment guide (DAS, FGTS) is tracked as
 // paid/unpaid in the client portal, an extract/declaration is not.
-const documentDeliveryItemSchema = z.object({
+export const documentDeliveryItemSchema = z.object({
   name: z.string().trim().min(1, 'Nome do documento obrigatório'),
   requiresPayment: z.boolean().default(false),
   // Robot: the obligation the document reader recognizes for this document (DAS, FGTS...)

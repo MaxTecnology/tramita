@@ -67,7 +67,7 @@ export async function getTemplateById(id: string, organizationId: string) {
 }
 
 // Each robot obligation on a delivery must be global or this office's own
-async function assertDeliveryObligations(deliveries: { obligationTypeId?: string | null }[], organizationId: string) {
+export async function assertDeliveryObligations(deliveries: { obligationTypeId?: string | null }[], organizationId: string) {
   for (const id of new Set(deliveries.map((d) => d.obligationTypeId).filter((v): v is string => !!v))) {
     await assertObligationTypeAccessible(id, organizationId)
   }

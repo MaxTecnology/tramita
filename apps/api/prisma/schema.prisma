@@ -24,6 +24,7 @@ model Plan {
 
 model Organization {
   holidays Holiday[]
+  osModels OSModel[]
   inAppNotifications  InAppNotification[]
   taskApprovals       TaskApproval[]
   id                  String              @id @default(cuid())
@@ -248,6 +249,7 @@ model Department {
   clientUserAccesses     ClientUserAccess[]
   members                UserDepartment[]
   processTemplates       ProcessTemplate[]
+  osModels               OSModel[]
 
   @@unique([organizationId, name])
   @@map("departments")
@@ -297,6 +299,7 @@ model Board {
   processTemplate ProcessTemplate? @relation(fields: [processTemplateId], references: [id])
   columns         Column[]
 
+  @@index([processTemplateId])
   @@map("boards")
 }
 
@@ -331,6 +334,7 @@ model Request {
 
   @@index([organizationId, status])
   @@index([departmentId])
+  @@index([processTemplateId])
   @@map("requests")
 }
 
@@ -509,6 +513,7 @@ model ProcessTemplate {
   boards       Board[]
 
   @@index([organizationId])
+  @@index([departmentId])
   @@map("process_templates")
 }
 
@@ -523,6 +528,7 @@ model ProcessTemplateColumn {
   template  ProcessTemplate                 @relation(fields: [templateId], references: [id], onDelete: Cascade)
   documents ProcessTemplateColumnDocument[]
 
+  @@index([templateId])
   @@map("process_template_columns")
 }
 
@@ -534,6 +540,7 @@ model ProcessTemplateColumnDocument {
 
   column ProcessTemplateColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
 
+  @@index([columnId])
   @@map("process_template_column_documents")
 }
 
@@ -1025,6 +1032,7 @@ model ObligationType {
   documentModels    DocumentModel[]
   templateDocuments RecurringTaskTemplateDocument[]
   taskDeliverables  TaskDeliverable[]
+  osModelDocuments  OSModelDocument[]
 
   // Só garante unicidade de code quando organizationId NÃO é null (Postgres trata múltiplos NULL
   // como distintos nesse tipo de índice) — a unicidade de code entre os GLOBAIS (organizationId
@@ -1241,4 +1249,54 @@ model Holiday {
 
   @@unique([organizationId, date])
   @@map("holidays")
+}
+
+// An OS (service order) is a single task, like a recurring one but sporadic. The model configures
+// it: documents to ask/deliver (robot per delivery), internal deadline in business days, competence,
+// auto-completion, and where it is used (standalone — office opens, client requests — or in processes).
+model OSModel {
+  id                         String   @id @default(cuid())
+  organizationId             String
+  name                       String
+  description                String?
+  departmentId               String
+  priority                   Priority @default(MEDIUM)
+  visibleToClient            Boolean  @default(true)
+  requiresCompetence         Boolean  @default(false)
+  deadlineBusinessDays       Int?
+  autoCompleteOnAllDelivered Boolean  @default(false)
+  usableStandalone           Boolean  @default(true)
+  usableInProcess            Boolean  @default(false)
+  isActive                   Boolean  @default(true)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department         Department        @relation(fields: [departmentId], references: [id])
+  documentRequests   OSModelDocument[] @relation("OSModelDocumentRequests")
+  documentDeliveries OSModelDocument[] @relation("OSModelDocumentDeliveries")
+
+  @@index([organizationId, isActive])
+  @@index([departmentId])
+  @@map("os_models")
+}
+
+model OSModelDocument {
+  id               String  @id @default(cuid())
+  requestModelId   String?
+  deliveryModelId  String?
+  name             String
+  position         Int
+  // Delivery rows only: payment guide, and the obligation the robot recognizes for this document
+  requiresPayment  Boolean @default(false)
+  obligationTypeId String?
+
+  requestModel  OSModel?        @relation("OSModelDocumentRequests", fields: [requestModelId], references: [id], onDelete: Cascade)
+  deliveryModel OSModel?        @relation("OSModelDocumentDeliveries", fields: [deliveryModelId], references: [id], onDelete: Cascade)
+  obligationType ObligationType? @relation(fields: [obligationTypeId], references: [id], onDelete: SetNull)
+
+  @@index([requestModelId])
+  @@index([deliveryModelId])
+  @@index([obligationTypeId])
+  @@map("os_model_documents")
 }
