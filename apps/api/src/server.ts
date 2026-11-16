@@ -22,6 +22,7 @@ import { requestCommentsRoutes } from '@/modules/request-comments/request-commen
 import { protocolsRoutes } from '@/modules/protocols/protocols.routes'
 import { dashboardRoutes } from '@/modules/dashboard/dashboard.routes'
 import { departmentsRoutes } from '@/modules/departments/departments.routes'
+import { holidaysRoutes } from '@/modules/holidays/holidays.routes'
 import { recurringTemplatesRoutes } from '@/modules/recurring-templates/recurring-templates.routes'
 import { clientUsersRoutes } from '@/modules/client-users/client-users.routes'
 import { osTemplatesRoutes } from '@/modules/os-templates/os-templates.routes'
@@ -65,6 +66,7 @@ export function buildApp() {
   app.register(protocolsRoutes)
   app.register(dashboardRoutes, { prefix: '/dashboard' })
   app.register(departmentsRoutes, { prefix: '/departments' })
+  app.register(holidaysRoutes, { prefix: '/holidays' })
   app.register(recurringTemplatesRoutes, { prefix: '/recurring-templates' })
   app.register(clientUsersRoutes, { prefix: '/client-users' })
   app.register(osTemplatesRoutes, { prefix: '/os-templates' })

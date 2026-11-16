@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import type { RecurringTaskTemplate, Department, ObligationType } from '@/types'
 import { PRIORITY_LABEL } from '@/components/shared/TaskDrawer'
 import { nextOccurrences, describeRule } from './recurringPreview'
+import { useHolidayDays } from '@/lib/holidays'
 
 const PERIODICITY_LABEL: Record<RecurringTaskTemplate['periodicity'], string> = {
   MONTHLY: 'Mensal',
@@ -298,7 +299,8 @@ export default function RecurringTemplateForm() {
 
   const isWeekly = form.periodicity === 'WEEKLY'
   const dayOptions = isWeekly ? [1, 2, 3, 4, 5, 6, 7] : Array.from({ length: 31 }, (_, i) => i + 1)
-  const occurrences = nextOccurrences(form, new Date(), 3)
+  const holidayDays = useHolidayDays(new Date().getFullYear(), new Date().getFullYear() + 3)
+  const occurrences = nextOccurrences(form, new Date(), 3, holidayDays)
   const sentence = describeRule(form)
   const departmentName = departments.find((d) => d.id === form.departmentId)?.name
   const robotCount = form.documentDeliveries.filter((d) => d.obligationTypeId).length

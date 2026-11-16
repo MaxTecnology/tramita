@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { nationalHolidays } from '@/lib/business-days'
 import {
   computeDueDate,
   computeDueDateFromMonth,
@@ -312,3 +313,16 @@ function addMonthsUTCForTest(date: Date, months: number): Date {
   result.setUTCMonth(result.getUTCMonth() + months)
   return result
 }
+
+describe('rolagem com feriados (calendário único de dias úteis)', () => {
+  const holidays = new Set(nationalHolidays(2026))
+  it('a due date on a national holiday rolls forward past it and the weekend', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, dueDayOfPeriod: 20, dueBusinessDayRoll: 'FORWARD' }
+    expect(computeDueDateFromMonth(new Date(Date.UTC(2026, 10, 1)), rules, holidays).toISOString().slice(0, 10)).toBe('2026-11-23')
+    expect(computeDueDateFromMonth(new Date(Date.UTC(2026, 10, 1)), rules).toISOString().slice(0, 10)).toBe('2026-11-20')
+  })
+  it('the target date rolls back past a holiday', () => {
+    const rules: RecurrenceDateRules = { ...monthlyRules, targetOffsetDays: -1, targetBusinessDayRoll: 'BACKWARD' }
+    expect(computeTargetDate(new Date(Date.UTC(2026, 10, 3)), rules, holidays).toISOString().slice(0, 10)).toBe('2026-10-30')
+  })
+})

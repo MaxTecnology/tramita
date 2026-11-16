@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Card } from '@/components/ui/card'
-import { Settings, Bell, CreditCard, Building2, UserCog, Repeat, FileStack, Zap, FileText } from 'lucide-react'
+import { Settings, Bell, CreditCard, Building2, UserCog, Repeat, FileStack, Zap, FileText, CalendarOff } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { FailedGeneration } from '@/types'
 
@@ -38,6 +38,7 @@ export default function SettingsHub() {
       title: 'Organização',
       cards: [
         { to: '/app/settings/departments', icon: <Building2 size={20} />, title: 'Departamentos', description: 'Áreas internas do escritório', roles: ADMIN_ROLES },
+        { to: '/app/settings/holidays', icon: <CalendarOff size={20} />, title: 'Feriados', description: 'Dias que não contam nos prazos em dias úteis', roles: ADMIN_ROLES },
         { to: '/app/settings/client-users', icon: <UserCog size={20} />, title: 'Usuários de Cliente', description: 'Acessos do portal do cliente', roles: MANAGER_ROLES },
         { to: '/app/settings/subscription', icon: <CreditCard size={20} />, title: 'Assinatura', description: 'Plano e cobrança', roles: ADMIN_ROLES },
       ],

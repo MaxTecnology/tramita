@@ -13,16 +13,16 @@ export interface RecurrenceDateRules {
   generationDayOfPeriod: number
 }
 
-function isWeekend(date: Date): boolean {
-  const day = date.getUTCDay()
-  return day === 0 || day === 6
-}
+import { isBusinessDay, type HolidaySet } from '@/lib/business-days'
 
-function rollToBusinessDay(date: Date, direction: BusinessDayRoll): Date {
+const NO_HOLIDAYS: HolidaySet = new Set()
+
+// Rolls past weekends and holidays (the single business-day calendar of lib/business-days)
+function rollToBusinessDay(date: Date, direction: BusinessDayRoll, holidays: HolidaySet = NO_HOLIDAYS): Date {
   if (direction === 'NONE') return date
   const step = direction === 'FORWARD' ? 1 : -1
   const result = new Date(date)
-  while (isWeekend(result)) {
+  while (!isBusinessDay(result, holidays)) {
     result.setUTCDate(result.getUTCDate() + step)
   }
   return result
@@ -60,16 +60,16 @@ function mondayOfWeek(date: Date): Date {
  * primária (a competência É a segunda-feira da semana, não existe ambiguidade com vencimento
  * nesse caso, por isso essa periodicidade ficou fora do redesenho vencimento-como-âncora).
  */
-export function computeDueDate(competence: Date, rules: RecurrenceDateRules): Date {
+export function computeDueDate(competence: Date, rules: RecurrenceDateRules, holidays: HolidaySet = NO_HOLIDAYS): Date {
   const due = addDaysUTC(competence, rules.dueDayOfPeriod - 1)
-  return rollToBusinessDay(due, rules.dueBusinessDayRoll)
+  return rollToBusinessDay(due, rules.dueBusinessDayRoll, holidays)
 }
 
 /**
  * Vencimento a partir do mês-alvo já decidido — usada por MONTHLY/QUARTERLY/ANNUAL, onde
  * vencimento é a âncora (não mais derivado de uma "competência" abstrata).
  */
-export function computeDueDateFromMonth(dueMonthStart: Date, rules: RecurrenceDateRules): Date {
+export function computeDueDateFromMonth(dueMonthStart: Date, rules: RecurrenceDateRules, holidays: HolidaySet = NO_HOLIDAYS): Date {
   if (rules.periodicity === 'WEEKLY') {
     throw new Error('computeDueDateFromMonth não serve pra WEEKLY — use computeDueDate')
   }
@@ -77,7 +77,7 @@ export function computeDueDateFromMonth(dueMonthStart: Date, rules: RecurrenceDa
   const month = dueMonthStart.getUTCMonth()
   const day = clampDayOfMonth(year, month, rules.dueDayOfPeriod)
   const due = new Date(Date.UTC(year, month, day))
-  return rollToBusinessDay(due, rules.dueBusinessDayRoll)
+  return rollToBusinessDay(due, rules.dueBusinessDayRoll, holidays)
 }
 
 /** Competência derivada do mês de vencimento — sempre `competenceMonthOffset` meses antes. */
@@ -102,9 +102,9 @@ export function computeDueMonthFromCompetence(
   return addMonthsUTC(competence, rules.competenceMonthOffset)
 }
 
-export function computeTargetDate(dueDate: Date, rules: RecurrenceDateRules): Date {
+export function computeTargetDate(dueDate: Date, rules: RecurrenceDateRules, holidays: HolidaySet = NO_HOLIDAYS): Date {
   const target = addDaysUTC(dueDate, rules.targetOffsetDays)
-  return rollToBusinessDay(target, rules.targetBusinessDayRoll)
+  return rollToBusinessDay(target, rules.targetBusinessDayRoll, holidays)
 }
 
 /**

@@ -23,11 +23,12 @@ const SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'o
 const utc = (y: number, m: number, day = 1) => new Date(Date.UTC(y, m, day))
 const clampDay = (y: number, m: number, day: number) => Math.min(day, new Date(Date.UTC(y, m + 1, 0)).getUTCDate())
 
-function roll(date: Date, direction: Roll): Date {
+// Same business-day calendar as the API: weekends plus the office holidays ('YYYY-MM-DD')
+function roll(date: Date, direction: Roll, holidays: ReadonlySet<string>): Date {
   if (direction === 'NONE') return date
   const step = direction === 'FORWARD' ? 1 : -1
   const r = new Date(date)
-  while (r.getUTCDay() === 0 || r.getUTCDay() === 6) r.setUTCDate(r.getUTCDate() + step)
+  while (r.getUTCDay() === 0 || r.getUTCDay() === 6 || holidays.has(r.toISOString().slice(0, 10))) r.setUTCDate(r.getUTCDate() + step)
   return r
 }
 
@@ -37,7 +38,7 @@ function dueMonthMatches(rules: PreviewRules, month: number): boolean {
   return true
 }
 
-export function nextOccurrences(rules: PreviewRules, today: Date, count: number): Occurrence[] {
+export function nextOccurrences(rules: PreviewRules, today: Date, count: number, holidays: ReadonlySet<string> = new Set()): Occurrence[] {
   if (rules.periodicity === 'WEEKLY') return []
   const out: Occurrence[] = []
   const todayDay = utc(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
@@ -50,10 +51,10 @@ export function nextOccurrences(rules: PreviewRules, today: Date, count: number)
     if (!dueMonthMatches(rules, dueMonth.getUTCMonth())) continue
     const y = dueMonth.getUTCFullYear()
     const m = dueMonth.getUTCMonth()
-    const due = roll(utc(y, m, clampDay(y, m, rules.dueDayOfPeriod)), rules.dueBusinessDayRoll)
+    const due = roll(utc(y, m, clampDay(y, m, rules.dueDayOfPeriod)), rules.dueBusinessDayRoll, holidays)
     const targetRaw = new Date(due)
     targetRaw.setUTCDate(targetRaw.getUTCDate() + rules.targetOffsetDays)
-    out.push({ createdOn, due, target: roll(targetRaw, rules.targetBusinessDayRoll), competence: utc(y, m - rules.competenceMonthOffset) })
+    out.push({ createdOn, due, target: roll(targetRaw, rules.targetBusinessDayRoll, holidays), competence: utc(y, m - rules.competenceMonthOffset) })
   }
   return out
 }

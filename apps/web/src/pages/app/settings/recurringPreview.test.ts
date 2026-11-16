@@ -53,3 +53,12 @@ describe('frase-resumo da regra', () => {
     expect(describeRule({ ...base, periodicity: 'ANNUAL', dueMonthAnchor: 5, dueDayOfPeriod: 31, competenceMonthOffset: 3 })).toMatch(/^Todo ano em maio, vence no dia 31, referente a 3 meses antes\./)
   })
 })
+
+describe('nextOccurrences com feriados', () => {
+  it('rolls the due date past a holiday when the office calendar is given', () => {
+    const rules = { periodicity: 'MONTHLY' as const, dueDayOfPeriod: 20, dueBusinessDayRoll: 'FORWARD' as const, dueMonthAnchor: 1, competenceMonthOffset: 1, targetOffsetDays: 0, targetBusinessDayRoll: 'NONE' as const, generationMonthOffset: 0, generationDayOfPeriod: 1 }
+    const [first] = nextOccurrences(rules, new Date(Date.UTC(2026, 10, 1)), 1, new Set(['2026-11-20']))
+    expect(first.due.toISOString().slice(0, 10)).toBe('2026-11-23')
+    expect(nextOccurrences(rules, new Date(Date.UTC(2026, 10, 1)), 1)[0].due.toISOString().slice(0, 10)).toBe('2026-11-20')
+  })
+})

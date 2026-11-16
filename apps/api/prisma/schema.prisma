@@ -23,6 +23,7 @@ model Plan {
 }
 
 model Organization {
+  holidays Holiday[]
   inAppNotifications  InAppNotification[]
   taskApprovals       TaskApproval[]
   id                  String              @id @default(cuid())
@@ -1207,4 +1208,20 @@ enum AttachmentReview {
   APPROVED
   REJECTED
   REPLACED
+}
+
+// Holidays of an office (municipal, state, Carnaval, recess) on top of the built-in national ones
+// (lib/business-days). One business-day calendar for the whole system: recurring due/target dates
+// and OS/process deadlines.
+model Holiday {
+  id             String   @id @default(cuid())
+  organizationId String
+  date           DateTime @db.Date
+  name           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, date])
+  @@map("holidays")
 }

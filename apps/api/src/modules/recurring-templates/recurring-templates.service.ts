@@ -1,3 +1,4 @@
+import { loadHolidaySet } from '@/modules/holidays/holidays.service'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
@@ -294,8 +295,10 @@ export async function generateTaskForAssignment(
     const systemBoard = await ensureRecurringSystemBoard(assignment.clientId, template.organizationId)
     const columnId = systemBoard.columns[0].id
 
-    const dueDate = rules.periodicity === 'WEEKLY' ? computeDueDate(dueMonth, rules) : computeDueDateFromMonth(dueMonth, rules)
-    const targetDate = computeTargetDate(dueDate, rules)
+    // One business-day calendar: national + office holidays (the due date can roll into next year)
+    const holidays = await loadHolidaySet(template.organizationId, [dueMonth.getUTCFullYear(), dueMonth.getUTCFullYear() + 1])
+    const dueDate = rules.periodicity === 'WEEKLY' ? computeDueDate(dueMonth, rules, holidays) : computeDueDateFromMonth(dueMonth, rules, holidays)
+    const targetDate = computeTargetDate(dueDate, rules, holidays)
     const initialStatus = template.documentRequests.length > 0 ? 'BLOCKED' : 'OPEN'
 
     const taskId = await prisma.$transaction(async (tx) => {

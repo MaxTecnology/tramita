@@ -293,6 +293,18 @@ describe('generateTaskForAssignment', () => {
     return { org, dept, client, template, assignment }
   }
 
+  it('o vencimento rola por cima de feriado nacional e de feriado do escritório', async () => {
+    const { org, template, assignment } = await setup()
+    vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
+    // dueDay 20 FORWARD: 20/11/2026 é feriado nacional (sexta) → segunda 23/11; o escritório tem 23/11 como feriado → 24/11
+    await prisma.recurringTaskTemplate.update({ where: { id: template.id }, data: { dueDayOfPeriod: 20, dueBusinessDayRoll: 'FORWARD' } })
+    await prisma.holiday.create({ data: { organizationId: org.id, date: new Date(Date.UTC(2026, 10, 23)), name: 'Feriado municipal' } })
+    const outcome = await generateTaskForAssignment(template.id, assignment.id, new Date(Date.UTC(2026, 10, 1)))
+    if (outcome.status !== 'SUCCESS') throw new Error(JSON.stringify(outcome))
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: outcome.taskId } })
+    expect(task.dueDate?.toISOString().slice(0, 10)).toBe('2026-11-24')
+  })
+
   it('gera a tarefa com checklist copiado do template, dueDate/targetDate calculados e status BLOCKED (tem documento a cobrar)', async () => {
     const { template, assignment } = await setup()
     const spy = vi.spyOn(queue, 'enqueueNotification').mockResolvedValue()
