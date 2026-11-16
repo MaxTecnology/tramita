@@ -9,14 +9,13 @@ const documentRequestItemSchema = z.object({
 const documentDeliveryItemSchema = z.object({
   name: z.string().trim().min(1, 'Nome do documento obrigatório'),
   requiresPayment: z.boolean().default(false),
+  // Robot: the obligation the document reader recognizes for this document (DAS, FGTS...)
+  obligationTypeId: z.string().cuid().nullable().optional(),
 })
 
 export const createTemplateSchema = z.object({
   departmentId: z.string().cuid(),
   title: z.string().trim().min(1, 'Título obrigatório'),
-  // Só preenchido pra templates que geram uma obrigação lida pelo robô de documentos
-  // (document-reader) — permite casar (cliente, obrigação, competência) com confiança.
-  obligationTypeId: z.string().cuid().nullable().optional(),
   description: z.string().optional(),
   periodicity: z.enum(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUAL']),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),

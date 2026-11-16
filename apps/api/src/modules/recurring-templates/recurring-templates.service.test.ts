@@ -30,65 +30,6 @@ import {
 } from '@/test/helpers'
 
 describe('createTemplate', () => {
-  it('persiste obligationTypeId quando o template representa uma obrigação fiscal', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const dept = await createTestDepartment(org.id)
-    const obrigacao = await prisma.obligationType.create({ data: { code: 'TESTE-RT', name: 'Obrigação de Teste', organizationId: null } })
-
-    const template = await createTemplate(org.id, {
-      departmentId: dept.id,
-      title: 'DAS mensal',
-      obligationTypeId: obrigacao.id,
-      periodicity: 'MONTHLY', priority: 'MEDIUM',
-      competenceMonthOffset: 1,
-      dueDayOfPeriod: 15, dueMonthAnchor: 1,
-      dueBusinessDayRoll: 'NONE',
-      targetOffsetDays: -2,
-      targetBusinessDayRoll: 'NONE',
-      generationMonthOffset: 1,
-      generationDayOfPeriod: 20,
-      autoCompleteOnAllActivitiesDone: false,
-      notifyViaWhatsapp: true,
-      notifyViaEmail: false,
-      visibleToClient: true,
-      isActive: true,
-      documentRequests: [],
-      documentDeliveries: [],
-    })
-
-    expect(template.obligationTypeId).toBe(obrigacao.id)
-  })
-
-  it('lança 404 ao vincular obligationTypeId privado de outra organização', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const outraOrg = await createTestOrg(plan.id, { slug: 'outra-org-criar-recurring-template' })
-    const dept = await createTestDepartment(org.id)
-    const obrigacaoDeOutraOrg = await prisma.obligationType.create({ data: { code: 'TESTE-RT-OUTRA-ORG-2', name: 'Obrigação de outra org', organizationId: outraOrg.id } })
-
-    await expect(createTemplate(org.id, {
-      departmentId: dept.id,
-      title: 'DAS mensal',
-      obligationTypeId: obrigacaoDeOutraOrg.id,
-      periodicity: 'MONTHLY', priority: 'MEDIUM',
-      competenceMonthOffset: 1,
-      dueDayOfPeriod: 15, dueMonthAnchor: 1,
-      dueBusinessDayRoll: 'NONE',
-      targetOffsetDays: -2,
-      targetBusinessDayRoll: 'NONE',
-      generationMonthOffset: 1,
-      generationDayOfPeriod: 20,
-      autoCompleteOnAllActivitiesDone: false,
-      notifyViaWhatsapp: true,
-      notifyViaEmail: false,
-      visibleToClient: true,
-      isActive: true,
-      documentRequests: [],
-      documentDeliveries: [],
-    })).rejects.toMatchObject({ statusCode: 404 })
-  })
-
   it('cria template com as duas listas de documento', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
@@ -206,35 +147,6 @@ describe('updateTemplate', () => {
     expect(updated.documentRequests.map((d) => d.name)).toEqual(['B', 'C'])
   })
 
-  it('lança 404 ao editar um template vinculando obligationTypeId privado de outra organização', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const outraOrg = await createTestOrg(plan.id, { slug: 'outra-org-recurring-template' })
-    const dept = await createTestDepartment(org.id)
-    const obrigacaoDeOutraOrg = await prisma.obligationType.create({ data: { code: 'TESTE-RT-OUTRA-ORG', name: 'Obrigação de outra org', organizationId: outraOrg.id } })
-    const template = await createTemplate(org.id, {
-      departmentId: dept.id,
-      title: 'X',
-      periodicity: 'MONTHLY', priority: 'MEDIUM',
-      competenceMonthOffset: 0,
-      dueDayOfPeriod: 10, dueMonthAnchor: 1,
-      dueBusinessDayRoll: 'NONE',
-      targetOffsetDays: 0,
-      targetBusinessDayRoll: 'NONE',
-      generationMonthOffset: 1,
-      generationDayOfPeriod: 5,
-      autoCompleteOnAllActivitiesDone: false,
-      notifyViaWhatsapp: true,
-      notifyViaEmail: false,
-      visibleToClient: true,
-      isActive: true,
-      documentRequests: [],
-      documentDeliveries: [],
-    })
-
-    await expect(updateTemplate(template.id, org.id, { obligationTypeId: obrigacaoDeOutraOrg.id }))
-      .rejects.toMatchObject({ statusCode: 404 })
-  })
 })
 
 describe('createAssignment', () => {

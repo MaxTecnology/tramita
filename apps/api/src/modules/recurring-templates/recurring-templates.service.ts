@@ -65,9 +65,16 @@ export async function getTemplateById(id: string, organizationId: string) {
   return template
 }
 
+// Each robot obligation on a delivery must be global or this office's own
+async function assertDeliveryObligations(deliveries: { obligationTypeId?: string | null }[], organizationId: string) {
+  for (const id of new Set(deliveries.map((d) => d.obligationTypeId).filter((v): v is string => !!v))) {
+    await assertObligationTypeAccessible(id, organizationId)
+  }
+}
+
 export async function createTemplate(organizationId: string, data: CreateTemplateBody) {
   await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
-  if (data.obligationTypeId) await assertObligationTypeAccessible(data.obligationTypeId, organizationId)
+  await assertDeliveryObligations(data.documentDeliveries, organizationId)
   assertDayOfPeriodValid(data.periodicity, data.dueDayOfPeriod, data.generationDayOfPeriod)
 
   const { documentRequests, documentDeliveries, ...templateData } = data
@@ -77,7 +84,7 @@ export async function createTemplate(organizationId: string, data: CreateTemplat
       ...templateData,
       organizationId,
       documentRequests: { create: documentRequests.map((d, i) => ({ name: d.name, position: i })) },
-      documentDeliveries: { create: documentDeliveries.map((d, i) => ({ name: d.name, requiresPayment: d.requiresPayment, position: i })) },
+      documentDeliveries: { create: documentDeliveries.map((d, i) => ({ name: d.name, requiresPayment: d.requiresPayment, obligationTypeId: d.obligationTypeId ?? null, position: i })) },
     },
     include: { documentRequests: true, documentDeliveries: true },
   })
@@ -103,7 +110,7 @@ export async function updateTemplate(id: string, organizationId: string, data: U
       )
     }
   }
-  if (data.obligationTypeId) await assertObligationTypeAccessible(data.obligationTypeId, organizationId)
+  if (data.documentDeliveries) await assertDeliveryObligations(data.documentDeliveries, organizationId)
   assertDayOfPeriodValid(
     data.periodicity ?? existing.periodicity,
     data.dueDayOfPeriod ?? existing.dueDayOfPeriod,
@@ -122,7 +129,7 @@ export async function updateTemplate(id: string, organizationId: string, data: U
     if (documentDeliveries) {
       await tx.recurringTaskTemplateDocument.deleteMany({ where: { deliveryTemplateId: id } })
       await tx.recurringTaskTemplateDocument.createMany({
-        data: documentDeliveries.map((d, i) => ({ deliveryTemplateId: id, name: d.name, requiresPayment: d.requiresPayment, position: i })),
+        data: documentDeliveries.map((d, i) => ({ deliveryTemplateId: id, name: d.name, requiresPayment: d.requiresPayment, obligationTypeId: d.obligationTypeId ?? null, position: i })),
       })
     }
     return tx.recurringTaskTemplate.update({
@@ -320,7 +327,7 @@ export async function generateTaskForAssignment(
       }
       if (template.documentDeliveries.length > 0) {
         await tx.taskDeliverable.createMany({
-          data: template.documentDeliveries.map((d, i) => ({ taskId: task.id, name: d.name, requiresPayment: d.requiresPayment, position: i })),
+          data: template.documentDeliveries.map((d, i) => ({ taskId: task.id, name: d.name, requiresPayment: d.requiresPayment, obligationTypeId: d.obligationTypeId, position: i })),
         })
       }
 

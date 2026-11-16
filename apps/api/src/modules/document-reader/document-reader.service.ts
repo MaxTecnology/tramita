@@ -107,23 +107,27 @@ export async function processarDocumento(receivedDocumentId: string): Promise<vo
       // motor — aceitamos os dois como período válido pra não perder o casamento (regressão vs.
       // a POC original, que já passava ambos pro decidir()).
       const periodos = [resultado.periodo, resultado.competenciaCab].filter((p): p is string => !!p)
+      // Candidates are the open tasks' pending deliveries marked for the robot (one per obligation):
+      // two pending deliveries of the same obligation in a task make the match ambiguous (queue)
       const tarefas = await prisma.task.findMany({
         where: {
           status: { notIn: ['DONE', 'DISREGARDED'] },
           column: { board: { clientId: cliente.id, organizationId: doc.organizationId } },
-          recurringTemplate: { obligationTypeId: { not: null } },
+          deliverables: { some: { deliveredAt: null, obligationTypeId: { not: null } } },
         },
-        select: { id: true, competence: true, recurringTemplate: { select: { obligationType: { select: { code: true } } } } },
+        select: {
+          id: true, competence: true,
+          deliverables: { where: { deliveredAt: null, obligationTypeId: { not: null } }, select: { id: true, obligationType: { select: { code: true } } } },
+        },
       })
       base.tarefas = tarefas
-        .filter((t) => t.recurringTemplate?.obligationType)
-        .map((t) => ({
+        .flatMap((t) => t.deliverables.map((d) => ({
           id: t.id,
           clienteId: cliente.id,
-          tipoImposto: t.recurringTemplate!.obligationType!.code,
+          tipoImposto: d.obligationType?.code ?? '',
           competencia: competenciaParaRotulo(t.competence),
           status: 'aberta' as const,
-        }))
+        })))
         .filter((t) => periodos.includes(t.competencia))
     }
   }

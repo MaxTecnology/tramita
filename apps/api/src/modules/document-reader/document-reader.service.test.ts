@@ -31,13 +31,15 @@ async function setupObrigacaoETarefa(org: { id: string }, cnpj: string) {
   const template = await prisma.recurringTaskTemplate.create({
     data: {
       organizationId: org.id, departmentId: dept.id, title: 'Teste', periodicity: 'MONTHLY',
-      dueDayOfPeriod: 10, generationDayOfPeriod: 1, obligationTypeId: obrigacao.id,
+      dueDayOfPeriod: 10, generationDayOfPeriod: 1,
     },
   })
   const task = await prisma.task.create({
     data: {
       title: 'Obrigação de Teste — 2026-08', columnId: column.id, departmentId: dept.id,
       competence: new Date(Date.UTC(2026, 7, 1)), recurringTemplateId: template.id, position: 0,
+      // The robot fills this pending delivery (obligation per delivered document)
+      deliverables: { create: [{ name: 'Guia', position: 0, obligationTypeId: obrigacao.id }] },
     },
   })
   const modelo = await prisma.documentModel.create({
@@ -95,13 +97,15 @@ describe('processarDocumento', () => {
     const template = await prisma.recurringTaskTemplate.create({
       data: {
         organizationId: org.id, departmentId: dept.id, title: 'Teste', periodicity: 'MONTHLY',
-        dueDayOfPeriod: 10, generationDayOfPeriod: 1, obligationTypeId: obrigacao.id,
+        dueDayOfPeriod: 10, generationDayOfPeriod: 1,
       },
     })
     const task = await prisma.task.create({
       data: {
         title: 'Obrigação de Teste — 2026-08', columnId: column.id, departmentId: dept.id,
         competence: new Date(Date.UTC(2026, 7, 1)), recurringTemplateId: template.id, position: 0,
+      // The robot fills this pending delivery (obligation per delivered document)
+      deliverables: { create: [{ name: 'Guia', position: 0, obligationTypeId: obrigacao.id }] },
       },
     })
     const modelo = await prisma.documentModel.create({
@@ -198,13 +202,15 @@ describe('processarDocumento', () => {
     const template = await prisma.recurringTaskTemplate.create({
       data: {
         organizationId: org.id, departmentId: dept.id, title: 'Teste Trimestral', periodicity: 'QUARTERLY',
-        dueDayOfPeriod: 10, generationDayOfPeriod: 1, dueMonthAnchor: 2, obligationTypeId: obrigacao.id,
+        dueDayOfPeriod: 10, generationDayOfPeriod: 1, dueMonthAnchor: 2,
       },
     })
     const task = await prisma.task.create({
       data: {
         title: 'Obrigação Trimestral — 2026-T2', columnId: column.id, departmentId: dept.id,
         competence: new Date(Date.UTC(2026, 5, 1)), recurringTemplateId: template.id, position: 0,
+      // The robot fills this pending delivery (obligation per delivered document)
+      deliverables: { create: [{ name: 'Guia', position: 0, obligationTypeId: obrigacao.id }] },
       },
     })
     await prisma.documentModel.create({

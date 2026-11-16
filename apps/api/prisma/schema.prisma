@@ -520,16 +520,13 @@ model OSTemplateColumnDocument {
 }
 
 model RecurringTaskTemplate {
-  id               String                @id @default(cuid())
-  organizationId   String
-  departmentId     String
-  // Só preenchido pra templates que geram uma obrigação lida pelo robô de documentos — permite
-  // casar (cliente, obrigação, competência) com confiança, em vez de comparar title (texto livre).
-  obligationTypeId String?
-  title            String
-  description      String?
-  periodicity      RecurrencePeriodicity
-  priority         Priority              @default(MEDIUM)
+  id             String                @id @default(cuid())
+  organizationId String
+  departmentId   String
+  title          String
+  description    String?
+  periodicity    RecurrencePeriodicity
+  priority       Priority              @default(MEDIUM)
 
   dueDayOfPeriod     Int
   dueBusinessDayRoll BusinessDayRoll @default(NONE)
@@ -560,7 +557,6 @@ model RecurringTaskTemplate {
 
   organization       Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   department         Department                      @relation(fields: [departmentId], references: [id])
-  obligationType     ObligationType?                 @relation(fields: [obligationTypeId], references: [id])
   documentRequests   RecurringTaskTemplateDocument[] @relation("TemplateDocumentRequests")
   documentDeliveries RecurringTaskTemplateDocument[] @relation("TemplateDocumentDeliveries")
   assignments        RecurringTaskAssignment[]
@@ -591,9 +587,12 @@ model RecurringTaskTemplateDocument {
   position           Int
   // Only meaningful on delivery rows: the generated deliverable is a payment guide
   requiresPayment    Boolean @default(false)
+  // Only on delivery rows: the obligation the document reader recognizes for this document (robot)
+  obligationTypeId   String?
 
   requestTemplate  RecurringTaskTemplate? @relation("TemplateDocumentRequests", fields: [requestTemplateId], references: [id], onDelete: Cascade)
   deliveryTemplate RecurringTaskTemplate? @relation("TemplateDocumentDeliveries", fields: [deliveryTemplateId], references: [id], onDelete: Cascade)
+  obligationType   ObligationType?        @relation(fields: [obligationTypeId], references: [id], onDelete: SetNull)
 
   @@map("recurring_task_template_documents")
 }
@@ -664,24 +663,28 @@ enum DocumentRequirementStatus {
 }
 
 model TaskDeliverable {
-  id              String    @id @default(cuid())
-  taskId          String
-  name            String
-  attachmentId    String?   @unique
-  deliveredById   String?
-  deliveredAt     DateTime?
-  position        Int
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  taskId           String
+  name             String
+  attachmentId     String?   @unique
+  deliveredById    String?
+  deliveredAt      DateTime?
+  position         Int
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
   // Payment guide (DAS, FGTS...): amount and due date informed by the office on delivery
-  requiresPayment Boolean   @default(false)
-  amount          Decimal?  @db.Decimal(12, 2)
-  paymentDueDate  DateTime?
+  requiresPayment  Boolean   @default(false)
+  amount           Decimal?  @db.Decimal(12, 2)
+  paymentDueDate   DateTime?
+  // Robot: the obligation the document reader recognizes for this delivery (copied from the template)
+  obligationTypeId String?
 
-  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  attachment  Attachment? @relation(fields: [attachmentId], references: [id])
-  deliveredBy User?       @relation(fields: [deliveredById], references: [id])
-  protocol    Protocol?
+  task              Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  attachment        Attachment?        @relation(fields: [attachmentId], references: [id])
+  deliveredBy       User?              @relation(fields: [deliveredById], references: [id])
+  protocol          Protocol?
+  obligationType    ObligationType?    @relation(fields: [obligationTypeId], references: [id], onDelete: SetNull)
+  receivedDocuments ReceivedDocument[]
 
   @@map("task_deliverables")
 }
@@ -999,10 +1002,11 @@ model ObligationType {
   // Restrict (não o SetNull default do Prisma pra FK opcional): sem isso, apagar uma org tornaria
   // os ObligationType privados dela GLOBAIS (organizationId vira null = global neste sistema) —
   // exatamente a classe de vazamento de isolamento entre escritórios que o resto da base evita.
-  organization           Organization?           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdBy              User?                   @relation(fields: [createdById], references: [id])
-  documentModels         DocumentModel[]
-  recurringTaskTemplates RecurringTaskTemplate[]
+  organization      Organization?                   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy         User?                           @relation(fields: [createdById], references: [id])
+  documentModels    DocumentModel[]
+  templateDocuments RecurringTaskTemplateDocument[]
+  taskDeliverables  TaskDeliverable[]
 
   // Só garante unicidade de code quando organizationId NÃO é null (Postgres trata múltiplos NULL
   // como distintos nesse tipo de índice) — a unicidade de code entre os GLOBAIS (organizationId
@@ -1049,6 +1053,8 @@ model ReceivedDocument {
   confidence      Float?
   extractedFields Json?
   taskId          String?
+  // Delivery the robot suggests filling (with taskId)
+  deliverableId   String?
   how             String?
   reviewedById    String?
   reviewedAt      DateTime?
@@ -1057,14 +1063,16 @@ model ReceivedDocument {
   attachingSince  DateTime?
   createdAt       DateTime               @default(now())
 
-  organization  Organization   @relation(fields: [organizationId], references: [id])
-  documentModel DocumentModel? @relation(fields: [documentModelId], references: [id])
-  task          Task?          @relation(fields: [taskId], references: [id])
-  attachment    Attachment?    @relation(fields: [attachmentId], references: [id])
-  uploadedBy    User?          @relation("ReceivedDocumentUploadedBy", fields: [uploadedById], references: [id])
-  reviewedBy    User?          @relation("ReceivedDocumentReviewedBy", fields: [reviewedById], references: [id])
+  organization  Organization     @relation(fields: [organizationId], references: [id])
+  documentModel DocumentModel?   @relation(fields: [documentModelId], references: [id])
+  task          Task?            @relation(fields: [taskId], references: [id])
+  deliverable   TaskDeliverable? @relation(fields: [deliverableId], references: [id], onDelete: SetNull)
+  attachment    Attachment?      @relation(fields: [attachmentId], references: [id])
+  uploadedBy    User?            @relation("ReceivedDocumentUploadedBy", fields: [uploadedById], references: [id])
+  reviewedBy    User?            @relation("ReceivedDocumentReviewedBy", fields: [reviewedById], references: [id])
 
   @@unique([organizationId, fileHash])
+  @@index([deliverableId])
   // listarFilaDeRevisao filtra por organizationId + status IN (PENDING, NOT_IDENTIFIED).
   @@index([organizationId, status])
   // purgeRejectedDocuments (cron LGPD) filtra por status = REJECTED + reviewedAt < cutoff.
