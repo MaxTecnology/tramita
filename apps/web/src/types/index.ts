@@ -215,13 +215,14 @@ export interface RecurringTaskTemplateDocumentItem {
   name: string
   position: number
   requiresPayment: boolean
+  // Robot: obligation the document reader recognizes for this delivered document
+  obligationTypeId: string | null
 }
 
 export interface RecurringTaskTemplate {
   id: string
   departmentId: string
   department: { id: string; name: string }
-  obligationTypeId: string | null
   title: string
   description: string | null
   periodicity: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL'

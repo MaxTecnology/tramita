@@ -45,9 +45,6 @@ const GENERATION_OFFSET_OPTIONS = [
 
 interface FormState {
   departmentId: string
-  // Only when the template is a tax obligation the document reader recognizes (DAS, PGDAS-D...): lets
-  // it match a read document with the right open task.
-  obligationTypeId: string
   title: string
   description: string
   periodicity: RecurringTaskTemplate['periodicity']
@@ -66,11 +63,12 @@ interface FormState {
   visibleToClient: boolean
   isActive: boolean
   documentRequests: { name: string }[]
-  documentDeliveries: { name: string; requiresPayment?: boolean }[]
+  // obligationTypeId: the robot (document reader) fills this delivery when it reads that obligation
+  documentDeliveries: { name: string; requiresPayment?: boolean; obligationTypeId?: string }[]
 }
 
 const EMPTY_FORM: FormState = {
-  departmentId: '', obligationTypeId: '', title: '', description: '', periodicity: 'MONTHLY', priority: 'MEDIUM',
+  departmentId: '', title: '', description: '', periodicity: 'MONTHLY', priority: 'MEDIUM',
   dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE', dueMonthAnchor: 1, competenceMonthOffset: 1,
   targetOffsetDays: 0, targetBusinessDayRoll: 'NONE',
   generationMonthOffset: 1, generationDayOfPeriod: 20,
@@ -164,16 +162,18 @@ function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange
   )
 }
 
-type DocumentListItem = { name: string; requiresPayment?: boolean }
+type DocumentListItem = { name: string; requiresPayment?: boolean; obligationTypeId?: string }
 
 // Delivery rows get the "guia" marker (tracked as paid/unpaid in the client portal)
-function DocumentList({ title, icon, placeholder, items, onChange, withPaymentToggle = false }: {
+function DocumentList({ title, icon, placeholder, items, onChange, withPaymentToggle = false, robotOptions }: {
   title: string
   icon: ReactNode
   placeholder: string
   items: DocumentListItem[]
   onChange: (items: DocumentListItem[]) => void
   withPaymentToggle?: boolean
+  // Delivery rows: which obligation the robot recognizes for this document (none = manual only)
+  robotOptions?: ObligationType[]
 }) {
   const [draft, setDraft] = useState('')
   const add = () => { if (draft.trim()) { onChange([...items, { name: draft.trim() }]); setDraft('') } }
@@ -198,6 +198,21 @@ function DocumentList({ title, icon, placeholder, items, onChange, withPaymentTo
             <li key={i} className="flex items-center gap-2 rounded-md bg-surface px-2 py-1.5 text-sm">
               <FileText size={13} className="flex-shrink-0 text-muted-foreground" />
               <span className="flex-1 truncate text-foreground">{item.name}</span>
+              {robotOptions && (
+                <select
+                  aria-label={`Robô de ${item.name}`}
+                  title="Robô de leitura: quando ler este tipo de documento, sugere esta entrega"
+                  value={item.obligationTypeId ?? ''}
+                  onChange={(e) => onChange(items.map((it, idx) => (idx === i ? { ...it, obligationTypeId: e.target.value || undefined } : it)))}
+                  className={cn(
+                    'h-6 max-w-[7.5rem] rounded-full border px-1.5 text-[11px] font-medium bg-surface',
+                    item.obligationTypeId ? 'border-info-text/40 text-info-text' : 'border-border text-muted-foreground',
+                  )}
+                >
+                  <option value="">🤖 sem robô</option>
+                  {robotOptions.map((o) => <option key={o.id} value={o.id}>🤖 {o.name}</option>)}
+                </select>
+              )}
               {withPaymentToggle && (
                 <button
                   type="button"
@@ -250,7 +265,7 @@ export default function RecurringTemplateForm() {
   useEffect(() => {
     if (!template) return
     setForm({
-      departmentId: template.departmentId, obligationTypeId: template.obligationTypeId ?? '',
+      departmentId: template.departmentId,
       title: template.title, description: template.description ?? '',
       periodicity: template.periodicity, priority: template.priority, dueDayOfPeriod: template.dueDayOfPeriod,
       dueBusinessDayRoll: template.dueBusinessDayRoll, dueMonthAnchor: template.dueMonthAnchor, competenceMonthOffset: template.competenceMonthOffset, targetOffsetDays: template.targetOffsetDays,
@@ -259,14 +274,13 @@ export default function RecurringTemplateForm() {
       notifyViaWhatsapp: template.notifyViaWhatsapp, notifyViaEmail: template.notifyViaEmail, visibleToClient: template.visibleToClient,
       isActive: template.isActive,
       documentRequests: template.documentRequests.map((d) => ({ name: d.name })),
-      documentDeliveries: template.documentDeliveries.map((d) => ({ name: d.name, requiresPayment: d.requiresPayment })),
+      documentDeliveries: template.documentDeliveries.map((d) => ({ name: d.name, requiresPayment: d.requiresPayment, obligationTypeId: d.obligationTypeId ?? undefined })),
     })
   }, [template])
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      // obligationTypeId is cuid().nullable() in the API: an empty string is not a valid cuid
-      const payload = { ...form, obligationTypeId: form.obligationTypeId || null }
+      const payload = form
       return isEditing
         ? api.patch(`/recurring-templates/${id}`, payload).then((r) => r.data)
         : api.post('/recurring-templates', payload).then((r) => r.data)
@@ -287,6 +301,7 @@ export default function RecurringTemplateForm() {
   const occurrences = nextOccurrences(form, new Date(), 3)
   const sentence = describeRule(form)
   const departmentName = departments.find((d) => d.id === form.departmentId)?.name
+  const robotCount = form.documentDeliveries.filter((d) => d.obligationTypeId).length
   const canSave = !!form.title.trim() && !!form.departmentId && !saveMutation.isPending
 
   if (isEditing && isLoading) return <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
@@ -340,19 +355,6 @@ export default function RecurringTemplateForm() {
                 />
               )}
             </Field>
-            <details className="group rounded-md border border-border px-3 py-2">
-              <summary className="cursor-pointer text-sm text-muted-foreground group-open:text-foreground">Avançado: obrigação do robô de leitura</summary>
-              <div className="pt-3">
-                <Field label="Obrigação" hint="Só preencha se o robô de leitura de documentos lê essa obrigação (DAS, PGDAS-D, IRPJ...): ele sugere o anexo na tarefa certa.">
-                  {(fid) => (
-                    <select id={fid} value={form.obligationTypeId} onChange={(e) => set('obligationTypeId', e.target.value)} className={fieldCls}>
-                      <option value="">Nenhuma — tarefa interna comum</option>
-                      {obrigacoes.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-                    </select>
-                  )}
-                </Field>
-              </div>
-            </details>
           </Section>
 
           <Section step={2} icon={<CalendarClock size={14} />} title="Calendário" hint="Quando vence, a que mês se refere e quando a tarefa aparece para a equipe.">
@@ -471,6 +473,7 @@ export default function RecurringTemplateForm() {
                 items={form.documentDeliveries}
                 onChange={(items) => set('documentDeliveries', items)}
                 withPaymentToggle
+                robotOptions={obrigacoes}
               />
             </div>
           </Section>
@@ -512,6 +515,7 @@ export default function RecurringTemplateForm() {
             <div className="flex flex-wrap gap-1.5 text-[11px]">
               <span className="rounded-full bg-info-bg px-2 py-0.5 text-info-text">{form.documentRequests.length} a cobrar</span>
               <span className="rounded-full bg-success-bg px-2 py-0.5 text-success-text">{form.documentDeliveries.length} a entregar</span>
+              {robotCount > 0 && <span className="rounded-full bg-info-bg px-2 py-0.5 text-info-text">{robotCount} com robô</span>}
               {form.visibleToClient && <span className="rounded-full bg-neutral-bg px-2 py-0.5 text-muted-foreground">cliente vê</span>}
               {form.autoCompleteOnAllActivitiesDone && <span className="rounded-full bg-neutral-bg px-2 py-0.5 text-muted-foreground">conclui sozinha</span>}
               {!form.isActive && <span className="rounded-full bg-warning-bg px-2 py-0.5 text-warning-text">inativo</span>}
