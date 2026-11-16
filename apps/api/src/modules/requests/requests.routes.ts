@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
-import { consumeStreamTicket } from '@/modules/stream/stream-ticket'
+import { consumeStreamTicket, streamRecheck } from '@/modules/stream/stream-ticket'
 import { attachSSESubscriber } from '@/lib/sse'
 import { AppError } from '@/errors/AppError'
 import {
@@ -34,7 +34,7 @@ export async function requestsRoutes(app: FastifyInstance) {
       throw new AppError(403, 'Acesso negado')
     }
 
-    attachSSESubscriber(request, reply, `org:${user.organizationId}:requests`)
+    attachSSESubscriber(request, reply, `org:${user.organizationId}:requests`, streamRecheck(user))
   })
 
   app.register(async (authed) => {

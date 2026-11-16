@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
-import { consumeStreamTicket, issueStreamTicket } from './stream-ticket'
+import { consumeStreamTicket, issueStreamTicket, streamRecheck } from './stream-ticket'
 import { prisma } from '@/lib/prisma'
 import { attachSSESubscriber, inboxChannel } from '@/lib/sse'
 import { AppError } from '@/errors/AppError'
@@ -20,7 +20,7 @@ export async function streamRoutes(app: FastifyInstance) {
     if (!user.organizationId) throw new AppError(403, 'Acesso negado') // MASTER has no inbox
     const staff = user.role === 'ORG_ADMIN' || user.role === 'ORG_MANAGER' || user.role === 'ORG_MEMBER'
     if (!staff && user.role !== 'CLIENT') throw new AppError(403, 'Acesso negado')
-    attachSSESubscriber(request, reply, inboxChannel({ kind: staff ? 'user' : 'clientUser', id: user.sub }))
+    attachSSESubscriber(request, reply, inboxChannel({ kind: staff ? 'user' : 'clientUser', id: user.sub }), streamRecheck(user))
   })
 
   app.get('/boards/:id/stream', async (request, reply) => {
@@ -47,12 +47,15 @@ export async function streamRoutes(app: FastifyInstance) {
     // filtering is intentionally not applied here: the events pushed on this stream are already
     // coarse (task id/title/column), matching the concern being board-level access, not
     // per-event department leakage.
-    if (user.role === 'CLIENT') {
-      const scope = await getClientAccessScope(user.sub)
-      if (!scope.clientIds.includes(board.clientId)) throw new AppError(404, 'Board não encontrado')
-    }
+    const clientCheck = user.role === 'CLIENT'
+      ? async () => {
+        const scope = await getClientAccessScope(user.sub)
+        if (!scope.clientIds.includes(board.clientId)) throw new AppError(404, 'Board não encontrado')
+      }
+      : null
+    if (clientCheck) await clientCheck()
 
     // Scope can shrink while the panel is open ("ver colegas" turned off, portfolio moved)
-    attachSSESubscriber(request, reply, `board:${id}`, staffCheck ? { recheck: () => staffCheck().then(() => true, () => false) } : {})
+    attachSSESubscriber(request, reply, `board:${id}`, streamRecheck(user, staffCheck ?? clientCheck ?? undefined))
   })
 }

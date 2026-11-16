@@ -3,7 +3,7 @@ import { app } from '@/test/setup'
 import { prisma } from '@/lib/prisma'
 import * as queue from '@/lib/queue'
 import * as coverage from '@/modules/clients/client-coverage'
-import { ensureServiceSystemBoard } from '@/modules/tasks/tasks.service'
+import { ensureServiceSystemBoard, ensureRecurringSystemBoard } from '@/modules/tasks/tasks.service'
 import { createTestPlan, createTestOrg, createTestUser, createTestClient, createTestDepartment, serveClientDepartment, getAuthHeader } from '@/test/helpers'
 
 beforeEach(() => {
@@ -126,6 +126,25 @@ describe('board de serviços do cliente é único', () => {
     expect(new Set(boards.map((b) => b.id)).size).toBe(1)
     expect(await prisma.board.count({ where: { clientId: c.client.id, type: 'SERVICE_SYSTEM' } })).toBe(1)
     expect(boards[0].columns).toHaveLength(4)
+  })
+})
+
+describe('board de recorrentes do cliente é único', () => {
+  it('concurrent first generations share one recurring board', async () => {
+    const c = await setup()
+    const boards = await Promise.all([1, 2, 3].map(() => ensureRecurringSystemBoard(c.client.id, c.org.id)))
+    expect(new Set(boards.map((b) => b.id)).size).toBe(1)
+    expect(await prisma.board.count({ where: { clientId: c.client.id, type: 'RECURRING_SYSTEM' } })).toBe(1)
+    expect(boards[0].columns).toHaveLength(1)
+  })
+
+  it('a recurring board left without columns gets its column back instead of a second board', async () => {
+    const c = await setup()
+    const bare = await prisma.board.create({ data: { title: 'Rec', organizationId: c.org.id, clientId: c.client.id, type: 'RECURRING_SYSTEM' } })
+    const board = await ensureRecurringSystemBoard(c.client.id, c.org.id)
+    expect(board.id).toBe(bare.id)
+    expect(board.columns).toHaveLength(1)
+    expect(await prisma.board.count({ where: { clientId: c.client.id, type: 'RECURRING_SYSTEM' } })).toBe(1)
   })
 })
 

@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { redis } from '@/lib/redis'
+import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import type { JwtPayload } from '@/lib/jwt'
 
@@ -23,4 +24,25 @@ export async function consumeStreamTicket(ticket: string | undefined): Promise<S
   const stored = await redis.getdel(key(ticket))
   if (!stored) throw new AppError(401, 'Ticket inválido ou expirado')
   return JSON.parse(stored) as StreamUser
+}
+
+// The person behind an open stream is still allowed in (deactivated → stream closes on the next check)
+export async function stillActive(user: StreamUser): Promise<boolean> {
+  if (user.role === 'CLIENT') {
+    return (await prisma.clientUser.count({ where: { id: user.sub, isActive: true } })) > 0
+  }
+  return (await prisma.user.count({ where: { id: user.sub, isActive: true } })) > 0
+}
+
+// Re-check for attachSSESubscriber: active, plus whatever access the route checked at connection
+export function streamRecheck(user: StreamUser, access?: () => Promise<unknown>): { recheck: () => Promise<boolean> } {
+  return {
+    recheck: async () => {
+      if (!(await stillActive(user))) return false
+      if (access) {
+        try { await access() } catch { return false }
+      }
+      return true
+    },
+  }
 }

@@ -271,12 +271,31 @@ export async function moveTask(
 // task.column.board.clientId. Criar essa cadeia uma vez por cliente é mais barato do que refatorar
 // essa cadeia inteira pra aceitar Task sem coluna.
 export async function ensureRecurringSystemBoard(clientId: string, organizationId: string) {
-  const existing = await prisma.board.findFirst({
+  const find = () => prisma.board.findFirst({
     where: { clientId, organizationId, type: 'RECURRING_SYSTEM' },
     include: { columns: true },
   })
-  if (existing && existing.columns[0]) return existing
+  const existing = await find()
+  if (existing) return existing.columns[0] ? existing : addRecurringColumn(existing.id)
+  try {
+    return await createRecurringSystemBoard(clientId, organizationId)
+  } catch (err) {
+    // Another generation created it first (unique per client, partial index) — use that one
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      const winner = await find()
+      if (winner) return winner.columns[0] ? winner : addRecurringColumn(winner.id)
+    }
+    throw err
+  }
+}
 
+// A recurring board without its column (should not happen) gets it back; a second board is never made
+async function addRecurringColumn(boardId: string) {
+  await prisma.column.create({ data: { boardId, title: 'Recorrentes', position: 0, statusEffect: 'NONE' } })
+  return prisma.board.findUniqueOrThrow({ where: { id: boardId }, include: { columns: true } })
+}
+
+function createRecurringSystemBoard(clientId: string, organizationId: string) {
   return prisma.board.create({
     data: {
       title: 'Tarefas Recorrentes (sistema)',

@@ -650,10 +650,9 @@ Todos os itens resolvidos na branch `feat/os-processos` (testes em `os-followups
    de OS e processos abertos cuja janela cobre a data; (e) abrir processo revalida `usableInProcess`;
    (f) `TASK_CREATED` da OS que aguarda outra sai na liberação.
 
-Pendente relacionado: o board `RECURRING_SYSTEM` tem a mesma corrida de criação do (c); não recebeu o
-índice porque o banco online pode já ter duplicados — conferir com
-`SELECT "clientId", count(*) FROM boards WHERE type = 'RECURRING_SYSTEM' GROUP BY 1 HAVING count(*) > 1`
-antes de criar o índice equivalente. Feriado novo não recalcula vencimentos/metas de tarefas
+Board `RECURRING_SYSTEM` também ficou único por cliente (migration 20261116120000,
+`boards_client_recurring_system_key`; banco online conferido sem duplicados em 2026-11-16). Um board
+de recorrentes sem coluna recebe a coluna de volta em vez de ganhar um segundo board. Feriado novo não recalcula vencimentos/metas de tarefas
 recorrentes já geradas (só OS e processos).
 
 Achados da revisão destas correções — ✅ resolvidos em 2026-11-16:
@@ -666,5 +665,5 @@ Achados da revisão destas correções — ✅ resolvidos em 2026-11-16:
   (sem ficar liberada e sem meta), e o gerente pode liberá-la pelo drawer.
 - Entrega do robô recusa (409) entrega pendente que já tem documento com o cliente: substituir é
   ação da pessoa, pelo drawer.
-- SSE: a reconferência não se sobrepõe. Pendente: um usuário desativado só perde o stream no limite
-  de 15 min (a reconferência periódica cobre só ORG_MEMBER/ORG_MANAGER).
+- SSE: a reconferência não se sobrepõe e vale para todos os streams (sino, solicitações, processo) e
+  perfis: usuário ou usuário do portal desativado perde o stream em até 1 min (`streamRecheck`).

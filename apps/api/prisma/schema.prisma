@@ -305,8 +305,9 @@ model Board {
 
   @@index([processTemplateId])
   @@index([delayReasonId])
-  // Partial unique index outside the schema (migration 20261116110000): one SERVICE_SYSTEM board per
-  // client — boards_client_service_system_key. Never accept a generated DROP of it.
+  // Partial unique indexes outside the schema: one SERVICE_SYSTEM board per client
+  // (boards_client_service_system_key, migration 20261116110000) and one RECURRING_SYSTEM board per
+  // client (boards_client_recurring_system_key, 20261116120000). Never accept a generated DROP of them.
   @@map("boards")
 }
 

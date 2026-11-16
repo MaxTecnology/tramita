@@ -15,6 +15,7 @@ import {
   getStreamTicket,
 } from '@/test/helpers'
 import { redis } from '@/lib/redis'
+import { prisma } from '@/lib/prisma'
 import { moveTask } from '@/modules/tasks/tasks.service'
 
 afterEach(() => {
@@ -171,5 +172,38 @@ describe('tempo real nas tarefas recorrentes', () => {
       new Promise<'open'>((resolve) => setTimeout(() => resolve('open'), 300)),
     ])
     expect(res).toBe('open')
+  })
+})
+
+describe('SSE — usuário desativado', () => {
+  it('stillActive follows the office user and the client user being active', async () => {
+    const { stillActive } = await import('./stream-ticket')
+    const org = await createTestOrg((await createTestPlan()).id)
+    const user = await createTestUser(org.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    expect(await stillActive({ sub: user.id, role: 'ORG_MEMBER', organizationId: org.id })).toBe(true)
+    expect(await stillActive({ sub: clientUser.id, role: 'CLIENT', organizationId: org.id })).toBe(true)
+    await prisma.user.update({ where: { id: user.id }, data: { isActive: false } })
+    await prisma.clientUser.update({ where: { id: clientUser.id }, data: { isActive: false } })
+    expect(await stillActive({ sub: user.id, role: 'ORG_MEMBER', organizationId: org.id })).toBe(false)
+    expect(await stillActive({ sub: clientUser.id, role: 'CLIENT', organizationId: org.id })).toBe(false)
+  })
+
+  it('every stream re-checks the person, not only members and managers', async () => {
+    const sse = await import('@/lib/sse')
+    const spy = vi.spyOn(sse, 'attachSSESubscriber').mockImplementation((_req, reply) => { void reply.code(204).send() })
+    const org = await createTestOrg((await createTestPlan()).id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const auth = await getAuthHeader(admin.email, 'Test@1234')
+    for (const url of ['/notifications/stream', '/requests/stream', `/boards/${board.id}/stream`]) {
+      const ticket = await getStreamTicket(auth)
+      await app.inject({ method: 'GET', url: `${url}?ticket=${ticket}` })
+    }
+    expect(spy).toHaveBeenCalledTimes(3)
+    for (const call of spy.mock.calls) expect(typeof call[3]?.recheck).toBe('function')
+    await prisma.user.update({ where: { id: admin.id }, data: { isActive: false } })
+    for (const call of spy.mock.calls) expect(await call[3]!.recheck!()).toBe(false)
   })
 })
