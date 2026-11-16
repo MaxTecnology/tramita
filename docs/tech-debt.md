@@ -633,3 +633,9 @@ Fora do escopo (não é débito, é decisão): aprovação em processo (OS) até
    PROCESS); com OS avulsas o nome confunde.
 5. **Concluir pelo drawer não move o cartão** para a coluna de conclusão do processo (comportamento
    anterior, ficou mais visível com OS de processo).
+6. **Menores da revisão final (adiados):** (a) `PATCH /tasks|/boards/:id/delay-reason` só confere a
+   organização (membro grava motivo fora da carteira); (b) corrida em `addOSToProcess` — dependência
+   concluída entre a leitura e a gravação deixa a OS nova sem liberar; (c) `ensureServiceSystemBoard`
+   sem unique — duas primeiras OS simultâneas do mesmo cliente criam dois boards de serviços; (d)
+   feriado cadastrado depois não recalcula metas já gravadas; (e) `openProcess` não revalida
+   `usableInProcess` dos itens ao abrir; (f) `TASK_CREATED` avisa o cliente de OS ainda não liberada.

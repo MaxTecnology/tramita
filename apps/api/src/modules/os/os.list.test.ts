@@ -35,7 +35,7 @@ describe('lista de Ordens de Serviço', () => {
     const late = await c.open(c.model.id)
     await prisma.task.update({ where: { id: late.id }, data: { releasedAt: new Date('2026-01-02T12:00:00Z'), targetDate: new Date('2026-01-07T00:00:00Z') } })
     const done = await c.open(c.model.id)
-    await prisma.task.update({ where: { id: done.id }, data: { status: 'DONE' } })
+    await prisma.task.update({ where: { id: done.id }, data: { status: 'DONE', completedAt: new Date() } })
     const all = await list(c.auth)
     expect(all[0].id).toBe(late.id)
     expect(all.find((o) => o.id === late.id)?.deadline.state).toBe('LATE')
@@ -114,5 +114,18 @@ describe('board do processo traz o prazo e a espera de cada OS', () => {
     const tasks = one.columns[0].tasks as { title: string; osModel: { name: string }; waitingFor: string[]; deadline: { state: string } }[]
     const junta = tasks.find((x) => x.title === 'Junta')!
     expect([junta.osModel.name, junta.waitingFor, junta.deadline.state]).toEqual(['Junta', ['Recálculo'], 'WAITING_DEPENDENCY'])
+  })
+})
+
+describe('lista de OS não perde as abertas', () => {
+  it('open OS always come; old finished ones only in "Concluídas", newest first', async () => {
+    const c = await setup()
+    const old = await c.open(c.model.id)
+    const recent = await c.open(c.model.id)
+    const openOne = await c.open(c.model.id)
+    await prisma.task.update({ where: { id: old.id }, data: { status: 'DONE', completedAt: new Date(Date.now() - 60 * 86_400_000) } })
+    await prisma.task.update({ where: { id: recent.id }, data: { status: 'DONE', completedAt: new Date(Date.now() - 2 * 86_400_000) } })
+    expect((await list(c.auth)).map((o) => o.id).sort()).toEqual([recent.id, openOne.id].sort())
+    expect((await list(c.auth, '?situation=DONE')).map((o) => o.id)).toEqual([recent.id, old.id])
   })
 })

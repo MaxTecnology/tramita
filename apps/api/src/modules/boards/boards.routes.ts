@@ -10,16 +10,26 @@ import { listBoards, getBoardById, updateBoard, searchTasks } from './boards.ser
 import { openProcess } from '@/modules/os/os.service'
 import { getClientAccessScope, canSeeTask, type ClientAccessScope } from '@/modules/client-users/client-access'
 
+// Office-only data never reaches the portal: delay reasons, the internal clock (business days,
+// office x client time) and the OS a task waits for (they may be internal tasks)
+const INTERNAL_KEYS = ['delayReasonId', 'delayNote', 'delayReasonPending', 'deadlineBusinessDays', 'deadline', 'waitingFor', 'targetDate'] as const
+
+function withoutInternal<T extends Record<string, unknown>>(row: T): Omit<T, (typeof INTERNAL_KEYS)[number]> {
+  const copy: Record<string, unknown> = { ...row }
+  for (const key of INTERNAL_KEYS) delete copy[key]
+  return copy as Omit<T, (typeof INTERNAL_KEYS)[number]>
+}
+
 function filterBoardTasksForClient<
-  T extends { clientId: string; columns: { tasks: { departmentId: string; visibleToClient: boolean }[] }[] },
->(board: T, scope: ClientAccessScope): T {
+  T extends Record<string, unknown> & { clientId: string; columns: { tasks: (Record<string, unknown> & { departmentId: string; visibleToClient: boolean })[] }[] },
+>(board: T, scope: ClientAccessScope) {
   return {
-    ...board,
+    ...withoutInternal(board),
     columns: board.columns.map((column) => ({
       ...column,
-      tasks: column.tasks.filter(
-        (task) => task.visibleToClient && canSeeTask(scope, board.clientId, task.departmentId),
-      ),
+      tasks: column.tasks
+        .filter((task) => task.visibleToClient && canSeeTask(scope, board.clientId, task.departmentId))
+        .map((task) => withoutInternal(task)),
     })),
   }
 }

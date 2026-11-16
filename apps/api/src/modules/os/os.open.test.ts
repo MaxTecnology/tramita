@@ -205,3 +205,15 @@ describe('fila do robô com OS', () => {
     expect(item.suggestion).toMatchObject({ osModelName: 'Recálculo DAS', processTitle: null })
   })
 })
+
+describe('abrir processo é tudo ou nada', () => {
+  it('an OS whose department does not serve the client refuses the process and leaves no board behind', async () => {
+    const c = await setup()
+    const other = await prisma.department.create({ data: { organizationId: c.org.id, name: 'Societário' } })
+    const foreign = await prisma.oSModel.create({ data: { organizationId: c.org.id, departmentId: other.id, name: 'Alteração contratual', usableInProcess: true } })
+    const t = JSON.parse((await app.inject({ method: 'POST', url: '/process-templates', headers: { authorization: c.admin }, payload: { name: 'P', columns: [{ title: 'A', statusEffect: 'OPEN', documents: [] }], items: [{ osModelId: c.inscricao.id, columnIndex: 0, dependsOn: [] }, { osModelId: foreign.id, columnIndex: 0, dependsOn: [] }] } })).body)
+    const res = await app.inject({ method: 'POST', url: '/boards', headers: { authorization: c.admin }, payload: { title: 'P', clientId: c.client.id, processTemplateId: t.id } })
+    expect(res.statusCode).toBeGreaterThanOrEqual(400)
+    expect(await prisma.board.count({ where: { clientId: c.client.id, type: 'PROCESS' } })).toBe(0)
+  })
+})

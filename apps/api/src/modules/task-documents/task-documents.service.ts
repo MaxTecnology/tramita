@@ -398,6 +398,12 @@ export async function recalculateTaskStatus(taskId: string) {
     },
   })
 
+  // An OS waiting for another one keeps its status until released (never blocked nor completed here)
+  if (task.osModelId && !task.releasedAt) {
+    await syncPause(taskId)
+    return
+  }
+
   const hasPendingOrRejected = task.documentRequirements.some((d) => d.status === 'PENDING' || d.status === 'REJECTED')
   // "Nada a enviar" counts as resolved, like an approval
   const allRequirementsApproved = task.documentRequirements.every((d) => d.status === 'APPROVED' || d.status === 'NOT_APPLICABLE')

@@ -177,9 +177,13 @@ describe('approveRequest', () => {
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id, { name: 'Empresa X', codigo: 'CLI-001' })
+    // A process the client can ask for brings the department that evaluates it
+    const department = await createTestDepartment(org.id)
     const template = await createProcessTemplate(org.id, {
       name: 'Abertura de Empresa',
       isActive: true,
+      departmentId: department.id,
+      clientCanRequest: true,
       columns: [
         { title: 'Documentação', statusEffect: 'NONE', notifyClient: false, documents: [{ name: 'RG' }] },
         { title: 'Concluído', statusEffect: 'DONE', notifyClient: true, documents: [] },
@@ -188,6 +192,7 @@ describe('approveRequest', () => {
     const request = await createTestRequest(org.id, client.id, {
       title: 'Abertura de LTDA',
       processTemplateId: template.id,
+      departmentId: department.id,
     })
 
     const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })

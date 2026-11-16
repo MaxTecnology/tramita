@@ -11,6 +11,7 @@ import type { CreateBoardBody } from '@/modules/boards/boards.schema'
 import { ensureServiceSystemBoard } from '@/modules/tasks/tasks.service'
 import { scheduleDeadline, scheduleBoardDeadline } from './os-deadline.service'
 import { competenceToDate, type OpenOSBody, type AddOSToProcessBody } from './os.schema'
+import { startOfMonthInBRT } from '@/lib/date-only'
 
 export interface OSActor { id: string; role: string }
 
@@ -69,10 +70,11 @@ async function insertOSTask(tx: Prisma.TransactionClient, os: NewOS, actorName: 
   const position = await tx.task.count({ where: { columnId: os.columnId } })
   const task = await tx.task.create({
     data: {
-      title: osTitle(os.model, os.competence),
+      title: osTitle(os.model, os.model.requiresCompetence ? os.competence : null),
       description: os.model.description,
       priority: os.model.priority,
-      status: os.model.documentRequests.length > 0 ? 'BLOCKED' : 'OPEN',
+      // Waiting for another OS: open until released (then documents may block it)
+      status: os.released && os.model.documentRequests.length > 0 ? 'BLOCKED' : 'OPEN',
       columnId: os.columnId,
       departmentId: os.model.departmentId,
       assigneeId: os.assigneeId ?? responsibleId,
@@ -127,7 +129,9 @@ export async function openOS(organizationId: string, actor: OSActor, body: OpenO
     await lockClients(tx, [body.clientId])
     return insertOSTask(tx, {
       organizationId, clientId: body.clientId, boardId: board.id, columnId, model,
-      competence: body.competence ? competenceToDate(body.competence) : null,
+      // Without a competence of its own, the opening month is the reference (the portal groups the
+      // client's documents by month in "Enviar documentos")
+      competence: body.competence ? competenceToDate(body.competence) : startOfMonthInBRT(new Date()),
       assigneeId: body.assigneeId, dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
       released: true, sourceRequestId: opts.sourceRequestId, actorId: actor.id,
     }, name)
@@ -185,7 +189,28 @@ export async function openProcess(organizationId: string, actor: OSActor, body: 
   const competence = body.competence ? competenceToDate(body.competence) : null
   if (!competence && template.items.some((it) => it.osModel.requiresCompetence)) throw new AppError(422, 'Informe a competência')
 
+  // Every OS department must serve the client before anything is created (fails fast, no empty board)
+  for (const departmentId of new Set(template.items.map((it) => it.osModel.departmentId))) {
+    await assertDepartmentServesClient(prisma, body.clientId, departmentId)
+  }
+
   const board = await createBoard(organizationId, actor.id, actor.role, body)
+  try {
+    await createProcessOS(board)
+  } catch (err) {
+    // Refused by a business rule (e.g. coverage changed meanwhile, checked again under the client
+    // lock): the OS transaction rolled back, so the board goes too. Other failures keep what exists.
+    if (err instanceof AppError) await prisma.board.delete({ where: { id: board.id } })
+    throw err
+  }
+  await scheduleBoardDeadline(board.id)
+  return prisma.board.findUniqueOrThrow({
+    where: { id: board.id },
+    include: { client: { select: { id: true, name: true, codigo: true } }, columns: { orderBy: { position: 'asc' } } },
+  })
+
+  async function createProcessOS(board: Awaited<ReturnType<typeof createBoard>>) {
+  if (!template) return
   await prisma.board.update({ where: { id: board.id }, data: { deadlineBusinessDays: template.deadlineBusinessDays, competence } })
   if (template.items.length > 0) {
     const columnsByPosition = new Map(board.columns.map((c) => [c.position, c.id]))
@@ -208,9 +233,5 @@ export async function openProcess(organizationId: string, actor: OSActor, body: 
     })
     for (const t of created) await afterOSCreated(t.id, organizationId, board.clientId, board.id, t.columnId, t.title, { id: actor.id, name })
   }
-  await scheduleBoardDeadline(board.id)
-  return prisma.board.findUniqueOrThrow({
-    where: { id: board.id },
-    include: { client: { select: { id: true, name: true, codigo: true } }, columns: { orderBy: { position: 'asc' } } },
-  })
+  }
 }

@@ -134,7 +134,8 @@ function monthTasksWhere(
     visibleToClient: true,
     departmentId: { in: departmentIds },
     competence,
-    column: { board: { organizationId, clientId, isActive: true, type: 'RECURRING_SYSTEM' } },
+    // Recurring tasks and standalone OS live in system boards: their documents are asked here by month
+    column: { board: { organizationId, clientId, isActive: true, type: { in: ['RECURRING_SYSTEM', 'SERVICE_SYSTEM'] } } },
     OR: [{ documentRequirements: { some: {} } }, { comments: { some: { deletedAt: null } } }, { approvals: { some: {} } }],
   }
 }

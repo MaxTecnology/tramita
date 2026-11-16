@@ -12,7 +12,7 @@ import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, Li
 import { assertDepartmentServesClient, lockClients } from '@/modules/clients/client-coverage'
 import { syncProtocolsForTask } from '@/modules/protocols/protocol-from-deliverable'
 import { actorScope, taskWhere, mineTaskWhere, actableTaskIds } from '@/modules/staff-scope/staff-scope'
-import { assertReleased, afterStatusChange, deadlineInfo } from '@/modules/os/os-deadline.service'
+import { assertReleased, afterStatusChange, deadlineInfo, releaseIfFree, syncProcessCompletion } from '@/modules/os/os-deadline.service'
 import { warnDaysFor } from '@/modules/os/os-list.service'
 import { loadHolidaySet } from '@/modules/holidays/holidays.service'
 import type { HolidaySet } from '@/lib/business-days'
@@ -492,7 +492,14 @@ export async function deleteTask(id: string, organizationId: string) {
   if (protocolCount > 0) {
     throw new AppError(409, 'Essa tarefa tem protocolos — eles são evidência legal e não podem ser apagados junto com a tarefa')
   }
+  // OS of a process that waited only for this one are released; the process may now be complete
+  const [dependents, task] = await Promise.all([
+    prisma.taskDependency.findMany({ where: { dependsOnTaskId: id }, select: { taskId: true } }),
+    prisma.task.findUniqueOrThrow({ where: { id }, select: { column: { select: { board: { select: { id: true, type: true } } } } } }),
+  ])
   await prisma.task.delete({ where: { id } })
+  for (const d of dependents) await releaseIfFree(d.taskId, null)
+  if (task.column.board.type === 'PROCESS') await syncProcessCompletion(task.column.board.id)
   return { ok: true }
 }
 

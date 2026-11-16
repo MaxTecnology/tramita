@@ -3,7 +3,7 @@ import { AppError } from '@/errors/AppError'
 import { businessDaysBetween } from '@/lib/business-days'
 import { loadHolidaySet } from '@/modules/holidays/holidays.service'
 import { loadStaffScope, boardWhere, taskWhere } from '@/modules/staff-scope/staff-scope'
-import { deadlineInfo } from './os-deadline.service'
+import { deadlineInfo, brtDay } from './os-deadline.service'
 import { warnDaysFor } from './os-list.service'
 
 const FINISHED: readonly string[] = ['DONE', 'DISREGARDED']
@@ -43,7 +43,7 @@ export async function getStageTimes(boardId: string, organizationId: string, use
     let column = t.history[0]?.fromValue ?? t.column.title
     let start = t.createdAt
     const spent = new Map<string, number>()
-    const add = (title: string, from: Date, to: Date) => spent.set(title, (spent.get(title) ?? 0) + businessDaysBetween(from, to < end ? to : end, holidays))
+    const add = (title: string, from: Date, to: Date) => spent.set(title, (spent.get(title) ?? 0) + businessDaysBetween(brtDay(from), brtDay(to < end ? to : end), holidays))
     for (const move of t.history) {
       if (column) add(column, start, move.createdAt)
       column = move.toValue ?? column
@@ -117,8 +117,8 @@ export async function getOSDashboard(organizationId: string, user: { id: string;
   }
   for (const b of boards) {
     countReason(b.delayReason)
-    const client = b.pauses.reduce((sum, p) => sum + businessDaysBetween(p.startedAt, p.endedAt ?? b.completedAt!, holidays), 0)
-    const total = businessDaysBetween(b.createdAt, b.completedAt!, holidays)
+    const client = b.pauses.reduce((sum, p) => sum + businessDaysBetween(brtDay(p.startedAt), brtDay(p.endedAt ?? b.completedAt!), holidays), 0)
+    const total = businessDaysBetween(brtDay(b.createdAt), brtDay(b.completedAt!), holidays)
     const key = `PROCESS:${b.processTemplate!.id}`
     const m = models.get(key) ?? { kind: 'PROCESS' as const, id: b.processTemplate!.id, name: b.processTemplate!.name, office: [], client: [], late: 0 }
     m.office.push(Math.max(0, total - client))

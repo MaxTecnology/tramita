@@ -7,6 +7,7 @@ import { onRequestCreated, onRequestStatus, staffActor, clientActor } from '@/mo
 import { publishOrgEvent, publishBoardEvent } from '@/lib/sse'
 import { createBoard } from '@/modules/boards/boards.service'
 import { openOS, openProcess, addOSToProcess } from '@/modules/os/os.service'
+import { afterStatusChange } from '@/modules/os/os-deadline.service'
 import { createTask } from '@/modules/tasks/tasks.service'
 import { assertDepartmentServesClient } from '@/modules/clients/client-coverage'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
@@ -32,10 +33,14 @@ async function resolveRequestDepartment(organizationId: string, data: Omit<Creat
     return model.departmentId
   }
   if (data.processTemplateId) {
-    const template = await prisma.processTemplate.findFirst({ where: { id: data.processTemplateId, organizationId } })
-    if (!template || !template.isActive) throw new AppError(422, 'Serviço indisponível')
-    // Requestable processes carry their department; legacy templates keep the department chosen
-    if (template.clientCanRequest && template.departmentId) return template.departmentId
+    const template = await prisma.processTemplate.findFirst({
+      where: { id: data.processTemplateId, organizationId },
+      include: { items: { select: { osModel: { select: { requiresCompetence: true } } } } },
+    })
+    // Only processes the office lets the client ask for (they carry the department that evaluates)
+    if (!template || !template.isActive || !template.clientCanRequest || !template.departmentId) throw new AppError(422, 'Serviço indisponível')
+    if (template.items.some((i) => i.osModel.requiresCompetence) && !data.competence) throw new AppError(422, 'Informe a competência')
+    return template.departmentId
   }
   if (!data.departmentId) throw new AppError(400, 'Selecione o departamento')
   return data.departmentId
@@ -255,6 +260,8 @@ export async function cancelApprovedRequest(
       },
     }),
   ])
+  // An OS disregarded this way releases the OS waiting for it and updates its process
+  await afterStatusChange(request.taskId, task.status, 'DISREGARDED', { id: staffId, name: staffUser?.name ?? 'Escritório' })
 
   // Board com essa tarefa pode estar aberto em outra aba — sem isso, quem está olhando o board
   // só veria a tarefa sair do status ao recarregar a página.

@@ -152,3 +152,66 @@ describe('uma OS libera a próxima', () => {
     expect((await prisma.board.findUniqueOrThrow({ where: { id: board.id } })).completedAt).toBeNull()
   })
 })
+
+describe('revisão final', () => {
+  it('finishing an OS that was waiting for the client counts the last pause (no false delay)', async () => {
+    const c = await setup()
+    const os = JSON.parse((await app.inject({ method: 'POST', url: '/os', headers: { authorization: c.auth }, payload: { osModelId: c.model.id, clientId: c.client.id } })).body)
+    // released long ago, deadline 3 days, but waiting for the client since then: not late
+    const released = new Date(Date.now() - 30 * 86_400_000)
+    await prisma.task.update({ where: { id: os.id }, data: { releasedAt: released, targetDate: new Date(released.getTime() + 5 * 86_400_000) } })
+    await prisma.taskPause.create({ data: { taskId: os.id, startedAt: new Date(released.getTime() + 3600_000) } })
+    const res = await app.inject({ method: 'PATCH', url: `/tasks/${os.id}`, headers: { authorization: c.auth }, payload: { status: 'DONE' } })
+    expect(res.statusCode).toBe(200)
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: os.id } })).delayReasonPending).toBe(false)
+  })
+})
+
+describe('OS aguardando outra não conclui sozinha', () => {
+  it('is born open, is never completed automatically and gets its real status when released', async () => {
+    const c = await setup()
+    await prisma.oSModel.update({ where: { id: c.model.id }, data: { autoCompleteOnAllDelivered: true, documentRequests: { create: [{ name: 'Contrato', position: 0 }] } } })
+    const { tasks: [a, b] } = await process(c, [{ dependsOn: [] }, { dependsOn: [0] }])
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: b.id } })).status).toBe('OPEN')
+    const { recalculateTaskStatus } = await import('@/modules/task-documents/task-documents.service')
+    await prisma.taskDocumentRequirement.updateMany({ where: { taskId: b.id }, data: { status: 'APPROVED' } })
+    await recalculateTaskStatus(b.id)
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: b.id } })).status).toBe('OPEN')
+    await prisma.taskDocumentRequirement.updateMany({ where: { taskId: b.id }, data: { status: 'PENDING' } })
+    await prisma.taskDocumentRequirement.updateMany({ where: { taskId: a.id }, data: { status: 'APPROVED' } })
+    await app.inject({ method: 'PATCH', url: `/tasks/${a.id}`, headers: { authorization: c.auth }, payload: { status: 'DONE' } })
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: b.id } })).status).toBe('BLOCKED')
+  })
+})
+
+describe('relógio no fuso de Brasília', () => {
+  it('the target day is not late in the evening, and a release at 22h counts that same day', async () => {
+    const base = { status: 'OPEN', osModelId: 'm', releasedAt: new Date('2026-11-16T12:00:00Z'), deadlineBusinessDays: 2, targetDate: new Date('2026-11-18T00:00:00Z'), pauses: [] }
+    // 18/11 22:00 in Brasília = 19/11 01:00 UTC: still the target day
+    expect(deadlineInfo(base, new Date('2026-11-19T01:00:00Z'), holidays, 0).state).not.toBe('LATE')
+    const c = await setup()
+    const os = JSON.parse((await app.inject({ method: 'POST', url: '/os', headers: { authorization: c.auth }, payload: { osModelId: c.model.id, clientId: c.client.id } })).body)
+    // released Thursday 12/11 at 22:00 in Brasília (13/11 01:00 UTC), 3 business days → Tuesday 17/11
+    await prisma.task.update({ where: { id: os.id }, data: { releasedAt: new Date('2026-11-13T01:00:00Z') } })
+    await scheduleDeadline(os.id)
+    expect(iso((await prisma.task.findUniqueOrThrow({ where: { id: os.id } })).targetDate)).toBe('2026-11-17')
+  })
+})
+
+describe('caminhos que tiram uma OS do processo liberam as que esperavam', () => {
+  it('cancelling the approved request of an OS disregards it and releases the waiting one', async () => {
+    const c = await setup()
+    const { tasks: [a, b] } = await process(c, [{ dependsOn: [] }, { dependsOn: [0] }])
+    const req = await prisma.request.create({ data: { organizationId: c.org.id, clientId: c.client.id, title: 'Pedido', departmentId: c.dept.id, status: 'APPROVED', taskId: a.id } })
+    const { cancelApprovedRequest } = await import('@/modules/requests/requests.service')
+    await cancelApprovedRequest(req.id, c.org.id, c.admin.id, 'Cliente desistiu')
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: b.id } })).releasedAt).not.toBeNull()
+  })
+
+  it('deleting the OS another one waits for releases it', async () => {
+    const c = await setup()
+    const { tasks: [a, b] } = await process(c, [{ dependsOn: [] }, { dependsOn: [0] }])
+    expect((await app.inject({ method: 'DELETE', url: `/tasks/${a.id}`, headers: { authorization: c.auth } })).statusCode).toBeLessThan(300)
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: b.id } })).releasedAt).not.toBeNull()
+  })
+})

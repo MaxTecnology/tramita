@@ -43,7 +43,7 @@ export const staffTaskLink = (t: Pick<TaskCtx, 'id' | 'boardId' | 'boardType'>) 
   t.boardType === 'PROCESS' ? `/app/board/${t.boardId}?task=${t.id}` : `/app/tasks?task=${t.id}`
 
 export const clientTaskLink = (t: Pick<TaskCtx, 'id' | 'boardId' | 'boardType' | 'competence'>) =>
-  t.boardType === 'RECURRING_SYSTEM' ? `/portal/send?${competenceParam(t.competence)}task=${t.id}` : `/portal/board/${t.boardId}?task=${t.id}`
+  t.boardType === 'PROCESS' ? `/portal/board/${t.boardId}?task=${t.id}` : `/portal/send?${competenceParam(t.competence)}task=${t.id}`
 
 const staffRequestLink = (id: string) => `/app/requests?request=${id}`
 const clientRequestLink = (id: string) => `/portal/requests?request=${id}`

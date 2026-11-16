@@ -99,3 +99,17 @@ describe('solicitar serviço', () => {
     expect([task.osModelId, task.releasedAt]).toEqual([c.junta.id, null])
   })
 })
+
+describe('pedido de processo valida o serviço', () => {
+  it('a process the client cannot request, or one that needs the month without it, is refused', async () => {
+    const c = await setup()
+    const internal = await prisma.processTemplate.findFirstOrThrow({ where: { organizationId: c.org.id, name: 'Interno' } })
+    const res = await ask(c, { processTemplateId: internal.id, departmentId: c.fiscal.id })
+    expect([res.statusCode, JSON.parse(res.body).message]).toEqual([422, 'Serviço indisponível'])
+    await prisma.oSModel.update({ where: { id: c.junta.id }, data: { requiresCompetence: true } })
+    const noMonth = await ask(c, { processTemplateId: c.abertura.id })
+    expect([noMonth.statusCode, JSON.parse(noMonth.body).message]).toEqual([422, 'Informe a competência'])
+    const ok = JSON.parse((await ask(c, { processTemplateId: c.abertura.id, competence: '2026-10' })).body)
+    expect((await approve(c, ok.id, { mode: 'NEW_BOARD' })).statusCode).toBe(200)
+  })
+})

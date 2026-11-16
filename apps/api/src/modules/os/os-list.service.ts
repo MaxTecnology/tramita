@@ -25,10 +25,11 @@ export async function listOS(organizationId: string, user: { id: string; role: s
     ...(q.search ? { OR: [{ title: { contains: q.search, mode: 'insensitive' } }, { column: { board: { client: { name: { contains: q.search, mode: 'insensitive' } } } } }] } : {}),
     AND: [taskWhere(scope)],
   }
-  const rows = await prisma.task.findMany({
-    where,
-    take: 1000,
-    select: {
+  // Every open OS comes (lateness is computed from it); finished ones are only the last 30 days by
+  // default, or the newest 300 in "Concluídas"
+  const finishedOnly = q.situation === 'DONE'
+  const recent = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const select = {
       id: true, title: true, status: true, competence: true, dueDate: true, targetDate: true, releasedAt: true, completedAt: true,
       deadlineBusinessDays: true, osModelId: true, delayReasonPending: true,
       osModel: { select: { id: true, name: true } },
@@ -36,8 +37,15 @@ export async function listOS(organizationId: string, user: { id: string; role: s
       department: { select: { id: true, name: true } },
       pauses: { select: { startedAt: true, endedAt: true } },
       column: { select: { board: { select: { id: true, type: true, title: true, client: { select: { id: true, name: true, codigo: true } } } } } },
-    },
-  })
+  } satisfies Prisma.TaskSelect
+  const [open, finished] = await Promise.all([
+    finishedOnly ? [] : prisma.task.findMany({ where: { AND: [where, { status: { notIn: ['DONE', 'DISREGARDED'] } }] }, select, orderBy: { targetDate: 'asc' } }),
+    prisma.task.findMany({
+      where: { AND: [where, { status: { in: ['DONE', 'DISREGARDED'] } }, ...(finishedOnly ? [] : [{ completedAt: { gte: recent } }])] },
+      select, orderBy: { completedAt: 'desc' }, take: 300,
+    }),
+  ])
+  const rows = [...open, ...finished]
   const holidays = await loadHolidaySet(organizationId, [now.getUTCFullYear() - 1, now.getUTCFullYear(), now.getUTCFullYear() + 1])
   const warnDays = await warnDaysFor(organizationId)
   const items = rows.map((t) => {
@@ -51,8 +59,9 @@ export async function listOS(organizationId: string, user: { id: string; role: s
       link: staffTaskLink({ id: t.id, boardId: board.id, boardType: board.type }),
     }
   })
-  return items
-    .filter((i) => !q.situation || i.deadline.state === q.situation)
-    .sort((a, b) => ORDER[a.deadline.state] - ORDER[b.deadline.state]
-      || (a.targetDate?.getTime() ?? Infinity) - (b.targetDate?.getTime() ?? Infinity))
+  const filtered = items.filter((i) => !q.situation || i.deadline.state === q.situation)
+  // Finished: newest first (already ordered); the rest by situation, then target
+  if (finishedOnly) return filtered
+  return filtered.sort((a, b) => ORDER[a.deadline.state] - ORDER[b.deadline.state]
+    || (a.targetDate?.getTime() ?? Infinity) - (b.targetDate?.getTime() ?? Infinity))
 }
