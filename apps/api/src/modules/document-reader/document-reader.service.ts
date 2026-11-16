@@ -8,7 +8,7 @@ import { getOrgSlug } from '@/lib/org-slug'
 import { AppError } from '@/errors/AppError'
 import { enqueueDocumentReader } from '@/lib/document-reader-queue'
 import { createAttachment } from '@/modules/attachments/attachments.service'
-import { deliverDocument } from '@/modules/task-documents/task-documents.service'
+import { deliverDocument, type DeliveryCompletion } from '@/modules/task-documents/task-documents.service'
 import { extrairEInterpretar, decidir, type Modelo, type Base } from './engine/pipeline'
 import { soDigitos, moedaNormalizada } from './engine/validadores'
 import { assertStaffSees } from '@/middlewares/staffScope'
@@ -451,10 +451,12 @@ async function anexarDocumento(
     const payload = { filename, mimeType: 'application/pdf', size: buffer.length, buffer }
 
     let attachmentId: string
+    let completion: DeliveryCompletion = 'PENDING'
     if (entrega) {
       // Preenche a entrega — gera/atualiza o protocolo que o cliente vê em "Documentos recebidos"
       const entregue = await deliverDocument(taskId, entrega.id, organizationId, actor, payload, pagamento, { source: 'robot' })
       attachmentId = entregue.attachmentId!
+      completion = entregue.completion
     } else {
       attachmentId = (await createAttachment(taskId, organizationId, actor, payload)).id
     }
@@ -466,7 +468,8 @@ async function anexarDocumento(
     if (finalizado.count === 0) {
       throw new AppError(409, 'Documento foi revisado por outra pessoa enquanto este anexo era criado')
     }
-    return prisma.attachment.findUniqueOrThrow({ where: { id: attachmentId } })
+    // completion: did this delivery finish the task (completed by itself / ready to complete)?
+    return { ...(await prisma.attachment.findUniqueOrThrow({ where: { id: attachmentId } })), completion }
   } catch (err) {
     // Falhou no meio: libera a reserva pra que o documento possa ser revisado de novo
     await prisma.receivedDocument.updateMany({ where: { id: receivedDocumentId, attachingSince: reservadoEm }, data: { attachingSince: null } })
@@ -557,4 +560,37 @@ export async function obterMetricas(organizationId: string) {
 function competenciaParaRotulo(competence: Date | null): string {
   if (!competence) return ''
   return `${competence.getUTCFullYear()}-${String(competence.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+export interface ConfirmacaoLote { id: string; ok: boolean; error?: string; taskId?: string; completion?: DeliveryCompletion }
+
+// Each document goes through the same checks as a single confirmation; one failing never stops the
+// others. The summary lists the tasks left ready to complete (the screen offers to complete them).
+export async function confirmarLote(
+  ids: string[],
+  organizationId: string,
+  actor: { id: string; role: string },
+  scope: StaffScope,
+) {
+  const results: ConfirmacaoLote[] = []
+  for (const id of [...new Set(ids)]) {
+    try {
+      await assertDocumentInScope(id, organizationId, scope)
+      const r = await confirmarSugestao(id, organizationId, actor)
+      results.push({ id, ok: true, taskId: r.taskId, completion: r.completion })
+    } catch (err) {
+      if (!(err instanceof AppError)) logger.error({ receivedDocumentId: id, reason: err instanceof Error ? err.message : String(err) }, 'Falha ao confirmar documento em lote')
+      results.push({ id, ok: false, error: err instanceof AppError ? err.message : 'Erro ao confirmar este documento' })
+    }
+  }
+  const ok = results.filter((r) => r.ok)
+  return {
+    results,
+    summary: {
+      delivered: ok.length,
+      completed: ok.filter((r) => r.completion === 'AUTO_COMPLETED').length,
+      readyTaskIds: [...new Set(ok.filter((r) => r.completion === 'READY').map((r) => r.taskId!))],
+      failed: results.length - ok.length,
+    },
+  }
 }

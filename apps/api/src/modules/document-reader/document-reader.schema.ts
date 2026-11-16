@@ -16,3 +16,8 @@ export const trocarTarefaBodySchema = anexarOpcoesSchema.extend({
 export const filaQuerySchema = z.object({
   scope: z.enum(['mine', 'department', 'all']).optional(),
 })
+
+// Confirm several suggestions at once (the "sem pendência" ones in the queue)
+export const confirmarLoteSchema = z.object({
+  ids: z.array(z.string().cuid()).min(1, 'Selecione ao menos um documento').max(50, 'Até 50 documentos por vez'),
+})

@@ -7,9 +7,9 @@ import { AppError } from '@/errors/AppError'
 import {
   ingerirDocumento, listarFilaDeRevisao, confirmarSugestao, trocarTarefa, rejeitarDocumento, reabrirDocumento,
   obterMetricas, listarObrigacoes, obterUrlVisualizacao, listarRejeitados,
-  assertDocumentInScope,
+  assertDocumentInScope, confirmarLote,
 } from './document-reader.service'
-import { trocarTarefaBodySchema, anexarOpcoesSchema, filaQuerySchema } from './document-reader.schema'
+import { trocarTarefaBodySchema, anexarOpcoesSchema, filaQuerySchema, confirmarLoteSchema } from './document-reader.schema'
 import { getStaffScope } from '@/modules/staff-scope/staff-scope'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
@@ -99,6 +99,15 @@ export async function documentReaderRoutes(app: FastifyInstance) {
     preHandler: [requireRole(...ORG_ROLES)],
   }, async (request, reply) => {
     return reply.send(await obterMetricas(request.user.organizationId!))
+  })
+
+  // Before /:id/confirmar so "confirmar-lote" is never read as an id
+  app.post('/document-reader/confirmar-lote', {
+    preHandler: [requireRole(...ORG_ROLES), checkSubscription],
+  }, async (request, reply) => {
+    const body = confirmarLoteSchema.safeParse(request.body)
+    if (!body.success) throw new AppError(400, body.error.errors[0].message)
+    return reply.send(await confirmarLote(body.data.ids, request.user.organizationId!, { id: request.user.sub, role: request.user.role }, await getStaffScope(request)))
   })
 
   app.post('/document-reader/:id/confirmar', {
