@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { StageTimesPanel } from '@/components/shared/StageTimesPanel'
+import { DeadlineChip } from '@/components/shared/DeadlineChip'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -67,6 +69,7 @@ export default function Board() {
     : null
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [search, setSearch] = useState('')
+  const [showStageTimes, setShowStageTimes] = useState(false)
   const [filterPriority, setFilterPriority] = useState('')
   const [filterCompetence, setFilterCompetence] = useState('')
   const hasFilters = search.trim() !== '' || filterPriority !== '' || filterCompetence !== ''
@@ -153,6 +156,11 @@ export default function Board() {
           <h1 className="text-base md:text-lg font-semibold text-foreground truncate">{board.title}</h1>
           <p className="text-xs md:text-sm text-muted-foreground truncate">{board.client.name}</p>
         </div>
+        {board.deadline && <DeadlineChip deadline={board.deadline} className="flex-shrink-0" />}
+        <button type="button" onClick={() => setShowStageTimes((v) => !v)} aria-pressed={showStageTimes}
+          className="text-xs font-medium text-accent-hover hover:underline flex-shrink-0">
+          Tempo por etapa
+        </button>
         {boardDueDate && (
           <span className={cn(
             'text-xs px-2 py-1 rounded-full font-medium flex-shrink-0',
@@ -164,6 +172,12 @@ export default function Board() {
           </span>
         )}
       </div>
+
+      {showStageTimes && (
+        <div className="px-4 md:px-6 py-3 border-b border-border bg-neutral-bg/40">
+          <StageTimesPanel boardId={board.id} />
+        </div>
+      )}
 
       {/* Search bar */}
       <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-2 border-b border-border bg-surface">

@@ -41,3 +41,6 @@ export const listOSQuerySchema = z.object({
   search: z.string().trim().max(100).optional(),
 })
 export type ListOSQuery = z.infer<typeof listOSQuerySchema>
+
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use AAAA-MM-DD)')
+export const osDashboardQuerySchema = z.object({ from: isoDay, to: isoDay })

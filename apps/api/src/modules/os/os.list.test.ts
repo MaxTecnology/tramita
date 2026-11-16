@@ -89,6 +89,8 @@ describe('Tarefas e Processos mostram a OS e o prazo', () => {
     await prisma.board.update({ where: { id: board.id }, data: { targetDate: new Date('2026-01-07T00:00:00Z') } })
     const boards = JSON.parse((await app.inject({ method: 'GET', url: '/boards', headers: { authorization: c.auth } })).body) as { id: string; deadline: { state: string } }[]
     expect(boards.find((b) => b.id === board.id)?.deadline.state).toBe('LATE')
+    const one = JSON.parse((await app.inject({ method: 'GET', url: `/boards/${board.id}`, headers: { authorization: c.auth } })).body)
+    expect(one.deadline.state).toBe('LATE')
   })
 })
 

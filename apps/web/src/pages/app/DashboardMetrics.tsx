@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { OSIndicators } from '@/components/shared/StageTimesPanel'
 import { useAuth } from '@/hooks/useAuth'
 import { FailedGenerationsAlert } from '@/components/FailedGenerationsAlert'
 import { UnpaidGuidesCard } from '@/components/UnpaidGuidesCard'
@@ -404,6 +405,9 @@ function ProductivityTab() {
       ) : (
         <ProductivityTable metrics={metrics} viewBy={isManagerOrAdmin ? viewBy : 'person'} />
       )}
+
+      {/* OS and processes in the same period: delays by reason, office × client time per model */}
+      <OSIndicators from={from.toISOString().slice(0, 10)} to={to.toISOString().slice(0, 10)} />
     </div>
   )
 }

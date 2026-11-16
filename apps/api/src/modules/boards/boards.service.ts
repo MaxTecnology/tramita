@@ -88,7 +88,13 @@ export async function listBoards(
     },
     orderBy: { createdAt: 'desc' },
   })
-  // Process clock: business days from its opening, paused while every open OS waits for the client
+  return withProcessDeadline(boards, organizationId, now)
+}
+
+type ClockBoard = { createdAt: Date; completedAt: Date | null; deadlineBusinessDays: number | null; targetDate: Date | null; pauses: { startedAt: Date; endedAt: Date | null }[] }
+
+// Process clock: business days from its opening, paused while every open OS waits for the client
+async function withProcessDeadline<B extends ClockBoard>(boards: B[], organizationId: string, now: Date) {
   const y = now.getUTCFullYear()
   const holidays = await loadHolidaySet(organizationId, [y - 1, y, y + 1])
   const warnDays = await warnDaysFor(organizationId)
@@ -129,10 +135,12 @@ export async function getBoardById(
           },
         },
       },
+      pauses: { select: { startedAt: true, endedAt: true } },
     },
   })
   if (!board) throw new AppError(404, 'Board não encontrado')
-  return board
+  const [withDeadline] = await withProcessDeadline([board], organizationId, new Date())
+  return withDeadline
 }
 
 export async function createBoard(

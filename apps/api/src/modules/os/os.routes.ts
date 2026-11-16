@@ -5,6 +5,8 @@ import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { openOSSchema, addOSToProcessSchema, releaseEarlySchema, listOSQuerySchema } from './os.schema'
 import { listOS } from './os-list.service'
+import { getStageTimes, getOSDashboard } from './os-metrics.service'
+import { osDashboardQuerySchema } from './os.schema'
 import { openOS, addOSToProcess } from './os.service'
 import { releaseEarly } from './os-deadline.service'
 import { prisma } from '@/lib/prisma'
@@ -12,6 +14,19 @@ import { prisma } from '@/lib/prisma'
 export async function osRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
   const staffWrite = [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), checkSubscription]
+
+  app.get('/boards/:id/stage-times', { preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')] }, async (request) => {
+    const { id } = request.params as { id: string }
+    return getStageTimes(id, request.user.organizationId!, { id: request.user.sub, role: request.user.role })
+  })
+
+  app.get('/dashboard/os', { preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')] }, async (request) => {
+    const q = osDashboardQuerySchema.safeParse(request.query)
+    if (!q.success) throw new AppError(400, q.error.errors[0].message)
+    return getOSDashboard(request.user.organizationId!, { id: request.user.sub, role: request.user.role }, {
+      from: new Date(`${q.data.from}T00:00:00.000Z`), to: new Date(`${q.data.to}T23:59:59.999Z`),
+    })
+  })
 
   app.get('/os', { preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')] }, async (request) => {
     const q = listOSQuerySchema.safeParse(request.query)
