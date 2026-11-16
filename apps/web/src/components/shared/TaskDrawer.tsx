@@ -78,6 +78,7 @@ function formatHistoryAction(h: TaskHistory, userName: (id: string) => string): 
     case 'document_not_applicable_undone': return `desfez "Nada a enviar" em "${h.toValue ?? ''}"`
     case 'deliverable_requested': return `adicionou documento a entregar "${h.toValue ?? ''}"`
     case 'deliverable_delivered': return `entregou "${h.fromValue ?? ''}" (${h.toValue ?? ''})`
+    case 'deliverable_delivered_robot': return `entregou "${h.fromValue ?? ''}" (${h.toValue ?? ''}) — conferido pelo robô`
   }
   if (h.action === 'approval_closed_by_office') return `${label} (${CLOSE_REASON_HISTORY[h.toValue ?? ''] ?? h.toValue ?? ''})`
   if (h.toValue) return `${label} ${h.toValue}`

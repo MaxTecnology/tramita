@@ -369,6 +369,21 @@ export interface ReceivedDocument {
     client: { name: string }
     pendingDeliverables: { id: string; name: string; requiresPayment: boolean }[]
   } | null
+  // What the robot matched and checked (queue): the delivery it fills and the green/yellow checks
+  suggestion?: {
+    taskId: string
+    taskTitle: string
+    clientName: string
+    competence: string | null
+    deliverableId: string
+    deliverableName: string
+    obligationName: string | null
+    requiresPayment: boolean
+    amount: string | null
+    paymentDueDate: string | null
+  } | null
+  checks?: { cnpj: boolean; competence: boolean; payment: boolean }
+  ready?: boolean
   createdAt: string
 }
 

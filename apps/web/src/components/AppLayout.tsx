@@ -52,6 +52,14 @@ export default function AppLayout() {
   })
   const failedGenerationsCount = failedGenerations?.length ?? 0
 
+  // Documents the robot read and that wait for someone to confirm (Leitura de Documentos)
+  const { data: toReview } = useQuery<unknown[]>({
+    queryKey: ['document-reader-fila', 'menu'],
+    queryFn: () => api.get('/document-reader/fila').then((r) => r.data),
+    enabled: isOrgRole,
+    refetchOnWindowFocus: true,
+  })
+
   useRequestsBadgeStream()
   useInboxStream(isOrgRole)
 
@@ -119,7 +127,7 @@ export default function AppLayout() {
               />
             )}
             {ORG_ROLES.includes(role) && (
-              <SidebarLink to="/app/document-reader" icon={<FileSearch size={16} />} label="Leitura de Documentos" onClick={handleNavClick} />
+              <SidebarLink to="/app/document-reader" icon={<FileSearch size={16} />} label="Leitura de Documentos" badge={toReview?.length} onClick={handleNavClick} />
             )}
             {ORG_ROLES.includes(role) && (
               <SidebarLink to="/app/guides" icon={<Receipt size={16} />} label="Guias não pagas" onClick={handleNavClick} />
