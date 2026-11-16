@@ -193,12 +193,44 @@ export async function syncProcessCompletion(boardId: string): Promise<void> {
   }
 }
 
+// Late = internal target passed (pauses already pushed it) and not waiting for the client right now
+export async function isTaskLate(taskId: string, now: Date = new Date()): Promise<boolean> {
+  const t = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { osModelId: true, targetDate: true, pauses: { where: { endedAt: null }, select: { id: true } }, column: { select: { board: { select: { organizationId: true } } } } },
+  })
+  if (!t?.osModelId || !t.targetDate || t.pauses.length > 0) return false
+  return businessDaysBetween(t.targetDate, now, await holidaysFrom(t.column.board.organizationId, t.targetDate)) > 0
+}
+
+export async function isBoardLate(boardId: string, now: Date = new Date()): Promise<boolean> {
+  const b = await prisma.board.findUnique({ where: { id: boardId }, select: { targetDate: true, organizationId: true, pauses: { where: { endedAt: null }, select: { id: true } } } })
+  if (!b?.targetDate || b.pauses.length > 0) return false
+  return businessDaysBetween(b.targetDate, now, await holidaysFrom(b.organizationId, b.targetDate)) > 0
+}
+
+// Finished without anyone giving a reason (automatic completion): flag it to be explained later
+async function flagMissingDelayReason(taskId: string): Promise<void> {
+  const t = await prisma.task.findUnique({ where: { id: taskId }, select: { status: true, delayReasonId: true, column: { select: { board: { select: { id: true, type: true, completedAt: true, delayReasonId: true } } } } } })
+  if (!t || t.status !== 'DONE') return
+  if (!t.delayReasonId && await isTaskLate(taskId, new Date())) {
+    await prisma.task.update({ where: { id: taskId }, data: { delayReasonPending: true } })
+  }
+  const board = t.column.board
+  if (board.type === 'PROCESS' && board.completedAt && !board.delayReasonId && await isBoardLate(board.id, new Date())) {
+    await prisma.board.update({ where: { id: board.id }, data: { delayReasonPending: true } })
+  }
+}
+
 // Every status change of a task goes through here: finishing releases dependents and closes the
 // pause; reopening restarts the pause check and puts the process back in progress
 export async function afterStatusChange(taskId: string, previous: string, next: string, actor: { id: string; name: string } | null): Promise<void> {
   if (previous === next) return
   if (FINISHED.includes(next) && !FINISHED.includes(previous)) {
+    // Late check before the pause closes (a paused OS is not late)
+    if (next === 'DONE') await flagMissingDelayReason(taskId)
     await onOSFinished(taskId, actor)
+    if (next === 'DONE') await flagMissingDelayReason(taskId)
     return
   }
   if (FINISHED.includes(previous) && !FINISHED.includes(next)) {

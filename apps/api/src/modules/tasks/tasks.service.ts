@@ -13,6 +13,7 @@ import { assertDepartmentServesClient, lockClients } from '@/modules/clients/cli
 import { syncProtocolsForTask } from '@/modules/protocols/protocol-from-deliverable'
 import { actorScope, taskWhere, mineTaskWhere, actableTaskIds } from '@/modules/staff-scope/staff-scope'
 import { assertReleased, afterStatusChange } from '@/modules/os/os-deadline.service'
+import { planDelayReasonsOnFinish, applyDelayReasons, type FinishPlan } from '@/modules/delay-reasons/delay-reasons.service'
 
 export interface Actor {
   id: string
@@ -147,6 +148,9 @@ export async function moveTask(
   const actorName = await resolveActorName(actor.id, actor.type)
 
   const nextStatus = toColumn.statusEffect !== 'NONE' ? toColumn.statusEffect : task.status
+  const delayPlan: FinishPlan = nextStatus === 'DONE' && task.status !== 'DONE'
+    ? await planDelayReasonsOnFinish(taskId, organizationId, data)
+    : {}
   // Tarefa concluída pode ter ficado num departamento que deixou de atender o cliente — reabrir ali
   // criaria uma tarefa aberta invisível pro cliente (I5).
   if (isReopening(task.status, nextStatus)) {
@@ -222,6 +226,7 @@ export async function moveTask(
   }
 
   await notifyIfBlocked(taskId, task.status, nextStatus, toColumn.board.clientId, organizationId, task.visibleToClient)
+  await applyDelayReasons(taskId, delayPlan, { id: actor.id, name: actorName })
   await afterStatusChange(taskId, task.status, nextStatus, actor.type === 'user' ? { id: actor.id, name: actorName } : null)
 
   await publishBoardEvent(toColumn.board.id, {
@@ -317,6 +322,9 @@ export async function updateTask(
 ) {
   const task = await verifyTaskBelongsToOrg(id, organizationId)
   if (data.status !== undefined && data.status !== task.status) await assertReleased(id)
+  const delayPlan: FinishPlan = data.status === 'DONE' && task.status !== 'DONE'
+    ? await planDelayReasonsOnFinish(id, organizationId, data)
+    : {}
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
   if (data.departmentId && data.departmentId !== task.departmentId) {
     await assertDepartmentServesClient(prisma, task.column.board.clientId, data.departmentId)
@@ -424,6 +432,7 @@ export async function updateTask(
 
   if (data.status !== undefined) {
     await notifyIfBlocked(id, task.status, data.status, task.column.board.clientId, organizationId, updated.visibleToClient)
+    await applyDelayReasons(id, delayPlan, { id: actor.id, name: actorName })
     await afterStatusChange(id, task.status, data.status, actor.type === 'user' ? { id: actor.id, name: actorName } : null)
   }
 

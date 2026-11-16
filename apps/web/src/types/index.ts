@@ -360,6 +360,8 @@ export interface ProcessTemplate {
   items: ProcessTemplateItem[]
 }
 
+export interface DelayReason { id: string; name: string; requiresNote: boolean; isActive: boolean; position: number }
+
 export interface OSModelDocument { id: string; name: string; position: number; requiresPayment: boolean; obligationTypeId: string | null }
 // Service order model: one task, like a recurring one but sporadic
 export interface OSModel {

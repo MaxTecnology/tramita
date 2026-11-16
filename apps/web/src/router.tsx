@@ -22,6 +22,7 @@ import Profile from '@/pages/app/settings/Profile'
 import Departments from '@/pages/app/settings/Departments'
 import Holidays from '@/pages/app/settings/Holidays'
 import OSModels from '@/pages/app/settings/OSModels'
+import DelayReasons from '@/pages/app/settings/DelayReasons'
 import OSModelForm from '@/pages/app/settings/OSModelForm'
 import RecurringTemplates from '@/pages/app/settings/RecurringTemplates'
 import RecurringTemplateForm from '@/pages/app/settings/RecurringTemplateForm'
@@ -205,6 +206,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <RecurringGenerationConsole />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/delay-reasons',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <DelayReasons />
           </ProtectedRoute>
         ),
       },

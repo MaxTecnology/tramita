@@ -24,6 +24,7 @@ model Plan {
 
 model Organization {
   holidays Holiday[]
+  delayReasons DelayReason[]
   osModels OSModel[]
   inAppNotifications  InAppNotification[]
   taskApprovals       TaskApproval[]
@@ -299,8 +300,10 @@ model Board {
   processTemplate ProcessTemplate? @relation(fields: [processTemplateId], references: [id])
   columns         Column[]
   pauses          BoardPause[]
+  delayReason     DelayReason?     @relation(fields: [delayReasonId], references: [id], onDelete: SetNull)
 
   @@index([processTemplateId])
+  @@index([delayReasonId])
   @@map("boards")
 }
 
@@ -445,6 +448,7 @@ model Task {
   updatedAt           DateTime            @updatedAt
 
   osModel              OSModel?                  @relation(fields: [osModelId], references: [id], onDelete: SetNull)
+  delayReason          DelayReason?              @relation(fields: [delayReasonId], references: [id], onDelete: SetNull)
   dependsOn            TaskDependency[]          @relation("TaskDependsOn")
   pauses               TaskPause[]
   dependents           TaskDependency[]          @relation("TaskDependents")
@@ -473,6 +477,7 @@ model Task {
   @@index([completedAt])
   @@index([assigneeId])
   @@index([osModelId])
+  @@index([delayReasonId])
   @@map("tasks")
 }
 
@@ -1388,4 +1393,21 @@ model BoardPause {
 
   @@index([boardId])
   @@map("board_pauses")
+}
+
+// Why an OS or a process finished after its internal deadline (list configured by the office)
+model DelayReason {
+  id             String  @id @default(cuid())
+  organizationId String
+  name           String
+  requiresNote   Boolean @default(false)
+  isActive       Boolean @default(true)
+  position       Int
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tasks        Task[]
+  boards       Board[]
+
+  @@unique([organizationId, name])
+  @@map("delay_reasons")
 }

@@ -10,6 +10,14 @@ export const createTaskSchema = z.object({
   departmentId: z.string().cuid(),
 })
 
+// Finishing a late OS (or the OS that closes a late process) needs a reason
+const delayReasonFields = {
+  delayReasonId: z.string().cuid().optional(),
+  delayNote: z.string().trim().max(500).optional(),
+  processDelayReasonId: z.string().cuid().optional(),
+  processDelayNote: z.string().trim().max(500).optional(),
+}
+
 export const updateTaskSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
@@ -22,11 +30,13 @@ export const updateTaskSchema = z.object({
   visibleToClient: z.boolean().optional(),
   targetDate: z.string().datetime().nullable().optional(),
   competence: z.string().datetime().nullable().optional(),
+  ...delayReasonFields,
 })
 
 export const moveTaskSchema = z.object({
   columnId: z.string().cuid(),
   position: z.number().int().min(0),
+  ...delayReasonFields,
 })
 
 export const reorderTasksSchema = z.array(

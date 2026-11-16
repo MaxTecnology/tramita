@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Card } from '@/components/ui/card'
-import { Settings, Bell, CreditCard, Building2, UserCog, Repeat, FileStack, Zap, FileText, CalendarOff, ListChecks } from 'lucide-react'
+import { Settings, Bell, CreditCard, Building2, UserCog, Repeat, FileStack, Zap, FileText, CalendarOff, ListChecks, AlarmClock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { FailedGeneration } from '@/types'
 
@@ -47,6 +47,7 @@ export default function SettingsHub() {
       title: 'Automação de tarefas',
       cards: [
         { to: '/app/settings/recurring-templates', icon: <Repeat size={20} />, title: 'Tarefas Recorrentes', description: 'Templates de geração automática', roles: ADMIN_ROLES },
+        { to: '/app/settings/delay-reasons', icon: <AlarmClock size={20} />, title: 'Motivos de atraso', description: 'Pedidos ao concluir OS ou processo fora do prazo', roles: ADMIN_ROLES },
         { to: '/app/settings/os-models', icon: <ListChecks size={20} />, title: 'Modelos de OS', description: 'Serviços avulsos: documentos, robô, prazo', roles: ADMIN_ROLES },
         { to: '/app/settings/process-templates', icon: <FileStack size={20} />, title: 'Modelos de Processo', description: 'Etapas e OS de cada tipo de processo', roles: ADMIN_ROLES },
         { to: '/app/settings/recurring-generation', icon: <Zap size={20} />, title: 'Geração manual', description: 'Rodar geração de tarefas recorrentes fora do ciclo automático', roles: ADMIN_ROLES, badge: failures.length },
