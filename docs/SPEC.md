@@ -493,7 +493,7 @@ Visibilidade do `ORG_MEMBER` nessas rotas e em `GET /protocols`/`summary`: `memb
 Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma tarefa criada de um **Modelo de OS** (avulsa no board `SERVICE_SYSTEM` do cliente, ou etapa de um processo). **Processo** = board `PROCESS` criado de um **Modelo de Processo** (colunas + OS que nascem nele, com dependências).
 
 **Calendário**
-### GET `/holidays?year=` → `{ national: {date,name}[], custom: {id,date,name}[] }` · POST `/holidays` `{ date: 'AAAA-MM-DD', name }` (ORG_ADMIN; 409 `'Já existe feriado nesta data'`) · DELETE `/holidays/:id`
+### GET `/holidays?year=` → `{ national: {date,name}[], custom: {id,date,name}[] }` · POST `/holidays` `{ date: 'AAAA-MM-DD', name }` (ORG_ADMIN; 409 `'Já existe feriado nesta data'`) · DELETE `/holidays/:id`. Cadastrar ou remover feriado recalcula a meta das OS e processos abertos cuja janela (liberação/abertura → meta) cobre a data.
 ### GET `/holidays/days?from=AAAA&to=AAAA` (máx. 5 anos) → `string[]` com todos os dias de feriado (nacionais + do escritório). Dia útil = seg–sex menos esses dias; vale para recorrentes (rolagem de vencimento/meta) e prazos de OS/processo.
 
 **Modelos**
@@ -502,21 +502,23 @@ Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma t
 
 **Abrir**
 ### POST `/os` `{ osModelId, clientId, competence?: 'AAAA-MM', assigneeId?, dueDate? }` → tarefa da OS (201). 422 `'Informe a competência'`, `'Essa OS é só de processo'`, `'Modelo de OS inativo'`; 404 `'Cliente não encontrado'` fora do escopo.
-### POST `/boards` com `processTemplateId` (+ `competence?`) cria o processo e uma OS por item (OS com dependência nasce com `releasedAt = null`). POST `/boards/:id/os` `{ osModelId, columnId, dependsOnTaskIds?, competence?, assigneeId?, dueDate? }` adiciona OS ao processo.
+### POST `/boards` com `processTemplateId` (+ `competence?`) cria o processo e uma OS por item (OS com dependência nasce com `releasedAt = null`). POST `/boards/:id/os` `{ osModelId, columnId, dependsOnTaskIds?, competence?, assigneeId?, dueDate? }` adiciona OS ao processo. Abrir processo revalida os modelos dos itens (422 `'Modelo de OS inativo'`, `'Essa OS não é usada em processos'`), sem deixar board vazio. O board `SERVICE_SYSTEM` é único por cliente (índice parcial `boards_client_service_system_key`). O cliente recebe `TASK_CREATED` de uma OS que aguarda outra só quando ela é liberada.
 
 **Prazo, pausa, dependência**
 - Meta (`targetDate`) = `releasedAt` + `deadlineBusinessDays` + dias úteis pausados. Pausa (`TaskPause`) enquanto houver documento obrigatório do cliente `PENDING`/`REJECTED` ou aprovação do cliente pendente (`UPLOADED` não pausa). Processo: `BoardPause` quando todas as OS liberadas e abertas estão pausadas; meta do processo = abertura + prazo + pausas; `completedAt` quando todas as tarefas terminam.
 - OS não liberada: PATCH de status e `/move` → 409 `'Esta OS aguarda: <títulos>'`. Concluir/desconsiderar libera as dependentes (uma vez; sino `OS_RELEASED`). POST `/tasks/:id/release` `{ reason }` (ORG_ADMIN/ORG_MANAGER) libera antes (histórico `os_released_early`).
+- PATCH `/tasks/:id` com `status` move o cartão junto: `DONE` vai para a primeira coluna `statusEffect = DONE` do board; reabrir uma tarefa que está numa coluna `DONE` leva à coluna do novo status (ou à primeira não-DONE). Grava `moved_to`.
+- GET `/tasks?dateField=period&dateFrom&dateTo` inclui também as tarefas abertas com meta (ou vencimento, sem meta) antes de `dateFrom`.
 - Listas trazem `deadline: { state: NONE|ON_TIME|DUE_SOON|LATE|PAUSED|WAITING_DEPENDENCY|DONE, businessDaysLeft?, businessDaysLate?, pausedSinceDays?, officeBusinessDays, clientBusinessDays }` (GET `/tasks`, `/boards`, `/boards/:id` — tarefas e processo) e `waitingFor: string[]`.
 
 **Motivo de atraso**
 ### `/delay-reasons` — GET (cria os padrões na primeira leitura: Aguardando órgão público, Retrabalho interno, Volume de trabalho, Outro com observação), POST/PATCH/DELETE (ORG_ADMIN; usado → desativa).
 - PATCH `/tasks/:id` com `status: DONE` e `/tasks/:id/move` para coluna de conclusão aceitam `delayReasonId`, `delayNote`, `processDelayReasonId`, `processDelayNote`. OS atrasada sem motivo → 422 `'Informe o motivo do atraso'`; última OS de processo atrasado → 422 `'Informe o motivo do atraso do processo'`; motivo com observação obrigatória → 422 `'Descreva o motivo'`. Conclusão automática não bloqueia: `delayReasonPending = true`.
-- PATCH `/tasks/:id/delay-reason` e `/boards/:id/delay-reason` `{ delayReasonId, delayNote? }` registram antes ou resolvem pendente. Histórico `delay_reason_set` / `process_delay_reason_set`.
+- PATCH `/tasks/:id/delay-reason` e `/boards/:id/delay-reason` `{ delayReasonId, delayNote? }` registram antes ou resolvem pendente (escopo de escrita da carteira: fora dela → 404). Histórico `delay_reason_set` / `process_delay_reason_set`.
 
 **Listas e indicadores**
 ### GET `/os?clientId&osModelId&assigneeId&departmentId&boardId&situation&search` — OS (avulsas e de processo) com `deadline`, `process`, `link`; atrasadas primeiro; escopo de Tarefas.
-### GET `/boards/:id/stage-times` → `{ columns: {columnId,title,totalBusinessDays,avgBusinessDays}[], os: {taskId,title,officeBusinessDays,clientBusinessDays,state}[] }` (histórico `moved_to`, casado pelo título da coluna).
+### GET `/boards/:id/stage-times` → `{ columns: {columnId,title,totalBusinessDays,avgBusinessDays}[], os: {taskId,title,officeBusinessDays,clientBusinessDays,state}[] }` (histórico `moved_to` com `fromColumnId`/`toColumnId`; registros antigos sem id casam pelo título).
 ### GET `/dashboard/os?from=AAAA-MM-DD&to=AAAA-MM-DD` → `{ delaysByReason, pendingReasons, byModel: {kind,id,name,count,avgOfficeBusinessDays,avgClientBusinessDays,lateCount}[] }`.
 
 **Portal e solicitações**

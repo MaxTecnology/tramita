@@ -6,7 +6,7 @@ import { assertNoPendingApproval } from '@/modules/approvals/approval-gate'
 import { publishBoardEvent } from '@/lib/sse'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
 import { recalculateTaskStatus, notifyIfBlocked } from '@/modules/task-documents/task-documents.service'
-import { Prisma } from '@prisma/client'
+import { Prisma, type TaskStatus } from '@prisma/client'
 import { resolveCompletedAt } from '@/lib/task-completion'
 import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, ListTasksQuery } from './tasks.schema'
 import { assertDepartmentServesClient, lockClients } from '@/modules/clients/client-coverage'
@@ -178,6 +178,8 @@ export async function moveTask(
         action: 'moved_to',
         fromValue: fromColumn.title,
         toValue: toColumn.title,
+        fromColumnId: fromColumn.id,
+        toColumnId: toColumn.id,
         actorType: actor.type,
         actorId: actor.id,
         actorName,
@@ -291,12 +293,25 @@ export async function ensureRecurringSystemBoard(clientId: string, organizationI
 // Board of the client's standalone OS (service orders), created on the first one. Columns anchor the
 // status like the Tarefas screen: open, in progress, blocked, done.
 export async function ensureServiceSystemBoard(clientId: string, organizationId: string) {
-  const existing = await prisma.board.findFirst({
+  const find = () => prisma.board.findFirst({
     where: { clientId, organizationId, type: 'SERVICE_SYSTEM' },
     include: { columns: true },
   })
-  if (existing && existing.columns.length > 0) return existing
+  const existing = await find()
+  if (existing) return existing
+  try {
+    return await createServiceSystemBoard(clientId, organizationId)
+  } catch (err) {
+    // Another request created it first (unique per client, partial index) — use that one
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      const winner = await find()
+      if (winner) return winner
+    }
+    throw err
+  }
+}
 
+function createServiceSystemBoard(clientId: string, organizationId: string) {
   return prisma.board.create({
     data: {
       title: 'Ordens de Serviço (sistema)',
@@ -315,6 +330,21 @@ export async function ensureServiceSystemBoard(clientId: string, organizationId:
     },
     include: { columns: true },
   })
+}
+
+// The card follows a status set by hand (drawer, Tarefas): done goes to the board's done column;
+// reopening one that sits in the done column takes it to the column of that status, or the first one.
+async function columnForStatus(
+  column: { id: string; boardId: string; statusEffect: string },
+  status: string,
+): Promise<{ id: string; title: string } | null> {
+  const columns = await prisma.column.findMany({ where: { boardId: column.boardId }, orderBy: { position: 'asc' }, select: { id: true, title: true, statusEffect: true } })
+  if (status === 'DONE') {
+    if (column.statusEffect === 'DONE') return null
+    return columns.find((c) => c.statusEffect === 'DONE') ?? null
+  }
+  if (column.statusEffect !== 'DONE' || status === 'DISREGARDED') return null
+  return columns.find((c) => c.statusEffect === status) ?? columns.find((c) => c.statusEffect !== 'DONE') ?? null
 }
 
 export async function updateTask(
@@ -378,6 +408,9 @@ export async function updateTask(
   const completedAt = data.status !== undefined
     ? resolveCompletedAt(task.status, data.status, new Date())
     : undefined
+  const columnMove = data.status !== undefined && data.status !== task.status
+    ? await columnForStatus(task.column, data.status)
+    : null
 
   const updated = await prisma.$transaction(async (tx) => {
     // Same checks as above, now under the client lock (the early ones only fail fast)
@@ -413,8 +446,18 @@ export async function updateTask(
           data.competence === null ? null
           : data.competence !== undefined ? new Date(data.competence)
           : undefined,
+        ...(columnMove ? { columnId: columnMove.id, position: await tx.task.count({ where: { columnId: columnMove.id } }) } : {}),
       },
     })
+    if (columnMove) {
+      await tx.taskHistory.create({
+        data: {
+          taskId: id, action: 'moved_to', fromValue: task.column.title, toValue: columnMove.title,
+          fromColumnId: task.column.id, toColumnId: columnMove.id,
+          actorType: actor.type, actorId: actor.id, actorName,
+        },
+      })
+    }
 
     for (const entry of historyEntries) {
       await tx.taskHistory.create({
@@ -510,7 +553,7 @@ export async function deleteTask(id: string, organizationId: string) {
 // - 'target' (default): targetDate in range (List/Kanban history).
 // - 'effective': targetDate, or dueDate when there is no target (Calendar).
 // - 'period': like 'effective', plus tasks with no date at all — they cannot be placed in a month
-//   and must not vanish from the default "this month" view.
+//   and must not vanish from the default "this month" view — and open tasks late from before.
 // Search matches the title and the client name or code.
 function dateAndSearchFilters(query: ListTasksQuery): Prisma.TaskWhereInput[] {
   const filters: Prisma.TaskWhereInput[] = []
@@ -525,6 +568,11 @@ function dateAndSearchFilters(query: ListTasksQuery): Prisma.TaskWhereInput[] {
           { targetDate: range },
           { targetDate: null, dueDate: range },
           ...(query.dateField === 'period' ? [{ targetDate: null, dueDate: null }] : []),
+          // Still open and already late from an earlier month: it is work of this month too
+          ...(query.dateField === 'period' && range.gte ? [{
+            status: { notIn: ['DONE', 'DISREGARDED'] as TaskStatus[] },
+            OR: [{ targetDate: { lt: range.gte } }, { targetDate: null, dueDate: { lt: range.gte } }],
+          }] : []),
         ],
       })
     } else {

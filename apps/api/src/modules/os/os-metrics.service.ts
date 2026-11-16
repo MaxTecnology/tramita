@@ -29,33 +29,37 @@ export async function getStageTimes(boardId: string, organizationId: string, use
     orderBy: { createdAt: 'asc' },
     select: {
       id: true, title: true, status: true, createdAt: true, completedAt: true, releasedAt: true, targetDate: true, deadlineBusinessDays: true, osModelId: true,
-      column: { select: { title: true } },
+      columnId: true,
       pauses: { select: { startedAt: true, endedAt: true } },
-      history: { where: { action: 'moved_to' }, orderBy: { createdAt: 'asc' }, select: { fromValue: true, toValue: true, createdAt: true } },
+      history: { where: { action: 'moved_to' }, orderBy: { createdAt: 'asc' }, select: { fromValue: true, toValue: true, fromColumnId: true, toColumnId: true, createdAt: true } },
     },
   })
   const holidays = await holidaysAround(organizationId, now)
   const warnDays = await warnDaysFor(organizationId)
-  const perColumn = new Map<string, number[]>(board.columns.map((c) => [c.title, []]))
+  const perColumn = new Map<string, number[]>(board.columns.map((c) => [c.id, []]))
+  // Moves recorded before the history kept column ids only have titles: matched to today's columns
+  const idByTitle = new Map(board.columns.map((c) => [c.title, c.id]))
+  const columnOf = (id: string | null, title: string | null) => id ?? (title ? idByTitle.get(title) ?? null : null)
 
   for (const t of tasks) {
     const end = FINISHED.includes(t.status) && t.completedAt ? t.completedAt : now
-    let column = t.history[0]?.fromValue ?? t.column.title
+    const first = t.history[0]
+    let column = first ? columnOf(first.fromColumnId, first.fromValue) : t.columnId
     let start = t.createdAt
     const spent = new Map<string, number>()
-    const add = (title: string, from: Date, to: Date) => spent.set(title, (spent.get(title) ?? 0) + businessDaysBetween(brtDay(from), brtDay(to < end ? to : end), holidays))
+    const add = (columnId: string, from: Date, to: Date) => spent.set(columnId, (spent.get(columnId) ?? 0) + businessDaysBetween(brtDay(from), brtDay(to < end ? to : end), holidays))
     for (const move of t.history) {
       if (column) add(column, start, move.createdAt)
-      column = move.toValue ?? column
+      column = columnOf(move.toColumnId, move.toValue) ?? column
       start = move.createdAt
     }
     if (column) add(column, start, end)
-    for (const [title, days] of spent) perColumn.get(title)?.push(days)
+    for (const [columnId, days] of spent) perColumn.get(columnId)?.push(days)
   }
 
   return {
     columns: board.columns.map((c) => {
-      const values = perColumn.get(c.title) ?? []
+      const values = perColumn.get(c.id) ?? []
       const total = values.reduce((a, b) => a + b, 0)
       return { columnId: c.id, title: c.title, totalBusinessDays: total, avgBusinessDays: values.length ? Math.round((total / values.length) * 10) / 10 : 0 }
     }),

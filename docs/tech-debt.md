@@ -621,21 +621,37 @@ Fora do escopo (não é débito, é decisão): aprovação em processo (OS) até
    tarefa; (e) falha de banco em `carregarModelosDaOrg` vira aviso aceitável no check; (f) "Concluir
    prontas" sem tratamento de falha parcial; (g) backfill da migration sem teste de SQL.
 
-## OS e Processos (2026-11-16)
+## OS e Processos (2026-11-16) — resolvido em 2026-11-16
 
-1. **Tempo por etapa casa o histórico pelo título da coluna** (`TaskHistory.moved_to` grava títulos):
-   renomear uma coluna faz o tempo antigo sumir do painel. Gravar `columnId` no histórico resolve.
-2. **"Concluir prontas" da fila do robô** pede o motivo de cada OS atrasada uma a uma (sem "aplicar a
-   todas").
-3. **Tarefas abre em "Este mês" pela meta**: uma OS atrasada de meses anteriores não aparece no filtro
-   padrão (aparece na lista de Ordens de Serviço, filtro "Atrasadas").
-4. **Filtro "Tipo" do Dashboard › Produtividade** ainda chama de "OS" o bucket de processos (boards
-   PROCESS); com OS avulsas o nome confunde.
-5. **Concluir pelo drawer não move o cartão** para a coluna de conclusão do processo (comportamento
-   anterior, ficou mais visível com OS de processo).
-6. **Menores da revisão final (adiados):** (a) `PATCH /tasks|/boards/:id/delay-reason` só confere a
-   organização (membro grava motivo fora da carteira); (b) corrida em `addOSToProcess` — dependência
-   concluída entre a leitura e a gravação deixa a OS nova sem liberar; (c) `ensureServiceSystemBoard`
-   sem unique — duas primeiras OS simultâneas do mesmo cliente criam dois boards de serviços; (d)
-   feriado cadastrado depois não recalcula metas já gravadas; (e) `openProcess` não revalida
-   `usableInProcess` dos itens ao abrir; (f) `TASK_CREATED` avisa o cliente de OS ainda não liberada.
+Todos os itens resolvidos na branch `feat/os-processos` (testes em `os-followups.test.ts`,
+`tasks-list-filters.test.ts`, `delayReason.test.tsx`):
+
+1. ~~Tempo por etapa casava pelo título~~ — `task_history` grava `fromColumnId`/`toColumnId`;
+   histórico antigo cai no título como reserva.
+2. ~~"Concluir prontas" pedia motivo um a um~~ — lote com mais de uma OS oferece "Usar este motivo nas
+   próximas OS atrasadas".
+3. ~~Tarefas "Este mês" escondia atrasadas antigas~~ — filtro `period` inclui as abertas com meta ou
+   vencimento antes do mês.
+4. ~~Filtro "Tipo" do Dashboard~~ — "Todos os tipos / Só processos / Só OS avulsas / Só recorrentes".
+5. ~~Concluir pelo drawer não movia o cartão~~ — concluir leva à coluna de conclusão; reabrir uma que
+   está nela leva à coluna do status (ou à primeira).
+6. Menores: (a) motivo de atraso passa pelo `staffScope` (fora da carteira → 404); (b) `addOSToProcess`
+   libera depois de gravar se a dependência terminou no meio; (c) índice único parcial
+   `boards_client_service_system_key` + retry em P2002; (d) cadastrar/remover feriado recalcula metas
+   de OS e processos abertos cuja janela cobre a data; (e) abrir processo revalida `usableInProcess`;
+   (f) `TASK_CREATED` da OS que aguarda outra sai na liberação.
+
+Pendente relacionado: o board `RECURRING_SYSTEM` tem a mesma corrida de criação do (c); não recebeu o
+índice porque o banco online pode já ter duplicados — conferir com
+`SELECT "clientId", count(*) FROM boards WHERE type = 'RECURRING_SYSTEM' GROUP BY 1 HAVING count(*) > 1`
+antes de criar o índice equivalente. Feriado novo não recalcula vencimentos/metas de tarefas
+recorrentes já geradas (só OS e processos).
+
+Achados da revisão destas correções, não feitos:
+- `reorderTasks` pode trocar a coluna sem gravar `moved_to` (o tempo por etapa não vê essa troca).
+- `updateTask` decide a coluna destino com a coluna lida antes da transação; um `move` concorrente
+  deixa `fromColumnId` desatualizado no histórico.
+- Recalcular metas ao mudar feriado roda na requisição, uma OS por vez (escritório com milhares de OS
+  abertas pode ficar lento; falha só vai para o log). Candidato a job BullMQ em lotes.
+- `onOSFinished` libera as dependentes em sequência sem isolar erro por dependente (a falha do aviso
+  ao cliente já é tolerada; outras falhas ainda interrompem o laço).

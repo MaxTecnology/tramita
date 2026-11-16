@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
+import { enqueueNotification } from '@/lib/queue'
 import { AppError } from '@/errors/AppError'
 import { addBusinessDays, businessDaysBetween, type HolidaySet } from '@/lib/business-days'
 import { loadHolidaySet } from '@/modules/holidays/holidays.service'
@@ -139,6 +141,14 @@ async function release(taskId: string, actor: { id: string; name: string } | nul
   const { recalculateTaskStatus } = await import('@/modules/task-documents/task-documents.service')
   await recalculateTaskStatus(taskId)
   await onOSReleased(taskId, actor)
+  // The client hears of an OS that waited for another one only now (not when it was created)
+  // Already released and committed: a queue failure must not stop the other dependents
+  try {
+    const t = await prisma.task.findUniqueOrThrow({ where: { id: taskId }, select: { title: true, column: { select: { board: { select: { organizationId: true, clientId: true } } } } } })
+    await enqueueNotification({ event: 'TASK_CREATED', taskId, organizationId: t.column.board.organizationId, clientId: t.column.board.clientId, metadata: { taskTitle: t.title } })
+  } catch (err) {
+    logger.warn({ taskId, reason: err instanceof Error ? err.message : String(err) }, 'Falha ao avisar o cliente da OS liberada')
+  }
   return true
 }
 
@@ -196,6 +206,27 @@ export async function scheduleBoardDeadline(boardId: string): Promise<void> {
   const closed = board.pauses.filter((p) => p.endedAt)
   const targetDate = addBusinessDays(day(board.createdAt), board.deadlineBusinessDays + pausedDays(closed, new Date(), holidays), holidays)
   await prisma.board.update({ where: { id: boardId }, data: { targetDate } })
+}
+
+// A holiday registered or removed later: recompute the targets of the open OS and processes whose
+// window (release or opening → target) covers that day. Finished ones keep the target they had.
+export async function rescheduleAroundHoliday(organizationId: string, date: Date): Promise<void> {
+  // Superset by a day on each side (release instants count by the Brasília day); recomputing is idempotent
+  const startedBy = new Date(date.getTime() + 2 * 86_400_000)
+  const reaches = new Date(date.getTime() - 86_400_000)
+  const tasks = await prisma.task.findMany({
+    where: {
+      column: { board: { organizationId } }, osModelId: { not: null }, deadlineBusinessDays: { not: null },
+      status: { notIn: ['DONE', 'DISREGARDED'] }, releasedAt: { lt: startedBy }, targetDate: { gte: reaches },
+    },
+    select: { id: true },
+  })
+  for (const t of tasks) await scheduleDeadline(t.id)
+  const boards = await prisma.board.findMany({
+    where: { organizationId, type: 'PROCESS', deadlineBusinessDays: { not: null }, completedAt: null, createdAt: { lt: startedBy }, targetDate: { gte: reaches } },
+    select: { id: true },
+  })
+  for (const b of boards) await scheduleBoardDeadline(b.id)
 }
 
 // Done when every task finished; an added or reopened task puts it back in progress

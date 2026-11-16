@@ -3,6 +3,7 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
+import { staffScope, param } from '@/middlewares/staffScope'
 import { prisma } from '@/lib/prisma'
 import { createDelayReasonSchema, updateDelayReasonSchema, setDelayReasonSchema } from './delay-reasons.schema'
 import { listDelayReasons, createDelayReason, updateDelayReason, deleteDelayReason, setTaskDelayReason, setBoardDelayReason } from './delay-reasons.service'
@@ -33,14 +34,14 @@ export async function delayReasonsRoutes(app: FastifyInstance) {
     return deleteDelayReason(id, request.user.organizationId!)
   })
 
-  app.patch('/tasks/:id/delay-reason', { preHandler: [...staff, checkSubscription] }, async (request) => {
+  app.patch('/tasks/:id/delay-reason', { preHandler: [...staff, checkSubscription, staffScope((r) => ({ taskIds: param(r, 'id') }), 'write')] }, async (request) => {
     const { id } = request.params as { id: string }
     const body = setDelayReasonSchema.safeParse(request.body)
     if (!body.success) throw new AppError(400, body.error.errors[0].message)
     return setTaskDelayReason(id, request.user.organizationId!, body.data, await actorOf(request.user.sub))
   })
 
-  app.patch('/boards/:id/delay-reason', { preHandler: [...staff, checkSubscription] }, async (request) => {
+  app.patch('/boards/:id/delay-reason', { preHandler: [...staff, checkSubscription, staffScope((r) => ({ boardIds: param(r, 'id') }), 'write')] }, async (request) => {
     const { id } = request.params as { id: string }
     const body = setDelayReasonSchema.safeParse(request.body)
     if (!body.success) throw new AppError(400, body.error.errors[0].message)

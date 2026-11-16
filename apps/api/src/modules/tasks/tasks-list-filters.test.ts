@@ -26,6 +26,8 @@ async function setup() {
   await mk(colA.id, 'Meta em novembro', { targetDate: new Date('2026-11-10') })
   await mk(colA.id, 'Vence em novembro', { dueDate: new Date('2026-11-20') })
   await mk(colA.id, 'Meta em outubro', { targetDate: new Date('2026-10-10') })
+  const doneEarlier = await mk(colA.id, 'Concluída antes', { targetDate: new Date('2026-10-12') })
+  await prisma.task.update({ where: { id: doneEarlier.id }, data: { status: 'DONE', completedAt: new Date('2026-10-12') } })
   await mk(colA.id, 'Sem data')
   await mk(colB.id, 'Folha mensal')
   return { auth: await getAuthHeader(admin.email, 'Test@1234') }
@@ -36,16 +38,16 @@ const titles = async (auth: string, qs: string) =>
     .map((t) => t.title).sort()
 
 describe('filtros da lista de tarefas', () => {
-  it('period: target or due date in the month, plus tasks without any date', async () => {
+  it('period: target or due date in the month, tasks without any date, and open ones late from before', async () => {
     const c = await setup()
     const qs = `dateField=period&dateFrom=${encodeURIComponent('2026-11-01T00:00:00.000Z')}&dateTo=${encodeURIComponent('2026-11-30T23:59:59.000Z')}`
-    expect(await titles(c.auth, qs)).toEqual(['Folha mensal', 'Meta em novembro', 'Sem data', 'Vence em novembro'])
+    expect(await titles(c.auth, qs)).toEqual(['Folha mensal', 'Meta em novembro', 'Meta em outubro', 'Sem data', 'Vence em novembro'])
   })
 
   it('search also matches the client name and code', async () => {
     const c = await setup()
     expect(await titles(c.auth, 'q=beta')).toEqual(['Folha mensal'])
-    expect(await titles(c.auth, 'q=0042')).toEqual(['Meta em novembro', 'Meta em outubro', 'Sem data', 'Vence em novembro'])
+    expect(await titles(c.auth, 'q=0042')).toEqual(['Concluída antes', 'Meta em novembro', 'Meta em outubro', 'Sem data', 'Vence em novembro'])
     expect(await titles(c.auth, 'q=outubro')).toEqual(['Meta em outubro'])
   })
 })

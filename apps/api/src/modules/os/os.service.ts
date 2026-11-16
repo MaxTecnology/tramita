@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 import { AppError } from '@/errors/AppError'
 import { enqueueNotification } from '@/lib/queue'
 import { publishBoardEvent } from '@/lib/sse'
@@ -9,7 +10,7 @@ import { loadStaffScope, clientWhere } from '@/modules/staff-scope/staff-scope'
 import { createBoard } from '@/modules/boards/boards.service'
 import type { CreateBoardBody } from '@/modules/boards/boards.schema'
 import { ensureServiceSystemBoard } from '@/modules/tasks/tasks.service'
-import { scheduleDeadline, scheduleBoardDeadline } from './os-deadline.service'
+import { scheduleDeadline, scheduleBoardDeadline, releaseIfFree } from './os-deadline.service'
 import { competenceToDate, type OpenOSBody, type AddOSToProcessBody } from './os.schema'
 import { startOfMonthInBRT } from '@/lib/date-only'
 
@@ -107,9 +108,10 @@ async function actorName(actorId: string): Promise<string> {
   return user?.name ?? 'Escritório'
 }
 
-async function afterOSCreated(taskId: string, organizationId: string, clientId: string, boardId: string, columnId: string, title: string, actor: { id: string; name: string }) {
+async function afterOSCreated(taskId: string, organizationId: string, clientId: string, boardId: string, columnId: string, title: string, actor: { id: string; name: string }, released: boolean) {
   await scheduleDeadline(taskId)
-  await enqueueNotification({ event: 'TASK_CREATED', taskId, organizationId, clientId, metadata: { taskTitle: title } })
+  // An OS waiting for another one is announced to the client when it is released (release())
+  if (released) await enqueueNotification({ event: 'TASK_CREATED', taskId, organizationId, clientId, metadata: { taskTitle: title } })
   await onTaskAssigned(taskId, { userId: actor.id, name: actor.name })
   await publishBoardEvent(boardId, { event: 'task:created', data: { taskId, columnId, title } })
 }
@@ -136,7 +138,7 @@ export async function openOS(organizationId: string, actor: OSActor, body: OpenO
       released: true, sourceRequestId: opts.sourceRequestId, actorId: actor.id,
     }, name)
   })
-  await afterOSCreated(task.id, organizationId, body.clientId, board.id, columnId, task.title, { id: actor.id, name })
+  await afterOSCreated(task.id, organizationId, body.clientId, board.id, columnId, task.title, { id: actor.id, name }, true)
   return prisma.task.findUniqueOrThrow({ where: { id: task.id } })
 }
 
@@ -169,7 +171,15 @@ export async function addOSToProcess(organizationId: string, actor: OSActor, boa
     await tx.board.update({ where: { id: boardId }, data: { completedAt: null } })
     return created
   })
-  await afterOSCreated(task.id, organizationId, board.clientId, boardId, column.id, task.title, { id: actor.id, name })
+  // A dependency finished between the read above and this write: nobody else releases it
+  // (releasing it also announces it to the client)
+  if (!task.releasedAt) {
+    // The OS is committed: a failure releasing it is logged and the creation still completes
+    try { await releaseIfFree(task.id, null) } catch (err) {
+      logger.warn({ taskId: task.id, reason: err instanceof Error ? err.message : String(err) }, 'Falha ao liberar OS recém-adicionada')
+    }
+  }
+  await afterOSCreated(task.id, organizationId, board.clientId, boardId, column.id, task.title, { id: actor.id, name }, task.releasedAt !== null)
   return prisma.task.findUniqueOrThrow({ where: { id: task.id } })
 }
 
@@ -186,6 +196,8 @@ export async function openProcess(organizationId: string, actor: OSActor, body: 
   })
   if (!template) throw new AppError(404, 'Modelo de processo não encontrado')
   if (template.items.some((it) => !it.osModel.isActive)) throw new AppError(422, 'Modelo de OS inativo')
+  // The model may have stopped being used in processes after the template was built
+  if (template.items.some((it) => !it.osModel.usableInProcess)) throw new AppError(422, 'Essa OS não é usada em processos')
   const competence = body.competence ? competenceToDate(body.competence) : null
   if (!competence && template.items.some((it) => it.osModel.requiresCompetence)) throw new AppError(422, 'Informe a competência')
 
@@ -217,7 +229,7 @@ export async function openProcess(organizationId: string, actor: OSActor, body: 
     const name = await actorName(actor.id)
     const created = await prisma.$transaction(async (tx) => {
       await lockClients(tx, [board.clientId])
-      const byItem = new Map<string, { id: string; title: string; columnId: string }>()
+      const byItem = new Map<string, { id: string; title: string; columnId: string; released: boolean }>()
       for (const item of template.items) {
         const columnId = columnsByPosition.get(item.columnPosition) ?? board.columns[0].id
         const task = await insertOSTask(tx, {
@@ -225,13 +237,13 @@ export async function openProcess(organizationId: string, actor: OSActor, body: 
           competence: item.osModel.requiresCompetence ? competence : null,
           released: item.dependsOn.length === 0, sourceRequestId: opts.sourceRequestId, actorId: actor.id,
         }, name)
-        byItem.set(item.id, { id: task.id, title: task.title, columnId })
+        byItem.set(item.id, { id: task.id, title: task.title, columnId, released: task.releasedAt !== null })
       }
       const deps = template.items.flatMap((item) => item.dependsOn.map((d) => ({ taskId: byItem.get(item.id)!.id, dependsOnTaskId: byItem.get(d.dependsOnItemId)!.id })))
       if (deps.length > 0) await tx.taskDependency.createMany({ data: deps })
       return [...byItem.values()]
     })
-    for (const t of created) await afterOSCreated(t.id, organizationId, board.clientId, board.id, t.columnId, t.title, { id: actor.id, name })
+    for (const t of created) await afterOSCreated(t.id, organizationId, board.clientId, board.id, t.columnId, t.title, { id: actor.id, name }, t.released)
   }
   }
 }

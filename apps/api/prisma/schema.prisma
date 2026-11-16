@@ -305,6 +305,8 @@ model Board {
 
   @@index([processTemplateId])
   @@index([delayReasonId])
+  // Partial unique index outside the schema (migration 20261116110000): one SERVICE_SYSTEM board per
+  // client — boards_client_service_system_key. Never accept a generated DROP of it.
   @@map("boards")
 }
 
@@ -882,6 +884,10 @@ model TaskHistory {
   action    String
   fromValue String?
   toValue   String?
+  // moved_to: the columns by id (titles change; stage times must not lose the history). No FK — a
+  // deleted column keeps its past moves.
+  fromColumnId String?
+  toColumnId   String?
   actorType String
   actorId   String
   actorName String

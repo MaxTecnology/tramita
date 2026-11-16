@@ -219,11 +219,11 @@ function ProductivityTable({ metrics, viewBy }: { metrics: ProductivityMetrics; 
           <thead>
             <tr className="text-xs text-muted-foreground uppercase">
               <th className="text-left py-2 px-3">{viewBy === 'person' ? 'Pessoa' : 'Departamento'}</th>
-              <th className="px-3">Volume (OS | Rec.)</th>
+              <th className="px-3" title="OS: avulsas e de processos · Rec.: recorrentes">Volume (OS | Rec.)</th>
               <th className="px-3">% Meta</th>
               <th className="px-3">% Vencimento</th>
               <th className="px-3">Tempo médio (dias)</th>
-              <th className="px-3">Carga atual (OS | Rec.)</th>
+              <th className="px-3" title="OS: avulsas e de processos · Rec.: recorrentes">Carga atual (OS | Rec.)</th>
               <th className="px-3">Impedimento</th>
             </tr>
           </thead>
@@ -375,9 +375,10 @@ function ProductivityTab() {
             onChange={(e) => setBoardType(e.target.value as typeof boardType)}
             className="flex h-9 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
           >
-            <option value="">OS + Recorrente</option>
+            <option value="">Todos os tipos</option>
             <option value="PROCESS">Só processos</option>
-            <option value="RECURRING_SYSTEM">Só Recorrente</option>
+            <option value="SERVICE_SYSTEM">Só OS avulsas</option>
+            <option value="RECURRING_SYSTEM">Só recorrentes</option>
           </select>
         </div>
 

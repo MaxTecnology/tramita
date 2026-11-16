@@ -13,8 +13,10 @@ export interface ChoiceOptions extends Base {
   label: string
   choices: { value: string; label: string; requiresNote?: boolean }[]
   noteLabel?: string
+  // Offers a checkbox to reuse the answer (e.g. the same reason for every OS of a batch)
+  rememberLabel?: string
 }
-export interface ChoiceAnswer { value: string; note?: string }
+export interface ChoiceAnswer { value: string; note?: string; remember?: boolean }
 
 type Pending =
   | { kind: 'confirm'; options: ConfirmOptions; resolve: (v: boolean) => void }
@@ -55,7 +57,8 @@ export function AppDialogs() {
   const pending = useSyncExternalStore(subscribe, () => current, () => null)
   const [value, setValue] = useState('')
   const [choice, setChoice] = useState('')
-  useEffect(() => { setValue(''); setChoice('') }, [pending])
+  const [remember, setRemember] = useState(false)
+  useEffect(() => { setValue(''); setChoice(''); setRemember(false) }, [pending])
 
   if (!pending) return null
   const { options } = pending
@@ -73,7 +76,7 @@ export function AppDialogs() {
     if (!canConfirm) return
     if (pending.kind === 'confirm') pending.resolve(true)
     else if (pending.kind === 'text') pending.resolve(trimmed || null)
-    else pending.resolve({ value: choice, ...(trimmed ? { note: trimmed } : {}) })
+    else pending.resolve({ value: choice, ...(trimmed ? { note: trimmed } : {}), ...(remember ? { remember: true } : {}) })
     close()
   }
 
@@ -123,6 +126,12 @@ export function AppDialogs() {
                   className="mt-1.5 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-none"
                 />
               </label>
+              {pending.options.rememberLabel && (
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4" />
+                  {pending.options.rememberLabel}
+                </label>
+              )}
             </div>
           )}
           <div className="flex justify-end gap-2">

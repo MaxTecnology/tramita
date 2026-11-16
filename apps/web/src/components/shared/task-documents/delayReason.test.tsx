@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { server } from '@/test/server'
 import { AppDialogs } from '@/components/ui/app-dialogs'
-import { withDelayReason } from './delayReason'
+import { withDelayReason, type DelayMemory } from './delayReason'
 
 const API = 'http://localhost:3000'
 const missing = (message: string) => Object.assign(new Error(message), { response: { status: 422, data: { message } } })
@@ -58,4 +58,28 @@ it('giving up keeps the task as it was', async () => {
 it('other errors pass through', async () => {
   const send = vi.fn().mockRejectedValueOnce(missing('Esta OS aguarda: A'))
   await expect(withDelayReason(send)).rejects.toThrow('Esta OS aguarda: A')
+})
+
+it('in a batch, "use for the next ones" answers the following late OS without asking again', async () => {
+  const memory: DelayMemory = {}
+  const first = vi.fn().mockRejectedValueOnce(missing('Informe o motivo do atraso')).mockResolvedValueOnce('a')
+  const done = withDelayReason(first, memory)
+  await userEvent.selectOptions(await screen.findByLabelText('Motivo'), 'r1')
+  await userEvent.click(screen.getByLabelText('Usar este motivo nas próximas OS atrasadas'))
+  await userEvent.click(screen.getByRole('button', { name: 'Concluir' }))
+  await expect(done).resolves.toBe('a')
+
+  const second = vi.fn().mockRejectedValueOnce(missing('Informe o motivo do atraso')).mockResolvedValueOnce('b')
+  await expect(withDelayReason(second, memory)).resolves.toBe('b')
+  expect(second).toHaveBeenLastCalledWith({ delayReasonId: 'r1' })
+  expect(screen.queryByLabelText('Motivo')).not.toBeInTheDocument()
+})
+
+it('without a batch the option is not offered', async () => {
+  const send = vi.fn().mockRejectedValueOnce(missing('Informe o motivo do atraso')).mockResolvedValueOnce('ok')
+  const done = withDelayReason(send)
+  await screen.findByLabelText('Motivo')
+  expect(screen.queryByLabelText('Usar este motivo nas próximas OS atrasadas')).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  await done
 })

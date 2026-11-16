@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 import { AppError } from '@/errors/AppError'
 import { nationalHolidays, nationalHolidaysWithNames, dayKey, type HolidaySet } from '@/lib/business-days'
 import type { CreateHolidayBody } from './holidays.schema'
@@ -20,6 +21,7 @@ export async function listHolidays(organizationId: string, year: number) {
 export async function createHoliday(organizationId: string, data: CreateHolidayBody) {
   try {
     const h = await prisma.holiday.create({ data: { organizationId, date: toDate(data.date), name: data.name } })
+    await rescheduleDeadlines(organizationId, h.date)
     return { id: h.id, date: dayKey(h.date), name: h.name }
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -30,9 +32,23 @@ export async function createHoliday(organizationId: string, data: CreateHolidayB
 }
 
 export async function deleteHoliday(id: string, organizationId: string) {
-  const { count } = await prisma.holiday.deleteMany({ where: { id, organizationId } })
-  if (count === 0) throw new AppError(404, 'Feriado não encontrado')
+  const holiday = await prisma.holiday.findFirst({ where: { id, organizationId }, select: { date: true } })
+  if (!holiday) throw new AppError(404, 'Feriado não encontrado')
+  await prisma.holiday.delete({ where: { id } })
+  await rescheduleDeadlines(organizationId, holiday.date)
   return { id }
+}
+
+// OS and process targets already stored move with the calendar. Lazy import: os-deadline reads the
+// holidays from this module.
+async function rescheduleDeadlines(organizationId: string, date: Date) {
+  // The holiday is already saved: a failure here is logged, not answered as an error (a retry would hit 409)
+  try {
+    const { rescheduleAroundHoliday } = await import('@/modules/os/os-deadline.service')
+    await rescheduleAroundHoliday(organizationId, date)
+  } catch (err) {
+    logger.error({ organizationId, date: dayKey(date), reason: err instanceof Error ? err.message : String(err) }, 'Falha ao recalcular metas após mudança de feriado')
+  }
 }
 
 // National + office holidays of the given years, as 'YYYY-MM-DD' keys (lib/business-days)

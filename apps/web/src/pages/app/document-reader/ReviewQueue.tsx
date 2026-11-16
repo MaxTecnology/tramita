@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { withDelayReason } from '@/components/shared/task-documents/delayReason'
+import { withDelayReason, type DelayMemory } from '@/components/shared/task-documents/delayReason'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { ReceivedDocument, RejectedDocument } from '@/types'
@@ -241,8 +241,10 @@ export default function ReviewQueue() {
     // One by one: a late OS asks its own reason (the API says when); giving up skips that task
     mutationFn: async (taskIds: string[]) => {
       let done = 0
+      // Several late OS in the batch: the reason can be chosen once for all of them
+      const memory: DelayMemory | undefined = taskIds.length > 1 ? {} : undefined
       for (const id of taskIds) {
-        const result = await withDelayReason((extra) => api.patch(`/tasks/${id}`, { status: 'DONE', ...extra }))
+        const result = await withDelayReason((extra) => api.patch(`/tasks/${id}`, { status: 'DONE', ...extra }), memory)
         if (result !== null) done++
       }
       return done
