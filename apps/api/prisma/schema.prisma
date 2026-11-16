@@ -298,6 +298,7 @@ model Board {
   responsibleUser User?        @relation("BoardResponsible", fields: [responsibleUserId], references: [id])
   processTemplate ProcessTemplate? @relation(fields: [processTemplateId], references: [id])
   columns         Column[]
+  pauses          BoardPause[]
 
   @@index([processTemplateId])
   @@map("boards")
@@ -445,6 +446,7 @@ model Task {
 
   osModel              OSModel?                  @relation(fields: [osModelId], references: [id], onDelete: SetNull)
   dependsOn            TaskDependency[]          @relation("TaskDependsOn")
+  pauses               TaskPause[]
   dependents           TaskDependency[]          @relation("TaskDependents")
   column               Column                    @relation(fields: [columnId], references: [id], onDelete: Cascade)
   assignee             User?                     @relation("TaskAssignee", fields: [assigneeId], references: [id])
@@ -1192,6 +1194,7 @@ enum InAppType {
   DOCUMENT_RECEIVED
   DOCUMENT_REJECTED
   REQUEST_STATUS
+  OS_RELEASED
 }
 
 // Client approval of a file inside a task (e.g. payroll preview). The office may close it without the
@@ -1358,4 +1361,31 @@ model TaskDependency {
   @@id([taskId, dependsOnTaskId])
   @@index([dependsOnTaskId])
   @@map("task_dependencies")
+}
+
+// Periods an OS waited for the client (pending/rejected document or pending approval): its internal
+// deadline does not run while paused
+model TaskPause {
+  id        String    @id @default(cuid())
+  taskId    String
+  startedAt DateTime
+  endedAt   DateTime?
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("task_pauses")
+}
+
+// Periods a process waited for the client (every open OS of it paused)
+model BoardPause {
+  id        String    @id @default(cuid())
+  boardId   String
+  startedAt DateTime
+  endedAt   DateTime?
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@index([boardId])
+  @@map("board_pauses")
 }

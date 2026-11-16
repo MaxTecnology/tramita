@@ -26,3 +26,7 @@ export function competenceToDate(value: string): Date {
   const [y, m] = value.split('-').map(Number)
   return new Date(Date.UTC(y, m - 1, 1))
 }
+
+export const releaseEarlySchema = z.object({
+  reason: z.string().trim().min(3, 'Explique por que liberar antes').max(500),
+})

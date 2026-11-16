@@ -38,8 +38,9 @@ async function taskContext(taskId: string): Promise<TaskCtx | null> {
 
 const competenceParam = (d: Date | null) => (d ? `competence=${d.toISOString().slice(0, 7)}&` : '')
 
+// Recurring and standalone OS live in system boards: they open in Tarefas; process tasks in their board
 export const staffTaskLink = (t: Pick<TaskCtx, 'id' | 'boardId' | 'boardType'>) =>
-  t.boardType === 'RECURRING_SYSTEM' ? `/app/tasks?task=${t.id}` : `/app/board/${t.boardId}?task=${t.id}`
+  t.boardType === 'PROCESS' ? `/app/board/${t.boardId}?task=${t.id}` : `/app/tasks?task=${t.id}`
 
 export const clientTaskLink = (t: Pick<TaskCtx, 'id' | 'boardId' | 'boardType' | 'competence'>) =>
   t.boardType === 'RECURRING_SYSTEM' ? `/portal/send?${competenceParam(t.competence)}task=${t.id}` : `/portal/board/${t.boardId}?task=${t.id}`
@@ -73,6 +74,20 @@ async function safe(event: string, fn: () => Promise<unknown>): Promise<void> {
 const excerpt = (text: string, max = 140) => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
 
 export type Actor = { userId?: string; clientUserId?: string; name: string }
+
+// An OS of a process was released (the OS it waited for finished, or a manager released it early)
+export function onOSReleased(taskId: string, actor: { id: string; name: string } | null) {
+  return safe('OS_RELEASED', async () => {
+    const t = await taskContext(taskId)
+    if (!t) return
+    await notifyInApp({
+      organizationId: t.organizationId, type: 'OS_RELEASED', title: `"${t.title}" foi liberada — ${t.clientName}`,
+      body: 'A OS de que ela dependia terminou; o prazo começou a contar.', link: staffTaskLink(t),
+      refs: { taskId: t.id, boardId: t.boardId, clientId: t.clientId }, actorName: actor?.name ?? 'Sistema',
+      to: { userIds: await taskOwners(t) }, exclude: actor ? { userId: actor.id } : undefined,
+    })
+  })
+}
 
 export function onTaskComment(taskId: string, actor: Actor, content: string) {
   return safe('TASK_COMMENT', async () => {

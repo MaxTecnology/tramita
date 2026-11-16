@@ -12,6 +12,7 @@ import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, Li
 import { assertDepartmentServesClient, lockClients } from '@/modules/clients/client-coverage'
 import { syncProtocolsForTask } from '@/modules/protocols/protocol-from-deliverable'
 import { actorScope, taskWhere, mineTaskWhere, actableTaskIds } from '@/modules/staff-scope/staff-scope'
+import { assertReleased, afterStatusChange } from '@/modules/os/os-deadline.service'
 
 export interface Actor {
   id: string
@@ -136,6 +137,8 @@ export async function moveTask(
   actor: Actor,
 ) {
   const task = await verifyTaskBelongsToOrg(taskId, organizationId)
+  // An OS waiting for another one stays where it was born until released
+  await assertReleased(taskId)
   const fromColumn = task.column
   const toColumn = await verifyColumnBelongsToOrg(data.columnId, organizationId)
   if (toColumn.board.id !== task.column.board.id) {
@@ -219,6 +222,7 @@ export async function moveTask(
   }
 
   await notifyIfBlocked(taskId, task.status, nextStatus, toColumn.board.clientId, organizationId, task.visibleToClient)
+  await afterStatusChange(taskId, task.status, nextStatus, actor.type === 'user' ? { id: actor.id, name: actorName } : null)
 
   await publishBoardEvent(toColumn.board.id, {
     event: 'task:moved',
@@ -312,6 +316,7 @@ export async function updateTask(
   actor: Actor,
 ) {
   const task = await verifyTaskBelongsToOrg(id, organizationId)
+  if (data.status !== undefined && data.status !== task.status) await assertReleased(id)
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
   if (data.departmentId && data.departmentId !== task.departmentId) {
     await assertDepartmentServesClient(prisma, task.column.board.clientId, data.departmentId)
@@ -419,6 +424,7 @@ export async function updateTask(
 
   if (data.status !== undefined) {
     await notifyIfBlocked(id, task.status, data.status, task.column.board.clientId, organizationId, updated.visibleToClient)
+    await afterStatusChange(id, task.status, data.status, actor.type === 'user' ? { id: actor.id, name: actorName } : null)
   }
 
   if (data.assigneeId && data.assigneeId !== task.assigneeId) {

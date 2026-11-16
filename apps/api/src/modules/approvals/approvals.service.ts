@@ -13,6 +13,7 @@ import { actorScope, taskWhere, canActOnTask } from '@/modules/staff-scope/staff
 import { MUST_ASSUME } from '@/middlewares/staffScope'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 import { recalculateTaskStatus } from '@/modules/task-documents/task-documents.service'
+import { syncPause } from '@/modules/os/os-deadline.service'
 import { onApprovalRequested, onApprovalDecided } from '@/modules/inbox/inbox-events'
 import type { CloseApprovalBody, RequestApprovalBody } from './approvals.schema'
 
@@ -132,6 +133,7 @@ export async function requestApproval(taskId: string, organizationId: string, ac
     metadata: { taskTitle: task.title, approvalTitle: body.title, commentText: body.message },
   })
   await onApprovalRequested(approval.id, { userId: actor.id, name })
+  await syncPause(taskId) // OS clock pauses while the client approval is pending
   await publishBoardEvent(task.column.board.id, { event: 'task:updated', data: { taskId } })
   return presentApproval(approval)
 }
@@ -217,6 +219,7 @@ export async function decideAsClient(id: string, organizationId: string, clientU
   await onApprovalDecided(id, { clientUserId, name: clientUser.name })
   // A change request means work is still to be done: never let the checklist auto-complete it
   if (decision === 'APPROVED') await recalculateTaskStatus(task.id)
+  else await syncPause(task.id)
   await publishBoardEvent(task.column.board.id, { event: 'task:updated', data: { taskId: task.id } })
   return presentApproval(await prisma.taskApproval.findUniqueOrThrow({ where: { id }, include: approvalInclude }))
 }

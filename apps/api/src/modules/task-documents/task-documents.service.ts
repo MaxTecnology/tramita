@@ -1,5 +1,6 @@
 import { storageSafeName } from '@/lib/upload-policy'
 import { prisma } from '@/lib/prisma'
+import { afterStatusChange, syncPause } from '@/modules/os/os-deadline.service'
 import { AppError } from '@/errors/AppError'
 import { uploadFile, getSignedDownloadUrl } from '@/lib/b2'
 import { enqueueNotification } from '@/lib/queue'
@@ -437,5 +438,8 @@ export async function recalculateTaskStatus(taskId: string) {
       taskId, task.status, nextStatus, task.column.board.clientId, task.column.board.organizationId,
       task.visibleToClient,
     )
+    await afterStatusChange(taskId, task.status, nextStatus, null)
   }
+  // OS clock: a document pending or rejected on the client side pauses the internal deadline
+  await syncPause(taskId)
 }
