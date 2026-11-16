@@ -35,7 +35,8 @@ export async function webhooksRoutes(app: FastifyInstance) {
     if (!payment?.subscription) return reply.send({ received: true })
 
     const org = await prisma.organization.findFirst({
-      where: { asaasSubscriptionId: payment.subscription },
+      // A direct-agreement office is controlled by the Master, never by an Asaas event
+      where: { asaasSubscriptionId: payment.subscription, billingMode: 'ASAAS' },
     })
     if (!org) return reply.send({ received: true })
 

@@ -1,11 +1,16 @@
 import { z } from 'zod'
 import { cnpjValido, soDigitos } from '@/lib/documento'
 
+// Date-only (AAAA-MM-DD), stored as UTC midnight
+const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use AAAA-MM-DD)')
+
 export const updateOrgSchema = z.object({
   planId: z.string().optional(),
   subscriptionStatus: z
     .enum(['ACTIVE', 'SUSPENDED', 'CANCELLED', 'GRACE_PERIOD', 'TRIAL'])
     .optional(),
+  // Direct agreement only: when the next payment is due (null clears it)
+  manualNextDueDate: dateOnly.nullable().optional(),
 })
 
 export const registerOrgSchema = z.object({
@@ -38,6 +43,8 @@ export const createOrgByMasterSchema = z
     planId: z.string().min(1, 'Plano obrigatório'),
     adminName: z.string().min(2, 'Nome do admin obrigatório'),
     createAsaasSubscription: z.boolean(),
+    // Without Asaas the office pays by direct agreement: optional next due date
+    manualNextDueDate: dateOnly.optional(),
   })
   .refine((data) => !data.createAsaasSubscription || !!data.cnpj, {
     message: 'CNPJ é obrigatório para criar assinatura na Asaas',

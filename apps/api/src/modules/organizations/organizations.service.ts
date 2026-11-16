@@ -109,6 +109,8 @@ export async function createOrganizationByMaster(data: CreateOrgByMasterBody) {
       data: {
         name: data.name, slug, cnpj: data.cnpj, email: data.email,
         phone: data.phone, planId: data.planId, subscriptionStatus: 'ACTIVE',
+        billingMode: data.createAsaasSubscription ? 'ASAAS' : 'MANUAL',
+        manualNextDueDate: !data.createAsaasSubscription && data.manualNextDueDate ? dateOnlyToDate(data.manualNextDueDate) : null,
       },
     })
     const user = await tx.user.create({
@@ -202,6 +204,7 @@ export async function listOrganizations() {
     subscriptionStatus: org.subscriptionStatus, planId: org.planId,
     planName: org.plan.name, clientsCount: org._count.clients,
     usersCount: org._count.users, createdAt: org.createdAt,
+    billingMode: org.billingMode, manualNextDueDate: org.manualNextDueDate,
   }))
 }
 
@@ -230,6 +233,7 @@ export async function getOrganization(id: string) {
     phone: org.phone, subscriptionStatus: org.subscriptionStatus, planId: org.planId,
     planName: org.plan.name, clientsCount: org._count.clients, usersCount: org._count.users,
     gracePeriodEndsAt: org.gracePeriodEndsAt, trialEndsAt: org.trialEndsAt,
+    billingMode: org.billingMode, manualNextDueDate: org.manualNextDueDate,
     subscriptionHistory: org.subscriptionHistory, createdAt: org.createdAt,
     users: org.users,
   }
@@ -238,5 +242,19 @@ export async function getOrganization(id: string) {
 export async function updateOrganization(id: string, data: UpdateOrgBody) {
   const org = await prisma.organization.findUnique({ where: { id } })
   if (!org) throw new AppError(404, 'Organização não encontrada')
-  return prisma.organization.update({ where: { id }, data })
+  const { manualNextDueDate, ...rest } = data
+  if (manualNextDueDate !== undefined && org.billingMode !== 'MANUAL') {
+    throw new AppError(422, 'Escritório cobrado pelo Asaas não tem vencimento manual')
+  }
+  return prisma.organization.update({
+    where: { id },
+    data: {
+      ...rest,
+      ...(manualNextDueDate !== undefined ? { manualNextDueDate: manualNextDueDate ? dateOnlyToDate(manualNextDueDate) : null } : {}),
+    },
+  })
+}
+
+function dateOnlyToDate(value: string): Date {
+  return new Date(`${value}T00:00:00.000Z`)
 }

@@ -90,6 +90,7 @@ Login unificado — role no JWT discrimina acesso (`MASTER`, `ORG_ADMIN`, `ORG_M
 #### GET `/master/organizations` — lista com status da assinatura e uso
 #### GET `/master/organizations/:id` — detalhes + histórico de pagamentos + lista de usuários
 #### PATCH `/master/organizations/:id` — alterar plano, suspender, reativar
+→ Body: `{ planId?, subscriptionStatus?, manualNextDueDate?: 'AAAA-MM-DD' | null }`. `manualNextDueDate` só em escritório `billingMode: MANUAL` (422 `'Escritório cobrado pelo Asaas não tem vencimento manual'`).
 #### POST `/master/organizations` — cadastro manual pelo Master (sem passar pelo `/organizations/register` público)
 ```json
 {
@@ -99,17 +100,19 @@ Login unificado — role no JWT discrimina acesso (`MASTER`, `ORG_ADMIN`, `ORG_M
   "cnpj": "string?",
   "planId": "string",
   "adminName": "string",
-  "createAsaasSubscription": false
+  "createAsaasSubscription": false,
+  "manualNextDueDate": "AAAA-MM-DD?"
 }
 ```
 → Cria Organization (`subscriptionStatus: ACTIVE` direto, sem trial) + User (ORG_ADMIN)
 → Senha do ORG_ADMIN é **gerada pelo servidor**, nunca definida no formulário — retorna `temporaryPassword` em texto puro só nesta resposta (não fica persistida em lugar nenhum)
 → `cnpj` só é obrigatório quando `createAsaasSubscription: true`; nesse caso cria Customer + Subscription no Asaas igual ao `/organizations/register` (com o mesmo rollback se a Asaas falhar)
+→ `billingMode`: com assinatura no Asaas → `ASAAS`; sem → `MANUAL` (acerto direto com a AutoHubs; `manualNextDueDate` opcional, só lembrete no painel — nunca bloqueia). O webhook do Asaas só altera escritórios `ASAAS`. Lista e detalhe trazem `billingMode` e `manualNextDueDate`.
 
 #### POST `/master/organizations/:orgId/users/:userId/reset-password` — redefine a senha de qualquer usuário da organização
 → Mesmo mecanismo de senha gerada do endpoint acima; retorna `{ id, name, email, temporaryPassword }`
 
-#### GET `/master/revenue` — receita total, MRR, churn (agregados do Asaas)
+#### GET `/master/revenue` — `{ mrr, mrrAsaas, mrrManual, totalOrgsAtivas, churn }` (MRR das orgs ACTIVE, separado por forma de cobrança)
 
 ---
 

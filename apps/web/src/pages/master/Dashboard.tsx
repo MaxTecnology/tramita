@@ -5,6 +5,8 @@ import { TrendingUp, Building2, TrendingDown } from 'lucide-react'
 
 interface Revenue {
   mrr: number
+  mrrAsaas: number
+  mrrManual: number
   totalOrgsAtivas: number
   churn: number
 }
@@ -24,7 +26,8 @@ export default function MasterDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label="MRR"
-          value={`R$ ${(data?.mrr ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          value={brl(data?.mrr ?? 0)}
+          hint={`Asaas ${brl(data?.mrrAsaas ?? 0)} · acerto direto ${brl(data?.mrrManual ?? 0)}`}
           icon={<TrendingUp size={20} />}
           iconColor="#185FA5"
         />
@@ -45,14 +48,18 @@ export default function MasterDashboard() {
   )
 }
 
+const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+
 function StatCard({
   label,
   value,
+  hint,
   icon,
   iconColor,
 }: {
   label: string
   value: string
+  hint?: string
   icon: React.ReactNode
   iconColor: string
 }) {
@@ -64,6 +71,7 @@ function StatCard({
           <span style={{ color: iconColor }}>{icon}</span>
         </div>
         <p className="text-3xl font-bold text-foreground">{value}</p>
+        {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
       </CardContent>
     </Card>
   )

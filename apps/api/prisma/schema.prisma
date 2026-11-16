@@ -40,6 +40,9 @@ model Organization {
   gracePeriodEndsAt   DateTime?
   asaasCustomerId     String?
   asaasSubscriptionId String?
+  billingMode         BillingMode         @default(ASAAS)
+  // MANUAL only: next payment of the agreement (date-only, UTC midnight)
+  manualNextDueDate   DateTime?
   isActive            Boolean             @default(true)
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
@@ -72,6 +75,13 @@ enum SubscriptionStatus {
   GRACE_PERIOD
   SUSPENDED
   CANCELLED
+}
+
+// How the office pays AutoHubs: Asaas subscription (webhook drives the status) or a direct agreement
+// (the Master controls the status; manualNextDueDate only reminds)
+enum BillingMode {
+  ASAAS
+  MANUAL
 }
 
 model SubscriptionHistory {

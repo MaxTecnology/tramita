@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { BillingBadge, type BillingMode } from '@/components/master/BillingBadge'
 
 interface Org {
   id: string
@@ -18,6 +19,8 @@ interface Org {
   planName: string
   clientsCount: number
   usersCount: number
+  billingMode: BillingMode
+  manualNextDueDate: string | null
 }
 
 interface Plan {
@@ -34,10 +37,11 @@ type CreateOrgForm = {
   planId: string
   adminName: string
   createAsaasSubscription: boolean
+  manualNextDueDate: string
 }
 
 const EMPTY_CREATE_ORG: CreateOrgForm = {
-  name: '', email: '', phone: '', cnpj: '', planId: '', adminName: '', createAsaasSubscription: false,
+  name: '', email: '', phone: '', cnpj: '', planId: '', adminName: '', createAsaasSubscription: false, manualNextDueDate: '',
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -79,6 +83,7 @@ export default function MasterOrganizations() {
         planId: createForm.planId,
         adminName: createForm.adminName,
         createAsaasSubscription: createForm.createAsaasSubscription,
+        ...(!createForm.createAsaasSubscription && createForm.manualNextDueDate ? { manualNextDueDate: createForm.manualNextDueDate } : {}),
       }).then((r) => r.data as { temporaryPassword: string }),
     onSuccess: (data) => {
       toast.success('Organização criada com sucesso')
@@ -128,7 +133,7 @@ export default function MasterOrganizations() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-neutral-bg">
-                {['Nome', 'E-mail', 'Plano', 'Status', 'Clientes', 'Usuários', 'Ações'].map((h) => (
+                {['Nome', 'E-mail', 'Plano', 'Status', 'Cobrança', 'Clientes', 'Usuários', 'Ações'].map((h) => (
                   <th key={h} className="text-left px-4 py-3 font-medium text-muted-foreground">{h}</th>
                 ))}
               </tr>
@@ -148,6 +153,7 @@ export default function MasterOrganizations() {
                       {STATUS_LABEL[org.subscriptionStatus] ?? org.subscriptionStatus}
                     </Badge>
                   </td>
+                  <td className="px-4 py-3"><BillingBadge billingMode={org.billingMode} manualNextDueDate={org.manualNextDueDate} /></td>
                   <td className="px-4 py-3 text-foreground">{org.clientsCount}</td>
                   <td className="px-4 py-3 text-foreground">{org.usersCount}</td>
                   <td className="px-4 py-3">
@@ -266,6 +272,13 @@ export default function MasterOrganizations() {
                   />
                   <Label htmlFor="o-asaas">Também criar assinatura na Asaas</Label>
                 </div>
+                {!createForm.createAsaasSubscription && (
+                  <div className="space-y-1">
+                    <Label htmlFor="o-manual-due">Próximo vencimento do acerto</Label>
+                    <Input id="o-manual-due" type="date" value={createForm.manualNextDueDate} onChange={(e) => setCreateForm({ ...createForm, manualNextDueDate: e.target.value })} />
+                    <p className="text-xs text-muted-foreground">Sem Asaas o escritório paga por acerto direto. Opcional: só lembra você no painel.</p>
+                  </div>
+                )}
                 {createForm.createAsaasSubscription && (
                   <div className="space-y-1">
                     <Label htmlFor="o-cnpj">CNPJ *</Label>

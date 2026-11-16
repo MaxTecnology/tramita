@@ -1,12 +1,16 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { BillingBadge, type BillingMode } from '@/components/master/BillingBadge'
+import { mensagemDeErro } from '@/lib/utils'
 
 interface OrgUser {
   id: string
@@ -24,6 +28,8 @@ interface OrgDetail {
   clientsCount: number
   usersCount: number
   users: OrgUser[]
+  billingMode: BillingMode
+  manualNextDueDate: string | null
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -62,8 +68,11 @@ export default function MasterOrganizationDetail() {
           <div><span className="text-muted-foreground">Status:</span> <Badge>{org.subscriptionStatus}</Badge></div>
           <div><span className="text-muted-foreground">Clientes:</span> {org.clientsCount}</div>
           <div><span className="text-muted-foreground">Usuários:</span> {org.usersCount}</div>
+          <div className="flex items-center gap-2"><span className="text-muted-foreground">Cobrança:</span> <BillingBadge billingMode={org.billingMode} manualNextDueDate={org.manualNextDueDate} /></div>
         </CardContent>
       </Card>
+
+      {org.billingMode === 'MANUAL' && <ManualDueDate orgId={org.id} current={org.manualNextDueDate} />}
 
       <h2 className="text-sm font-semibold text-foreground mb-3">Usuários</h2>
       <Card>
@@ -127,5 +136,31 @@ export default function MasterOrganizationDetail() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+// Direct agreement: the Master keeps the next due date (a reminder on the panel, never a block)
+function ManualDueDate({ orgId, current }: { orgId: string; current: string | null }) {
+  const qc = useQueryClient()
+  const [value, setValue] = useState(current ? current.slice(0, 10) : '')
+  const save = useMutation({
+    mutationFn: () => api.patch(`/master/organizations/${orgId}`, { manualNextDueDate: value || null }),
+    onSuccess: () => {
+      toast.success('Vencimento salvo')
+      qc.invalidateQueries({ queryKey: ['master', 'organizations'] })
+    },
+    onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao salvar o vencimento')),
+  })
+  return (
+    <Card className="mb-6">
+      <CardContent className="p-4 flex flex-wrap items-end gap-3 text-sm">
+        <div className="space-y-1">
+          <Label htmlFor="manual-due">Próximo vencimento do acerto</Label>
+          <Input id="manual-due" type="date" value={value} onChange={(e) => setValue(e.target.value)} className="w-44" />
+        </div>
+        <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>Salvar vencimento</Button>
+        <p className="text-xs text-muted-foreground basis-full">Vazio = sem vencimento. Ao receber, avance para o próximo mês.</p>
+      </CardContent>
+    </Card>
   )
 }
