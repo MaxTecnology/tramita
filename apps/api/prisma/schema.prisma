@@ -54,7 +54,7 @@ model Organization {
   subscriptionHistory    SubscriptionHistory[]
   departments            Department[]
   recurringTaskTemplates RecurringTaskTemplate[]
-  osTemplates            OSTemplate[]
+  processTemplates       ProcessTemplate[]
   protocols              Protocol[]
   protocolCounters       ProtocolCounter[]
   obligationTypes        ObligationType[]
@@ -247,6 +247,7 @@ model Department {
   recurringTaskTemplates RecurringTaskTemplate[]
   clientUserAccesses     ClientUserAccess[]
   members                UserDepartment[]
+  processTemplates       ProcessTemplate[]
 
   @@unique([organizationId, name])
   @@map("departments")
@@ -277,15 +278,23 @@ model Board {
   responsibleUserId  String?
   isActive           Boolean             @default(true)
   dueDate            DateTime?
-  type               BoardType           @default(OS)
-  osTemplateId       String?
+  type               BoardType           @default(PROCESS)
+  processTemplateId  String?
+  // Process clock (business days, pauses while every open OS waits for the client) and delay reason
+  deadlineBusinessDays Int?
+  targetDate           DateTime?
+  competence           DateTime?
+  completedAt          DateTime?
+  delayReasonId        String?
+  delayNote            String?
+  delayReasonPending   Boolean   @default(false)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
   organization    Organization @relation(fields: [organizationId], references: [id])
   client          Client       @relation(fields: [clientId], references: [id])
   responsibleUser User?        @relation("BoardResponsible", fields: [responsibleUserId], references: [id])
-  osTemplate      OSTemplate?  @relation(fields: [osTemplateId], references: [id])
+  processTemplate ProcessTemplate? @relation(fields: [processTemplateId], references: [id])
   columns         Column[]
 
   @@map("boards")
@@ -304,7 +313,7 @@ model Request {
   rejectionReason    String?
   reviewedById       String?
   reviewedAt         DateTime?
-  osTemplateId       String?
+  processTemplateId  String?
   cancelledByType    CommentAuthorType?
   cancelledById      String?
   cancellationReason String?
@@ -316,7 +325,7 @@ model Request {
   task         Task?               @relation(fields: [taskId], references: [id])
   department   Department          @relation(fields: [departmentId], references: [id])
   reviewedBy   User?               @relation("RequestReviewer", fields: [reviewedById], references: [id])
-  osTemplate   OSTemplate?         @relation(fields: [osTemplateId], references: [id])
+  processTemplate ProcessTemplate? @relation(fields: [processTemplateId], references: [id])
   attachments  RequestAttachment[]
   comments     RequestComment[]
 
@@ -474,28 +483,36 @@ enum ColumnStatusEffect {
 }
 
 enum BoardType {
-  OS
+  PROCESS
   RECURRING_SYSTEM
+  // One per client: holds its standalone OS (service orders), like RECURRING_SYSTEM holds recurring tasks
+  SERVICE_SYSTEM
 }
 
-model OSTemplate {
+model ProcessTemplate {
   id             String   @id @default(cuid())
   organizationId String
   name           String
   description    String?
   isActive       Boolean  @default(true)
+  // Department that evaluates client requests for this process and owns its manual tasks
+  departmentId         String?
+  deadlineBusinessDays Int?
+  clientCanRequest     Boolean @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  columns      OSTemplateColumn[]
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department   Department?             @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  columns      ProcessTemplateColumn[]
   requests     Request[]
   boards       Board[]
 
-  @@map("os_templates")
+  @@index([organizationId])
+  @@map("process_templates")
 }
 
-model OSTemplateColumn {
+model ProcessTemplateColumn {
   id           String             @id @default(cuid())
   templateId   String
   title        String
@@ -503,21 +520,21 @@ model OSTemplateColumn {
   statusEffect ColumnStatusEffect @default(NONE)
   notifyClient Boolean            @default(false)
 
-  template  OSTemplate                 @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  documents OSTemplateColumnDocument[]
+  template  ProcessTemplate                 @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  documents ProcessTemplateColumnDocument[]
 
-  @@map("os_template_columns")
+  @@map("process_template_columns")
 }
 
-model OSTemplateColumnDocument {
+model ProcessTemplateColumnDocument {
   id       String @id @default(cuid())
   columnId String
   name     String
   position Int
 
-  column OSTemplateColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  column ProcessTemplateColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
 
-  @@map("os_template_column_documents")
+  @@map("process_template_column_documents")
 }
 
 model RecurringTaskTemplate {

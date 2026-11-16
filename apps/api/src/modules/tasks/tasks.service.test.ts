@@ -696,7 +696,7 @@ describe('listTasks (boardType / openOnly)', () => {
     const osTask = await createTestTask(osColumn.id, user.id)
     await createTestTask(recurringColumn.id, user.id)
 
-    const result = await listTasks(org.id, { id: user.id, role: 'ORG_ADMIN' }, { boardType: 'OS' })
+    const result = await listTasks(org.id, { id: user.id, role: 'ORG_ADMIN' }, { boardType: 'PROCESS' })
 
     const ids = result.items.map((t) => t.id)
     expect(ids).toContain(osTask.id)

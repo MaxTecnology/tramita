@@ -49,7 +49,7 @@ export async function createRequest(
       title: data.title,
       description: data.description,
       departmentId: data.departmentId,
-      osTemplateId: data.osTemplateId,
+      processTemplateId: data.processTemplateId,
     },
   })
 
@@ -272,19 +272,19 @@ export async function approveRequest(
   if (data.mode === 'NEW_BOARD') {
     const client = await prisma.client.findFirst({ where: { id: request.clientId, organizationId } })
     const titlePrefix = client?.codigo ? `${client.codigo} - ${client.name}` : client?.name
-    const osTemplate = request.osTemplateId
-      ? await prisma.oSTemplate.findFirst({ where: { id: request.osTemplateId, organizationId } })
+    const processTemplate = request.processTemplateId
+      ? await prisma.processTemplate.findFirst({ where: { id: request.processTemplateId, organizationId } })
       : null
 
     const board = await createBoard(organizationId, reviewerId, reviewerRole, {
-      title: osTemplate ? `${titlePrefix} — ${osTemplate.name}` : request.title,
+      title: processTemplate ? `${titlePrefix} — ${processTemplate.name}` : request.title,
       clientId: request.clientId,
-      osTemplateId: request.osTemplateId ?? undefined,
+      processTemplateId: request.processTemplateId ?? undefined,
     })
     columnId = board.columns[0].id
   } else {
     const board = await prisma.board.findFirst({
-      where: { id: data.boardId, organizationId, clientId: request.clientId, isActive: true, type: 'OS' },
+      where: { id: data.boardId, organizationId, clientId: request.clientId, isActive: true, type: 'PROCESS' },
     })
     if (!board) throw new AppError(404, 'Processo não encontrado para este cliente')
     const column = await prisma.column.findFirst({ where: { id: data.columnId, boardId: board.id } })

@@ -67,7 +67,7 @@ describe('boardWhere', () => {
   it('processes of clients served by my departments; without the option or without departments only the portfolio', async () => {
     const w = await world()
     const boards = async (u: { id: string; role: string; organizationId: string | null }) =>
-      ids(await prisma.board.findMany({ where: { organizationId: w.org.id, type: 'OS', ...boardWhere(await loadStaffScope(asUser(u))) } }))
+      ids(await prisma.board.findMany({ where: { organizationId: w.org.id, type: 'PROCESS', ...boardWhere(await loadStaffScope(asUser(u))) } }))
 
     expect(await boards(w.gerenteFiscal)).toEqual([w.osA.id])
     expect(await boards(w.bruna)).toEqual([w.osA.id])

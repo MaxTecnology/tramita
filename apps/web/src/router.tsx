@@ -27,8 +27,8 @@ import RecurringTemplateManage from '@/pages/app/settings/RecurringTemplateManag
 import RecurringGenerationConsole from '@/pages/app/settings/RecurringGenerationConsole'
 import ClientUsers from '@/pages/app/settings/ClientUsers'
 import ClientUserForm from '@/pages/app/settings/ClientUserForm'
-import OSTemplates from '@/pages/app/settings/OSTemplates'
-import OSTemplateForm from '@/pages/app/settings/OSTemplateForm'
+import ProcessTemplates from '@/pages/app/settings/ProcessTemplates'
+import ProcessTemplateForm from '@/pages/app/settings/ProcessTemplateForm'
 import OSList from '@/pages/app/OSList'
 import DashboardMetrics from '@/pages/app/DashboardMetrics'
 import Processes from '@/pages/app/Processes'
@@ -207,10 +207,10 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'settings/os-templates',
+        path: 'settings/process-templates',
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <OSTemplates />
+            <ProcessTemplates />
           </ProtectedRoute>
         ),
       },
@@ -239,18 +239,18 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'settings/os-templates/new',
+        path: 'settings/process-templates/new',
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <OSTemplateForm />
+            <ProcessTemplateForm />
           </ProtectedRoute>
         ),
       },
       {
-        path: 'settings/os-templates/:id/edit',
+        path: 'settings/process-templates/:id/edit',
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <OSTemplateForm />
+            <ProcessTemplateForm />
           </ProtectedRoute>
         ),
       },

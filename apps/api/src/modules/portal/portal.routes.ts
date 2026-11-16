@@ -91,9 +91,9 @@ export async function portalRoutes(app: FastifyInstance) {
     )
   })
 
-  app.get('/os-templates', async (request, reply) => {
+  app.get('/process-templates', async (request, reply) => {
     return reply.send(
-      await prisma.oSTemplate.findMany({
+      await prisma.processTemplate.findMany({
         where: { organizationId: request.user.organizationId!, isActive: true },
         select: { id: true, name: true },
         orderBy: { name: 'asc' },

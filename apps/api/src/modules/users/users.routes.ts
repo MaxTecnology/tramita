@@ -28,7 +28,7 @@ export async function usersRoutes(app: FastifyInstance) {
   // encapsulamento, inclusive as declaradas antes do addHook — confirmado empiricamente. Um
   // `addHook('preHandler', requireRole('ORG_ADMIN'))` aqui bloquearia também GET/PATCH /me pra
   // qualquer usuário não-admin, quebrando o acesso ao próprio perfil. Ver mesmo padrão em
-  // os-templates.routes.ts.
+  // process-templates.routes.ts.
   const adminOnly = [requireRole('ORG_ADMIN')]
 
   // Light id+name list for filters (Tasks "Colaborador"), open to the whole office team.

@@ -50,7 +50,7 @@ export const listTasksQuerySchema = z.object({
   // targetDate, por dueDate — é o que a visão Calendário precisa pra não excluir tarefas
   // regulares (que nunca ganham targetDate, só as recorrentes) da janela do mês.
   dateField: z.enum(['target', 'effective', 'period']).optional(),
-  boardType: z.enum(['OS', 'RECURRING_SYSTEM']).optional(),
+  boardType: z.enum(['PROCESS', 'RECURRING_SYSTEM', 'SERVICE_SYSTEM']).optional(),
   // Minhas · Meu departamento · Todas — default: department for office staff, all for admins
   scope: z.enum(['mine', 'department', 'all']).optional(),
   openOnly: z.coerce.boolean().optional(),

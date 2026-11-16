@@ -14,7 +14,7 @@ type TaskCtx = {
   visibleToClient: boolean
   competence: Date | null
   boardId: string
-  boardType: 'OS' | 'RECURRING_SYSTEM'
+  boardType: 'PROCESS' | 'RECURRING_SYSTEM' | 'SERVICE_SYSTEM'
   clientId: string
   clientName: string
 }

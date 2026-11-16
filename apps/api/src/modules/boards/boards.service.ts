@@ -32,7 +32,7 @@ export async function listBoards(
     where: {
       organizationId,
       isActive: true,
-      type: 'OS',
+      type: 'PROCESS',
       ...(query.staffScope ? { AND: [boardWhere(query.staffScope)] } : {}),
       ...(query.clientId
         ? { clientId: Array.isArray(query.clientId) ? { in: query.clientId } : query.clientId }
@@ -98,7 +98,7 @@ export async function getBoardById(
       id,
       organizationId,
       isActive: true,
-      type: 'OS',
+      type: 'PROCESS',
       ...(staffScope ? { AND: [boardWhere(staffScope)] } : {}),
       ...(clientId ? { clientId: Array.isArray(clientId) ? { in: clientId } : clientId } : {}),
     },
@@ -135,8 +135,8 @@ export async function createBoard(
   const responsibleUserId =
     userRole === 'ORG_MEMBER' ? userId : (data.responsibleUserId ?? null)
 
-  const columns = data.osTemplateId
-    ? await buildColumnsFromTemplate(data.osTemplateId, organizationId)
+  const columns = data.processTemplateId
+    ? await buildColumnsFromTemplate(data.processTemplateId, organizationId)
     : DEFAULT_COLUMNS
 
   const board = await prisma.board.create({
@@ -147,8 +147,8 @@ export async function createBoard(
       organizationId,
       responsibleUserId,
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
-      type: 'OS',
-      osTemplateId: data.osTemplateId,
+      type: 'PROCESS',
+      processTemplateId: data.processTemplateId,
       columns: { create: columns },
     },
     include: {
@@ -160,12 +160,12 @@ export async function createBoard(
   return board
 }
 
-async function buildColumnsFromTemplate(osTemplateId: string, organizationId: string) {
-  const template = await prisma.oSTemplate.findFirst({
-    where: { id: osTemplateId, organizationId, isActive: true },
+async function buildColumnsFromTemplate(processTemplateId: string, organizationId: string) {
+  const template = await prisma.processTemplate.findFirst({
+    where: { id: processTemplateId, organizationId, isActive: true },
     include: { columns: { orderBy: { position: 'asc' }, include: { documents: { orderBy: { position: 'asc' } } } } },
   })
-  if (!template) throw new AppError(404, 'Template de OS não encontrado')
+  if (!template) throw new AppError(404, 'Modelo de processo não encontrado')
 
   return template.columns.map((col) => ({
     title: col.title,
@@ -177,7 +177,7 @@ async function buildColumnsFromTemplate(osTemplateId: string, organizationId: st
 }
 
 export async function updateBoard(id: string, organizationId: string, data: UpdateBoardBody) {
-  const board = await prisma.board.findFirst({ where: { id, organizationId, isActive: true, type: 'OS' } })
+  const board = await prisma.board.findFirst({ where: { id, organizationId, isActive: true, type: 'PROCESS' } })
   if (!board) throw new AppError(404, 'Board não encontrado')
 
   return prisma.board.update({
@@ -196,7 +196,7 @@ export async function updateBoard(id: string, organizationId: string, data: Upda
 
 export async function searchTasks(boardId: string, organizationId: string, filters: SearchQuery) {
   const board = await prisma.board.findFirst({
-    where: { id: boardId, organizationId, isActive: true, type: 'OS' },
+    where: { id: boardId, organizationId, isActive: true, type: 'PROCESS' },
   })
   if (!board) throw new AppError(404, 'Board não encontrado')
 

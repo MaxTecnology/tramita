@@ -43,8 +43,8 @@ export interface Board {
   responsibleUser: { id: string; name: string } | null
   isActive: boolean
   dueDate: string | null
-  osTemplateId?: string | null
-  type: 'OS' | 'RECURRING_SYSTEM'
+  processTemplateId?: string | null
+  type: 'PROCESS' | 'RECURRING_SYSTEM' | 'SERVICE_SYSTEM'
   columns: Column[]
   client: { id: string; name: string; codigo: string | null }
 }
@@ -341,16 +341,16 @@ export interface ClientUser {
   accesses: ClientUserAccessItem[]
 }
 
-export interface OSTemplateColumnDocumentItem { id: string; name: string; position: number }
-export interface OSTemplateColumn {
+export interface ProcessTemplateColumnDocumentItem { id: string; name: string; position: number }
+export interface ProcessTemplateColumn {
   id: string; title: string; position: number
   statusEffect: 'NONE' | 'OPEN' | 'STARTED' | 'BLOCKED' | 'DISREGARDED' | 'DONE'
   notifyClient: boolean
-  documents: OSTemplateColumnDocumentItem[]
+  documents: ProcessTemplateColumnDocumentItem[]
 }
-export interface OSTemplate {
+export interface ProcessTemplate {
   id: string; name: string; description: string | null; isActive: boolean
-  columns: OSTemplateColumn[]
+  columns: ProcessTemplateColumn[]
 }
 
 export interface ObligationType {

@@ -33,8 +33,8 @@ const FALLBACK_SOUND: Record<'TARGET_WARNING' | 'DUE_CRITICAL', string> = {
 // que abre o app. Tarefas sem responsável ainda aparecem pro admin/manager via o resumo diário
 // (que já cai pro fallback de admins) — o alerta em tempo real fica consistente "assignee
 // primeiro", igual ao digest.
-export function buildSlaTasksParams(userId: string): { boardType: 'OS'; openOnly: true; assigneeId: string } {
-  return { boardType: 'OS', openOnly: true, assigneeId: userId }
+export function buildSlaTasksParams(userId: string): { boardType: 'PROCESS'; openOnly: true; assigneeId: string } {
+  return { boardType: 'PROCESS', openOnly: true, assigneeId: userId }
 }
 
 export function useSlaAlerts(): { permissionNeeded: boolean; requestPermission: () => void } {

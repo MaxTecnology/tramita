@@ -25,7 +25,7 @@ export interface ProductivityQuery {
   to: Date
   departmentId?: string
   userId?: string
-  boardType?: 'OS' | 'RECURRING_SYSTEM'
+  boardType?: 'PROCESS' | 'RECURRING_SYSTEM' | 'SERVICE_SYSTEM'
 }
 
 export interface OnTimeBucket {

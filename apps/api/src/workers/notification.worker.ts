@@ -186,7 +186,7 @@ const TASK_DEEP_LINK_EVENTS = new Set(['TASK_COMMENT_ADDED', 'DOCUMENT_REJECTED'
 
 function clientPortalUrl(
   event: string,
-  task: { id: string; competence: Date | null; column: { board: { id: string; type: 'OS' | 'RECURRING_SYSTEM' } } } | null,
+  task: { id: string; competence: Date | null; column: { board: { id: string; type: 'PROCESS' | 'RECURRING_SYSTEM' | 'SERVICE_SYSTEM' } } } | null,
 ): string {
   const appUrl = process.env.APP_URL ?? 'https://tramita.autohubs.com.br'
   if (!task || !TASK_DEEP_LINK_EVENTS.has(event)) return `${appUrl}/portal`

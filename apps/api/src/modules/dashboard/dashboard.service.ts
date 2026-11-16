@@ -32,13 +32,13 @@ export async function getDashboardMetrics(
     tasksByStatus,
     atRiskBoards,
   ] = await Promise.all([
-    prisma.board.count({ where: { organizationId, isActive: true, type: 'OS', ...scope } }),
+    prisma.board.count({ where: { organizationId, isActive: true, type: 'PROCESS', ...scope } }),
 
     prisma.board.count({
       where: {
         organizationId,
         isActive: true,
-        type: 'OS',
+        type: 'PROCESS',
         ...scope,
         OR: [
           {
@@ -56,7 +56,7 @@ export async function getDashboardMetrics(
     }),
 
     // Agregados a nível de TAREFA — recorrentes moram no board de sistema RECURRING_SYSTEM mas
-    // são tarefas reais de trabalho da equipe, então NÃO filtramos type: 'OS' aqui (diferente
+    // são tarefas reais de trabalho da equipe, então NÃO filtramos type: 'PROCESS' aqui (diferente
     // das contagens/listagens a nível de BOARD acima e abaixo, onde o board de sistema nunca
     // deve aparecer como "processo").
     prisma.task.count({
@@ -85,7 +85,7 @@ export async function getDashboardMetrics(
       where: {
         organizationId,
         isActive: true,
-        type: 'OS',
+        type: 'PROCESS',
         ...scope,
         OR: [
           {
@@ -208,8 +208,8 @@ function emptyBreakdown(): MetricsBreakdown {
   }
 }
 
-function bucketKey(type: 'OS' | 'RECURRING_SYSTEM'): 'os' | 'recurring' {
-  return type === 'OS' ? 'os' : 'recurring'
+function bucketKey(type: 'PROCESS' | 'RECURRING_SYSTEM' | 'SERVICE_SYSTEM'): 'os' | 'recurring' {
+  return type === 'RECURRING_SYSTEM' ? 'recurring' : 'os'
 }
 
 function clippedDurationMs(start: Date, end: Date, from: Date, to: Date): number {

@@ -26,7 +26,7 @@ import {
   cancelApprovedRequest,
 } from './requests.service'
 import { createBoard } from '@/modules/boards/boards.service'
-import { createOSTemplate } from '@/modules/os-templates/os-templates.service'
+import { createProcessTemplate } from '@/modules/process-templates/process-templates.service'
 
 beforeEach(() => {
   vi.spyOn(queue, 'enqueueNotification').mockResolvedValue(undefined)
@@ -172,12 +172,12 @@ describe('approveRequest', () => {
     expect(board?.title).toBe('Abertura de LTDA')
   })
 
-  it('mode NEW_BOARD com osTemplateId cria board com as colunas do template e título com prefixo do código do cliente', async () => {
+  it('mode NEW_BOARD com processTemplateId cria board com as colunas do template e título com prefixo do código do cliente', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id, { name: 'Empresa X', codigo: 'CLI-001' })
-    const template = await createOSTemplate(org.id, {
+    const template = await createProcessTemplate(org.id, {
       name: 'Abertura de Empresa',
       isActive: true,
       columns: [
@@ -187,7 +187,7 @@ describe('approveRequest', () => {
     })
     const request = await createTestRequest(org.id, client.id, {
       title: 'Abertura de LTDA',
-      osTemplateId: template.id,
+      processTemplateId: template.id,
     })
 
     const approved = await approveRequest(request.id, org.id, admin.id, 'ORG_ADMIN', { mode: 'NEW_BOARD' })
@@ -196,7 +196,7 @@ describe('approveRequest', () => {
       where: { clientId: client.id },
       include: { columns: { orderBy: { position: 'asc' } } },
     })
-    expect(board?.osTemplateId).toBe(template.id)
+    expect(board?.processTemplateId).toBe(template.id)
     expect(board?.title).toBe('CLI-001 - Empresa X — Abertura de Empresa')
     expect(board?.columns).toHaveLength(2)
     expect(board?.columns.map((c) => c.title)).toEqual(['Documentação', 'Concluído'])

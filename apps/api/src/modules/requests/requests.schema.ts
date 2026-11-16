@@ -5,7 +5,7 @@ export const createRequestSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   departmentId: z.string({ required_error: 'Selecione o departamento' }).cuid('Selecione o departamento'),
-  osTemplateId: z.string().cuid().optional(),
+  processTemplateId: z.string().cuid().optional(),
 })
 
 export const approveRequestSchema = z.discriminatedUnion('mode', [

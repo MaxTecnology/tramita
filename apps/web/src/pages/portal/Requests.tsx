@@ -36,7 +36,7 @@ export default function PortalRequests() {
   const qc = useQueryClient()
   const { clientId } = usePortalClient()
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ title: '', description: '', departmentId: '', osTemplateId: '' })
+  const [form, setForm] = useState({ title: '', description: '', departmentId: '', processTemplateId: '' })
   const [expandedId, setExpandedId] = useState<string | null>(null)
   useLinkedItem('request', setExpandedId)
 
@@ -69,9 +69,9 @@ export default function PortalRequests() {
     })
   }, [departments])
 
-  const { data: osTemplates = [] } = useQuery<{ id: string; name: string }[]>({
-    queryKey: ['portal-os-templates'],
-    queryFn: () => api.get('/portal/os-templates').then((r) => r.data),
+  const { data: processTemplates = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['portal-process-templates'],
+    queryFn: () => api.get('/portal/process-templates').then((r) => r.data),
   })
 
   const createMutation = useMutation({
@@ -80,13 +80,13 @@ export default function PortalRequests() {
       title: form.title,
       description: form.description,
       departmentId: form.departmentId,
-      osTemplateId: form.osTemplateId || undefined,
+      processTemplateId: form.processTemplateId || undefined,
     }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Solicitação enviada')
       qc.invalidateQueries({ queryKey: ['portal-requests'] })
       setOpen(false)
-      setForm({ title: '', description: '', departmentId: '', osTemplateId: '' })
+      setForm({ title: '', description: '', departmentId: '', processTemplateId: '' })
     },
     onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao enviar solicitação')),
   })
@@ -194,12 +194,12 @@ export default function PortalRequests() {
               <Label htmlFor="req-os-template">Tipo de solicitação</Label>
               <select
                 id="req-os-template"
-                value={form.osTemplateId}
-                onChange={(e) => setForm({ ...form, osTemplateId: e.target.value })}
+                value={form.processTemplateId}
+                onChange={(e) => setForm({ ...form, processTemplateId: e.target.value })}
                 className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <option value="">Outro</option>
-                {osTemplates.map((t) => (
+                {processTemplates.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>

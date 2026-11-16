@@ -157,7 +157,7 @@ export async function deleteRequestComment(id: string, actor: CommentActor) {
     include: { request: { select: { organizationId: true, clientId: true, departmentId: true } } },
   })
   // 404, não 403 — mesmo padrão de findFirst-escopado-por-organizationId usado no resto do
-  // projeto (os-templates.service.ts, document-reader-models.service.ts): nunca revela pra um
+  // projeto (process-templates.service.ts, document-reader-models.service.ts): nunca revela pra um
   // actor de outra org que um comentário com esse id existe.
   if (!comment || comment.request.organizationId !== actor.organizationId) {
     throw new AppError(404, 'Comentário não encontrado')

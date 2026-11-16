@@ -104,7 +104,7 @@ export function taskWhere(scope: StaffScope): Prisma.TaskWhereInput {
   return {
     OR: [
       { assigneeId: scope.userId },
-      { column: { board: { type: 'OS', ...boardWhere(scope) } } },
+      { column: { board: { type: 'PROCESS', ...boardWhere(scope) } } },
       ...(reach ? [{ departmentId: { in: reach } }] : []),
     ],
   }
@@ -161,7 +161,7 @@ export function actableTaskWhere(scope: StaffScope): Prisma.TaskWhereInput {
   return {
     OR: [
       { assigneeId: scope.userId },
-      { column: { board: { type: 'OS', ...memberPortfolioBoardWhere(scope.userId) } } },
+      { column: { board: { type: 'PROCESS', ...memberPortfolioBoardWhere(scope.userId) } } },
     ],
   }
 }

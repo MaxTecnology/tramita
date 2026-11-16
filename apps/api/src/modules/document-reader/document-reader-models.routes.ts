@@ -17,7 +17,7 @@ export async function documentReaderModelsRoutes(app: FastifyInstance) {
   await app.register(multipart, { limits: { fileSize: MAX_FILE_SIZE } })
   app.addHook('preHandler', verifyJWT)
   // Toda rota deste arquivo é ORG_ADMIN-only (inclusive leitura) — só quem administra o
-  // escritório mexe em modelo. Ao contrário de os-templates.routes.ts (que mistura leitura
+  // escritório mexe em modelo. Ao contrário de process-templates.routes.ts (que mistura leitura
   // ampla com escrita restrita), aqui TODAS as rotas têm a mesma exigência de role, então um
   // addHook global é seguro e mais simples que repetir requireRole('ORG_ADMIN') em cada rota.
   app.addHook('preHandler', requireRole('ORG_ADMIN'))

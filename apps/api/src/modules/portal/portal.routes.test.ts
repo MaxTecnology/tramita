@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { app } from '@/test/setup'
-import { createOSTemplate } from '@/modules/os-templates/os-templates.service'
+import { createProcessTemplate } from '@/modules/process-templates/process-templates.service'
 import { ensureRecurringSystemBoard } from '@/modules/tasks/tasks.service'
 import { prisma } from '@/lib/prisma'
 import {
@@ -397,7 +397,7 @@ describe('PATCH /portal/requests/:id/cancel', () => {
   })
 })
 
-describe('GET /portal/os-templates', () => {
+describe('GET /portal/process-templates', () => {
   it('retorna apenas templates ativos da organização do cliente', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
@@ -407,14 +407,14 @@ describe('GET /portal/os-templates', () => {
     const { clientUser, password } = await createTestClientUser(org.id)
     await grantClientAccess(clientUser.id, client.id, department.id)
 
-    await createOSTemplate(org.id, { name: 'Ativo', isActive: true, columns: [] })
-    await createOSTemplate(org.id, { name: 'Inativo', isActive: false, columns: [] })
-    await createOSTemplate(otherOrg.id, { name: 'De Outra Org', isActive: true, columns: [] })
+    await createProcessTemplate(org.id, { name: 'Ativo', isActive: true, columns: [] })
+    await createProcessTemplate(org.id, { name: 'Inativo', isActive: false, columns: [] })
+    await createProcessTemplate(otherOrg.id, { name: 'De Outra Org', isActive: true, columns: [] })
 
     const auth = await getAuthHeader(clientUser.email, password)
     const res = await app.inject({
       method: 'GET',
-      url: '/portal/os-templates',
+      url: '/portal/process-templates',
       headers: { authorization: auth },
     })
 

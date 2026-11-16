@@ -26,7 +26,7 @@ export async function listAccessibleClients(clientUserId: string) {
 }
 
 // Listagem flat de tarefas pro portal do cliente — cobre o que GET /boards e GET /boards/:id
-// (filtrados por Board.type: 'OS') não conseguem mais mostrar: tarefas recorrentes, que moram
+// (filtrados por Board.type: 'PROCESS') não conseguem mais mostrar: tarefas recorrentes, que moram
 // no board de sistema RECURRING_SYSTEM e nunca aparecem em nenhuma listagem de board. Mesma
 // lógica de escopo de getTaskHistory acima (clientId + departmentId do ClientUser), mais o
 // filtro visibleToClient — só mostra o que o escritório marcou como visível pro cliente.

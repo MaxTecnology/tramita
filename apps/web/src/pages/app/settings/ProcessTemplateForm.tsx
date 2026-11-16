@@ -7,9 +7,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ArrowLeft, Trash2, Plus, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
-import type { OSTemplate } from '@/types'
+import type { ProcessTemplate } from '@/types'
 
-type StatusEffect = OSTemplate['columns'][number]['statusEffect']
+type StatusEffect = ProcessTemplate['columns'][number]['statusEffect']
 
 const STATUS_EFFECT_LABEL: Record<StatusEffect, string> = {
   NONE: 'Fase (sem efeito no status)',
@@ -127,16 +127,16 @@ function ColumnEditor({ column, index, onChange, onRemove, canRemove }: {
   )
 }
 
-export default function OSTemplateForm() {
+export default function ProcessTemplateForm() {
   const { id } = useParams<{ id: string }>()
   const isEditing = !!id
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
 
-  const { data: template, isLoading } = useQuery<OSTemplate>({
-    queryKey: ['os-template', id],
-    queryFn: () => api.get(`/os-templates/${id}`).then((r) => r.data),
+  const { data: template, isLoading } = useQuery<ProcessTemplate>({
+    queryKey: ['process-template', id],
+    queryFn: () => api.get(`/process-templates/${id}`).then((r) => r.data),
     enabled: isEditing,
   })
 
@@ -161,17 +161,17 @@ export default function OSTemplateForm() {
       // No PATCH (edição), descrição vazia precisa virar `null` pra realmente limpar no banco —
       // `undefined` faz o Prisma ignorar o campo. No POST (criação) não há nada a limpar.
       return isEditing
-        ? api.patch(`/os-templates/${id}`, { ...base, description: form.description || null }).then((r) => r.data)
-        : api.post('/os-templates', { ...base, description: form.description || undefined }).then((r) => r.data)
+        ? api.patch(`/process-templates/${id}`, { ...base, description: form.description || null }).then((r) => r.data)
+        : api.post('/process-templates', { ...base, description: form.description || undefined }).then((r) => r.data)
     },
     onSuccess: () => {
-      toast.success(isEditing ? 'Template atualizado' : 'Template criado')
-      qc.invalidateQueries({ queryKey: ['os-templates'] })
-      navigate('/app/settings/os-templates')
+      toast.success(isEditing ? 'Modelo atualizado' : 'Modelo criado')
+      qc.invalidateQueries({ queryKey: ['process-templates'] })
+      navigate('/app/settings/process-templates')
     },
     onError: (err: unknown) => {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(message ?? 'Erro ao salvar template')
+      toast.error(message ?? 'Erro ao salvar modelo')
     },
   })
 
@@ -194,11 +194,11 @@ export default function OSTemplateForm() {
   return (
     <div className="p-4 md:p-6 max-w-2xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link to="/app/settings/os-templates" aria-label="Voltar" className="text-muted-foreground hover:text-foreground">
+        <Link to="/app/settings/process-templates" aria-label="Voltar" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft size={18} />
         </Link>
         <h1 className="text-lg md:text-xl font-bold text-foreground">
-          {isEditing ? 'Editar template' : 'Novo template'}
+          {isEditing ? 'Editar modelo de processo' : 'Novo modelo de processo'}
         </h1>
       </div>
 
@@ -245,7 +245,7 @@ export default function OSTemplateForm() {
         </div>
 
         <div className="flex justify-end gap-2 pt-4 border-t border-border">
-          <Button type="button" variant="outline" onClick={() => navigate('/app/settings/os-templates')}>Cancelar</Button>
+          <Button type="button" variant="outline" onClick={() => navigate('/app/settings/process-templates')}>Cancelar</Button>
           <Button type="submit" disabled={saveMutation.isPending || !canSave}>
             {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
           </Button>

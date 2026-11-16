@@ -61,11 +61,11 @@ export async function getPortalHome(organizationId: string, clientId: string, cl
     prisma.taskDocumentRequirement.count({ where: openRequestsWhere(organizationId, clientId, departmentIds) }),
     // Requests of a process (OS) are answered inside the process, not in "Enviar documentos"
     prisma.taskDocumentRequirement.count({
-      where: openRequestsWhere(organizationId, clientId, departmentIds, {}, { type: 'OS' }),
+      where: openRequestsWhere(organizationId, clientId, departmentIds, {}, { type: 'PROCESS' }),
     }),
     prisma.board.count({
       where: {
-        organizationId, clientId, isActive: true, type: 'OS',
+        organizationId, clientId, isActive: true, type: 'PROCESS',
         columns: { some: { tasks: { some: { visibleToClient: true, departmentId: { in: departmentIds }, status: { notIn: ['DONE', 'DISREGARDED'] } } } } },
       },
     }),

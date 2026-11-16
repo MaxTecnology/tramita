@@ -264,7 +264,7 @@ function ProductivityTab() {
   const [customTo, setCustomTo] = useState('')
   const [departmentId, setDepartmentId] = useState('')
   const [userId, setUserId] = useState('')
-  const [boardType, setBoardType] = useState<'' | 'OS' | 'RECURRING_SYSTEM'>('')
+  const [boardType, setBoardType] = useState<'' | 'PROCESS' | 'RECURRING_SYSTEM' | 'SERVICE_SYSTEM'>('')
   const [viewBy, setViewBy] = useState<'person' | 'department'>('person')
 
   // `now` só pode ser recalculado quando o preset/intervalo muda — presetToRange chama `new
@@ -375,7 +375,7 @@ function ProductivityTab() {
             className="flex h-9 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
           >
             <option value="">OS + Recorrente</option>
-            <option value="OS">Só OS</option>
+            <option value="PROCESS">Só processos</option>
             <option value="RECURRING_SYSTEM">Só Recorrente</option>
           </select>
         </div>

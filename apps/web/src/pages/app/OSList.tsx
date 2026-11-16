@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Input } from '@/components/ui/input'
 import { Search, X, FileSearch } from 'lucide-react'
-import type { Board, OSTemplate } from '@/types'
+import type { Board, ProcessTemplate } from '@/types'
 
 const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
 
@@ -20,14 +20,14 @@ export default function OSList() {
     queryFn: () => api.get('/boards').then((r) => r.data),
   })
 
-  const { data: templates = [] } = useQuery<OSTemplate[]>({
-    queryKey: ['os-templates'],
-    queryFn: () => api.get('/os-templates').then((r) => r.data),
+  const { data: templates = [] } = useQuery<ProcessTemplate[]>({
+    queryKey: ['process-templates'],
+    queryFn: () => api.get('/process-templates').then((r) => r.data),
   })
 
   const templateName = useMemo(() => {
     const map = new Map(templates.map((t) => [t.id, t.name]))
-    return (osTemplateId?: string | null) => (osTemplateId ? (map.get(osTemplateId) ?? 'Sem template') : 'Sem template')
+    return (processTemplateId?: string | null) => (processTemplateId ? (map.get(processTemplateId) ?? 'Sem template') : 'Sem template')
   }, [templates])
 
   const uniqueClients = useMemo(
@@ -142,7 +142,7 @@ export default function OSList() {
                 <div className="md:hidden">
                   <p className="text-sm font-medium text-foreground truncate">{board.title} — {board.client.name}</p>
                   <div className="flex items-center justify-between mt-1">
-                    <span className="text-xs text-muted-foreground truncate">{templateName(board.osTemplateId)}</span>
+                    <span className="text-xs text-muted-foreground truncate">{templateName(board.processTemplateId)}</span>
                     <span className="text-xs text-muted-foreground flex-shrink-0">{taskCount} tarefa{taskCount !== 1 ? 's' : ''}</span>
                   </div>
                 </div>
@@ -153,7 +153,7 @@ export default function OSList() {
                     <p className="text-sm font-medium text-foreground truncate">{board.title} — {board.client.name}</p>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-muted-foreground truncate">{templateName(board.osTemplateId)}</p>
+                    <p className="text-sm text-muted-foreground truncate">{templateName(board.processTemplateId)}</p>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-muted-foreground truncate">{board.responsibleUser?.name ?? '—'}</p>

@@ -47,7 +47,7 @@ export default function SettingsHub() {
       title: 'Automação de tarefas',
       cards: [
         { to: '/app/settings/recurring-templates', icon: <Repeat size={20} />, title: 'Tarefas Recorrentes', description: 'Templates de geração automática', roles: ADMIN_ROLES },
-        { to: '/app/settings/os-templates', icon: <FileStack size={20} />, title: 'Templates de OS', description: 'Modelos de ordem de serviço', roles: ADMIN_ROLES },
+        { to: '/app/settings/process-templates', icon: <FileStack size={20} />, title: 'Modelos de Processo', description: 'Etapas e OS de cada tipo de processo', roles: ADMIN_ROLES },
         { to: '/app/settings/recurring-generation', icon: <Zap size={20} />, title: 'Geração manual', description: 'Rodar geração de tarefas recorrentes fora do ciclo automático', roles: ADMIN_ROLES, badge: failures.length },
       ],
     },

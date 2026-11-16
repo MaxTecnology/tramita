@@ -5,27 +5,27 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Plus, Pencil, Trash2, ClipboardList, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
-import type { OSTemplate } from '@/types'
+import type { ProcessTemplate } from '@/types'
 import { askConfirm } from '@/components/ui/app-dialogs'
 
-export default function OSTemplates() {
+export default function ProcessTemplates() {
   const qc = useQueryClient()
   const navigate = useNavigate()
 
-  const { data: templates = [], isLoading } = useQuery<OSTemplate[]>({
-    queryKey: ['os-templates'],
-    queryFn: () => api.get('/os-templates').then((r) => r.data),
+  const { data: templates = [], isLoading } = useQuery<ProcessTemplate[]>({
+    queryKey: ['process-templates'],
+    queryFn: () => api.get('/process-templates').then((r) => r.data),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/os-templates/${id}`),
+    mutationFn: (id: string) => api.delete(`/process-templates/${id}`),
     onSuccess: () => {
-      toast.success('Template removido')
-      qc.invalidateQueries({ queryKey: ['os-templates'] })
+      toast.success('Modelo removido')
+      qc.invalidateQueries({ queryKey: ['process-templates'] })
     },
     onError: (err: unknown) => {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(message ?? 'Erro ao remover template')
+      toast.error(message ?? 'Erro ao remover modelo')
     },
   })
 
@@ -38,8 +38,8 @@ export default function OSTemplates() {
           <ArrowLeft size={12} /> Configurações
         </Link>
         <div className="flex items-center justify-between">
-          <h1 className="text-lg md:text-xl font-bold text-foreground">Templates de OS</h1>
-          <Button onClick={() => navigate('/app/settings/os-templates/new')} className="gap-2">
+          <h1 className="text-lg md:text-xl font-bold text-foreground">Modelos de Processo</h1>
+          <Button onClick={() => navigate('/app/settings/process-templates/new')} className="gap-2">
             <Plus size={16} />
             Novo template
           </Button>
@@ -49,8 +49,8 @@ export default function OSTemplates() {
       {templates.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
           <ClipboardList size={48} className="mb-3 opacity-40" />
-          <p className="text-sm font-medium">Nenhum template de OS cadastrado</p>
-          <p className="text-xs mt-1">Crie um template pra padronizar as colunas de uma ordem de serviço (ex: Legalização, Fiscal).</p>
+          <p className="text-sm font-medium">Nenhum modelo de processo cadastrado</p>
+          <p className="text-xs mt-1">Crie um modelo pra padronizar as etapas de um processo (ex: Legalização, Fiscal).</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -67,11 +67,11 @@ export default function OSTemplates() {
                 </p>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
-                <Link to={`/app/settings/os-templates/${t.id}/edit`} className="p-1.5 rounded-md text-muted-foreground hover:bg-neutral-bg hover:text-foreground" aria-label="Editar">
+                <Link to={`/app/settings/process-templates/${t.id}/edit`} className="p-1.5 rounded-md text-muted-foreground hover:bg-neutral-bg hover:text-foreground" aria-label="Editar">
                   <Pencil size={14} />
                 </Link>
                 <button
-                  onClick={async () => { if (await askConfirm({ title: `Excluir o template "${t.name}"?`, confirmLabel: 'Excluir', danger: true })) deleteMutation.mutate(t.id) }}
+                  onClick={async () => { if (await askConfirm({ title: `Excluir o modelo "${t.name}"?`, confirmLabel: 'Excluir', danger: true })) deleteMutation.mutate(t.id) }}
                   className="p-1.5 rounded-md text-muted-foreground hover:bg-danger-bg hover:text-danger-text"
                   aria-label="Excluir"
                 >

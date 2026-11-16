@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { getBoardById, createBoard, listBoards } from './boards.service'
-import { createOSTemplate } from '@/modules/os-templates/os-templates.service'
+import { createProcessTemplate } from '@/modules/process-templates/process-templates.service'
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClient,
   createTestBoard, createTestColumn, createTestTask,
@@ -48,7 +48,7 @@ describe('getBoardById (visibilidade)', () => {
 })
 
 describe('createBoard', () => {
-  it('sem osTemplateId usa as colunas DEFAULT_COLUMNS (sem regressão)', async () => {
+  it('sem processTemplateId usa as colunas DEFAULT_COLUMNS (sem regressão)', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
@@ -59,18 +59,18 @@ describe('createBoard', () => {
       clientId: client.id,
     })
 
-    expect(board.osTemplateId).toBeNull()
+    expect(board.processTemplateId).toBeNull()
     expect(board.columns).toHaveLength(3)
     expect(board.columns.map((c) => c.title)).toEqual(['Pendente', 'Em andamento', 'Concluído'])
     expect(board.columns.map((c) => c.statusEffect)).toEqual(['NONE', 'NONE', 'DONE'])
   })
 
-  it('com osTemplateId cria as colunas a partir do template (título, statusEffect, notifyClient, documentos)', async () => {
+  it('com processTemplateId cria as colunas a partir do template (título, statusEffect, notifyClient, documentos)', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const template = await createOSTemplate(org.id, {
+    const template = await createProcessTemplate(org.id, {
       name: 'Abertura de Empresa',
       isActive: true,
       columns: [
@@ -92,11 +92,11 @@ describe('createBoard', () => {
     const board = await createBoard(org.id, admin.id, 'ORG_ADMIN', {
       title: 'Processo com template',
       clientId: client.id,
-      osTemplateId: template.id,
+      processTemplateId: template.id,
     })
 
-    expect(board.osTemplateId).toBe(template.id)
-    expect(board.type).toBe('OS')
+    expect(board.processTemplateId).toBe(template.id)
+    expect(board.type).toBe('PROCESS')
     expect(board.columns).toHaveLength(2)
     expect(board.columns[0].title).toBe('Documentação')
     expect(board.columns[0].statusEffect).toBe('NONE')
@@ -112,34 +112,34 @@ describe('createBoard', () => {
     expect(documents.map((d) => d.name)).toEqual(['RG', 'CPF'])
   })
 
-  it('lança 404 quando osTemplateId aponta pra um template soft-deleted (isActive: false)', async () => {
+  it('lança 404 quando processTemplateId aponta pra um template soft-deleted (isActive: false)', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const template = await createOSTemplate(org.id, {
+    const template = await createProcessTemplate(org.id, {
       name: 'Template descontinuado',
       isActive: true,
       columns: [{ title: 'Coluna', statusEffect: 'NONE', notifyClient: false, documents: [] }],
     })
-    await prisma.oSTemplate.update({ where: { id: template.id }, data: { isActive: false } })
+    await prisma.processTemplate.update({ where: { id: template.id }, data: { isActive: false } })
 
     await expect(
       createBoard(org.id, admin.id, 'ORG_ADMIN', {
         title: 'Board a partir de template inativo',
         clientId: client.id,
-        osTemplateId: template.id,
+        processTemplateId: template.id,
       }),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 
-  it('lança 404 quando osTemplateId não pertence à organização', async () => {
+  it('lança 404 quando processTemplateId não pertence à organização', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
     const otherOrg = await createTestOrg(plan.id, { slug: 'other-org-template' })
     const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
     const client = await createTestClient(org.id)
-    const templateOfOther = await createOSTemplate(otherOrg.id, {
+    const templateOfOther = await createProcessTemplate(otherOrg.id, {
       name: 'Template de outra org',
       isActive: true,
       columns: [{ title: 'Coluna', statusEffect: 'NONE', notifyClient: false, documents: [] }],
@@ -149,7 +149,7 @@ describe('createBoard', () => {
       createBoard(org.id, admin.id, 'ORG_ADMIN', {
         title: 'X',
         clientId: client.id,
-        osTemplateId: templateOfOther.id,
+        processTemplateId: templateOfOther.id,
       }),
     ).rejects.toMatchObject({ statusCode: 404 })
   })

@@ -306,7 +306,7 @@ export async function ensurePortalAccess(organizationId: string, clientId: strin
 export async function createTestRequest(
   organizationId: string,
   clientId: string,
-  data: { title: string; description?: string; departmentId?: string; osTemplateId?: string },
+  data: { title: string; description?: string; departmentId?: string; processTemplateId?: string },
 ) {
   const { departmentId, clientUserId } = await ensurePortalAccess(organizationId, clientId, data.departmentId)
   return createRequest(organizationId, clientId, clientUserId, { ...data, departmentId })

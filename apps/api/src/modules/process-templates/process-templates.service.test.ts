@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import {
-  createOSTemplate,
-  updateOSTemplate,
-  deleteOSTemplate,
-} from '@/modules/os-templates/os-templates.service'
+  createProcessTemplate,
+  updateProcessTemplate,
+  deleteProcessTemplate,
+} from '@/modules/process-templates/process-templates.service'
 import { createTestPlan, createTestOrg } from '@/test/helpers'
 
-describe('createOSTemplate', () => {
+describe('createProcessTemplate', () => {
   it('creates a template with nested columns and documents in one call', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
 
-    const result = await createOSTemplate(org.id, {
+    const result = await createProcessTemplate(org.id, {
       name: 'Abertura de Empresa',
       description: 'Processo padrão',
       isActive: true,
@@ -42,11 +42,11 @@ describe('createOSTemplate', () => {
   })
 })
 
-describe('updateOSTemplate', () => {
+describe('updateProcessTemplate', () => {
   it('replaces the whole column list — removed columns disappear, new ones appear', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const template = await createOSTemplate(org.id, {
+    const template = await createProcessTemplate(org.id, {
       name: 'Template',
       isActive: true,
       columns: [
@@ -55,7 +55,7 @@ describe('updateOSTemplate', () => {
       ],
     })
 
-    const result = await updateOSTemplate(template.id, org.id, {
+    const result = await updateProcessTemplate(template.id, org.id, {
       columns: [
         { title: 'Coluna C', statusEffect: 'DONE', notifyClient: true, documents: [{ name: 'Doc C' }] },
       ],
@@ -70,13 +70,13 @@ describe('updateOSTemplate', () => {
   it('updates only the name without touching columns when columns is omitted', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const template = await createOSTemplate(org.id, {
+    const template = await createProcessTemplate(org.id, {
       name: 'Template',
       isActive: true,
       columns: [{ title: 'Coluna A', statusEffect: 'NONE', notifyClient: false, documents: [] }],
     })
 
-    const result = await updateOSTemplate(template.id, org.id, { name: 'Renomeado' })
+    const result = await updateProcessTemplate(template.id, org.id, { name: 'Renomeado' })
 
     expect(result.name).toBe('Renomeado')
     expect(result.columns).toHaveLength(1)
@@ -87,29 +87,29 @@ describe('updateOSTemplate', () => {
     const plan = await createTestPlan()
     const orgA = await createTestOrg(plan.id)
     const orgB = await createTestOrg(plan.id)
-    const template = await createOSTemplate(orgA.id, {
+    const template = await createProcessTemplate(orgA.id, {
       name: 'Template',
       isActive: true,
       columns: [{ title: 'Coluna A', statusEffect: 'NONE', notifyClient: false, documents: [] }],
     })
 
     await expect(
-      updateOSTemplate(template.id, orgB.id, { name: 'Outro Nome' }),
+      updateProcessTemplate(template.id, orgB.id, { name: 'Outro Nome' }),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 })
 
-describe('deleteOSTemplate', () => {
+describe('deleteProcessTemplate', () => {
   it('soft-deletes the template (isActive: false), not a hard delete', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)
-    const template = await createOSTemplate(org.id, {
+    const template = await createProcessTemplate(org.id, {
       name: 'Template',
       isActive: true,
       columns: [{ title: 'Coluna A', statusEffect: 'NONE', notifyClient: false, documents: [] }],
     })
 
-    const result = await deleteOSTemplate(template.id, org.id)
+    const result = await deleteProcessTemplate(template.id, org.id)
 
     expect(result.isActive).toBe(false)
     expect(result.id).toBe(template.id)
@@ -119,12 +119,12 @@ describe('deleteOSTemplate', () => {
     const plan = await createTestPlan()
     const orgA = await createTestOrg(plan.id)
     const orgB = await createTestOrg(plan.id)
-    const template = await createOSTemplate(orgA.id, {
+    const template = await createProcessTemplate(orgA.id, {
       name: 'Template',
       isActive: true,
       columns: [{ title: 'Coluna A', statusEffect: 'NONE', notifyClient: false, documents: [] }],
     })
 
-    await expect(deleteOSTemplate(template.id, orgB.id)).rejects.toMatchObject({ statusCode: 404 })
+    await expect(deleteProcessTemplate(template.id, orgB.id)).rejects.toMatchObject({ statusCode: 404 })
   })
 })

@@ -28,7 +28,7 @@ export async function departmentsRoutes(app: FastifyInstance) {
   // encapsulamento, inclusive as declaradas antes do addHook — confirmado empiricamente. Um
   // `addHook('preHandler', requireRole('ORG_ADMIN'))` aqui bloquearia também o GET acima para
   // ORG_MANAGER/ORG_MEMBER, quebrando a leitura liberada pretendida. Ver mesmo padrão em
-  // os-templates.routes.ts.
+  // process-templates.routes.ts.
   const adminOnly = [requireRole('ORG_ADMIN')]
 
   app.post('/', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {
