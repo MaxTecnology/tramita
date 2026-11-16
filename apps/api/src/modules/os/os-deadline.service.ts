@@ -130,16 +130,22 @@ async function release(taskId: string, actor: { id: string; name: string } | nul
   // Guarded write: two dependencies finishing at the same instant release it only once
   const { count } = await prisma.task.updateMany({ where: { id: taskId, releasedAt: null }, data: { releasedAt: new Date() } })
   if (count === 0) return false
+  try {
+    await scheduleDeadline(taskId)
+    // Now its documents count: pending ones block it (and pause the clock)
+    const { recalculateTaskStatus } = await import('@/modules/task-documents/task-documents.service')
+    await recalculateTaskStatus(taskId)
+  } catch (err) {
+    // Never half released (released with no target): back to waiting, a manager can release it
+    await prisma.task.update({ where: { id: taskId }, data: { releasedAt: null } })
+    throw err
+  }
   await prisma.taskHistory.create({
     data: {
       taskId, action: early ? 'os_released_early' : 'os_released', toValue: early ?? 'Liberada',
       actorType: actor ? 'user' : 'system', actorId: actor?.id ?? 'system', actorName: actor?.name ?? 'Sistema',
     },
   })
-  await scheduleDeadline(taskId)
-  // Now its documents count: pending ones block it (and pause the clock)
-  const { recalculateTaskStatus } = await import('@/modules/task-documents/task-documents.service')
-  await recalculateTaskStatus(taskId)
   await onOSReleased(taskId, actor)
   // The client hears of an OS that waited for another one only now (not when it was created)
   // Already released and committed: a queue failure must not stop the other dependents
@@ -167,7 +173,12 @@ export async function onOSFinished(taskId: string, actor: { id: string; name: st
   if (closed > 0) await scheduleDeadline(taskId)
   const dependents = await prisma.taskDependency.findMany({ where: { dependsOnTaskId: taskId }, select: { taskId: true } })
   for (const { taskId: dependentId } of dependents) {
-    if ((await pendingDependencies(dependentId)).length === 0) await release(dependentId, actor)
+    // One dependent failing (its documents, its notifications) must not keep the others waiting
+    try {
+      if ((await pendingDependencies(dependentId)).length === 0) await release(dependentId, actor)
+    } catch (err) {
+      logger.error({ taskId: dependentId, reason: err instanceof Error ? err.message : String(err) }, 'Falha ao liberar OS dependente')
+    }
   }
   const task = await prisma.task.findUnique({ where: { id: taskId }, select: { column: { select: { board: { select: { id: true, type: true } } } } } })
   if (task?.column.board.type === 'PROCESS') {
@@ -212,21 +223,33 @@ export async function scheduleBoardDeadline(boardId: string): Promise<void> {
 // window (release or opening → target) covers that day. Finished ones keep the target they had.
 export async function rescheduleAroundHoliday(organizationId: string, date: Date): Promise<void> {
   // Superset by a day on each side (release instants count by the Brasília day); recomputing is idempotent
-  const startedBy = new Date(date.getTime() + 2 * 86_400_000)
-  const reaches = new Date(date.getTime() - 86_400_000)
+  const startedBy = new Date(date.getTime() + 2 * DAY_MS)
+  const reaches = new Date(date.getTime() - DAY_MS)
+  const now = new Date()
   const tasks = await prisma.task.findMany({
     where: {
       column: { board: { organizationId } }, osModelId: { not: null }, deadlineBusinessDays: { not: null },
-      status: { notIn: ['DONE', 'DISREGARDED'] }, releasedAt: { lt: startedBy }, targetDate: { gte: reaches },
+      status: { notIn: ['DONE', 'DISREGARDED'] }, releasedAt: { not: null, lt: startedBy }, targetDate: { gte: reaches },
     },
-    select: { id: true },
+    select: { id: true, releasedAt: true, deadlineBusinessDays: true, pauses: { select: { startedAt: true, endedAt: true } } },
   })
-  for (const t of tasks) await scheduleDeadline(t.id)
   const boards = await prisma.board.findMany({
     where: { organizationId, type: 'PROCESS', deadlineBusinessDays: { not: null }, completedAt: null, createdAt: { lt: startedBy }, targetDate: { gte: reaches } },
-    select: { id: true },
+    select: { id: true, createdAt: true, deadlineBusinessDays: true, pauses: { select: { startedAt: true, endedAt: true } } },
   })
-  for (const b of boards) await scheduleBoardDeadline(b.id)
+  if (tasks.length === 0 && boards.length === 0) return
+  // One holiday set for every window (all start within a few years of the date)
+  const starts = [...tasks.map((t) => t.releasedAt!), ...boards.map((b) => b.createdAt)]
+  const firstYear = Math.min(...starts.map((d) => d.getUTCFullYear()))
+  const holidays = await loadHolidaySet(organizationId, Array.from({ length: date.getUTCFullYear() - firstYear + 3 }, (_, k) => firstYear + k))
+  const target = (start: Date, businessDays: number, pauses: Period[]) =>
+    addBusinessDays(day(start), businessDays + pausedDays(pauses.filter((p) => p.endedAt), now, holidays), holidays)
+
+  const writes = [
+    ...tasks.map((t) => prisma.task.update({ where: { id: t.id }, data: { targetDate: target(t.releasedAt!, t.deadlineBusinessDays!, t.pauses) } })),
+    ...boards.map((b) => prisma.board.update({ where: { id: b.id }, data: { targetDate: target(b.createdAt, b.deadlineBusinessDays!, b.pauses) } })),
+  ]
+  for (let k = 0; k < writes.length; k += 200) await prisma.$transaction(writes.slice(k, k + 200))
 }
 
 // Done when every task finished; an added or reopened task puts it back in progress

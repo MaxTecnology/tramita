@@ -126,5 +126,10 @@ export function decidir(
   if (candidatas.length === 0) {
     return { acao: 'revisar', motivo: `Sem tarefa aberta de ${tipoImposto} ${rotulo} para ${cliente.razao}`, clienteId: cliente.id }
   }
-  return { acao: 'revisar', motivo: `${candidatas.length} tarefas abertas candidatas (ambíguo)`, clienteId: cliente.id }
+  const mesmaTarefa = new Set(candidatas.map((t) => t.id)).size === 1
+  return {
+    acao: 'revisar',
+    motivo: mesmaTarefa ? `${candidatas.length} entregas pendentes na mesma tarefa (ambíguo)` : `${candidatas.length} tarefas abertas candidatas (ambíguo)`,
+    clienteId: cliente.id,
+  }
 }

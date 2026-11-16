@@ -217,3 +217,66 @@ describe('falhas depois do commit não derrubam a operação', () => {
     expect(res.statusCode).toBe(201)
   })
 })
+
+describe('reordenar não troca de coluna', () => {
+  it('reorder only changes positions inside the current column; changing column goes through /move', async () => {
+    const c = await setup()
+    const board = json(await openProcess(c))
+    const os = await prisma.task.findFirstOrThrow({ where: { column: { boardId: board.id } } })
+    const done = await prisma.column.findFirstOrThrow({ where: { boardId: board.id, statusEffect: 'DONE' } })
+    const moved = await app.inject({ method: 'PATCH', url: '/tasks/reorder', headers: { authorization: c.auth }, payload: [{ id: os.id, columnId: done.id, position: 0 }] })
+    expect([moved.statusCode, json(moved).message]).toEqual([400, 'Para trocar de coluna, mova a tarefa'])
+    const after = await prisma.task.findUniqueOrThrow({ where: { id: os.id } })
+    expect([after.columnId, after.status]).toEqual([os.columnId, os.status])
+    const same = await app.inject({ method: 'PATCH', url: '/tasks/reorder', headers: { authorization: c.auth }, payload: [{ id: os.id, columnId: os.columnId, position: 5 }] })
+    expect(same.statusCode).toBe(200)
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: os.id } })).position).toBe(5)
+  })
+})
+
+describe('concluir pelo drawer com move concorrente', () => {
+  it('a card moved by someone else meanwhile is not dragged back; the history uses where it really was', async () => {
+    const c = await setup()
+    const board = json(await openProcess(c))
+    const os = await prisma.task.findFirstOrThrow({ where: { column: { boardId: board.id } } })
+    const cols = await prisma.column.findMany({ where: { boardId: board.id }, orderBy: { position: 'asc' } })
+    const gate = await import('@/modules/approvals/approval-gate')
+    const original = gate.assertNoPendingApproval
+    vi.spyOn(gate, 'assertNoPendingApproval').mockImplementation(async (tx, taskId) => {
+      // Someone moved it to "Prefeitura" while this request was on its way
+      await prisma.task.update({ where: { id: os.id }, data: { columnId: cols[1].id } })
+      return original(tx, taskId)
+    })
+    const res = await app.inject({ method: 'PATCH', url: `/tasks/${os.id}`, headers: { authorization: c.auth }, payload: { status: 'DONE' } })
+    expect(res.statusCode).toBe(200)
+    const move = await prisma.taskHistory.findFirstOrThrow({ where: { taskId: os.id, action: 'moved_to' } })
+    expect([move.fromColumnId, move.fromValue, move.toColumnId]).toEqual([cols[1].id, 'Prefeitura', cols[2].id])
+  })
+})
+
+describe('liberar dependentes é isolado por OS', () => {
+  it('a failure releasing one dependent does not stop the others', async () => {
+    const c = await setup()
+    const board = json(await openProcess(c, [
+      { osModelId: c.model.id, columnIndex: 0, dependsOn: [] },
+      { osModelId: c.model.id, columnIndex: 1, dependsOn: [0] },
+      { osModelId: c.model.id, columnIndex: 1, dependsOn: [0] },
+    ]))
+    const tasks = await prisma.task.findMany({ where: { column: { boardId: board.id } } })
+    const dependency = tasks.find((t) => t.releasedAt)!
+    const docs = await import('@/modules/task-documents/task-documents.service')
+    const original = docs.recalculateTaskStatus
+    let calls = 0
+    vi.spyOn(docs, 'recalculateTaskStatus').mockImplementation(async (...args) => {
+      if (tasks.some((t) => t.id === args[0] && t.id !== dependency.id) && calls++ === 0) throw new Error('falha no primeiro')
+      return original(...args)
+    })
+    const res = await app.inject({ method: 'PATCH', url: `/tasks/${dependency.id}`, headers: { authorization: c.auth }, payload: { status: 'DONE' } })
+    expect(res.statusCode).toBe(200)
+    // The failing one goes back to waiting (no half-released OS without target); the other is released
+    const others = await prisma.task.findMany({ where: { column: { boardId: board.id }, id: { not: dependency.id } } })
+    expect(others.filter((t) => t.releasedAt !== null)).toHaveLength(1)
+    const stuck = others.find((t) => t.releasedAt === null)!
+    expect(await prisma.taskHistory.count({ where: { taskId: stuck.id, action: 'os_released' } })).toBe(0)
+  })
+})

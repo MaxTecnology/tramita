@@ -98,7 +98,7 @@ export async function documentReaderRoutes(app: FastifyInstance) {
   app.get('/document-reader/metricas', {
     preHandler: [requireRole(...ORG_ROLES)],
   }, async (request, reply) => {
-    return reply.send(await obterMetricas(request.user.organizationId!))
+    return reply.send(await obterMetricas(request.user.organizationId!, await getStaffScope(request)))
   })
 
   // Before /:id/confirmar so "confirmar-lote" is never read as an id

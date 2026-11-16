@@ -337,8 +337,9 @@ function createServiceSystemBoard(clientId: string, organizationId: string) {
 async function columnForStatus(
   column: { id: string; boardId: string; statusEffect: string },
   status: string,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<{ id: string; title: string } | null> {
-  const columns = await prisma.column.findMany({ where: { boardId: column.boardId }, orderBy: { position: 'asc' }, select: { id: true, title: true, statusEffect: true } })
+  const columns = await db.column.findMany({ where: { boardId: column.boardId }, orderBy: { position: 'asc' }, select: { id: true, title: true, statusEffect: true } })
   if (status === 'DONE') {
     if (column.statusEffect === 'DONE') return null
     return columns.find((c) => c.statusEffect === 'DONE') ?? null
@@ -408,7 +409,7 @@ export async function updateTask(
   const completedAt = data.status !== undefined
     ? resolveCompletedAt(task.status, data.status, new Date())
     : undefined
-  const columnMove = data.status !== undefined && data.status !== task.status
+  let columnMove = data.status !== undefined && data.status !== task.status
     ? await columnForStatus(task.column, data.status)
     : null
 
@@ -422,6 +423,15 @@ export async function updateTask(
       await assertDepartmentServesClient(tx, task.column.board.clientId, task.departmentId)
     }
     if (data.status === 'DONE' && task.status !== 'DONE') await assertNoPendingApproval(tx, id)
+    // Moved by someone else since it was read: decide (and record) from the column it is really in
+    let fromColumn: { id: string; title: string } = task.column
+    if (columnMove || (data.status !== undefined && data.status !== task.status)) {
+      const current = await tx.task.findUniqueOrThrow({ where: { id }, select: { column: { select: { id: true, title: true, boardId: true, statusEffect: true } } } })
+      if (current.column.id !== task.column.id) {
+        fromColumn = current.column
+        columnMove = await columnForStatus(current.column, data.status!, tx)
+      }
+    }
     const result = await tx.task.update({
       where: { id },
       data: {
@@ -452,8 +462,8 @@ export async function updateTask(
     if (columnMove) {
       await tx.taskHistory.create({
         data: {
-          taskId: id, action: 'moved_to', fromValue: task.column.title, toValue: columnMove.title,
-          fromColumnId: task.column.id, toColumnId: columnMove.id,
+          taskId: id, action: 'moved_to', fromValue: fromColumn.title, toValue: columnMove.title,
+          fromColumnId: fromColumn.id, toColumnId: columnMove.id,
           actorType: actor.type, actorId: actor.id, actorName,
         },
       })
@@ -505,9 +515,13 @@ export async function reorderTasks(items: ReorderTasksBody, organizationId: stri
       id: { in: items.map((i) => i.id) },
       column: { board: { organizationId } },
     },
-    select: { id: true, column: { select: { boardId: true } } },
+    select: { id: true, columnId: true, column: { select: { boardId: true } } },
   })
   if (tasks.length !== items.length) throw new AppError(403, 'Acesso negado')
+  // Only the order inside the column: changing column goes through moveTask (status of the column,
+  // OS release, delay reason, history)
+  const columnByTask = new Map(tasks.map((t) => [t.id, t.columnId]))
+  if (items.some((i) => columnByTask.get(i.id) !== i.columnId)) throw new AppError(400, 'Para trocar de coluna, mova a tarefa')
 
   // Reordenar nunca pode tirar a tarefa do processo dela (outro cliente, outra organização) — mesma
   // regra do moveTask.

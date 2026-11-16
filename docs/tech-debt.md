@@ -567,18 +567,23 @@ Ações fora do código (ainda pendentes, por último na ordem combinada):
 
 ## Visibilidade por departamento — menores da revisão final (2026-11-13), não corrigidos
 
-1. **Corrida no "assumir em lote":** `findMany` + `updateMany` em READ COMMITTED — se um "assumir" individual
+1. ✅ (resolvido em 2026-11-16 — `updateManyAndReturn` com responsável e status abertos no mesmo
+   `UPDATE`; histórico, contagem e aviso saem das linhas alteradas) **Corrida no "assumir em lote":** `findMany` + `updateMany` em READ COMMITTED — se um "assumir" individual
    concorrente vencer no meio, o histórico, a contagem e o aviso incluem uma tarefa que não mudou de mãos.
    Correção: `updateManyAndReturn` (ou `UPDATE … RETURNING`) e histórico a partir dos ids devolvidos; guardar
    também `status notIn (DONE, DISREGARDED)` no `where` das duas escritas.
 2. ✅ (resolvido em 2026-11-15) **Dashboard: contagens de tarefas usam o escopo do processo**, não o da tarefa — o processo de recorrentes de
    um cliente atendido pelo Fiscal conta as recorrentes da Folha. Correção: `{ AND: [taskWhere(scope)] }` nos
    agregados de tarefa.
-3. **SSE do processo só confere o escopo ao conectar** — após desligar "ver colegas", até 15 min de eventos
+3. ✅ (resolvido em 2026-11-16 — reconfere a cada minuto, `SSE_RECHECK_MS`, e fecha se perdeu o
+   acesso) **SSE do processo só confere o escopo ao conectar** — após desligar "ver colegas", até 15 min de eventos
    (grossos: id/título/coluna) ainda chegam.
-4. **TaskDrawer:** `viewerCanEdit` ausente é tratado como editável (a API responde 403); o aviso diz "está com
+4. ✅ (resolvido em 2026-11-16 — sem a resposta da API só admin ou responsável edita; tarefa sem
+   responsável diz "sem responsável") **TaskDrawer:** `viewerCanEdit` ausente é tratado como editável (a API responde 403); o aviso diz "está com
    outro colaborador" também em tarefa sem responsável.
-5. **`/document-reader/obrigacoes` e `/metricas`** continuam agregados da organização inteira para o Membro.
+5. ✅ (resolvido em 2026-11-16) **`/document-reader/obrigacoes` e `/metricas`** continuavam agregados da organização inteira para o Membro.
+   `/metricas` agora conta só os documentos do escopo. `/obrigacoes` fica como está: é o catálogo de
+   tipos de obrigação dos seletores, sem dado de cliente.
 
 ## Central de notificações e aprovação — pendências (registrado em 2026-11-13, resolvido em 2026-11-14) ✅
 
@@ -609,11 +614,15 @@ Fora do escopo (não é débito, é decisão): aprovação em processo (OS) até
    Se pesar, guardar o resultado do check por hash do arquivo por alguns minutos.
 2. **Entrega avulsa sem robô:** "+ Adicionar documento a entregar" no drawer não tem o seletor 🤖;
    só entregas vindas do modelo de recorrente têm obrigação. Adicionar quando houver pedido.
-3. **Processos (OS) fora:** a fila não identifica a entrega dentro de um processo. Decidido deixar para
+3. ✅ (resolvido pelo trabalho de OS, 2026-11-16 — teste de regressão em `os.open.test.ts`) **Processos (OS) fora:** a fila não identifica a entrega dentro de um processo. Decidido deixar para
    depois (mesma ideia: casar pela obrigação da entrega da tarefa do processo).
 4. **Sem entrega automática:** decisão do Max — todo documento do robô passa pela fila de conferência.
    Reavaliar quando houver histórico de acerto por modelo (`obterMetricas`).
-5. **Revisão final (menores adiados):** (a) corrida — entrega manual entre a leitura de `pendentes` e o
+5. ✅ (a–f resolvidos em 2026-11-16: entrega do robô só preenche entrega pendente, com gravação
+   guardada; a fila mostra o seletor de entrega quando a sugerida sumiu; troca grava `deliverableId`;
+   "N entregas pendentes na mesma tarefa"; falha ao carregar modelos é erro, não aviso; "Concluir
+   prontas" segue quando uma falha e lista as que não concluíram. (g) fica sem teste: migration já
+   aplicada, testar o SQL histórico não protege nada daqui pra frente.) **Revisão final (menores adiados):** (a) corrida — entrega manual entre a leitura de `pendentes` e o
    download do B2 em `anexarDocumento` faz o robô substituir o arquivo em silêncio (guardar com
    `deliveredAt IS NULL`); (b) entrega sugerida apagada (SetNull) faz `anexarDocumento` cair no "uma
    pendente só" e a fila mostra "Sem entrega sugerida" com Confirmar travado; (c) `trocarTarefa` não
@@ -647,11 +656,15 @@ Pendente relacionado: o board `RECURRING_SYSTEM` tem a mesma corrida de criaçã
 antes de criar o índice equivalente. Feriado novo não recalcula vencimentos/metas de tarefas
 recorrentes já geradas (só OS e processos).
 
-Achados da revisão destas correções, não feitos:
-- `reorderTasks` pode trocar a coluna sem gravar `moved_to` (o tempo por etapa não vê essa troca).
-- `updateTask` decide a coluna destino com a coluna lida antes da transação; um `move` concorrente
-  deixa `fromColumnId` desatualizado no histórico.
-- Recalcular metas ao mudar feriado roda na requisição, uma OS por vez (escritório com milhares de OS
-  abertas pode ficar lento; falha só vai para o log). Candidato a job BullMQ em lotes.
-- `onOSFinished` libera as dependentes em sequência sem isolar erro por dependente (a falha do aviso
-  ao cliente já é tolerada; outras falhas ainda interrompem o laço).
+Achados da revisão destas correções — ✅ resolvidos em 2026-11-16:
+- `PATCH /tasks/reorder` só reordena dentro da coluna atual (400 `'Para trocar de coluna, mova a
+  tarefa'`); trocar de coluna passa pelo `/move` (status, liberação, motivo, histórico).
+- `updateTask` relê a coluna dentro da transação antes de mover o cartão e gravar o histórico.
+- Recalcular metas ao mudar feriado: um carregamento de feriados e gravação em blocos de 200 (falha
+  vai para o log). Continua na requisição; virar job só se algum escritório ficar lento.
+- `onOSFinished` isola a falha por dependente; uma OS cuja liberação falha no meio volta a aguardar
+  (sem ficar liberada e sem meta), e o gerente pode liberá-la pelo drawer.
+- Entrega do robô recusa (409) entrega pendente que já tem documento com o cliente: substituir é
+  ação da pessoa, pelo drawer.
+- SSE: a reconferência não se sobrepõe. Pendente: um usuário desativado só perde o stream no limite
+  de 15 min (a reconferência periódica cobre só ORG_MEMBER/ORG_MANAGER).

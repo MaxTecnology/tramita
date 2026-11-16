@@ -154,7 +154,8 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   const awaitingApproval = approvals.some((a) => a.status === 'PENDING')
   // Office staff sees everything in the drawer; changing it needs the task to be theirs (or their
   // portfolio / manager scope). A colleague's task seen through the department must be assumed first.
-  const canEdit = isStaff && task.viewerCanEdit !== false
+  // Without the API's answer (a screen that does not send it), only the admin or the assignee edits
+  const canEdit = isStaff && (task.viewerCanEdit ?? (role === 'ORG_ADMIN' || task.assigneeId === currentUserId))
   const me = useMyScope()
   const isOpen = task.status !== 'DONE' && task.status !== 'DISREGARDED'
   const canAssume = isStaff && !!me && isOpen && task.assigneeId !== currentUserId
@@ -457,7 +458,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
           {(canAssume || (isStaff && !canEdit)) && (
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning-text/40 bg-warning-bg px-3 py-2">
               <div className="text-xs text-warning-text">
-                {!canEdit ? <p>Assuma a tarefa para alterá-la</p> : <p>Esta tarefa está com outro colaborador.</p>}
+                {!canEdit ? <p>Assuma a tarefa para alterá-la</p> : <p>{task.assigneeId ? 'Esta tarefa está com outro colaborador.' : 'Esta tarefa está sem responsável.'}</p>}
                 {assumeError && <p className="font-medium text-danger-text">{assumeError}</p>}
               </div>
               {canAssume && (

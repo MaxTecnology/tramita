@@ -98,3 +98,36 @@ it('an OS suggestion says it is an OS and names the process', async () => {
   renderQueue()
   expect(await screen.findByText('OS · Abertura ACME')).toBeInTheDocument()
 })
+
+it('a task without a suggested delivery (it was removed) lets the reviewer pick one and confirm', async () => {
+  const confirmed: unknown[] = []
+  server.use(
+    http.get(`${API}/document-reader/fila`, () => HttpResponse.json([doc('x', false, {
+      suggestion: null, checks: { cnpj: false, competence: false, payment: true },
+      task: { id: 't-x', title: 'Apuração', competence: null, client: { name: 'ACME' }, pendingDeliverables: [{ id: 'd1', name: 'Extrato', requiresPayment: false }, { id: 'd2', name: 'Holerites', requiresPayment: false }] },
+    })])),
+    http.post(`${API}/document-reader/x/confirmar`, async ({ request }) => { confirmed.push(await request.json()); return HttpResponse.json({ taskId: 't-x' }) }),
+  )
+  renderQueue()
+  const confirmar = await screen.findByRole('button', { name: 'Confirmar' })
+  expect(confirmar).toBeDisabled()
+  await userEvent.selectOptions(screen.getByLabelText('Preenche a entrega'), 'd2')
+  await userEvent.click(confirmar)
+  await waitFor(() => expect(confirmed).toEqual([{ deliverableId: 'd2' }]))
+})
+
+it('"Concluir prontas" keeps going when one task fails and says which ones did not finish', async () => {
+  server.use(http.patch(`${API}/tasks/:id`, ({ params }) => {
+    if (params.id === 't-a') return HttpResponse.json({ message: 'Aprovação do cliente pendente' }, { status: 409 })
+    completed.push(String(params.id))
+    return HttpResponse.json({})
+  }), http.post(`${API}/document-reader/confirmar-lote`, () => HttpResponse.json({
+    results: [{ id: 'a', ok: true, taskId: 't-a' }, { id: 'b', ok: true, taskId: 't-b' }],
+    summary: { delivered: 2, completed: 0, readyTaskIds: ['t-a', 't-b'], failed: 0 },
+  })))
+  renderQueue()
+  await userEvent.click(await screen.findByRole('button', { name: 'Confirmar os 2 sem pendência' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Concluir 2 tarefas prontas' }))
+  await waitFor(() => expect(completed).toEqual(['t-b']))
+  expect(await screen.findByText(/1 tarefa não foi concluída: Aprovação do cliente pendente/)).toBeInTheDocument()
+})

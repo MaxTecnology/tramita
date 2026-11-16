@@ -34,10 +34,13 @@ export async function checkDeliveryFile(
   if (!deliverable?.obligationType) return { warnings: [], read: {} }
   if (file.mimeType !== 'application/pdf') return { warnings: [UNREADABLE], read: {} }
 
+  // Loading the models is infrastructure: a failure there is an error, never "could not read" (which
+  // the person may accept and deliver unchecked)
+  const modelos = await carregarModelosDaOrg(organizationId)
   let resultado
   try {
     const bytes = new Uint8Array(file.buffer.buffer, file.buffer.byteOffset, file.buffer.byteLength)
-    resultado = await extrairEInterpretar(bytes, await carregarModelosDaOrg(organizationId))
+    resultado = await extrairEInterpretar(bytes, modelos)
   } catch (err) {
     logger.warn({ taskId, deliverableId, reason: err instanceof Error ? err.message : String(err) }, 'Robô não leu o arquivo da entrega')
     return { warnings: [UNREADABLE], read: {} }

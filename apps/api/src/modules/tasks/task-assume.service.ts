@@ -71,31 +71,27 @@ export async function assumeTasksBulk(
     : scope.departmentIds.filter((d) => !input.departmentId || d === input.departmentId)
   if (departments && departments.length === 0) return { count: 0 }
 
-  const candidates = await prisma.task.findMany({
-    where: {
-      assigneeId: input.fromUserId,
-      status: { notIn: [...CLOSED] },
-      column: { board: { organizationId } },
-      ...(departments ? { departmentId: { in: departments } } : {}),
-    },
-    select: { id: true, column: { select: { board: { select: { id: true, client: { select: { name: true } } } } } } },
-  })
-  if (candidates.length === 0) return { count: 0 }
-
   const name = await actorName(actor.id)
-  const ids = candidates.map((t) => t.id)
-  const moved = await prisma.$transaction(async (tx) => {
-    // Guarded: tasks someone else took in the meantime are left alone
-    const still = await tx.task.findMany({ where: { id: { in: ids }, assigneeId: input.fromUserId }, select: { id: true } })
-    const stillIds = still.map((t) => t.id)
-    await tx.task.updateMany({ where: { id: { in: stillIds }, assigneeId: input.fromUserId }, data: { assigneeId: actor.id } })
-    await tx.taskHistory.createMany({
-      data: stillIds.map((taskId) => ({ taskId, action: 'assumed', fromValue: input.fromUserId, toValue: actor.id, actorType: 'user', actorId: actor.id, actorName: name })),
+  // One statement: only tasks still with that colleague and still open change hands (no gap between
+  // reading and writing), and history, count and notice come from the rows it changed
+  const movedTasks = await prisma.$transaction(async (tx) => {
+    const changed = await tx.task.updateManyAndReturn({
+      where: {
+        assigneeId: input.fromUserId,
+        status: { notIn: [...CLOSED] },
+        column: { board: { organizationId } },
+        ...(departments ? { departmentId: { in: departments } } : {}),
+      },
+      data: { assigneeId: actor.id },
+      select: { id: true },
     })
-    return new Set(stillIds)
+    if (changed.length === 0) return []
+    const ids = changed.map((t) => t.id)
+    await tx.taskHistory.createMany({
+      data: ids.map((taskId) => ({ taskId, action: 'assumed', fromValue: input.fromUserId, toValue: actor.id, actorType: 'user', actorId: actor.id, actorName: name })),
+    })
+    return tx.task.findMany({ where: { id: { in: ids } }, select: { id: true, column: { select: { board: { select: { id: true, client: { select: { name: true } } } } } } } })
   })
-
-  const movedTasks = candidates.filter((t) => moved.has(t.id))
   for (const boardId of new Set(movedTasks.map((t) => t.column.board.id))) {
     await publishBoardEvent(boardId, { event: 'task:updated', data: {} })
   }

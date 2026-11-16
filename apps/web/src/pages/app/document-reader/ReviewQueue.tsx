@@ -205,6 +205,7 @@ export default function ReviewQueue() {
   const [ajustandoId, setAjustandoId] = useState<string | null>(null)
   const [aba, setAba] = useState<'fila' | 'rejeitados'>('fila')
   const [resultado, setResultado] = useState<BulkResult | null>(null)
+  const [falhasConclusao, setFalhasConclusao] = useState<string | null>(null)
   const [pdf, setPdf] = useState<{ url: string; name: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -241,16 +242,25 @@ export default function ReviewQueue() {
     // One by one: a late OS asks its own reason (the API says when); giving up skips that task
     mutationFn: async (taskIds: string[]) => {
       let done = 0
+      const failures: string[] = []
       // Several late OS in the batch: the reason can be chosen once for all of them
       const memory: DelayMemory | undefined = taskIds.length > 1 ? {} : undefined
       for (const id of taskIds) {
-        const result = await withDelayReason((extra) => api.patch(`/tasks/${id}`, { status: 'DONE', ...extra }), memory)
-        if (result !== null) done++
+        // One task refused (pending approval, waiting for another OS...) never stops the others
+        try {
+          const result = await withDelayReason((extra) => api.patch(`/tasks/${id}`, { status: 'DONE', ...extra }), memory)
+          if (result !== null) done++
+        } catch (err) {
+          failures.push(mensagemDeErro(err, 'Erro ao concluir'))
+        }
       }
-      return done
+      return { done, failures }
     },
-    onSuccess: (done) => {
+    onSuccess: ({ done, failures }) => {
       if (done > 0) toast.success(done === 1 ? 'Tarefa concluída' : `${done} tarefas concluídas`)
+      setFalhasConclusao(failures.length > 0
+        ? `${plural(failures.length, 'tarefa não foi concluída', 'tarefas não foram concluídas')}: ${[...new Set(failures)].join('; ')}`
+        : null)
       setResultado((r) => (r ? { ...r, summary: { ...r.summary, readyTaskIds: [] } } : r))
       invalidar()
     },
@@ -275,7 +285,7 @@ export default function ReviewQueue() {
 
   const loteMutation = useMutation({
     mutationFn: (ids: string[]) => api.post<BulkResult>('/document-reader/confirmar-lote', { ids }).then((r) => r.data),
-    onSuccess: (r) => { setResultado(r); invalidar() },
+    onSuccess: (r) => { setResultado(r); setFalhasConclusao(null); invalidar() },
     onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao confirmar em lote')),
   })
 
@@ -363,6 +373,7 @@ export default function ReviewQueue() {
                   {resultado.summary.readyTaskIds.length > 0 && ` · ${plural(resultado.summary.readyTaskIds.length, 'pronta para concluir', 'prontas para concluir')}`}
                   {resultado.summary.failed > 0 && <span className="text-danger-text"> · {plural(resultado.summary.failed, 'com erro', 'com erro')}</span>}
                 </p>
+                {falhasConclusao && <p className="text-xs text-danger-text">{falhasConclusao}</p>}
                 {resultado.results.filter((r) => !r.ok).map((r) => (
                   <p key={r.id} className="text-xs text-danger-text">{nomeDoArquivo(r.id)}: {r.error}</p>
                 ))}
@@ -425,7 +436,8 @@ export default function ReviewQueue() {
                       {typeof erro === 'string' && <p className="text-xs text-danger-text">Erro ao processar: {erro}</p>}
                       {typeof duplicataDe === 'string' && <p className="text-xs text-warning-text">Possível duplicata de outro documento já enviado.</p>}
 
-                      {(ajustando || (s && !doc.ready)) && doc.task && doc.task.pendingDeliverables.length > 0 && (
+                      {/* Also without a suggestion (the suggested delivery was removed): the reviewer picks one */}
+                      {(ajustando || !doc.ready) && doc.taskId && doc.task && doc.task.pendingDeliverables.length > 0 && (
                         <OpcoesDeEntrega
                           entregas={doc.task.pendingDeliverables}
                           campos={doc.extractedFields ?? {}}

@@ -275,6 +275,11 @@ export async function deliverDocument(
   await verifyTaskAccess(taskId, organizationId)
   const deliverable = await prisma.taskDeliverable.findFirst({ where: { id: deliverableId, taskId }, include: { protocol: true } })
   if (!deliverable) throw new AppError(404, 'Entregável não encontrado')
+  // The robot only fills a pending delivery; replacing a file is a person's decision
+  const onlyIfPending = options.source === 'robot'
+  if (onlyIfPending && deliverable.deliveredAt) throw new AppError(409, 'Essa entrega já foi feita')
+  // ... and never swaps a document the client already has (that is done by hand, in the drawer)
+  if (onlyIfPending && deliverable.protocol) throw new AppError(409, 'O cliente já tem um documento nesta entrega — substitua pelo drawer da tarefa')
 
   // Validate everything before uploading: a refused delivery leaves no orphan file behind
   if (deliverable.protocol) assertProtocolEditable(deliverable.protocol)
@@ -312,14 +317,22 @@ export async function deliverDocument(
     }
   }
 
-  const updated = await prisma.taskDeliverable.update({
-    where: { id: deliverableId },
-    data: {
-      attachmentId: attachment.id, deliveredById: actor.id, deliveredAt: new Date(),
-      ...(amount !== undefined ? { amount } : {}),
-      ...(paymentDueDate !== undefined ? { paymentDueDate } : {}),
-    },
-  })
+  const deliveryData = {
+    attachmentId: attachment.id, deliveredById: actor.id, deliveredAt: new Date(),
+    ...(amount !== undefined ? { amount } : {}),
+    ...(paymentDueDate !== undefined ? { paymentDueDate } : {}),
+  }
+  if (onlyIfPending) {
+    // Guarded: a manual delivery that landed meanwhile wins, the robot's file is discarded
+    const { count } = await prisma.taskDeliverable.updateMany({ where: { id: deliverableId, deliveredAt: null }, data: deliveryData })
+    if (count === 0) {
+      await discardUploadedAttachment(attachment.id)
+      throw new AppError(409, 'Essa entrega já foi feita')
+    }
+  }
+  const updated = onlyIfPending
+    ? await prisma.taskDeliverable.findUniqueOrThrow({ where: { id: deliverableId } })
+    : await prisma.taskDeliverable.update({ where: { id: deliverableId }, data: deliveryData })
 
   const statusBefore = (await prisma.task.findUniqueOrThrow({ where: { id: taskId }, select: { status: true } })).status
   await upsertProtocolForDeliverable(deliverableId, actor)

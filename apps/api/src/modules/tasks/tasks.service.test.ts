@@ -926,7 +926,7 @@ describe('reorderTasks — isolamento entre processos e organizações', () => {
     const otherCol = await createTestColumn(otherBoard.id)
 
     await expect(reorderTasks([{ id: task.id, columnId: otherCol.id, position: 0 }], org.id))
-      .rejects.toMatchObject({ statusCode: 400, message: 'A tarefa só pode ser movida dentro do mesmo processo' })
+      .rejects.toMatchObject({ statusCode: 400, message: 'Para trocar de coluna, mova a tarefa' })
     expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).columnId).not.toBe(otherCol.id)
   })
 
@@ -942,13 +942,16 @@ describe('reorderTasks — isolamento entre processos e organizações', () => {
       .rejects.toMatchObject({ statusCode: 400 })
   })
 
-  it('reordena dentro do mesmo processo', async () => {
-    const { org, board, task } = await setup()
+  it('reordena dentro da mesma coluna, mas não troca de coluna (isso é o /move)', async () => {
+    const { org, board, col, task } = await setup()
     const col2 = await createTestColumn(board.id, { position: 1 })
 
-    await reorderTasks([{ id: task.id, columnId: col2.id, position: 0 }], org.id)
+    await expect(reorderTasks([{ id: task.id, columnId: col2.id, position: 0 }], org.id))
+      .rejects.toMatchObject({ statusCode: 400, message: 'Para trocar de coluna, mova a tarefa' })
+    await reorderTasks([{ id: task.id, columnId: col.id, position: 3 }], org.id)
 
-    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).columnId).toBe(col2.id)
+    const after = await prisma.task.findUniqueOrThrow({ where: { id: task.id } })
+    expect([after.columnId, after.position]).toEqual([col.id, 3])
   })
 })
 

@@ -37,9 +37,10 @@ export async function streamRoutes(app: FastifyInstance) {
       where: { id, organizationId: user.organizationId!, isActive: true },
     })
     if (!board) throw new AppError(404, 'Board não encontrado')
-    if (user.role === 'ORG_MEMBER' || user.role === 'ORG_MANAGER') {
-      await assertStaffSees(await loadStaffScope(user), user.organizationId, { boardIds: [id] }, 'read')
-    }
+    const staffCheck = user.role === 'ORG_MEMBER' || user.role === 'ORG_MANAGER'
+      ? async () => assertStaffSees(await loadStaffScope(user), user.organizationId!, { boardIds: [id] }, 'read')
+      : null
+    if (staffCheck) await staffCheck()
 
     // CLIENT subscribers are additionally gated at the company level — a ClientUser must have
     // access to the board's client, or the board effectively doesn't exist to them. Department
@@ -51,6 +52,7 @@ export async function streamRoutes(app: FastifyInstance) {
       if (!scope.clientIds.includes(board.clientId)) throw new AppError(404, 'Board não encontrado')
     }
 
-    attachSSESubscriber(request, reply, `board:${id}`)
+    // Scope can shrink while the panel is open ("ver colegas" turned off, portfolio moved)
+    attachSSESubscriber(request, reply, `board:${id}`, staffCheck ? { recheck: () => staffCheck().then(() => true, () => false) } : {})
   })
 }

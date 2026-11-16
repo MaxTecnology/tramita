@@ -676,4 +676,28 @@ describe('obterMetricas', () => {
       { documentModelId: modelo.id, nome: 'Modelo X', confirmados: 1, trocados: 1, rejeitados: 1 },
     ])
   })
+  it('um membro só conta os documentos das tarefas que ele vê', async () => {
+    const plan = await createTestPlan()
+    const org = await createTestOrg(plan.id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const client = await createTestClient(org.id)
+    // Recurring board: visibility is per task (a process board shows the whole process to whoever works on it)
+    const rec = await prisma.board.create({ data: { title: 'Rec', organizationId: org.id, clientId: client.id, type: 'RECURRING_SYSTEM', columns: { create: [{ title: 'R', position: 0 }] } }, include: { columns: true } })
+    const column = rec.columns[0]
+    const mine = await createTestTask(column.id, admin.id)
+    await prisma.task.update({ where: { id: mine.id }, data: { assigneeId: member.id } })
+    const others = await createTestTask(column.id, admin.id)
+    const obrigacao = await prisma.obligationType.create({ data: { code: 'T2', name: 'T2', organizationId: null } })
+    const modelo = await prisma.documentModel.create({ data: { organizationId: null, obligationTypeId: obrigacao.id, name: 'Modelo Y', definicao: {} } })
+    await prisma.receivedDocument.createMany({
+      data: [
+        { organizationId: org.id, fileHash: 'm1', storageKey: 'm1', uploadedById: admin.id, status: 'ATTACHED', how: 'confirmado', documentModelId: modelo.id, taskId: mine.id },
+        { organizationId: org.id, fileHash: 'm2', storageKey: 'm2', uploadedById: admin.id, status: 'ATTACHED', how: 'confirmado', documentModelId: modelo.id, taskId: others.id },
+      ],
+    })
+    const scope = { kind: 'LIMITED' as const, role: 'ORG_MEMBER' as const, userId: member.id, organizationId: org.id, departmentIds: [], seesDepartment: false, assignments: [] }
+    expect((await obterMetricas(org.id, scope)).porModelo).toEqual([{ documentModelId: modelo.id, nome: 'Modelo Y', confirmados: 1, trocados: 0, rejeitados: 0 }])
+    expect((await obterMetricas(org.id)).porModelo[0].confirmados).toBe(2)
+  })
 })

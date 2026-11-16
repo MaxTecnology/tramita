@@ -36,6 +36,7 @@ export async function publishInboxEvent(
 }
 
 export const SSE_MAX_CONNECTION_MS = 15 * 60 * 1000
+export const SSE_RECHECK_MS = 60 * 1000
 
 // Hijacks the reply, subscribes to `channel` on a dedicated Redis connection, and
 // forwards every published message as an SSE event. Shared by every SSE route in
@@ -44,6 +45,9 @@ export function attachSSESubscriber(
   request: FastifyRequest,
   reply: FastifyReply,
   channel: string,
+  // Access checked again every minute (e.g. a member who stopped seeing colleagues); false or an
+  // error closes the stream and the client reconnects through the full check
+  opts: { recheck?: () => Promise<boolean> } = {},
 ): void {
   reply.hijack()
   const raw = reply.raw
@@ -83,6 +87,7 @@ export function attachSSESubscriber(
     if (closed) return
     closed = true
     clearInterval(heartbeat)
+    clearInterval(recheckTimer)
     clearTimeout(maxDuration)
     sub.unsubscribe().catch(() => {})
     sub.quit().catch(() => {})
@@ -95,6 +100,20 @@ export function attachSSESubscriber(
     cleanup()
     raw.end()
   }, SSE_MAX_CONNECTION_MS)
+
+  const close = () => {
+    if (closed) return
+    cleanup()
+    raw.end()
+  }
+  let checking = false
+  const recheckTimer = opts.recheck
+    ? setInterval(() => {
+      if (checking) return // a slow check is not stacked with another one
+      checking = true
+      opts.recheck!().then((ok) => { if (!ok) close() }, close).finally(() => { checking = false })
+    }, SSE_RECHECK_MS)
+    : undefined
 
   // Cleanup on client disconnect
   request.raw.on('close', cleanup)

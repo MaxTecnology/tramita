@@ -467,7 +467,7 @@ async function anexarDocumento(
 
     const finalizado = await prisma.receivedDocument.updateMany({
       where: { id: receivedDocumentId, status: { in: AGUARDANDO_REVISAO }, attachingSince: reservadoEm },
-      data: { status: 'ATTACHED', taskId, attachmentId, how, reviewedById: actor.id, reviewedAt: new Date(), attachingSince: null },
+      data: { status: 'ATTACHED', taskId, deliverableId: entrega?.id ?? null, attachmentId, how, reviewedById: actor.id, reviewedAt: new Date(), attachingSince: null },
     })
     if (finalizado.count === 0) {
       throw new AppError(409, 'Documento foi revisado por outra pessoa enquanto este anexo era criado')
@@ -538,9 +538,10 @@ export async function reabrirDocumento(receivedDocumentId: string, organizationI
   if (resultado.count === 0) throw new AppError(409, `Só é possível reabrir um documento REJECTED (status atual: ${doc.status})`)
 }
 
-export async function obterMetricas(organizationId: string) {
+// Per model hit rate, counted over the documents the person can see (members: their tasks)
+export async function obterMetricas(organizationId: string, scope: StaffScope = { kind: 'ALL' }) {
   const docs = await prisma.receivedDocument.findMany({
-    where: { organizationId, how: { in: ['confirmado', 'trocado', 'rejeitado'] }, documentModelId: { not: null } },
+    where: { organizationId, how: { in: ['confirmado', 'trocado', 'rejeitado'] }, documentModelId: { not: null }, AND: [receivedDocumentWhere(scope)] },
     select: { how: true, documentModel: { select: { id: true, name: true } } },
   })
 

@@ -107,6 +107,35 @@ describe('abrir OS avulsa', () => {
     expect([read.taskId, read.deliverableId]).toEqual([os.id, guia.id])
   })
 
+  it('the robot also recognizes the delivery of an OS inside a process (and the queue names the process)', async () => {
+    const c = await setup()
+    await prisma.oSModel.update({ where: { id: c.recalculo.id }, data: { usableInProcess: true } })
+    const t = json(await app.inject({ method: 'POST', url: '/process-templates', headers: { authorization: c.admin }, payload: { name: 'Regularização', columns: [{ title: 'A', statusEffect: 'OPEN', documents: [] }], items: [{ osModelId: c.recalculo.id, columnIndex: 0, dependsOn: [] }] } }))
+    const board = json(await app.inject({ method: 'POST', url: '/boards', headers: { authorization: c.admin }, payload: { title: 'Regularização ACME', clientId: c.client.id, processTemplateId: t.id, competence: '2025-03' } }))
+    const os = await prisma.task.findFirstOrThrow({ where: { column: { boardId: board.id } } })
+    await prisma.documentModel.create({
+      data: {
+        organizationId: c.org.id, obligationTypeId: c.das.id, name: `Modelo ${c.org.id}`,
+        definicao: {
+          tipoImposto: `DAS-${c.org.id}`,
+          ancoras: [{ texto: 'Documento de Arrecadação', pagina: 1, x: 0.1, y: 0.05 }],
+          zonas: [
+            { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+            { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+          ],
+        },
+      },
+    })
+    const doc = await prisma.receivedDocument.create({ data: { organizationId: c.org.id, fileHash: `p-${c.org.id}`, storageKey: `k/${c.org.id}/2-guia.pdf`, status: 'PENDING' } })
+    vi.spyOn(b2Module, 'downloadFile').mockResolvedValue(Buffer.from(await gerarPdfComDocumentoArrecadacao('11.222.333/0001-81', 'março/2025')))
+    await processarDocumento(doc.id)
+    const read = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
+    expect(read.taskId).toBe(os.id)
+    const { listarFilaDeRevisao } = await import('@/modules/document-reader/document-reader.service')
+    const [item] = await listarFilaDeRevisao(c.org.id)
+    expect(item.suggestion).toMatchObject({ processTitle: 'Regularização ACME' })
+  })
+
   it('a model configured to complete by itself completes the OS when everything is delivered', async () => {
     const c = await setup()
     const os = json(await openOS(c, { osModelId: c.recalculo.id, clientId: c.client.id, competence: '2025-03' }))

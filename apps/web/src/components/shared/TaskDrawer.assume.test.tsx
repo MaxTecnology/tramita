@@ -54,3 +54,17 @@ it('a race (409) shows the API message', async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Assumir' }))
   expect(await screen.findByText('Essa tarefa já foi assumida por outra pessoa')).toBeInTheDocument()
 })
+
+it('without viewerCanEdit from the API, a member does not get edit controls on a task that is not theirs', async () => {
+  const { viewerCanEdit: _omit, ...unknown } = task
+  render(<TaskDrawer task={unknown} currentUserId="bruna" role="ORG_MEMBER" onClose={() => {}} />, { wrapper })
+  expect(await screen.findByText('Assuma a tarefa para alterá-la')).toBeInTheDocument()
+  expect(screen.queryAllByRole('combobox')).toHaveLength(0)
+})
+
+it('an editable task without assignee says so, not "with another colleague"', async () => {
+  server.use(http.get(`${API}/users/me`, () => HttpResponse.json({ id: 'bruna', role: 'ORG_MANAGER', departments: [{ id: 'fiscal', name: 'Fiscal' }], seesDepartmentWork: true })))
+  render(<TaskDrawer task={{ ...task, assigneeId: null, viewerCanEdit: true }} currentUserId="bruna" role="ORG_MANAGER" onClose={() => {}} />, { wrapper })
+  expect(await screen.findByText('Esta tarefa está sem responsável.')).toBeInTheDocument()
+  expect(screen.queryByText('Esta tarefa está com outro colaborador.')).not.toBeInTheDocument()
+})

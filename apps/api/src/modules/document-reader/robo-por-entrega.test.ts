@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import * as b2Module from '@/lib/b2'
 import * as queue from '@/lib/queue'
-import { processarDocumento, confirmarSugestao, listarFilaDeRevisao } from './document-reader.service'
+import { processarDocumento, confirmarSugestao, listarFilaDeRevisao, trocarTarefa } from './document-reader.service'
+import * as readerService from './document-reader.service'
+import { checkDeliveryFile } from './delivery-check'
 import { createTestPlan, createTestOrg, createTestUser, createTestClient, createTestBoard, createTestColumn, createTestDepartment } from '@/test/helpers'
 import { gerarPdfComDocumentoArrecadacao } from '@/test/pdf-helpers'
 
@@ -76,6 +78,55 @@ describe('robô casa por entrega', () => {
     await prisma.taskDeliverable.update({ where: { id: guia.id }, data: { deliveredAt: new Date() } })
     await expect(confirmarSugestao(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })).rejects.toMatchObject({ statusCode: 409, message: 'Essa entrega já foi feita' })
     expect((await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })).status).toBe('PENDING')
+  })
+})
+
+describe('menores do robô', () => {
+  it('a manual delivery while the robot is attaching is not silently replaced', async () => {
+    const { org, admin, doc, guia } = await setup()
+    await processarDocumento(doc.id)
+    const pdf = Buffer.from(await gerarPdfComDocumentoArrecadacao('11.222.333/0001-81', 'agosto/2026'))
+    const manual = await prisma.attachment.create({ data: { taskId: guia.taskId, filename: 'manual.pdf', mimeType: 'application/pdf', size: 1, storageKey: 'k/manual', uploadedBy: admin.id } })
+    vi.spyOn(b2Module, 'downloadFile').mockImplementation(async () => {
+      // Someone delivers by hand right after the robot checked the pending deliveries
+      await prisma.taskDeliverable.update({ where: { id: guia.id }, data: { deliveredAt: new Date(), attachmentId: manual.id } })
+      return pdf
+    })
+    await expect(confirmarSugestao(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })).rejects.toMatchObject({ statusCode: 409, message: 'Essa entrega já foi feita' })
+    expect((await prisma.taskDeliverable.findUniqueOrThrow({ where: { id: guia.id } })).attachmentId).toBe(manual.id)
+    expect((await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })).status).toBe('PENDING')
+  })
+
+  it('a pending delivery whose document the client already has is not replaced by the robot', async () => {
+    const { org, admin, task, doc, guia } = await setup()
+    await processarDocumento(doc.id)
+    const board = await prisma.board.findFirstOrThrow({ where: { columns: { some: { id: task.columnId } } } })
+    const protocol = await prisma.protocol.create({ data: { organizationId: org.id, number: `P-${org.id}`, clientId: board.clientId, taskId: task.id, title: 'Guia', createdById: admin.id, deliverableId: guia.id } })
+    await expect(confirmarSugestao(doc.id, org.id, { id: admin.id, role: 'ORG_ADMIN' })).rejects.toMatchObject({ statusCode: 409 })
+    expect((await prisma.protocol.findUniqueOrThrow({ where: { id: protocol.id } })).attachmentId).toBeNull()
+    expect(await prisma.attachment.count({ where: { taskId: task.id } })).toBe(0)
+  })
+
+  it('switching task records the delivery the document filled', async () => {
+    const { org, admin, task, doc } = await setup([{ name: 'Guia', robot: true }, { name: 'Holerites' }])
+    const holerites = task.deliverables[1]
+    await processarDocumento(doc.id)
+    await trocarTarefa(doc.id, org.id, task.id, { id: admin.id, role: 'ORG_ADMIN' }, { deliverableId: holerites.id })
+    expect((await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })).deliverableId).toBe(holerites.id)
+  })
+
+  it('two deliveries of the same task say "entregas", not "tarefas"', async () => {
+    const { doc } = await setup([{ name: 'Guia 1', robot: true }, { name: 'Guia 2', robot: true }])
+    await processarDocumento(doc.id)
+    const d = await prisma.receivedDocument.findUniqueOrThrow({ where: { id: doc.id } })
+    expect((d.extractedFields as { _motivo: string })._motivo).toBe('2 entregas pendentes na mesma tarefa (ambíguo)')
+  })
+
+  it('a database failure loading the models is an error, not a warning the person can accept', async () => {
+    const { org, task, guia } = await setup()
+    vi.spyOn(readerService, 'carregarModelosDaOrg').mockRejectedValue(new Error('connection lost'))
+    const pdf = Buffer.from(await gerarPdfComDocumentoArrecadacao('11.222.333/0001-81', 'agosto/2026'))
+    await expect(checkDeliveryFile(task.id, guia.id, org.id, { buffer: pdf, mimeType: 'application/pdf' })).rejects.toThrow('connection lost')
   })
 })
 

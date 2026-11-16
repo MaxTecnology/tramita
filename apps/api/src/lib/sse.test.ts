@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { EventEmitter } from 'node:events'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { redis } from '@/lib/redis'
-import { attachSSESubscriber, SSE_MAX_CONNECTION_MS } from './sse'
+import { attachSSESubscriber, SSE_MAX_CONNECTION_MS, SSE_RECHECK_MS } from './sse'
 
 afterEach(() => {
   vi.useRealTimers()
@@ -43,5 +43,35 @@ describe('attachSSESubscriber', () => {
 
     expect(raw.end).not.toHaveBeenCalled()
     expect(sub.quit).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-checks access every minute and closes as soon as it is lost', async () => {
+    vi.useFakeTimers()
+    const { raw, reply, request } = fakeConnection()
+    const recheck = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+
+    attachSSESubscriber(request, reply, 'board:b1', { recheck })
+    await vi.advanceTimersByTimeAsync(SSE_RECHECK_MS)
+    expect(raw.end).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(SSE_RECHECK_MS)
+    expect(recheck).toHaveBeenCalledTimes(2)
+    expect(raw.end).toHaveBeenCalledTimes(1)
+  })
+
+  it('a failing re-check also closes (the client reconnects and is checked again)', async () => {
+    vi.useFakeTimers()
+    const { raw, reply, request } = fakeConnection()
+    attachSSESubscriber(request, reply, 'board:b1', { recheck: vi.fn().mockRejectedValue(new Error('db')) })
+    await vi.advanceTimersByTimeAsync(SSE_RECHECK_MS)
+    expect(raw.end).toHaveBeenCalledTimes(1)
+  })
+
+  it('a slow re-check is not started again while the previous one is running', async () => {
+    vi.useFakeTimers()
+    const { reply, request } = fakeConnection()
+    const recheck = vi.fn(() => new Promise<boolean>(() => {}))
+    attachSSESubscriber(request, reply, 'board:b1', { recheck })
+    await vi.advanceTimersByTimeAsync(SSE_RECHECK_MS * 3)
+    expect(recheck).toHaveBeenCalledTimes(1)
   })
 })

@@ -508,6 +508,7 @@ Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma t
 - Meta (`targetDate`) = `releasedAt` + `deadlineBusinessDays` + dias úteis pausados. Pausa (`TaskPause`) enquanto houver documento obrigatório do cliente `PENDING`/`REJECTED` ou aprovação do cliente pendente (`UPLOADED` não pausa). Processo: `BoardPause` quando todas as OS liberadas e abertas estão pausadas; meta do processo = abertura + prazo + pausas; `completedAt` quando todas as tarefas terminam.
 - OS não liberada: PATCH de status e `/move` → 409 `'Esta OS aguarda: <títulos>'`. Concluir/desconsiderar libera as dependentes (uma vez; sino `OS_RELEASED`). POST `/tasks/:id/release` `{ reason }` (ORG_ADMIN/ORG_MANAGER) libera antes (histórico `os_released_early`).
 - PATCH `/tasks/:id` com `status` move o cartão junto: `DONE` vai para a primeira coluna `statusEffect = DONE` do board; reabrir uma tarefa que está numa coluna `DONE` leva à coluna do novo status (ou à primeira não-DONE). Grava `moved_to`.
+- PATCH `/tasks/reorder` só reordena dentro da coluna atual de cada tarefa; outra coluna → 400 `'Para trocar de coluna, mova a tarefa'`.
 - GET `/tasks?dateField=period&dateFrom&dateTo` inclui também as tarefas abertas com meta (ou vencimento, sem meta) antes de `dateFrom`.
 - Listas trazem `deadline: { state: NONE|ON_TIME|DUE_SOON|LATE|PAUSED|WAITING_DEPENDENCY|DONE, businessDaysLeft?, businessDaysLate?, pausedSinceDays?, officeBusinessDays, clientBusinessDays }` (GET `/tasks`, `/boards`, `/boards/:id` — tarefas e processo) e `waitingFor: string[]`.
 
