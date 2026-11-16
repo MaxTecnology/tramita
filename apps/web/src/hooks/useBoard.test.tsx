@@ -1,4 +1,6 @@
-import { renderHook, waitFor, act } from '@testing-library/react'
+import { renderHook, waitFor, act, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { AppDialogs } from '@/components/ui/app-dialogs'
 import { http, HttpResponse } from 'msw'
 import { server } from '@/test/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -102,4 +104,25 @@ it('reverts optimistic update on moveTask error', async () => {
     const col1 = result.current.board?.columns.find((c) => c.id === 'col-1')
     expect(col1?.tasks.some((t) => t.id === 't1')).toBe(true)
   })
+})
+
+it('moving a late OS to the done column asks the reason and moves with it', async () => {
+  const bodies: unknown[] = []
+  server.use(
+    http.get('http://localhost:3000/boards/board-1', () => HttpResponse.json(mockBoard)),
+    http.get('http://localhost:3000/delay-reasons', () => HttpResponse.json([{ id: 'r1', name: 'Aguardando órgão público', requiresNote: false, isActive: true, position: 0 }])),
+    http.patch('http://localhost:3000/tasks/t1/move', async ({ request }) => {
+      bodies.push(await request.json())
+      return bodies.length === 1
+        ? HttpResponse.json({ message: 'Informe o motivo do atraso' }, { status: 422 })
+        : HttpResponse.json({})
+    }),
+  )
+  render(<AppDialogs />)
+  const { result } = renderHook(() => useBoard('board-1'), { wrapper })
+  await waitFor(() => expect(result.current.board).toBeDefined())
+  act(() => { result.current.moveTask({ taskId: 't1', columnId: 'col-2', position: 0 }) })
+  await userEvent.selectOptions(await screen.findByLabelText('Motivo'), 'r1')
+  await userEvent.click(screen.getByRole('button', { name: 'Concluir' }))
+  await waitFor(() => expect(bodies.at(-1)).toEqual({ columnId: 'col-2', position: 0, delayReasonId: 'r1' }))
 })

@@ -571,6 +571,7 @@ const LIST_TASK_SELECT = {
   delayNote: true,
   delayReasonPending: true,
   pauses: { select: { startedAt: true, endedAt: true } },
+  dependsOn: { select: { dependsOn: { select: { title: true, status: true } } } },
 } satisfies Prisma.TaskSelect
 
 type ListTaskRow = Prisma.TaskGetPayload<{ select: typeof LIST_TASK_SELECT }>
@@ -585,9 +586,13 @@ async function clockCtx(organizationId: string): Promise<ClockCtx> {
 
 // "Aguardando aprovação do cliente" flag (the approvals themselves are not part of the list) and the
 // OS clock state
-function toListItem({ approvals, pauses, ...t }: ListTaskRow, editable: Set<string>, clock: ClockCtx) {
+function toListItem({ approvals, pauses, dependsOn, ...t }: ListTaskRow, editable: Set<string>, clock: ClockCtx) {
   return {
     ...t, viewerCanEdit: editable.has(t.id), awaitingApproval: approvals.length > 0,
+    // OS not released yet: which OS it still waits for
+    waitingFor: t.osModelId && !t.releasedAt
+      ? dependsOn.filter((d) => d.dependsOn.status !== 'DONE' && d.dependsOn.status !== 'DISREGARDED').map((d) => d.dependsOn.title)
+      : [],
     deadline: deadlineInfo({ ...t, pauses }, clock.now, clock.holidays, clock.warnDays),
   }
 }

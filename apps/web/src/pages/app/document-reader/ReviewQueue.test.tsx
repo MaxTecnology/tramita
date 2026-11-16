@@ -90,3 +90,11 @@ it('on a narrow screen (no side panel) "Ver PDF" opens the PDF in a new tab', as
   await waitFor(() => expect(open).toHaveBeenCalledWith('https://b2/a.pdf', '_blank', 'noopener'))
   vi.unstubAllGlobals()
 })
+
+it('an OS suggestion says it is an OS and names the process', async () => {
+  server.use(http.get(`${API}/document-reader/fila`, () => HttpResponse.json([
+    doc('o', true, { suggestion: { ...doc('o', true).suggestion, taskTitle: 'Registro na Junta', osModelName: 'Registro na Junta', processTitle: 'Abertura ACME' } }),
+  ])))
+  renderQueue()
+  expect(await screen.findByText('OS · Abertura ACME')).toBeInTheDocument()
+})

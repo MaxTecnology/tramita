@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { withDelayReason } from '@/components/shared/task-documents/delayReason'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { ReceivedDocument, RejectedDocument } from '@/types'
@@ -237,9 +238,17 @@ export default function ReviewQueue() {
   })
 
   const concluirMutation = useMutation({
-    mutationFn: (taskIds: string[]) => Promise.all(taskIds.map((id) => api.patch(`/tasks/${id}`, { status: 'DONE' }))),
-    onSuccess: (_r, taskIds) => {
-      toast.success(taskIds.length === 1 ? 'Tarefa concluída' : `${taskIds.length} tarefas concluídas`)
+    // One by one: a late OS asks its own reason (the API says when); giving up skips that task
+    mutationFn: async (taskIds: string[]) => {
+      let done = 0
+      for (const id of taskIds) {
+        const result = await withDelayReason((extra) => api.patch(`/tasks/${id}`, { status: 'DONE', ...extra }))
+        if (result !== null) done++
+      }
+      return done
+    },
+    onSuccess: (done) => {
+      if (done > 0) toast.success(done === 1 ? 'Tarefa concluída' : `${done} tarefas concluídas`)
       setResultado((r) => (r ? { ...r, summary: { ...r.summary, readyTaskIds: [] } } : r))
       invalidar()
     },
@@ -389,6 +398,9 @@ export default function ReviewQueue() {
                               <span className="font-medium text-foreground">{s.clientName}</span>
                               {' · '}<span className="font-medium text-info-text">{s.obligationName ?? 'Documento'} → {s.deliverableName}</span>
                               {' · '}{s.taskTitle}{s.competence && ` ${fmtCompetence(s.competence)}`}
+                              {s.osModelName && (
+                                <span className="ml-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-info-bg text-info-text">{s.processTitle ? `OS · ${s.processTitle}` : 'OS'}</span>
+                              )}
                             </p>
                           ) : (
                             <p className="text-xs text-warning-text">

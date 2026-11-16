@@ -252,7 +252,8 @@ export async function listarFilaDeRevisao(
       task: {
         select: {
           id: true, title: true, competence: true,
-          column: { select: { board: { select: { client: { select: { name: true, cnpj: true, cpf: true, cei: true, caepf: true, inscricaoEstadual: true } } } } } },
+          osModel: { select: { name: true } },
+          column: { select: { board: { select: { type: true, title: true, client: { select: { name: true, cnpj: true, cpf: true, cei: true, caepf: true, inscricaoEstadual: true } } } } } },
           deliverables: {
             where: { deliveredAt: null },
             orderBy: { position: 'asc' },
@@ -285,6 +286,9 @@ export async function listarFilaDeRevisao(
             taskId: task.id, taskTitle: task.title, clientName: client!.name, competence: competenciaParaRotulo(task.competence),
             deliverableId: deliverable.id, deliverableName: deliverable.name, obligationName: deliverable.obligationType?.name ?? null,
             requiresPayment: deliverable.requiresPayment, amount: lido.amount ?? null, paymentDueDate: lido.paymentDueDate ?? null,
+            // An OS (standalone or step of a process) says so in the queue
+            osModelName: task.osModel?.name ?? null,
+            processTitle: task.column.board.type === 'PROCESS' ? task.column.board.title : null,
           }
         : null,
       checks,

@@ -8,10 +8,18 @@ import { Button } from './button'
 interface Base { title: string; description?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }
 export type ConfirmOptions = Base
 export interface TextOptions extends Base { label: string; placeholder?: string; optional?: boolean }
+// Pick one option, with a note (required by some options) — e.g. the reason of a delay
+export interface ChoiceOptions extends Base {
+  label: string
+  choices: { value: string; label: string; requiresNote?: boolean }[]
+  noteLabel?: string
+}
+export interface ChoiceAnswer { value: string; note?: string }
 
 type Pending =
   | { kind: 'confirm'; options: ConfirmOptions; resolve: (v: boolean) => void }
   | { kind: 'text'; options: TextOptions; resolve: (v: string | null) => void }
+  | { kind: 'choice'; options: ChoiceOptions; resolve: (v: ChoiceAnswer | null) => void }
 
 let current: Pending | null = null
 const listeners = new Set<() => void>()
@@ -21,7 +29,7 @@ const subscribe = (l: () => void) => { listeners.add(l); return () => listeners.
 function open(next: Pending) {
   // A dialog left open is answered as "cancel" before the next one shows
   if (current?.kind === 'confirm') current.resolve(false)
-  else if (current?.kind === 'text') current.resolve(null)
+  else if (current) current.resolve(null)
   current = next
   emit()
 }
@@ -34,6 +42,10 @@ export function askText(options: TextOptions): Promise<string | null> {
   return new Promise((resolve) => open({ kind: 'text', options, resolve }))
 }
 
+export function askChoice(options: ChoiceOptions): Promise<ChoiceAnswer | null> {
+  return new Promise((resolve) => open({ kind: 'choice', options, resolve }))
+}
+
 function close() {
   current = null
   emit()
@@ -42,7 +54,8 @@ function close() {
 export function AppDialogs() {
   const pending = useSyncExternalStore(subscribe, () => current, () => null)
   const [value, setValue] = useState('')
-  useEffect(() => { setValue('') }, [pending])
+  const [choice, setChoice] = useState('')
+  useEffect(() => { setValue(''); setChoice('') }, [pending])
 
   if (!pending) return null
   const { options } = pending
@@ -52,11 +65,15 @@ export function AppDialogs() {
     close()
   }
   const trimmed = value.trim()
-  const canConfirm = pending.kind === 'confirm' || pending.options.optional || trimmed.length > 0
+  const picked = pending.kind === 'choice' ? pending.options.choices.find((c) => c.value === choice) : undefined
+  const canConfirm = pending.kind === 'confirm'
+    || (pending.kind === 'text' && (pending.options.optional || trimmed.length > 0))
+    || (pending.kind === 'choice' && !!picked && (!picked.requiresNote || trimmed.length > 0))
   const confirm = () => {
     if (!canConfirm) return
     if (pending.kind === 'confirm') pending.resolve(true)
-    else pending.resolve(trimmed || null)
+    else if (pending.kind === 'text') pending.resolve(trimmed || null)
+    else pending.resolve({ value: choice, ...(trimmed ? { note: trimmed } : {}) })
     close()
   }
 
@@ -80,6 +97,33 @@ export function AppDialogs() {
                 className="mt-1.5 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-none"
               />
             </label>
+          )}
+          {pending.kind === 'choice' && (
+            <div className="space-y-3">
+              <label className="block text-sm text-foreground">
+                {pending.options.label}
+                <select
+                  autoFocus
+                  aria-label={pending.options.label}
+                  value={choice}
+                  onChange={(e) => setChoice(e.target.value)}
+                  className="mt-1.5 h-9 w-full rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  <option value="">Selecione...</option>
+                  {pending.options.choices.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm text-foreground">
+                {pending.options.noteLabel ?? 'Observação'}{picked?.requiresNote ? '' : ' (opcional)'}
+                <textarea
+                  aria-label={pending.options.noteLabel ?? 'Observação'}
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  rows={2}
+                  className="mt-1.5 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent resize-none"
+                />
+              </label>
+            </div>
           )}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={cancel}>{options.cancelLabel ?? 'Cancelar'}</Button>

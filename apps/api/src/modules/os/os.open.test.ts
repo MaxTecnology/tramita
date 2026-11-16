@@ -193,3 +193,15 @@ describe('abrir processo com OS', () => {
     expect(json(res).releasedAt).toBeNull()
   })
 })
+
+describe('fila do robô com OS', () => {
+  it('the suggestion says it is an OS and names the model', async () => {
+    const c = await setup()
+    const os = json(await openOS(c, { osModelId: c.recalculo.id, clientId: c.client.id, competence: '2025-03' }))
+    const guia = await prisma.taskDeliverable.findFirstOrThrow({ where: { taskId: os.id } })
+    await prisma.receivedDocument.create({ data: { organizationId: c.org.id, fileHash: `q-${c.org.id}`, storageKey: `k/${c.org.id}/1-g.pdf`, status: 'PENDING', taskId: os.id, deliverableId: guia.id, extractedFields: {} } })
+    const { listarFilaDeRevisao } = await import('@/modules/document-reader/document-reader.service')
+    const [item] = await listarFilaDeRevisao(c.org.id)
+    expect(item.suggestion).toMatchObject({ osModelName: 'Recálculo DAS', processTitle: null })
+  })
+})

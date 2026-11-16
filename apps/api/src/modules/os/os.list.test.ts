@@ -91,3 +91,14 @@ describe('Tarefas e Processos mostram a OS e o prazo', () => {
     expect(boards.find((b) => b.id === board.id)?.deadline.state).toBe('LATE')
   })
 })
+
+describe('OS aguardando outra na lista de Tarefas', () => {
+  it('names the OS it waits for', async () => {
+    const c = await setup()
+    const t = JSON.parse((await app.inject({ method: 'POST', url: '/process-templates', headers: { authorization: c.auth }, payload: { name: 'P', columns: [{ title: 'A', statusEffect: 'OPEN', documents: [] }], items: [{ osModelId: c.model.id, columnIndex: 0, dependsOn: [] }, { osModelId: c.legalModel.id, columnIndex: 0, dependsOn: [0] }] } })).body)
+    const board = JSON.parse((await app.inject({ method: 'POST', url: '/boards', headers: { authorization: c.auth }, payload: { title: 'P', clientId: c.client.id, processTemplateId: t.id } })).body)
+    const waiting = await prisma.task.findFirstOrThrow({ where: { column: { boardId: board.id }, releasedAt: null } })
+    const res = JSON.parse((await app.inject({ method: 'GET', url: `/tasks?taskId=${waiting.id}`, headers: { authorization: c.auth } })).body)
+    expect((res.items ?? res)[0].waitingFor).toEqual(['Recálculo'])
+  })
+})

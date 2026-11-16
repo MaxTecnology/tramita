@@ -20,6 +20,14 @@ export interface Task {
   visibleToClient: boolean
   /** false when the viewer must assume the task before changing it (colleague's task) */
   viewerCanEdit?: boolean
+  // OS: model, release (null = waiting for other OS), clock and delay reason
+  osModelId?: string | null
+  osModel?: { id: string; name: string } | null
+  releasedAt?: string | null
+  deadline?: DeadlineInfo
+  waitingFor?: string[]
+  delayReasonId?: string | null
+  delayReasonPending?: boolean
 }
 
 export interface Column {
@@ -434,6 +442,9 @@ export interface ReceivedDocument {
     requiresPayment: boolean
     amount: string | null
     paymentDueDate: string | null
+    // OS (standalone or step of a process)
+    osModelName?: string | null
+    processTitle?: string | null
   } | null
   checks?: { cnpj: boolean; competence: boolean; payment: boolean }
   ready?: boolean

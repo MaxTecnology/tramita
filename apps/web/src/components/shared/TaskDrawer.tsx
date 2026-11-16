@@ -15,6 +15,8 @@ import { toast } from 'sonner'
 import { formatBRL, toApiAmount } from '@/lib/money'
 import { PaymentFields, type PaymentValues } from './task-documents/PaymentFields'
 import { robotCheckFile } from './task-documents/robotCheck'
+import { withDelayReason, registerDelayReason } from './task-documents/delayReason'
+import { DeadlineChip } from './DeadlineChip'
 import { ProtocolOfficeCard } from './task-documents/ProtocolOfficeCard'
 import { AddDeliverableForm } from './task-documents/AddDeliverableForm'
 import { ApprovalsSection, useTaskApprovals } from './task-documents/ApprovalsSection'
@@ -162,10 +164,29 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
 
   const { departments } = useServedDepartments(isStaff ? clientId : undefined)
 
-  const updateMutation = useMutation({
-    mutationFn: (data: Partial<Pick<Task, 'title' | 'priority' | 'status' | 'description' | 'dueDate' | 'departmentId' | 'visibleToClient' | 'targetDate' | 'competence' | 'assigneeId'>>) =>
-      api.patch(`/tasks/${task.id}`, data).then((r) => r.data),
+  // OS waiting for another one: no status change until it is released (the manager may release early)
+  const waitingDependency = !!task.osModelId && !task.releasedAt && isOpen
+  const canReleaseEarly = role === 'ORG_ADMIN' || role === 'ORG_MANAGER'
+  const releaseMutation = useMutation({
+    mutationFn: (reason: string) => api.post(`/tasks/${task.id}/release`, { reason }),
     onSuccess: () => {
+      toast.success('OS liberada — o prazo começou a contar')
+      queryClient.invalidateQueries({ queryKey: ['board'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['os'] })
+    },
+    onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao liberar OS')),
+  })
+
+  const updateMutation = useMutation({
+    // Finishing an OS after its deadline asks the reason (the API says when it is missing)
+    mutationFn: async (data: Partial<Pick<Task, 'title' | 'priority' | 'status' | 'description' | 'dueDate' | 'departmentId' | 'visibleToClient' | 'targetDate' | 'competence' | 'assigneeId'>>) => {
+      if (data.status !== 'DONE') return { saved: true, task: await api.patch(`/tasks/${task.id}`, data).then((r) => r.data) }
+      const result = await withDelayReason((extra) => api.patch(`/tasks/${task.id}`, { ...data, ...extra }).then((r) => r.data))
+      return { saved: result !== null, task: result }
+    },
+    onSuccess: ({ saved }) => {
+      if (!saved) return
       toast.success('Tarefa atualizada')
       // TaskDrawer é usado tanto no Kanban por board (Board.tsx, query ['board', boardId]) quanto
       // na tela flat de Tarefas (Tasks.tsx, query ['tasks', filters]) — precisa invalidar os dois,
@@ -503,7 +524,9 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
               </span>
             )}
 
-            {canEdit ? (
+            {waitingDependency ? (
+              <DeadlineChip deadline={task.deadline ?? { state: 'WAITING_DEPENDENCY', officeBusinessDays: 0, clientBusinessDays: 0 }} waitingFor={task.waitingFor?.join(', ')} />
+            ) : canEdit ? (
               <select
                 value={task.status}
                 onChange={(e) => updateMutation.mutate({ status: e.target.value as Task['status'] })}
@@ -617,6 +640,32 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                   Meta: {formatDateOnlyUTC(task.targetDate)}{isRecurring ? ' 🔒' : ''}
                 </span>
               )
+            )}
+            {task.osModel && task.deadline && !waitingDependency && (
+              <span className="inline-flex items-center gap-1.5" title="Prazo interno em dias úteis (pausa enquanto aguarda o cliente)">
+                <DeadlineChip deadline={task.deadline} />
+                {(task.deadline.officeBusinessDays > 0 || task.deadline.clientBusinessDays > 0) && (
+                  <span className="text-[11px] text-muted-foreground">
+                    {task.deadline.officeBusinessDays} dias úteis do escritório · {task.deadline.clientBusinessDays} aguardando o cliente
+                  </span>
+                )}
+              </span>
+            )}
+            {waitingDependency && canReleaseEarly && (
+              <button type="button" disabled={releaseMutation.isPending}
+                onClick={async () => {
+                  const reason = await askText({ title: 'Liberar esta OS agora?', description: `Ela aguarda: ${task.waitingFor?.join(', ') || 'outra OS'}. O prazo começa a contar hoje.`, label: 'Por que liberar antes?', confirmLabel: 'Liberar' })
+                  if (reason) releaseMutation.mutate(reason)
+                }}
+                className="text-xs font-medium text-accent-hover hover:underline">
+                Liberar agora
+              </button>
+            )}
+            {task.delayReasonPending && canEdit && (
+              <button type="button" onClick={() => void registerDelayReason(task.id).then((ok) => { if (ok) { queryClient.invalidateQueries({ queryKey: ['tasks'] }); queryClient.invalidateQueries({ queryKey: ['os'] }) } })}
+                className="text-xs font-medium text-danger-text hover:underline">
+                Concluída com atraso — registrar o motivo
+              </button>
             )}
             {task.competence && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-bg text-foreground" title="Competência">
