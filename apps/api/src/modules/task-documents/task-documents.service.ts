@@ -392,6 +392,7 @@ export async function recalculateTaskStatus(taskId: string) {
       deliverables: true,
       approvals: { where: { status: 'PENDING' }, select: { id: true } },
       recurringTemplate: { select: { autoCompleteOnAllActivitiesDone: true } },
+      osModel: { select: { autoCompleteOnAllDelivered: true } },
       column: { select: { board: { select: { clientId: true, organizationId: true } } } },
     },
   })
@@ -400,7 +401,7 @@ export async function recalculateTaskStatus(taskId: string) {
   // "Nada a enviar" counts as resolved, like an approval
   const allRequirementsApproved = task.documentRequirements.every((d) => d.status === 'APPROVED' || d.status === 'NOT_APPLICABLE')
   const allDeliverablesDone = task.deliverables.every((d) => d.deliveredAt !== null)
-  const autoComplete = task.recurringTemplate?.autoCompleteOnAllActivitiesDone ?? false
+  const autoComplete = task.recurringTemplate?.autoCompleteOnAllActivitiesDone ?? task.osModel?.autoCompleteOnAllDelivered ?? false
 
   let nextStatus: TaskStatus | undefined
 

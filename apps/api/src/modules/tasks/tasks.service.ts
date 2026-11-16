@@ -276,6 +276,35 @@ export async function ensureRecurringSystemBoard(clientId: string, organizationI
   })
 }
 
+// Board of the client's standalone OS (service orders), created on the first one. Columns anchor the
+// status like the Tarefas screen: open, in progress, blocked, done.
+export async function ensureServiceSystemBoard(clientId: string, organizationId: string) {
+  const existing = await prisma.board.findFirst({
+    where: { clientId, organizationId, type: 'SERVICE_SYSTEM' },
+    include: { columns: true },
+  })
+  if (existing && existing.columns.length > 0) return existing
+
+  return prisma.board.create({
+    data: {
+      title: 'Ordens de Serviço (sistema)',
+      organizationId,
+      clientId,
+      type: 'SERVICE_SYSTEM',
+      isActive: true,
+      columns: {
+        create: [
+          { title: 'Abertas', position: 0, statusEffect: 'OPEN' },
+          { title: 'Em andamento', position: 1, statusEffect: 'STARTED' },
+          { title: 'Com impedimento', position: 2, statusEffect: 'BLOCKED' },
+          { title: 'Concluídas', position: 3, statusEffect: 'DONE' },
+        ],
+      },
+    },
+    include: { columns: true },
+  })
+}
+
 export async function updateTask(
   id: string,
   organizationId: string,

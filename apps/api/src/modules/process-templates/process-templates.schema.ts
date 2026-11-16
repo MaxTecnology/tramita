@@ -9,6 +9,14 @@ const columnSchema = z.object({
   documents: z.array(z.object({ name: z.string().trim().min(1) })).default([]),
 })
 
+// OS the process creates when opened: the model, the column (index) where it is born and the other
+// items (indexes in this same list) it waits for
+const itemSchema = z.object({
+  osModelId: z.string().cuid(),
+  columnIndex: z.number().int().min(0),
+  dependsOn: z.array(z.number().int().min(0)).default([]),
+})
+
 export const createProcessTemplateSchema = z.object({
   name: z.string().trim().min(1),
   description: z.string().optional(),
@@ -17,6 +25,7 @@ export const createProcessTemplateSchema = z.object({
   deadlineBusinessDays: z.number().int().min(1).max(365).nullable().optional(),
   clientCanRequest: z.boolean().optional(),
   columns: z.array(columnSchema).min(1, 'Adicione pelo menos uma coluna'),
+  items: z.array(itemSchema).max(100).optional(),
 })
 
 export const updateProcessTemplateSchema = createProcessTemplateSchema.partial().extend({

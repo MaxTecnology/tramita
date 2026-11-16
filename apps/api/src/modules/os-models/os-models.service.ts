@@ -84,8 +84,18 @@ export async function updateOSModel(id: string, organizationId: string, data: Up
   })
 }
 
+// A model already used (an OS or a process template item points to it) is deactivated, not deleted:
+// opened OS keep showing where they came from
 export async function deleteOSModel(id: string, organizationId: string) {
   await getOSModelForOrg(id, organizationId)
+  const [tasks, items] = await Promise.all([
+    prisma.task.count({ where: { osModelId: id } }),
+    prisma.processTemplateItem.count({ where: { osModelId: id } }),
+  ])
+  if (tasks > 0 || items > 0) {
+    await prisma.oSModel.update({ where: { id }, data: { isActive: false } })
+    return { id, deactivated: true }
+  }
   await prisma.oSModel.delete({ where: { id } })
-  return { id }
+  return { id, deactivated: false }
 }

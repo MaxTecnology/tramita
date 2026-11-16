@@ -6,7 +6,8 @@ import { staffScope, param } from '@/middlewares/staffScope'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createBoardSchema, updateBoardSchema, searchQuerySchema, listBoardsQuerySchema } from './boards.schema'
-import { listBoards, getBoardById, createBoard, updateBoard, searchTasks } from './boards.service'
+import { listBoards, getBoardById, updateBoard, searchTasks } from './boards.service'
+import { openProcess } from '@/modules/os/os.service'
 import { getClientAccessScope, canSeeTask, type ClientAccessScope } from '@/modules/client-users/client-access'
 
 function filterBoardTasksForClient<
@@ -82,13 +83,9 @@ export async function boardsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const result = createBoardSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    // With a process template: the board plus its OS (os.service); without: a plain board
     return reply.status(201).send(
-      await createBoard(
-        request.user.organizationId!,
-        request.user.sub,
-        request.user.role,
-        result.data,
-      ),
+      await openProcess(request.user.organizationId!, { id: request.user.sub, role: request.user.role }, result.data),
     )
   })
 

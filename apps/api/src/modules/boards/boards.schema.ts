@@ -5,6 +5,8 @@ export const createBoardSchema = z.object({
   description: z.string().optional(),
   clientId: z.string().cuid(),
   processTemplateId: z.string().cuid().optional(),
+  // Competence copied to the process OS whose model asks for one (AAAA-MM)
+  competence: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Competência inválida (use AAAA-MM)').optional(),
   responsibleUserId: z.string().cuid().optional(),
   dueDate: z.string().datetime().optional(),
 })
