@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { getDashboardMetrics, getTeamMembers, getProductivityMetrics } from '@/modules/dashboard/dashboard.service'
 import { ensureRecurringSystemBoard } from '@/modules/tasks/tasks.service'
+import { loadStaffScope } from '@/modules/staff-scope/staff-scope'
 import {
   createTestPlan,
   createTestOrg,
@@ -228,6 +229,31 @@ describe('getDashboardMetrics', () => {
     expect(result.kpis.completedTasksThisMonth).toBe(1)
     expect(result.tasksByStatus.OPEN).toBe(1)
     expect(result.tasksByStatus.DONE).toBe(1)
+  })
+})
+
+describe('getDashboardMetrics — escopo de tarefa do membro', () => {
+  it('a member of Fiscal does not count the Folha recurring tasks of a client Fiscal serves', async () => {
+    const org = await createTestOrg((await createTestPlan()).id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const member = await createTestUser(org.id, { role: 'ORG_MEMBER' })
+    const fiscal = await createTestDepartment(org.id, { name: 'Fiscal' })
+    const folha = await createTestDepartment(org.id, { name: 'Folha' })
+    const client = await createTestClient(org.id)
+    await prisma.userDepartment.create({ data: { userId: member.id, departmentId: fiscal.id } })
+    await prisma.clientAssignment.create({ data: { clientId: client.id, departmentId: fiscal.id, userId: member.id } })
+    await prisma.user.update({ where: { id: member.id }, data: { seesDepartmentWork: false } })
+    const board = await ensureRecurringSystemBoard(client.id, org.id)
+    const column = board.columns[0]
+    await createTestTask(column.id, admin.id, { title: 'DAS', priority: 'URGENT', departmentId: fiscal.id })
+    await createTestTask(column.id, admin.id, { title: 'Folha', priority: 'URGENT', departmentId: folha.id })
+    await prisma.task.updateMany({ where: { column: { boardId: board.id }, title: 'DAS' }, data: { assigneeId: member.id } })
+
+    const scope = await loadStaffScope({ sub: member.id, role: 'ORG_MEMBER', organizationId: org.id })
+    const result = await getDashboardMetrics(org.id, new Date(), scope)
+
+    expect(result.kpis.urgentOpenTasks).toBe(1)
+    expect(result.tasksByStatus.OPEN).toBe(1)
   })
 })
 

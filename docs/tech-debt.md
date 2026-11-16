@@ -571,7 +571,7 @@ Ações fora do código (ainda pendentes, por último na ordem combinada):
    concorrente vencer no meio, o histórico, a contagem e o aviso incluem uma tarefa que não mudou de mãos.
    Correção: `updateManyAndReturn` (ou `UPDATE … RETURNING`) e histórico a partir dos ids devolvidos; guardar
    também `status notIn (DONE, DISREGARDED)` no `where` das duas escritas.
-2. **Dashboard: contagens de tarefas usam o escopo do processo**, não o da tarefa — o processo de recorrentes de
+2. ✅ (resolvido em 2026-11-15) **Dashboard: contagens de tarefas usam o escopo do processo**, não o da tarefa — o processo de recorrentes de
    um cliente atendido pelo Fiscal conta as recorrentes da Folha. Correção: `{ AND: [taskWhere(scope)] }` nos
    agregados de tarefa.
 3. **SSE do processo só confere o escopo ao conectar** — após desligar "ver colegas", até 15 min de eventos

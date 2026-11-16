@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import type { ProductivityQuery, ProductivityMetrics, MetricsBreakdown } from './dashboard.types'
-import { boardWhere, type StaffScope } from '@/modules/staff-scope/staff-scope'
+import { boardWhere, taskWhere, type StaffScope } from '@/modules/staff-scope/staff-scope'
 import { utcDayLabel, todayInBRT, startOfTodayInBRT, startOfMonthInBRT } from '@/lib/date-only'
 
 export async function getDashboardMetrics(
@@ -11,6 +11,12 @@ export async function getDashboardMetrics(
 ) {
   // ORG_MEMBER: same visibility as the process list, so the numbers match what they can open.
   const scope: Prisma.BoardWhereInput = staffScope ? { AND: [boardWhere(staffScope)] } : {}
+  // Task aggregates follow the task visibility (Tarefas screen), not the process one: a recurring
+  // board of a client the member serves holds tasks of other departments too.
+  const taskBase: Prisma.TaskWhereInput = {
+    column: { board: { organizationId, isActive: true } },
+    ...(staffScope ? { AND: [taskWhere(staffScope)] } : {}),
+  }
   // startOfMonth usava getters locais do processo (now.getFullYear()/getMonth()) — em produção
   // o container normalmente roda em UTC, não BRT, então "este mês" virava até 3h adiantado perto
   // da troca de mês. startOfTodayInBRT/startOfMonthInBRT convertem de verdade pro fuso da org.
@@ -57,7 +63,7 @@ export async function getDashboardMetrics(
       where: {
         status: 'DONE',
         updatedAt: { gte: startOfMonth },
-        column: { board: { organizationId, isActive: true, ...scope } },
+        ...taskBase,
       },
     }),
 
@@ -65,13 +71,13 @@ export async function getDashboardMetrics(
       where: {
         priority: 'URGENT',
         status: { notIn: ['DONE', 'DISREGARDED'] },
-        column: { board: { organizationId, isActive: true, ...scope } },
+        ...taskBase,
       },
     }),
 
     prisma.task.groupBy({
       by: ['status'],
-      where: { column: { board: { organizationId, isActive: true, ...scope } } },
+      where: taskBase,
       _count: { status: true },
     }),
 
