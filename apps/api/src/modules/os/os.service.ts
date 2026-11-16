@@ -110,8 +110,15 @@ async function actorName(actorId: string): Promise<string> {
 
 async function afterOSCreated(taskId: string, organizationId: string, clientId: string, boardId: string, columnId: string, title: string, actor: { id: string; name: string }, released: boolean) {
   await scheduleDeadline(taskId)
-  // Born asking the client for documents: the clock starts paused (and so may the process)
-  if (released) await syncPause(taskId)
+  // Born asking the client for documents: the clock starts paused (and so may the process).
+  // The OS is already saved: a failure here is logged, never undoes the opening nor skips the rest
+  if (released) {
+    try {
+      await syncPause(taskId)
+    } catch (err) {
+      logger.warn({ taskId, reason: err instanceof Error ? err.message : String(err) }, 'Falha ao pausar o prazo da OS recém-aberta')
+    }
+  }
   // An OS waiting for another one is announced to the client when it is released (release())
   if (released) await enqueueNotification({ event: 'TASK_CREATED', taskId, organizationId, clientId, metadata: { taskTitle: title } })
   await onTaskAssigned(taskId, { userId: actor.id, name: actor.name })

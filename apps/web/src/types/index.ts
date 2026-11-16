@@ -52,6 +52,8 @@ export interface Board {
   isActive: boolean
   dueDate: string | null
   processTemplateId?: string | null
+  // Month of the process (AAAA-MM-01 UTC): OS of a period added later default to it
+  competence?: string | null
   type: 'PROCESS' | 'RECURRING_SYSTEM' | 'SERVICE_SYSTEM'
   columns: Column[]
   client: { id: string; name: string; codigo: string | null }

@@ -1,18 +1,16 @@
 import { useState, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { diffDaysDateOnlyUTC, formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { Plus, ChevronDown, ChevronRight, AlertTriangle, Clock, ClipboardList, CheckCircle2, Search, X, FileSearch } from 'lucide-react'
-import type { Board, Client } from '@/types'
+import type { Board } from '@/types'
 import { DeadlineChip } from '@/components/shared/DeadlineChip'
-import { toast } from 'sonner'
+import { NewProcessDialog } from '@/components/process/NewProcessDialog'
 
 const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
 
@@ -172,8 +170,6 @@ function BoardGroup({ group, now }: { group: Group; now: Date }) {
 
 export default function Processes() {
   const { user } = useAuth()
-  const navigate = useNavigate()
-  const qc = useQueryClient()
 
   const [search, setSearch] = useState('')
   const [filterClient, setFilterClient] = useState('')
@@ -181,36 +177,10 @@ export default function Processes() {
   const [filterStage, setFilterStage] = useState('')
   const [showOnlyOverdue, setShowOnlyOverdue] = useState(false)
   const [newProcessOpen, setNewProcessOpen] = useState(false)
-  const [newProcessForm, setNewProcessForm] = useState({ title: '', clientId: '', dueDate: '' })
 
   const { data: boards = [], isLoading } = useQuery<Board[]>({
     queryKey: ['boards'],
     queryFn: () => api.get('/boards').then((r) => r.data),
-  })
-
-  const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ['clients'],
-    queryFn: () => api.get('/clients').then((r) => r.data),
-    enabled: newProcessOpen,
-  })
-
-  const createMutation = useMutation({
-    mutationFn: () =>
-      api.post('/boards', {
-        title: newProcessForm.title,
-        clientId: newProcessForm.clientId,
-        // "YYYY-MM-DD" puro (sem sufixo de hora) já é parseado como meia-noite UTC pelo ISO 8601
-        // — mesmo padrão usado pros outros campos date-only do projeto (ver apps/web/src/lib/dates.ts).
-        ...(newProcessForm.dueDate ? { dueDate: new Date(newProcessForm.dueDate).toISOString() } : {}),
-      }).then((r) => r.data),
-    onSuccess: (board) => {
-      toast.success('Processo criado com sucesso')
-      qc.invalidateQueries({ queryKey: ['boards'] })
-      setNewProcessOpen(false)
-      setNewProcessForm({ title: '', clientId: '', dueDate: '' })
-      navigate(`/app/board/${board.id}`)
-    },
-    onError: () => toast.error('Erro ao criar processo'),
   })
 
   const now = useMemo(() => new Date(), [])
@@ -424,62 +394,7 @@ export default function Processes() {
         )}
       </div>
 
-      {/* Modal Novo Processo */}
-      <Dialog open={newProcessOpen} onOpenChange={setNewProcessOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Novo Processo</DialogTitle></DialogHeader>
-          <form
-            onSubmit={(e) => { e.preventDefault(); if (newProcessForm.title.trim() && newProcessForm.clientId) createMutation.mutate() }}
-            className="space-y-4 mt-2"
-          >
-            <div className="space-y-1.5">
-              <Label htmlFor="proc-title">Título do processo</Label>
-              <Input
-                id="proc-title"
-                placeholder="Ex: Abertura de empresa LTDA"
-                value={newProcessForm.title}
-                onChange={(e) => setNewProcessForm({ ...newProcessForm, title: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="proc-client">Cliente</Label>
-              <select
-                id="proc-client"
-                value={newProcessForm.clientId}
-                onChange={(e) => setNewProcessForm({ ...newProcessForm, clientId: e.target.value })}
-                required
-                className="flex h-9 w-full rounded-md border border-border bg-surface px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                <option value="">Selecione um cliente</option>
-                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="proc-due">Prazo estimado de conclusão</Label>
-              <Input
-                id="proc-due"
-                type="date"
-                value={newProcessForm.dueDate}
-                onChange={(e) => setNewProcessForm({ ...newProcessForm, dueDate: e.target.value })}
-              />
-              <p className="text-xs text-muted-foreground">Opcional — você poderá alterar depois</p>
-            </div>
-            <p className="text-xs text-muted-foreground">3 colunas padrão serão criadas automaticamente: Pendente → Em andamento → Concluído</p>
-            {createMutation.isError && <p className="text-sm text-danger-text">Erro ao criar processo. Tente novamente.</p>}
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setNewProcessOpen(false)}>Cancelar</Button>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending || !newProcessForm.title.trim() || !newProcessForm.clientId}
-                className="bg-accent hover:bg-accent-hover text-white"
-              >
-                {createMutation.isPending ? 'Criando...' : 'Criar processo'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <NewProcessDialog open={newProcessOpen} onClose={() => setNewProcessOpen(false)} />
     </div>
   )
 }

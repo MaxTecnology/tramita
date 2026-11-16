@@ -313,6 +313,16 @@ describe('OS que nasce pedindo documento ao cliente', () => {
     expect(await prisma.taskHistory.count({ where: { taskId: os.id, action: 'os_paused' } })).toBe(1)
   })
 
+  it('a failure checking the pause does not fail the opening nor skip the rest (the OS is already saved)', async () => {
+    const c = await setup()
+    await withRequest(c)
+    const deadline = await import('@/modules/os/os-deadline.service')
+    vi.spyOn(deadline, 'syncPause').mockRejectedValue(new Error('timeout'))
+    const res = await app.inject({ method: 'POST', url: '/os', headers: { authorization: c.auth }, payload: { osModelId: c.model.id, clientId: c.client.id } })
+    expect(res.statusCode).toBe(201)
+    expect(queue.enqueueNotification).toHaveBeenCalledWith(expect.objectContaining({ event: 'TASK_CREATED', taskId: json(res).id }))
+  })
+
   it('the first OS of a process born with a pending client document pauses it and the process', async () => {
     const c = await setup()
     await withRequest(c)

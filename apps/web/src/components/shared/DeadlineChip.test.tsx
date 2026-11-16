@@ -10,6 +10,8 @@ it.each([
   [{ state: 'DUE_SOON' as const, businessDaysLeft: 0 }, 'vence hoje'],
   [{ state: 'LATE' as const, businessDaysLate: 2 }, 'atrasada há 2 dias úteis'],
   [{ state: 'PAUSED' as const, pausedSinceDays: 4 }, '⏸ aguardando cliente há 4 dias'],
+  [{ state: 'PAUSED' as const, pausedSinceDays: 0 }, '⏸ aguardando cliente desde hoje'],
+  [{ state: 'PAUSED' as const }, '⏸ aguardando cliente'],
   [{ state: 'DONE' as const }, 'concluída'],
 ])('shows %o as "%s"', (deadline, text) => {
   render(<DeadlineChip deadline={{ ...base, ...deadline }} />)

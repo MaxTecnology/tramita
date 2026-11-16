@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { StageTimesPanel } from '@/components/shared/StageTimesPanel'
+import { AddOSDialog } from '@/components/process/AddOSDialog'
 import { DeadlineChip } from '@/components/shared/DeadlineChip'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -70,6 +71,7 @@ export default function Board() {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [search, setSearch] = useState('')
   const [showStageTimes, setShowStageTimes] = useState(false)
+  const [addingOS, setAddingOS] = useState(false)
   const [filterPriority, setFilterPriority] = useState('')
   const [filterCompetence, setFilterCompetence] = useState('')
   const hasFilters = search.trim() !== '' || filterPriority !== '' || filterCompetence !== ''
@@ -161,6 +163,11 @@ export default function Board() {
           className="text-xs font-medium text-accent-hover hover:underline flex-shrink-0">
           Tempo por etapa
         </button>
+        {board.type === 'PROCESS' && (
+          <button type="button" onClick={() => setAddingOS(true)} className="text-xs font-medium text-accent-hover hover:underline flex-shrink-0">
+            Adicionar OS
+          </button>
+        )}
         {boardDueDate && (
           <span className={cn(
             'text-xs px-2 py-1 rounded-full font-medium flex-shrink-0',
@@ -172,6 +179,8 @@ export default function Board() {
           </span>
         )}
       </div>
+
+      {board.type === 'PROCESS' && <AddOSDialog open={addingOS} board={board} onClose={() => setAddingOS(false)} />}
 
       {showStageTimes && (
         <div className="px-4 md:px-6 py-3 border-b border-border bg-neutral-bg/40">

@@ -14,7 +14,9 @@ export function deadlineLabel(d: DeadlineInfo, waitingFor?: string): string | nu
       return left === 1 ? 'falta 1 dia útil' : `faltam ${left} dias úteis`
     }
     case 'LATE': return `atrasada há ${plural(d.businessDaysLate ?? 0, 'dia útil', 'dias úteis')}`
-    case 'PAUSED': return `⏸ aguardando cliente há ${plural(d.pausedSinceDays ?? 0, 'dia', 'dias')}`
+    case 'PAUSED':
+      if (d.pausedSinceDays === undefined) return '⏸ aguardando cliente'
+      return d.pausedSinceDays === 0 ? '⏸ aguardando cliente desde hoje' : `⏸ aguardando cliente há ${plural(d.pausedSinceDays, 'dia', 'dias')}`
     case 'WAITING_DEPENDENCY': return waitingFor ? `aguardando ${waitingFor}` : 'aguardando outra OS'
     case 'DONE': return 'concluída'
     default: return null
