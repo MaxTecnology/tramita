@@ -8,7 +8,6 @@ import {
   updateTemplateSchema,
   createAssignmentSchema,
   updateAssignmentSchema,
-  manualGenerateSchema,
   bulkGenerateSchema,
   bulkGenerateAllSchema,
   bulkRegenerateSchema,
@@ -23,7 +22,6 @@ import {
   createAssignment,
   updateAssignment,
   deleteAssignment,
-  generateManually,
   listGenerationLog,
   generateBulkForTemplate,
   generateBulkForAllTemplates,
@@ -115,15 +113,6 @@ export async function recurringTemplatesRoutes(app: FastifyInstance) {
   app.delete('/:id/assignments/:assignmentId', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {
     const { id, assignmentId } = request.params as { id: string; assignmentId: string }
     return reply.send(await deleteAssignment(id, assignmentId, request.user.organizationId!))
-  })
-
-  app.post('/:id/assignments/:assignmentId/generate', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {
-    const { id, assignmentId } = request.params as { id: string; assignmentId: string }
-    const result = manualGenerateSchema.safeParse(request.body ?? {})
-    if (!result.success) throw new AppError(400, result.error.errors[0].message)
-    return reply.status(201).send(
-      await generateManually(id, assignmentId, request.user.organizationId!, result.data.dueMonth),
-    )
   })
 
   app.post('/:id/assignments/bulk-generate', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {

@@ -39,14 +39,6 @@ export const moveTaskSchema = z.object({
   ...delayReasonFields,
 })
 
-export const reorderTasksSchema = z.array(
-  z.object({
-    id: z.string().cuid(),
-    position: z.number().int().min(0),
-    columnId: z.string().cuid(),
-  }),
-)
-
 export const listTasksQuerySchema = z.object({
   clientId: z.string().cuid().optional(),
   assigneeId: z.string().cuid().optional(),
@@ -74,7 +66,6 @@ export const listTasksQuerySchema = z.object({
 export type CreateTaskBody = z.infer<typeof createTaskSchema>
 export type UpdateTaskBody = z.infer<typeof updateTaskSchema>
 export type MoveTaskBody = z.infer<typeof moveTaskSchema>
-export type ReorderTasksBody = z.infer<typeof reorderTasksSchema>
 export const assumeTaskSchema = z.object({
   // Assignee the screen showed: the write only happens if it is still the same
   expectedAssigneeId: z.string().cuid().nullable(),

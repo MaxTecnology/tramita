@@ -393,69 +393,7 @@ Authorization: Bearer {{accessToken}}
 
 
 # ─────────────────────────────────────────────
-# COLUMNS — Colunas (etapas do processo)
-# ─────────────────────────────────────────────
-
-### Cria coluna no board
-POST {{baseUrl}}/boards/{{boardId}}/columns
-Content-Type: application/json
-Authorization: Bearer {{accessToken}}
-
-{
-  "title": "Documentação Pendente",
-  "color": "#F59E0B",
-  "position": 0,
-  "isFinal": false
-}
-
-###
-
-### Cria coluna final (mover tarefa para cá → status DONE)
-POST {{baseUrl}}/boards/{{boardId}}/columns
-Content-Type: application/json
-Authorization: Bearer {{accessToken}}
-
-{
-  "title": "Concluído",
-  "color": "#10B981",
-  "position": 4,
-  "isFinal": true
-}
-
-###
-
-### Atualiza coluna
-PATCH {{baseUrl}}/columns/{{columnId}}
-Content-Type: application/json
-Authorization: Bearer {{accessToken}}
-
-{
-  "title": "Em Análise",
-  "color": "#3B82F6"
-}
-
-###
-
-### Reordena colunas em lote
-PATCH {{baseUrl}}/columns/reorder
-Content-Type: application/json
-Authorization: Bearer {{accessToken}}
-
-[
-  { "id": "col-id-1", "position": 0 },
-  { "id": "col-id-2", "position": 1 },
-  { "id": "col-id-3", "position": 2 }
-]
-
-###
-
-### Remove coluna (cascade deleta tarefas filhas)
-DELETE {{baseUrl}}/columns/{{columnId}}
-Authorization: Bearer {{accessToken}}
-
-
-# ─────────────────────────────────────────────
-# TASKS — Tarefas / processos
+# TASKS — Tarefas / processos (as colunas vêm do Modelo de Processo)
 # ─────────────────────────────────────────────
 
 ### Cria tarefa em uma coluna (position calculado automaticamente)
@@ -496,18 +434,6 @@ Authorization: Bearer {{accessToken}}
   "columnId": "{{columnId}}",
   "position": 0
 }
-
-###
-
-### Reordena tarefas em lote (permite mover entre colunas)
-PATCH {{baseUrl}}/tasks/reorder
-Content-Type: application/json
-Authorization: Bearer {{accessToken}}
-
-[
-  { "id": "task-id-1", "columnId": "col-id-1", "position": 0 },
-  { "id": "task-id-2", "columnId": "col-id-1", "position": 1 }
-]
 
 ###
 

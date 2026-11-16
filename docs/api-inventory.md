@@ -6,31 +6,21 @@
 
 ## Resumo
 
-- Rotas: **219**
+- Rotas: **209**
 - Públicas (sem login): **6** — `POST /auth/login`, `POST /auth/logout`, `POST /auth/refresh`, `GET /organizations/plans`, `POST /organizations/register`, `GET /organizations/signup-status`
-- Sem uso no web nem chamador externo conhecido: **15**
-- Sem teste de rota: **63**
+- Sem uso no web nem chamador externo conhecido: **5**
+- Sem teste de rota: **58**
 - Cliente (portal) passa fora de /portal: **13** (rotas compartilhadas — o escopo dentro delas é revisado na auditoria de segurança)
 
 ## Sem uso
 
 | Método | Rota | Quem passa | Teste de rota |
 |---|---|---|---|
-| POST | `/boards/:boardId/columns` | Admin, Gerente, Membro | sim |
 | PATCH | `/boards/:id/delay-reason` | Admin, Gerente, Membro | sim |
-| DELETE | `/columns/:id` | Admin | não |
-| PATCH | `/columns/:id` | Admin, Gerente, Membro | não |
-| PATCH | `/columns/reorder` | Admin, Gerente, Membro | não |
 | GET | `/document-reader/metricas` | Admin, Gerente, Membro | sim |
 | POST | `/notifications/config/test-whatsapp` | Admin | sim |
-| GET | `/notifications/templates` | Admin | não |
-| GET | `/portal/process-templates` | Cliente | sim |
 | GET | `/portal/requests/:id` | Cliente | sim |
 | POST | `/portal/requests/:id/attachments` | Cliente | não |
-| GET | `/portal/tasks` | Cliente | sim |
-| GET | `/portal/tasks/:taskId/approvals` | Cliente | sim |
-| POST | `/recurring-templates/:id/assignments/:assignmentId/generate` | Admin | não |
-| PATCH | `/tasks/reorder` | Admin, Gerente, Membro | sim |
 
 ## Cliente fora de /portal
 
@@ -75,7 +65,6 @@
 |---|---|---|---|---|
 | GET | `/boards` | Admin, Gerente, Membro, Cliente | web | sim |
 | POST | `/boards` | Admin, Gerente, Membro | web | sim |
-| POST | `/boards/:boardId/columns` | Admin, Gerente, Membro | — | sim |
 | GET | `/boards/:id` | Admin, Gerente, Membro, Cliente | web | sim |
 | PATCH | `/boards/:id` | Admin, Gerente | web (indireto) | sim |
 | PATCH | `/boards/:id/delay-reason` | Admin, Gerente, Membro | — | sim |
@@ -112,9 +101,6 @@
 | Método | Rota | Quem passa | Usada por | Teste de rota |
 |---|---|---|---|---|
 | POST | `/columns/:columnId/tasks` | Admin, Gerente, Membro | web | sim |
-| DELETE | `/columns/:id` | Admin | — | **não** |
-| PATCH | `/columns/:id` | Admin, Gerente, Membro | — | **não** |
-| PATCH | `/columns/reorder` | Admin, Gerente, Membro | — | **não** |
 
 ### /comments
 
@@ -213,7 +199,6 @@
 | POST | `/notifications/read-all` | Admin, Gerente, Membro, Cliente | web | sim |
 | POST | `/notifications/read-by-task` | Admin, Gerente, Membro, Cliente, Master | web | sim |
 | GET | `/notifications/stream` | token próprio (ticket/webhook) | web (indireto) | sim |
-| GET | `/notifications/templates` | Admin | — | **não** |
 | DELETE | `/notifications/templates/:event/:channel` | Admin | web (indireto) | **não** |
 | GET | `/notifications/templates/:event/:channel` | Admin | web (indireto) | sim |
 | PUT | `/notifications/templates/:event/:channel` | Admin | web | sim |
@@ -263,7 +248,6 @@
 | GET | `/portal/document-requests` | Cliente | web | sim |
 | GET | `/portal/document-requests/months` | Cliente | web | sim |
 | GET | `/portal/home` | Cliente | web | sim |
-| GET | `/portal/process-templates` | Cliente | — | sim |
 | GET | `/portal/protocols` | Cliente | web | sim |
 | GET | `/portal/protocols/:id` | Cliente | web | sim |
 | GET | `/portal/protocols/:id/download` | Cliente | web | sim |
@@ -275,8 +259,6 @@
 | POST | `/portal/requests/:id/attachments` | Cliente | — | **não** |
 | PATCH | `/portal/requests/:id/cancel` | Cliente | web | sim |
 | GET | `/portal/services` | Cliente | web | sim |
-| GET | `/portal/tasks` | Cliente | — | sim |
-| GET | `/portal/tasks/:taskId/approvals` | Cliente | — | sim |
 | GET | `/portal/tasks/:taskId/documents` | Cliente | web (indireto) | **não** |
 | DELETE | `/portal/tasks/:taskId/documents/requests/:reqId/not-applicable` | Cliente | web (indireto) | **não** |
 | POST | `/portal/tasks/:taskId/documents/requests/:reqId/not-applicable` | Cliente | web (indireto) | sim |
@@ -320,7 +302,6 @@
 | POST | `/recurring-templates/:id/assignments` | Admin | web | **não** |
 | DELETE | `/recurring-templates/:id/assignments/:assignmentId` | Admin | web | **não** |
 | PATCH | `/recurring-templates/:id/assignments/:assignmentId` | Admin | web (indireto) | **não** |
-| POST | `/recurring-templates/:id/assignments/:assignmentId/generate` | Admin | — | **não** |
 | POST | `/recurring-templates/:id/assignments/bulk-generate` | Admin | web | **não** |
 | POST | `/recurring-templates/:id/assignments/bulk-regenerate` | Admin | web | **não** |
 | GET | `/recurring-templates/:id/generation-log` | Admin, Gerente | web | **não** |
@@ -393,7 +374,6 @@
 | GET | `/tasks/:taskId/protocols` | Admin, Gerente, Membro | web | **não** |
 | POST | `/tasks/:taskId/protocols` | Admin, Gerente, Membro | web | sim |
 | POST | `/tasks/assume-bulk` | Admin, Gerente, Membro | web | sim |
-| PATCH | `/tasks/reorder` | Admin, Gerente, Membro | — | sim |
 
 ### /users
 

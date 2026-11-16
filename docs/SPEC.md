@@ -239,21 +239,11 @@ Cadastro de novo escritório (público — sem autenticação). Só com `PUBLIC_
 
 ## Colunas
 
-### POST `/boards/:boardId/columns` _(ORG_ADMIN | ORG_MANAGER)_
-```json
-{
-  "title": "string", "color": "#hex?", "position": 0,
-  "statusEffect": "NONE|OPEN|STARTED|BLOCKED|DISREGARDED|DONE",
-  "notifyClient": false
-}
-```
+Não há rota para criar, editar, reordenar ou remover colunas: elas nascem com o processo, copiadas do Modelo de Processo (ou as 3 padrão). Campos de cada coluna: `title`, `position`, `statusEffect` (`NONE|OPEN|STARTED|BLOCKED|DISREGARDED|DONE`), `notifyClient`.
 → `statusEffect` (padrão `NONE`): quando a tarefa entra nessa coluna, o `Task.status` é forçado pro valor configurado (exceto `NONE`, que não altera o status atual) — é assim que uma coluna "Fase" intermediária consegue marcar `STARTED` sem depender de `isFinal`, e uma coluna "Bloqueado" mantém `BLOCKED` mesmo movendo entre colunas do tipo Fase
 → `statusEffect: DONE` também dispara `TASK_COMPLETED`, igual ao antigo `isFinal: true`
 → `notifyClient` (padrão `false`): quando `true`, mover uma tarefa pra essa coluna dispara `TASK_MOVED` pro cliente mesmo que o toggle global "Tarefa movida" da organização esteja desligado — é uma notificação por coluna, não a notificação genérica de qualquer movimentação
 → Documentos vinculados à coluna (via Modelo de Processo) viram `TaskDocumentRequirement` automaticamente na tarefa ao entrar na coluna, sem duplicar se ela passar pela mesma coluna mais de uma vez
-### PATCH `/columns/:id`
-### PATCH `/columns/reorder` — `[{ "id": "string", "position": 0 }]`
-### DELETE `/columns/:id` _(ORG_ADMIN)_
 
 ---
 
@@ -308,7 +298,6 @@ Cadastro de novo escritório (público — sem autenticação). Só com `PUBLIC_
 → Dispara `TASK_MOVED` (com canais `WHATSAPP`+`EMAIL` forçados se `Column.notifyClient: true`, independente do toggle global da org). Se `Column.statusEffect: DONE` → também aplica o status na tarefa e dispara `TASK_COMPLETED`
 → Status possíveis (`TaskStatus`): `OPEN` (padrão) | `STARTED` (em andamento, atribuído por coluna com `statusEffect: STARTED`) | `BLOCKED` (impedimento, geralmente por checklist de documento pendente/rejeitado) | `DISREGARDED` (desconsiderada) | `DONE` (concluída)
 
-### PATCH `/tasks/reorder` — `[{ "id": "string", "position": 0, "columnId": "string" }]`
 ### DELETE `/tasks/:id` _(ORG_ADMIN | ORG_MANAGER)_
 ### GET `/boards/:id/tasks/search?q=&priority=&assigneeId=&status=&dueBefore=&dueAfter=`
 
@@ -386,13 +375,6 @@ Cadastro de novo escritório (público — sem autenticação). Só com `PUBLIC_
 ### PATCH `/recurring-templates/:id/assignments/:assignmentId` _(ORG_ADMIN)_ — `{ "isActive": "boolean?" }`
 ### DELETE `/recurring-templates/:id/assignments/:assignmentId` _(ORG_ADMIN)_
 
-### POST `/recurring-templates/:id/assignments/:assignmentId/generate` _(ORG_ADMIN)_ — geração manual, fora do gatilho diário
-```json
-{ "dueMonth": "ISO8601?" }
-```
-→ `dueMonth` é o mês de VENCIMENTO (âncora), não a competência — a competência é derivada dele via `competenceMonthOffset` (WEEKLY: `dueMonth` já é a própria competência/semana). Sem `dueMonth`, usa o próximo ciclo normal do template (o que o cron geraria no próximo disparo); com `dueMonth`, o valor é canonicalizado pro início do período (semana/mês/trimestre/ano) a que pertence, pra bater com a chave de idempotência do cron
-→ 409 se já existe geração `SUCCESS` pra essa competência+cliente
-
 ### GET `/recurring-templates/:id/generation-log` _(ORG_ADMIN | ORG_MANAGER)_ — histórico de gerações (SUCCESS/FAILED) por competência
 
 ### POST `/recurring-templates/:id/assignments/bulk-generate` _(ORG_ADMIN)_ — geração manual em lote, pra um template e uma lista de vínculos escolhidos na tela
@@ -430,7 +412,7 @@ ou
 { "mode": "NEW_BOARD" }
 ```
 → `EXISTING_BOARD`: cria a tarefa direto na coluna informada de um board já existente do cliente
-→ `NEW_BOARD`: cria um board novo pro cliente antes de criar a tarefa — se a `Request` tiver `processTemplateId` (escolhido pelo cliente em `POST /portal/requests`, ver `GET /portal/process-templates`), o board nasce com as colunas desse template (igual a `POST /boards` com `processTemplateId`) e o título do board vira `"<codigo do cliente> - <nome do cliente> — <nome do template>"`; sem `processTemplateId`, o board nasce com as 3 colunas padrão e o título é o próprio título da Solicitação
+→ `NEW_BOARD`: cria um board novo pro cliente antes de criar a tarefa — se a `Request` tiver `processTemplateId` (escolhido pelo cliente em `POST /portal/requests`, a partir do catálogo `GET /portal/services`), o board nasce com as colunas desse template (igual a `POST /boards` com `processTemplateId`) e o título do board vira `"<codigo do cliente> - <nome do cliente> — <nome do template>"`; sem `processTemplateId`, o board nasce com as 3 colunas padrão e o título é o próprio título da Solicitação
 ### POST `/requests/:id/reject` _(ORG_ADMIN | ORG_MANAGER)_
 ```json
 { "reason": "string?" }
@@ -515,7 +497,6 @@ Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma t
 - Meta (`targetDate`) = `releasedAt` + `deadlineBusinessDays` + dias úteis pausados. Pausa (`TaskPause`) enquanto houver documento obrigatório do cliente `PENDING`/`REJECTED` ou aprovação do cliente pendente (`UPLOADED` não pausa) — inclusive a OS que já nasce liberada pedindo documento (nasce pausada). Processo: `BoardPause` quando todas as OS liberadas e abertas estão pausadas; meta do processo = abertura + prazo + pausas; `completedAt` quando todas as tarefas terminam.
 - OS não liberada: PATCH de status e `/move` → 409 `'Esta OS aguarda: <títulos>'`. Concluir/desconsiderar libera as dependentes (uma vez; sino `OS_RELEASED`). POST `/tasks/:id/release` `{ reason }` (ORG_ADMIN/ORG_MANAGER) libera antes (histórico `os_released_early`).
 - PATCH `/tasks/:id` com `status` move o cartão junto: `DONE` vai para a primeira coluna `statusEffect = DONE` do board; reabrir uma tarefa que está numa coluna `DONE` leva à coluna do novo status (ou à primeira não-DONE). Grava `moved_to`.
-- PATCH `/tasks/reorder` só reordena dentro da coluna atual de cada tarefa; outra coluna → 400 `'Para trocar de coluna, mova a tarefa'`.
 - GET `/tasks?dateField=period&dateFrom&dateTo` inclui também as tarefas abertas com meta (ou vencimento, sem meta) antes de `dateFrom`.
 - Listas trazem `deadline: { state: NONE|ON_TIME|DUE_SOON|LATE|PAUSED|WAITING_DEPENDENCY|DONE, businessDaysLeft?, businessDaysLate?, pausedSinceDays?, officeBusinessDays, clientBusinessDays }` (GET `/tasks`, `/boards`, `/boards/:id` — tarefas e processo) e `waitingFor: string[]`.
 
@@ -549,8 +530,6 @@ Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma t
 
 ### GET `/portal/departments` _(CLIENT)_ — departamentos da organização, pra o formulário de nova solicitação
 
-### GET `/portal/process-templates` _(CLIENT)_ — `{ id, name }[]` — modelos de processo ativos da organização, pra o cliente escolher o tipo de solicitação no formulário de nova Solicitação
-
 ### GET `/portal/requests` _(CLIENT)_ — `?clientId=` **obrigatório** — 400 se ausente, 404 se o `ClientUser` não tem acesso àquele `clientId`
 ### POST `/portal/requests` _(CLIENT)_
 ```json
@@ -559,7 +538,7 @@ Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma t
   "processTemplateId": "string?"
 }
 ```
-→ `processTemplateId` (opcional) é o tipo de solicitação escolhido pelo cliente (ver `GET /portal/process-templates`) — fica salvo na `Request` e é usado por `POST /requests/:id/approve` quando o escritório aprova em modo `NEW_BOARD`
+→ `processTemplateId` (opcional) é o tipo de solicitação escolhido pelo cliente (ver o catálogo `GET /portal/services`) — fica salvo na `Request` e é usado por `POST /requests/:id/approve` quando o escritório aprova em modo `NEW_BOARD`
 → `clientId` **obrigatório** no body — 404 se o `ClientUser` não tem acesso àquele `clientId`
 
 ### GET `/portal/requests/:id` _(CLIENT)_
@@ -569,9 +548,6 @@ Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma t
 ---
 
 ## Templates de Mensagem
-
-### GET `/notifications/templates` _(ORG_ADMIN)_
-Lista todos os templates da org (WhatsApp + Email por evento).
 
 ### GET `/notifications/templates/:event/:channel` _(ORG_ADMIN)_
 Retorna template atual ou o template padrão do sistema se não configurado.
@@ -693,7 +669,7 @@ Tarefa fora do escopo → 404; só vê (não pode mexer) → 403 `Assuma a taref
 ### GET `/tasks/:id/approvals` _(equipe)_ → `Approval[]`
 ### POST `/approvals/:id/close` _(equipe)_ — JSON `{ reason, note }` ou multipart com os mesmos campos antes do `file` (print opcional)
 `note` obrigatória nos dois motivos. Exige poder mexer na tarefa (fora do escopo 404; só vê → 403 `Assuma a tarefa para alterá-la`). Grava `decidedByUserId`, `decidedAt`, `waitedDays` (dias inteiros desde o pedido). Histórico `approval_closed_by_office`.
-### GET `/portal/tasks/:taskId/approvals` _(CLIENT)_ → `Approval[]` (fora da empresa/departamento → 404)
+O cliente vê as aprovações dentro de `GET /portal/document-requests` (cada tarefa traz `approvals`).
 ### POST `/portal/approvals/:id/approve` _(CLIENT)_ `{ note? }` · POST `/portal/approvals/:id/request-changes` _(CLIENT)_ `{ note }` (obrigatória)
 Histórico `approval_approved` / `approval_changes_requested`; pedido de ajuste avisa quem pediu e o responsável atual (`APPROVAL_CHANGES_REQUESTED`, toggle `approvalChangesRequested`, link para a tarefa); sino `APPROVAL_DECIDED`. Pedido de ajuste não dispara a conclusão automática. Tarefa encerrada → 409 (`Approval.taskClosed = true` no portal).
 

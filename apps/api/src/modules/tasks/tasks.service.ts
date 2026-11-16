@@ -8,7 +8,7 @@ import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.
 import { recalculateTaskStatus, notifyIfBlocked } from '@/modules/task-documents/task-documents.service'
 import { Prisma, type TaskStatus } from '@prisma/client'
 import { resolveCompletedAt } from '@/lib/task-completion'
-import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, ListTasksQuery } from './tasks.schema'
+import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ListTasksQuery } from './tasks.schema'
 import { assertDepartmentServesClient, lockClients } from '@/modules/clients/client-coverage'
 import { syncProtocolsForTask } from '@/modules/protocols/protocol-from-deliverable'
 import { actorScope, taskWhere, mineTaskWhere, actableTaskIds } from '@/modules/staff-scope/staff-scope'
@@ -526,40 +526,6 @@ export async function updateTask(
   })
 
   return updated
-}
-
-export async function reorderTasks(items: ReorderTasksBody, organizationId: string) {
-  const tasks = await prisma.task.findMany({
-    where: {
-      id: { in: items.map((i) => i.id) },
-      column: { board: { organizationId } },
-    },
-    select: { id: true, columnId: true, column: { select: { boardId: true } } },
-  })
-  if (tasks.length !== items.length) throw new AppError(403, 'Acesso negado')
-  // Only the order inside the column: changing column goes through moveTask (status of the column,
-  // OS release, delay reason, history)
-  const columnByTask = new Map(tasks.map((t) => [t.id, t.columnId]))
-  if (items.some((i) => columnByTask.get(i.id) !== i.columnId)) throw new AppError(400, 'Para trocar de coluna, mova a tarefa')
-
-  // Reordenar nunca pode tirar a tarefa do processo dela (outro cliente, outra organização) — mesma
-  // regra do moveTask.
-  const boardByTask = new Map(tasks.map((t) => [t.id, t.column.boardId]))
-  const targetColumns = await prisma.column.findMany({
-    where: { id: { in: [...new Set(items.map((i) => i.columnId))] } },
-    select: { id: true, boardId: true },
-  })
-  const boardByColumn = new Map(targetColumns.map((c) => [c.id, c.boardId]))
-  if (items.some((i) => boardByColumn.get(i.columnId) !== boardByTask.get(i.id))) {
-    throw new AppError(400, 'A tarefa só pode ser movida dentro do mesmo processo')
-  }
-
-  await prisma.$transaction(
-    items.map((i) =>
-      prisma.task.update({ where: { id: i.id }, data: { position: i.position, columnId: i.columnId } }),
-    ),
-  )
-  return { ok: true }
 }
 
 export async function deleteTask(id: string, organizationId: string) {

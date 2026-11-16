@@ -7,7 +7,7 @@ import { AppError } from '@/errors/AppError'
 import { readUpload, DEFAULT_MAX_UPLOAD_BYTES, type UploadedFile } from '@/lib/read-upload'
 import { prisma } from '@/lib/prisma'
 import { canSeeTask, getClientAccessScope } from '@/modules/client-users/client-access'
-import { getTaskHistory, listAccessibleClients, listPortalTasks, listRequestableServices } from './portal.service'
+import { getTaskHistory, listAccessibleClients, listRequestableServices } from './portal.service'
 import { z } from 'zod'
 import { createRequestSchema } from '@/modules/requests/requests.schema'
 import {
@@ -39,13 +39,6 @@ export async function portalRoutes(app: FastifyInstance) {
 
   app.get('/clients', async (request, reply) => {
     return reply.send(await listAccessibleClients(request.user.sub))
-  })
-
-  // Listagem flat de tarefas do cliente — inclui tarefas recorrentes (board de sistema
-  // RECURRING_SYSTEM, nunca listado por /boards) que sejam visibleToClient.
-  app.get('/tasks', async (request, reply) => {
-    const { clientId } = request.query as { clientId?: string }
-    return reply.send(await listPortalTasks(request.user.organizationId!, request.user.sub, { clientId }))
   })
 
   app.get('/tasks/:taskId/history', async (request, reply) => {
@@ -100,16 +93,6 @@ export async function portalRoutes(app: FastifyInstance) {
     const scope = await getClientAccessScope(request.user.sub)
     if (!scope.clientIds.includes(q.data.clientId)) throw new AppError(404, 'Empresa não encontrada')
     return reply.send(await listRequestableServices(request.user.organizationId!, request.user.sub, q.data.clientId))
-  })
-
-  app.get('/process-templates', async (request, reply) => {
-    return reply.send(
-      await prisma.processTemplate.findMany({
-        where: { organizationId: request.user.organizationId!, isActive: true },
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' },
-      }),
-    )
   })
 
   app.post('/requests', { preHandler: [checkSubscription] }, async (request, reply) => {

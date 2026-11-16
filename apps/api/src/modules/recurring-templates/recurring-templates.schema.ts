@@ -63,12 +63,6 @@ export const updateAssignmentSchema = z.object({
 export type CreateAssignmentBody = z.infer<typeof createAssignmentSchema>
 export type UpdateAssignmentBody = z.infer<typeof updateAssignmentSchema>
 
-export const manualGenerateSchema = z.object({
-  dueMonth: z.string().datetime().optional(),
-})
-
-export type ManualGenerateBody = z.infer<typeof manualGenerateSchema>
-
 export const bulkGenerateSchema = z.object({
   dueMonth: z.string().datetime(),
   assignmentIds: z.array(z.string().cuid()).min(1, 'Selecione ao menos um cliente'),

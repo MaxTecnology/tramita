@@ -182,12 +182,6 @@ async function clientTask(taskId: string, organizationId: string, clientUserId: 
   return task
 }
 
-export async function listApprovalsForClient(taskId: string, organizationId: string, clientUserId: string) {
-  await clientTask(taskId, organizationId, clientUserId)
-  const rows = await prisma.taskApproval.findMany({ where: { taskId }, include: approvalInclude, orderBy: { requestedAt: 'desc' } })
-  return Promise.all(rows.map(presentApproval))
-}
-
 export async function decideAsClient(id: string, organizationId: string, clientUserId: string, decision: 'APPROVED' | 'CHANGES_REQUESTED', note?: string) {
   const approval = await prisma.taskApproval.findFirst({ where: { id, organizationId }, select: { taskId: true, title: true, requestedById: true } })
   if (!approval) throw new AppError(404, 'Aprovação não encontrada')

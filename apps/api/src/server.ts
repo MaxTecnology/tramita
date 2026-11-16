@@ -9,7 +9,6 @@ import { webhooksRoutes } from '@/modules/webhooks/webhooks.routes'
 import { usersRoutes } from '@/modules/users/users.routes'
 import { clientsRoutes } from '@/modules/clients/clients.routes'
 import { boardsRoutes } from '@/modules/boards/boards.routes'
-import { columnsRoutes } from '@/modules/columns/columns.routes'
 import { tasksRoutes } from '@/modules/tasks/tasks.routes'
 import { commentsRoutes } from '@/modules/comments/comments.routes'
 import { notificationsRoutes } from '@/modules/notifications/notifications.routes'
@@ -56,7 +55,6 @@ export function buildApp() {
   app.register(usersRoutes, { prefix: '/users' })
   app.register(clientsRoutes, { prefix: '/clients' })
   app.register(boardsRoutes, { prefix: '/boards' })
-  app.register(columnsRoutes)
   app.register(tasksRoutes)
   app.register(commentsRoutes)
   app.register(notificationsRoutes, { prefix: '/notifications' })

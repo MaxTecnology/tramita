@@ -55,11 +55,7 @@ type Call = { method: 'GET' | 'POST' | 'PATCH'; url: (c: Ctx) => string; payload
 
 const ROUTES: Record<string, Call> = {
   'search tasks of the process': { kind: 'read', method: 'GET', url: (c) => `/boards/${c.board.id}/tasks/search?q=x` },
-  'create column': { method: 'POST', url: (c) => `/boards/${c.board.id}/columns`, payload: () => ({ title: 'Nova', position: 2 }) },
-  'rename column': { method: 'PATCH', url: (c) => `/columns/${c.column.id}`, payload: () => ({ title: 'Outra' }) },
-  'reorder columns': { method: 'PATCH', url: () => '/columns/reorder', payload: (c) => [{ id: c.column.id, position: 1 }, { id: c.other.id, position: 0 }] },
   'create task': { method: 'POST', url: (c) => `/columns/${c.column.id}/tasks`, payload: () => ({ title: 'Invasora' }) },
-  'reorder tasks': { method: 'PATCH', url: () => '/tasks/reorder', payload: (c) => [{ id: c.task.id, position: 0, columnId: c.other.id }] },
   'move task': { method: 'PATCH', url: (c) => `/tasks/${c.task.id}/move`, payload: (c) => ({ columnId: c.other.id, position: 0 }) },
   'edit task': { method: 'PATCH', url: (c) => `/tasks/${c.task.id}`, payload: () => ({ title: 'Mudada' }) },
   'task history': { kind: 'read', method: 'GET', url: (c) => `/tasks/${c.task.id}/history` },
@@ -109,9 +105,9 @@ describe('Membro só age em processo que enxerga', () => {
 
     const edit = await app.inject({ method: 'PATCH', url: `/tasks/${c.task.id}`, headers: { authorization: c.insiderAuth }, payload: { title: 'Ajustada' } })
     const comment = await app.inject({ method: 'POST', url: `/tasks/${c.task.id}/comments`, headers: { authorization: c.insiderAuth }, payload: { content: 'ok' } })
-    const column = await app.inject({ method: 'POST', url: `/boards/${c.board.id}/columns`, headers: { authorization: c.insiderAuth }, payload: { title: 'Nova', position: 2 } })
+    const created = await app.inject({ method: 'POST', url: `/columns/${c.column.id}/tasks`, headers: { authorization: c.insiderAuth }, payload: { title: 'Nova', departmentId: c.task.departmentId } })
 
-    expect([edit.statusCode, comment.statusCode, column.statusCode]).toEqual([200, 201, 201])
+    expect([edit.statusCode, comment.statusCode, created.statusCode]).toEqual([200, 201, 201])
   })
 })
 
@@ -185,7 +181,7 @@ describe('revisão final: escrita só com assumir / gerente limitado ao departam
     await prisma.task.update({ where: { id: own.id }, data: { assigneeId: c.bruna.id } })
 
     expect((await call(c, ROUTES['edit task'], c.brunaAuth)).statusCode).toBe(403)
-    expect((await call(c, ROUTES['create column'], c.brunaAuth)).statusCode).toBe(403)
+    expect((await call(c, ROUTES['create task'], c.brunaAuth)).statusCode).toBe(403)
   })
 
   it('a Fiscal manager cannot delete a task nor edit a process of a client Fiscal does not serve', async () => {

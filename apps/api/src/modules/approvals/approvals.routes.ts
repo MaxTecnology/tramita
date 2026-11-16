@@ -8,7 +8,7 @@ import { readUpload, DEFAULT_MAX_UPLOAD_BYTES, type UploadedFile } from '@/lib/r
 import { readMultipartField } from '@/lib/multipart-fields'
 import { approveSchema, closeApprovalSchema, requestApprovalSchema, requestChangesSchema } from './approvals.schema'
 import {
-  requestApproval, listApprovalsForStaff, closeApproval, listApprovalsForClient, decideAsClient,
+  requestApproval, listApprovalsForStaff, closeApproval, decideAsClient,
 } from './approvals.service'
 
 const STAFF = ['ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'] as const
@@ -58,11 +58,6 @@ export async function approvalsRoutes(app: FastifyInstance) {
 export async function portalApprovalsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
   app.addHook('preHandler', requireRole('CLIENT'))
-
-  app.get('/tasks/:taskId/approvals', async (request, reply) => {
-    const { taskId } = request.params as { taskId: string }
-    return reply.send(await listApprovalsForClient(taskId, request.user.organizationId!, request.user.sub))
-  })
 
   app.post('/approvals/:id/approve', { preHandler: [checkSubscription] }, async (request, reply) => {
     const { id } = request.params as { id: string }

@@ -5,7 +5,6 @@ import {
   moveTask,
   createTask,
   updateTask,
-  reorderTasks,
   deleteTask,
   getTaskHistory,
   listTasks,
@@ -454,46 +453,6 @@ describe('updateTask', () => {
   })
 })
 
-describe('reorderTasks', () => {
-  it('updates position and columnId for each task', async () => {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const user = await createTestUser(org.id)
-    const client = await createTestClient(org.id)
-    const board = await createTestBoard(org.id, client.id)
-    const col = await createTestColumn(board.id, { position: 0 })
-    const taskA = await createTestTask(col.id, user.id, { position: 0 })
-    const taskB = await createTestTask(col.id, user.id, { position: 1 })
-
-    const result = await reorderTasks(
-      [
-        { id: taskA.id, position: 1, columnId: col.id },
-        { id: taskB.id, position: 0, columnId: col.id },
-      ],
-      org.id,
-    )
-
-    expect(result.ok).toBe(true)
-    const updatedA = await prisma.task.findUnique({ where: { id: taskA.id } })
-    expect(updatedA?.position).toBe(1)
-  })
-
-  it('throws 403 when any task belongs to a different organization', async () => {
-    const plan = await createTestPlan()
-    const orgA = await createTestOrg(plan.id)
-    const orgB = await createTestOrg(plan.id)
-    const userA = await createTestUser(orgA.id)
-    const clientA = await createTestClient(orgA.id)
-    const boardA = await createTestBoard(orgA.id, clientA.id)
-    const colA = await createTestColumn(boardA.id, { position: 0 })
-    const taskA = await createTestTask(colA.id, userA.id)
-
-    await expect(
-      reorderTasks([{ id: taskA.id, position: 0, columnId: colA.id }], orgB.id),
-    ).rejects.toMatchObject({ statusCode: 403 })
-  })
-})
-
 describe('deleteTask', () => {
   it('removes the task row', async () => {
     const plan = await createTestPlan()
@@ -905,53 +864,6 @@ describe('departamento atendido e isolamento entre processos', () => {
     await expect(
       moveTask(task.id, org.id, { columnId: otherCol.id, position: 0 }, { id: user.id, type: 'user' }),
     ).rejects.toMatchObject({ statusCode: 400 })
-  })
-})
-
-describe('reorderTasks — isolamento entre processos e organizações', () => {
-  async function setup() {
-    const plan = await createTestPlan()
-    const org = await createTestOrg(plan.id)
-    const user = await createTestUser(org.id)
-    const client = await createTestClient(org.id)
-    const board = await createTestBoard(org.id, client.id)
-    const col = await createTestColumn(board.id)
-    const task = await createTestTask(col.id, user.id)
-    return { org, user, client, board, col, task }
-  }
-
-  it('recusa mover via reorder para coluna de outro processo', async () => {
-    const { org, client, task } = await setup()
-    const otherBoard = await createTestBoard(org.id, client.id)
-    const otherCol = await createTestColumn(otherBoard.id)
-
-    await expect(reorderTasks([{ id: task.id, columnId: otherCol.id, position: 0 }], org.id))
-      .rejects.toMatchObject({ statusCode: 400, message: 'Para trocar de coluna, mova a tarefa' })
-    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).columnId).not.toBe(otherCol.id)
-  })
-
-  it('recusa mover via reorder para coluna de outra organização', async () => {
-    const { org, task } = await setup()
-    const plan = await createTestPlan()
-    const otherOrg = await createTestOrg(plan.id)
-    const otherClient = await createTestClient(otherOrg.id)
-    const foreignBoard = await createTestBoard(otherOrg.id, otherClient.id)
-    const foreignCol = await createTestColumn(foreignBoard.id)
-
-    await expect(reorderTasks([{ id: task.id, columnId: foreignCol.id, position: 0 }], org.id))
-      .rejects.toMatchObject({ statusCode: 400 })
-  })
-
-  it('reordena dentro da mesma coluna, mas não troca de coluna (isso é o /move)', async () => {
-    const { org, board, col, task } = await setup()
-    const col2 = await createTestColumn(board.id, { position: 1 })
-
-    await expect(reorderTasks([{ id: task.id, columnId: col2.id, position: 0 }], org.id))
-      .rejects.toMatchObject({ statusCode: 400, message: 'Para trocar de coluna, mova a tarefa' })
-    await reorderTasks([{ id: task.id, columnId: col.id, position: 3 }], org.id)
-
-    const after = await prisma.task.findUniqueOrThrow({ where: { id: task.id } })
-    expect([after.columnId, after.position]).toEqual([col.id, 3])
   })
 })
 

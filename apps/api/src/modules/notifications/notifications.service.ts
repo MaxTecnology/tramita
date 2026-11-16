@@ -69,13 +69,6 @@ export async function updateConfig(organizationId: string, data: UpdateConfigBod
   })
 }
 
-export async function listTemplates(organizationId: string) {
-  return prisma.messageTemplate.findMany({
-    where: { organizationId, isActive: true },
-    orderBy: [{ event: 'asc' }, { channel: 'asc' }],
-  })
-}
-
 export async function getTemplateForOrg(
   organizationId: string,
   event: NotificationEvent,

@@ -93,8 +93,10 @@ describe('cliente decide', () => {
   it('approves: who and when are recorded, the office is told in the bell', async () => {
     const c = await setup()
     const { id } = JSON.parse((await requestApproval(c)).body)
-    const list = await app.inject({ method: 'GET', url: `/portal/tasks/${c.task.id}/approvals`, headers: { authorization: c.rhAuth } })
-    expect(JSON.parse(list.body)[0]).toMatchObject({ id, status: 'PENDING', fileUrl: 'https://signed.example/file' })
+    // The client sees it where the portal shows it: the documents of the month (Enviar documentos)
+    const month = await app.inject({ method: 'GET', url: `/portal/document-requests?clientId=${c.acme.id}&competence=2026-11`, headers: { authorization: c.rhAuth } })
+    const task = (JSON.parse(month.body) as { tasks: { taskId: string; approvals: object[] }[] }).tasks.find((t) => t.taskId === c.task.id)
+    expect(task?.approvals[0]).toMatchObject({ id, status: 'PENDING', fileUrl: 'https://signed.example/file' })
 
     const res = await post(`/portal/approvals/${id}/approve`, c.rhAuth, {})
     expect(res.statusCode).toBe(200)

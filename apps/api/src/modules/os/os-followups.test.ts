@@ -237,22 +237,6 @@ describe('falhas depois do commit não derrubam a operação', () => {
   })
 })
 
-describe('reordenar não troca de coluna', () => {
-  it('reorder only changes positions inside the current column; changing column goes through /move', async () => {
-    const c = await setup()
-    const board = json(await openProcess(c))
-    const os = await prisma.task.findFirstOrThrow({ where: { column: { boardId: board.id } } })
-    const done = await prisma.column.findFirstOrThrow({ where: { boardId: board.id, statusEffect: 'DONE' } })
-    const moved = await app.inject({ method: 'PATCH', url: '/tasks/reorder', headers: { authorization: c.auth }, payload: [{ id: os.id, columnId: done.id, position: 0 }] })
-    expect([moved.statusCode, json(moved).message]).toEqual([400, 'Para trocar de coluna, mova a tarefa'])
-    const after = await prisma.task.findUniqueOrThrow({ where: { id: os.id } })
-    expect([after.columnId, after.status]).toEqual([os.columnId, os.status])
-    const same = await app.inject({ method: 'PATCH', url: '/tasks/reorder', headers: { authorization: c.auth }, payload: [{ id: os.id, columnId: os.columnId, position: 5 }] })
-    expect(same.statusCode).toBe(200)
-    expect((await prisma.task.findUniqueOrThrow({ where: { id: os.id } })).position).toBe(5)
-  })
-})
-
 describe('concluir pelo drawer com move concorrente', () => {
   it('a card moved by someone else meanwhile is not dragged back; the history uses where it really was', async () => {
     const c = await setup()

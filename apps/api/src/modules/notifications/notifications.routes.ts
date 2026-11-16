@@ -18,7 +18,6 @@ import {
 import {
   getConfig,
   updateConfig,
-  listTemplates,
   getTemplateForOrg,
   upsertTemplate,
   deleteTemplate,
@@ -62,10 +61,6 @@ export async function notificationsRoutes(app: FastifyInstance) {
   })
 
   // Templates — preview ANTES de /:event/:channel
-  app.get('/templates', async (request, reply) => {
-    return reply.send(await listTemplates(request.user.organizationId!))
-  })
-
   app.post('/templates/preview', async (request, reply) => {
     const result = previewSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
