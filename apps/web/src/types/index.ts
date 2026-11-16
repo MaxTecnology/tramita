@@ -312,6 +312,15 @@ export interface TaskDeliverable {
   requiresPayment: boolean
   amount: string | null
   paymentDueDate: string | null
+  // set when the robot checks files delivered here (obligation the document must be)
+  obligationTypeId?: string | null
+}
+
+// Answer of POST /tasks/:id/documents/deliveries/:reqId/check
+export interface DeliveryCheck {
+  blocked?: string
+  warnings: string[]
+  read: { amount?: string; dueDate?: string }
 }
 
 export interface ClientUserAccessItem {

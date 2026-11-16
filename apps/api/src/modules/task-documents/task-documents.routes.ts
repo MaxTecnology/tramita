@@ -7,6 +7,7 @@ import { staffScope, byMethod, param } from '@/middlewares/staffScope'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { readUpload, DEFAULT_MAX_UPLOAD_BYTES } from '@/lib/read-upload'
+import { checkDeliveryFile } from '@/modules/document-reader/delivery-check'
 import { addDocumentItemSchema, addDeliverableSchema, reviewDocumentRequirementSchema } from './task-documents.schema'
 import {
   listTaskDocuments,
@@ -70,14 +71,36 @@ export async function taskDocumentsRoutes(app: FastifyInstance) {
     const { id, reqId } = request.params as { id: string; reqId: string }
 
     const { file, upload } = await readUpload(request)
+    const organizationId = request.user.organizationId!
+
+    // The robot checks deliveries marked with an obligation: another client's document never goes in;
+    // warnings only go in when the person confirms ("Entregar mesmo assim"), and are kept in the history.
+    const check = await checkDeliveryFile(id, reqId, organizationId, upload)
+    if (check.blocked) throw new AppError(422, check.blocked)
+    const acceptWarnings = readMultipartField(file, 'acceptWarnings') === 'true'
+    if (check.warnings.length > 0 && !acceptWarnings) {
+      throw new AppError(409, `O robô encontrou divergências: ${check.warnings.join('; ')}`)
+    }
 
     return reply.status(201).send(
       await deliverDocument(
-        id, reqId, request.user.organizationId!, { id: request.user.sub },
+        id, reqId, organizationId, { id: request.user.sub },
         upload,
-        { amount: readMultipartField(file, 'amount'), paymentDueDate: readMultipartField(file, 'paymentDueDate') },
+        {
+          amount: readMultipartField(file, 'amount') ?? check.read.amount,
+          paymentDueDate: readMultipartField(file, 'paymentDueDate') ?? check.read.dueDate,
+        },
+        { warnings: check.warnings },
       ),
     )
+  })
+
+  app.post('/tasks/:id/documents/deliveries/:reqId/check', {
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), checkSubscription],
+  }, async (request) => {
+    const { id, reqId } = request.params as { id: string; reqId: string }
+    const { upload } = await readUpload(request)
+    return checkDeliveryFile(id, reqId, request.user.organizationId!, upload)
   })
 
   app.post('/tasks/:id/documents/requests/:reqId/upload', {

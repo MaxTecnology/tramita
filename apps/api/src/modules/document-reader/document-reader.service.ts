@@ -35,7 +35,7 @@ export async function carregarModelosDaOrg(organizationId: string): Promise<Mode
 // Compara por dígitos (não string crua) — o cadastro de Client grava o CNPJ como o usuário digitou
 // (com máscara), mas o motor extrai só dígitos; comparar string-a-string nunca bateria com um
 // cliente real. Busca em ordem de prioridade (CNPJ > CPF > CEI > CAEPF > IE), conforme a spec.
-async function resolverClientePorIdentificador(organizationId: string, identificador: string) {
+export async function resolverClientePorIdentificador(organizationId: string, identificador: string) {
   const alvo = soDigitos(identificador)
   if (!alvo) return null
 
@@ -387,7 +387,7 @@ async function assertCompetenciaBateComTarefa(doc: { extractedFields: unknown },
 }
 
 // Valor/vencimento lidos pelo robô (campos "valor" tipo moeda e "vencimento" tipo data), quando válidos
-function pagamentoLido(doc: { extractedFields: unknown }): { amount?: string; paymentDueDate?: string } {
+export function pagamentoLido(doc: { extractedFields: unknown }): { amount?: string; paymentDueDate?: string } {
   const campos = doc.extractedFields as Campos
   const valor = campos?.valor
   const venc = campos?.vencimento
@@ -557,7 +557,7 @@ export async function obterMetricas(organizationId: string) {
 
 // Task.competence é um mês-âncora (DateTime, UTC) — converte pro rótulo "2026-08" que o motor usa
 // no casamento. Trimestral/anual também guardam um único mês-âncora (sem campo de cota — ver spec).
-function competenciaParaRotulo(competence: Date | null): string {
+export function competenciaParaRotulo(competence: Date | null): string {
   if (!competence) return ''
   return `${competence.getUTCFullYear()}-${String(competence.getUTCMonth() + 1).padStart(2, '0')}`
 }

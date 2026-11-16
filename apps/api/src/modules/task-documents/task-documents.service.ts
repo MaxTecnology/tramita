@@ -269,7 +269,7 @@ export async function deliverDocument(
   payload: UploadPayload,
   payment: { amount?: string; paymentDueDate?: string } = {},
   // robot = confirmed from the document reader queue (history says the robot checked it)
-  options: { source?: 'robot' } = {},
+  options: { source?: 'robot'; warnings?: string[] } = {},
 ) {
   await verifyTaskAccess(taskId, organizationId)
   const deliverable = await prisma.taskDeliverable.findFirst({ where: { id: deliverableId, taskId }, include: { protocol: true } })
@@ -322,7 +322,11 @@ export async function deliverDocument(
 
   const statusBefore = (await prisma.task.findUniqueOrThrow({ where: { id: taskId }, select: { status: true } })).status
   await upsertProtocolForDeliverable(deliverableId, actor)
-  await trail(taskId, options.source === 'robot' ? 'deliverable_delivered_robot' : 'deliverable_delivered', { type: 'user', id: actor.id }, deliverable.name, payload.filename)
+  // A delivery made despite the robot's warnings keeps them in the history, next to the file
+  const warned = options.warnings && options.warnings.length > 0
+  const action = options.source === 'robot' ? 'deliverable_delivered_robot' : warned ? 'deliverable_delivered_with_warnings' : 'deliverable_delivered'
+  const toValue = warned ? `${payload.filename} — ${options.warnings!.join('; ')}` : payload.filename
+  await trail(taskId, action, { type: 'user', id: actor.id }, deliverable.name, toValue)
   await recalculateTaskStatus(taskId)
 
   return { ...updated, completion: await completionAfterDelivery(taskId, statusBefore) }

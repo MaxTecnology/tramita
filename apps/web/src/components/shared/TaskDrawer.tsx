@@ -10,7 +10,7 @@ import { Comments } from '@/components/shared/Comments'
 import { useServedDepartments } from '@/hooks/useServedDepartments'
 import { useMyScope } from '@/hooks/useMyScope'
 import { hasUnseenClientReply } from '@/lib/request-comments'
-import type { Task, Attachment, AttachmentPurpose, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable, Protocol, Comment } from '@/types'
+import type { Task, Attachment, AttachmentPurpose, TaskHistory, DrawerRole, TaskDocumentRequirement, TaskDeliverable, DeliveryCheck, Protocol, Comment } from '@/types'
 import { toast } from 'sonner'
 import { formatBRL, toApiAmount } from '@/lib/money'
 import { PaymentFields, type PaymentValues } from './task-documents/PaymentFields'
@@ -79,6 +79,7 @@ function formatHistoryAction(h: TaskHistory, userName: (id: string) => string): 
     case 'deliverable_requested': return `adicionou documento a entregar "${h.toValue ?? ''}"`
     case 'deliverable_delivered': return `entregou "${h.fromValue ?? ''}" (${h.toValue ?? ''})`
     case 'deliverable_delivered_robot': return `entregou "${h.fromValue ?? ''}" (${h.toValue ?? ''}) — conferido pelo robô`
+    case 'deliverable_delivered_with_warnings': return `entregou "${h.fromValue ?? ''}" apesar do aviso do robô: ${h.toValue ?? ''}`
   }
   if (h.action === 'approval_closed_by_office') return `${label} (${CLOSE_REASON_HISTORY[h.toValue ?? ''] ?? h.toValue ?? ''})`
   if (h.toValue) return `${label} ${h.toValue}`
@@ -281,7 +282,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   })
   const [addingDeliverable, setAddingDeliverable] = useState(false)
   // Payment guide delivery waits for amount/due date before uploading
-  const [pendingDelivery, setPendingDelivery] = useState<{ reqId: string; file: File } | null>(null)
+  const [pendingDelivery, setPendingDelivery] = useState<{ reqId: string; file: File; acceptWarnings?: boolean; read?: DeliveryCheck['read'] } | null>(null)
 
   const uploadRequirementMutation = useMutation({
     mutationFn: ({ reqId, file }: { reqId: string; file: File }) => {
@@ -319,9 +320,10 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   })
 
   const deliverMutation = useMutation({
-    mutationFn: ({ reqId, file, payment }: { reqId: string; file: File; payment?: Partial<PaymentValues> }) => {
+    mutationFn: ({ reqId, file, payment, acceptWarnings }: { reqId: string; file: File; payment?: Partial<PaymentValues>; acceptWarnings?: boolean }) => {
       const form = new FormData()
       // Text fields BEFORE the file: the API reads them from the same multipart stream
+      if (acceptWarnings) form.append('acceptWarnings', 'true')
       if (payment?.amount) form.append('amount', payment.amount)
       if (payment?.paymentDueDate) form.append('paymentDueDate', payment.paymentDueDate)
       form.append('file', file)
@@ -348,6 +350,40 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
     },
     onError: (err: unknown) => toast.error(mensagemDeErro(err, 'Erro ao entregar documento')),
   })
+
+  // A delivery marked for the robot is checked before it goes in: another client's document is
+  // blocked; divergences ask "Entregar mesmo assim" (the API records them in the history).
+  async function startDelivery(d: TaskDeliverable, file: File) {
+    let acceptWarnings = false
+    let read: DeliveryCheck['read'] = {}
+    if (d.obligationTypeId) {
+      const form = new FormData()
+      form.append('file', file)
+      let check: DeliveryCheck
+      try {
+        check = (await api.post(`/tasks/${task.id}/documents/deliveries/${d.id}/check`, form)).data as DeliveryCheck
+      } catch (err) {
+        toast.error(mensagemDeErro(err, 'O robô não conseguiu conferir o arquivo'))
+        return
+      }
+      if (check.blocked) {
+        await askConfirm({ title: 'O robô bloqueou esta entrega', description: check.blocked, confirmLabel: 'Entendi', cancelLabel: 'Fechar' })
+        return
+      }
+      if (check.warnings.length > 0) {
+        const ok = await askConfirm({
+          title: `O robô encontrou divergências em ${file.name}`,
+          description: `${check.warnings.join(' • ')}. Se entregar, isso fica registrado no histórico.`,
+          confirmLabel: 'Entregar mesmo assim', cancelLabel: 'Escolher outro arquivo', danger: true,
+        })
+        if (!ok) return
+        acceptWarnings = true
+      }
+      read = check.read
+    }
+    if (d.requiresPayment) setPendingDelivery({ reqId: d.id, file, acceptWarnings, read })
+    else deliverMutation.mutate({ reqId: d.id, file, acceptWarnings })
+  }
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => {
@@ -841,8 +877,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                         <label className="inline-block mt-2 cursor-pointer">
                           <input type="file" accept={UPLOAD_ACCEPT} className="hidden" onChange={(e) => {
                             const file = e.target.files?.[0]
-                            if (file && d.requiresPayment) setPendingDelivery({ reqId: d.id, file })
-                            else if (file) deliverMutation.mutate({ reqId: d.id, file })
+                            if (file) void startDelivery(d, file)
                             e.target.value = ''
                           }} />
                           <span className="text-xs text-accent-hover hover:underline">{d.deliveredAt ? 'Substituir arquivo' : 'Enviar arquivo'}</span>
@@ -850,11 +885,11 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                       )}
                       {pendingDelivery?.reqId === d.id && (
                         <PaymentFields
-                          initialAmount={d.amount}
-                          initialDueDate={d.paymentDueDate ?? task.dueDate}
+                          initialAmount={d.amount ?? pendingDelivery.read?.amount ?? null}
+                          initialDueDate={d.paymentDueDate ?? pendingDelivery.read?.dueDate ?? task.dueDate}
                           submitLabel={`Enviar ${pendingDelivery.file.name}`}
                           pending={deliverMutation.isPending}
-                          onSubmit={(payment) => deliverMutation.mutate({ reqId: d.id, file: pendingDelivery.file, payment })}
+                          onSubmit={(payment) => deliverMutation.mutate({ reqId: d.id, file: pendingDelivery.file, payment, acceptWarnings: pendingDelivery.acceptWarnings })}
                           onCancel={() => setPendingDelivery(null)}
                         />
                       )}
