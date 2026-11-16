@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { diffDaysDateOnlyUTC, formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { Plus, ChevronDown, ChevronRight, AlertTriangle, Clock, ClipboardList, CheckCircle2, Search, X, FileSearch } from 'lucide-react'
 import type { Board, Client } from '@/types'
+import { DeadlineChip } from '@/components/shared/DeadlineChip'
 import { toast } from 'sonner'
 
 const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
@@ -92,6 +93,7 @@ function BoardRow({ board, now }: { board: Board; now: Date }) {
           <p className="text-sm font-medium text-foreground flex-1 min-w-0 truncate">{board.title}</p>
           <span className={cn('text-xs flex-shrink-0', dueDateCls)}>{dueDateLabel}</span>
         </div>
+        {board.deadline && <DeadlineChip className="mb-1.5" deadline={board.deadline} />}
         <p className="text-xs text-muted-foreground mb-2">{board.client.name}</p>
         <div className="flex items-center gap-3">
           <span className="text-xs bg-neutral-bg text-muted-foreground px-2 py-0.5 rounded-full">{stage}</span>
@@ -108,6 +110,7 @@ function BoardRow({ board, now }: { board: Board; now: Date }) {
       <div className="hidden md:flex items-center gap-3">
         <div className="flex-[2] min-w-0">
           <p className="text-sm font-medium text-foreground truncate">{board.title}</p>
+          {board.deadline && <DeadlineChip className="mt-0.5" deadline={board.deadline} />}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm text-muted-foreground truncate">{board.client.name}</p>

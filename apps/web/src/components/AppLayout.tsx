@@ -111,7 +111,7 @@ export default function AppLayout() {
             {ORG_ROLES.includes(role) && (
               <SidebarLink to="/app/processes" icon={<ClipboardList size={16} />} label="Processos" onClick={handleNavClick} />
             )}
-            {MANAGER_ROLES.includes(role) && (
+            {ORG_ROLES.includes(role) && (
               <SidebarLink to="/app/os" icon={<FileStack size={16} />} label="Ordens de Serviço" onClick={handleNavClick} />
             )}
             {ORG_ROLES.includes(role) && (

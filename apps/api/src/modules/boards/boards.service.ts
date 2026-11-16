@@ -1,5 +1,8 @@
 import { onBoardAssigned, staffActor } from '@/modules/inbox/inbox-events'
 import { prisma } from '@/lib/prisma'
+import { loadHolidaySet } from '@/modules/holidays/holidays.service'
+import { deadlineInfo } from '@/modules/os/os-deadline.service'
+import { warnDaysFor } from '@/modules/os/os-list.service'
 import { AppError } from '@/errors/AppError'
 import type { CreateBoardBody, UpdateBoardBody, SearchQuery } from './boards.schema'
 import { todayInBRT, startOfTodayInBRT } from '@/lib/date-only'
@@ -28,7 +31,7 @@ export async function listBoards(
   const todayBRT = startOfTodayInBRT(now)
   const in7days = new Date(todayInBRT(now) + 7 * 24 * 60 * 60 * 1000)
 
-  return prisma.board.findMany({
+  const boards = await prisma.board.findMany({
     where: {
       organizationId,
       isActive: true,
@@ -81,9 +84,21 @@ export async function listBoards(
         orderBy: { position: 'asc' },
         include: { tasks: { orderBy: { position: 'asc' } } },
       },
+      pauses: { select: { startedAt: true, endedAt: true } },
     },
     orderBy: { createdAt: 'desc' },
   })
+  // Process clock: business days from its opening, paused while every open OS waits for the client
+  const y = now.getUTCFullYear()
+  const holidays = await loadHolidaySet(organizationId, [y - 1, y, y + 1])
+  const warnDays = await warnDaysFor(organizationId)
+  return boards.map(({ pauses, ...b }) => ({
+    ...b,
+    deadline: deadlineInfo({
+      status: b.completedAt ? 'DONE' : 'OPEN', osModelId: null, releasedAt: b.createdAt, deadlineBusinessDays: b.deadlineBusinessDays,
+      targetDate: b.targetDate, completedAt: b.completedAt, pauses,
+    }, now, holidays, warnDays),
+  }))
 }
 
 export async function getBoardById(

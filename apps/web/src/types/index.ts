@@ -47,6 +47,13 @@ export interface Board {
   type: 'PROCESS' | 'RECURRING_SYSTEM' | 'SERVICE_SYSTEM'
   columns: Column[]
   client: { id: string; name: string; codigo: string | null }
+  // Process clock (business days, pauses while the client is awaited) and delay reason
+  deadlineBusinessDays?: number | null
+  targetDate?: string | null
+  completedAt?: string | null
+  delayReasonId?: string | null
+  delayReasonPending?: boolean
+  deadline?: DeadlineInfo
 }
 
 export interface User {
@@ -362,6 +369,17 @@ export interface ProcessTemplate {
   departmentId: string | null; deadlineBusinessDays: number | null; clientCanRequest: boolean
   columns: ProcessTemplateColumn[]
   items: ProcessTemplateItem[]
+}
+
+// Clock of an OS or process (API os-deadline.service deadlineInfo)
+export type DeadlineState = 'NONE' | 'ON_TIME' | 'DUE_SOON' | 'LATE' | 'PAUSED' | 'WAITING_DEPENDENCY' | 'DONE'
+export interface DeadlineInfo {
+  state: DeadlineState
+  businessDaysLeft?: number
+  businessDaysLate?: number
+  pausedSinceDays?: number
+  officeBusinessDays: number
+  clientBusinessDays: number
 }
 
 // Catalog of "Solicitar serviço" in the portal

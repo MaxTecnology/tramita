@@ -3,7 +3,8 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
-import { openOSSchema, addOSToProcessSchema, releaseEarlySchema } from './os.schema'
+import { openOSSchema, addOSToProcessSchema, releaseEarlySchema, listOSQuerySchema } from './os.schema'
+import { listOS } from './os-list.service'
 import { openOS, addOSToProcess } from './os.service'
 import { releaseEarly } from './os-deadline.service'
 import { prisma } from '@/lib/prisma'
@@ -11,6 +12,12 @@ import { prisma } from '@/lib/prisma'
 export async function osRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
   const staffWrite = [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER'), checkSubscription]
+
+  app.get('/os', { preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')] }, async (request) => {
+    const q = listOSQuerySchema.safeParse(request.query)
+    if (!q.success) throw new AppError(400, q.error.errors[0].message)
+    return listOS(request.user.organizationId!, { id: request.user.sub, role: request.user.role }, q.data)
+  })
 
   // Standalone OS (client's services board); scope: clients the user reaches, like opening a process
   app.post('/os', { preHandler: staffWrite }, async (request, reply) => {

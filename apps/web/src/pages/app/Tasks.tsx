@@ -21,12 +21,13 @@ import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { buildCalendarGrid, getCalendarGridRange } from './tasksCalendar'
 import { periodRange, type PeriodKind } from './tasksPeriod'
 import { STATUS_FILTER_OPTIONS, DEFAULT_STATUS_FILTER, statusFilterParams, type StatusFilter } from './tasksStatus'
-import type { Task, User, Department, RecurringTaskTemplate } from '@/types'
+import type { Task, User, Department, RecurringTaskTemplate, DeadlineInfo } from '@/types'
 import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
 import { useMyScope } from '@/hooks/useMyScope'
 import { useLinkedItem } from '@/hooks/useLinkedItem'
 import { useBoardStream } from '@/hooks/useBoardStream'
 import { askConfirm } from '@/components/ui/app-dialogs'
+import { DeadlineChip, OSTag } from '@/components/shared/DeadlineChip'
 
 // GET /tasks retorna uma listagem flat de tarefas cruzando todos os boards da org (inclusive o
 // board de sistema onde moram as recorrentes). O select do backend cobre todos os campos de Task,
@@ -41,8 +42,12 @@ interface TaskListItem extends Task {
       id: string
       clientId: string
       client: { id: string; name: string; codigo: string | null }
+      type?: 'PROCESS' | 'RECURRING_SYSTEM' | 'SERVICE_SYSTEM'
+      title?: string
     }
   }
+  osModel?: { id: string; name: string } | null
+  deadline?: DeadlineInfo
 }
 
 function AwaitingApprovalBadge({ className }: { className?: string }) {
@@ -124,6 +129,8 @@ function TaskRow({ task, onClick }: { task: TaskListItem; onClick: () => void })
       </td>
       <td className="px-3 py-2.5 text-sm text-foreground">
         {task.title}
+        {task.osModel && <OSTag className="ml-2" model={task.osModel.name} process={task.column.board.type === 'PROCESS' ? task.column.board.title : null} />}
+        {task.deadline && task.osModel && <DeadlineChip className="ml-2" deadline={task.deadline} />}
         {task.awaitingApproval && <AwaitingApprovalBadge className="ml-2" />}
       </td>
       <td className="px-3 py-2.5 text-sm text-muted-foreground">{task.department?.name ?? '—'}</td>
@@ -181,6 +188,8 @@ function DraggableTaskCard({ task, onClick }: { task: TaskListItem; onClick: () 
         {task.column.board.client.codigo && <span className="ml-1">#{task.column.board.client.codigo}</span>}
       </p>
       <div className="flex items-center gap-1.5 flex-wrap">
+        {task.osModel && <OSTag model={task.osModel.name} process={task.column.board.type === 'PROCESS' ? task.column.board.title : null} />}
+        {task.deadline && task.osModel && <DeadlineChip deadline={task.deadline} />}
         {task.awaitingApproval && <AwaitingApprovalBadge />}
         {task.sourceRequestId && (
           <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-highlight-bg text-highlight-text" title="Originado de uma solicitação do cliente">

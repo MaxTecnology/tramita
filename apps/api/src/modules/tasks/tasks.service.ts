@@ -12,7 +12,10 @@ import type { CreateTaskBody, UpdateTaskBody, MoveTaskBody, ReorderTasksBody, Li
 import { assertDepartmentServesClient, lockClients } from '@/modules/clients/client-coverage'
 import { syncProtocolsForTask } from '@/modules/protocols/protocol-from-deliverable'
 import { actorScope, taskWhere, mineTaskWhere, actableTaskIds } from '@/modules/staff-scope/staff-scope'
-import { assertReleased, afterStatusChange } from '@/modules/os/os-deadline.service'
+import { assertReleased, afterStatusChange, deadlineInfo } from '@/modules/os/os-deadline.service'
+import { warnDaysFor } from '@/modules/os/os-list.service'
+import { loadHolidaySet } from '@/modules/holidays/holidays.service'
+import type { HolidaySet } from '@/lib/business-days'
 import { planDelayReasonsOnFinish, applyDelayReasons, type FinishPlan } from '@/modules/delay-reasons/delay-reasons.service'
 
 export interface Actor {
@@ -556,15 +559,37 @@ const LIST_TASK_SELECT = {
   updatedAt: true,
   department: { select: { id: true, name: true } },
   assignee: { select: { id: true, name: true } },
-  column: { select: { board: { select: { id: true, clientId: true, client: { select: { id: true, name: true, codigo: true } } } } } },
+  column: { select: { board: { select: { id: true, clientId: true, type: true, title: true, client: { select: { id: true, name: true, codigo: true } } } } } },
   approvals: { where: { status: 'PENDING' }, select: { id: true }, take: 1 },
+  // OS: model, clock (release, deadline, pauses) and delay reason
+  osModelId: true,
+  osModel: { select: { id: true, name: true } },
+  releasedAt: true,
+  completedAt: true,
+  deadlineBusinessDays: true,
+  delayReasonId: true,
+  delayNote: true,
+  delayReasonPending: true,
+  pauses: { select: { startedAt: true, endedAt: true } },
 } satisfies Prisma.TaskSelect
 
 type ListTaskRow = Prisma.TaskGetPayload<{ select: typeof LIST_TASK_SELECT }>
 
-// "Aguardando aprovação do cliente" flag; the approvals themselves are not part of the list
-function toListItem({ approvals, ...t }: ListTaskRow, editable: Set<string>) {
-  return { ...t, viewerCanEdit: editable.has(t.id), awaitingApproval: approvals.length > 0 }
+interface ClockCtx { now: Date; holidays: HolidaySet; warnDays: number }
+
+async function clockCtx(organizationId: string): Promise<ClockCtx> {
+  const now = new Date()
+  const y = now.getUTCFullYear()
+  return { now, holidays: await loadHolidaySet(organizationId, [y - 1, y, y + 1]), warnDays: await warnDaysFor(organizationId) }
+}
+
+// "Aguardando aprovação do cliente" flag (the approvals themselves are not part of the list) and the
+// OS clock state
+function toListItem({ approvals, pauses, ...t }: ListTaskRow, editable: Set<string>, clock: ClockCtx) {
+  return {
+    ...t, viewerCanEdit: editable.has(t.id), awaitingApproval: approvals.length > 0,
+    deadline: deadlineInfo({ ...t, pauses }, clock.now, clock.holidays, clock.warnDays),
+  }
 }
 
 export async function listTasks(
@@ -579,7 +604,8 @@ export async function listTasks(
       select: LIST_TASK_SELECT,
     })
     const editable = await actableTaskIds(scope, rows.map((t) => t.id))
-    return { items: rows.map((t) => toListItem(t, editable)), nextCursor: null }
+    const clock = await clockCtx(organizationId)
+    return { items: rows.map((t) => toListItem(t, editable, clock)), nextCursor: null }
   }
 
   const where: Prisma.TaskWhereInput = {
@@ -632,7 +658,8 @@ export async function listTasks(
   const nextCursor = hasMore ? page[page.length - 1].id : null
   // Read-only for the viewer until they assume it (colleague's task seen through the department)
   const editable = await actableTaskIds(scope, page.map((t) => t.id))
-  const items = page.map((t) => toListItem(t, editable))
+  const clock = await clockCtx(organizationId)
+  const items = page.map((t) => toListItem(t, editable, clock))
 
   return { items, nextCursor }
 }

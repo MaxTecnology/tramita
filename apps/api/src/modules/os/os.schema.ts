@@ -30,3 +30,14 @@ export function competenceToDate(value: string): Date {
 export const releaseEarlySchema = z.object({
   reason: z.string().trim().min(3, 'Explique por que liberar antes').max(500),
 })
+
+export const listOSQuerySchema = z.object({
+  clientId: z.string().cuid().optional(),
+  osModelId: z.string().cuid().optional(),
+  assigneeId: z.string().cuid().optional(),
+  departmentId: z.string().cuid().optional(),
+  boardId: z.string().cuid().optional(),
+  situation: z.enum(['ON_TIME', 'DUE_SOON', 'LATE', 'PAUSED', 'WAITING_DEPENDENCY', 'DONE', 'NONE']).optional(),
+  search: z.string().trim().max(100).optional(),
+})
+export type ListOSQuery = z.infer<typeof listOSQuerySchema>

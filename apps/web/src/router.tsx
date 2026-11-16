@@ -88,7 +88,7 @@ export const router = createBrowserRouter([
       {
         path: 'os',
         element: (
-          <ProtectedRoute allowedRoles={MANAGER_ROLES}>
+          <ProtectedRoute allowedRoles={ORG_ROLES}>
             <OSList />
           </ProtectedRoute>
         ),
