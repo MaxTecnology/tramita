@@ -31,6 +31,7 @@ beforeEach(() => {
       h('document_not_applicable', 'RH (ACME)', null, 'Notas'),
       h('deliverable_delivered', 'Bruna', 'Holerites', 'holerites.pdf'),
       h('deliverable_delivered_robot', 'Bruna', 'Guia DAS', 'das.pdf'),
+      h('deliverable_delivered_with_warnings', 'Bruna', 'Guia FGTS', 'fgts.pdf — Competência do documento: 09/2026 — a tarefa é de 08/2026'),
     ])),
     http.get(`${API}/tasks/t1/attachments`, () => HttpResponse.json([
       { id: 'a1', filename: 'ponto.pdf', mimeType: 'application/pdf', size: 1000, uploaderName: 'RH (ACME)', signedUrl: 'https://f/1', createdAt: now, deletedAt: null, deletedByName: null,
@@ -49,6 +50,7 @@ it('the history tells the document trail in plain words', async () => {
   expect(screen.getByText(/marcou "Nada a enviar" em "Notas"/)).toBeInTheDocument()
   expect(screen.getByText(/entregou "Holerites" \(holerites\.pdf\)/)).toBeInTheDocument()
   expect(screen.getByText(/entregou "Guia DAS" \(das\.pdf\) — conferido pelo robô/)).toBeInTheDocument()
+  expect(screen.getByText(/entregou "Guia FGTS" apesar do aviso do robô: fgts\.pdf — Competência do documento: 09\/2026/)).toBeInTheDocument()
 })
 
 it('each attachment says what it was for and how it ended', async () => {

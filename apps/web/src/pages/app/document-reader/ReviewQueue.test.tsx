@@ -66,3 +66,17 @@ it('confirms only the ones without pending items, shows the summary and complete
   await userEvent.click(screen.getByRole('button', { name: 'Concluir 1 tarefa pronta' }))
   await waitFor(() => expect(completed).toEqual(['t-a']))
 })
+
+it('a competence that does not match shows the month read in the document next to the task month', async () => {
+  server.use(http.get(`${API}/document-reader/fila`, () => HttpResponse.json([
+    doc('x', false, { checks: { cnpj: true, competence: false, payment: false }, extractedFields: { competencia: { bruto: '01/2020', valor: '2020-01', valido: true } } }),
+  ])))
+  renderQueue()
+  expect(await screen.findByText(/⚠ Competência 01\/2020 — tarefa 10\/2026/)).toBeInTheDocument()
+})
+
+it('a single ready document reads "Confirmar 1 sem pendência"', async () => {
+  server.use(http.get(`${API}/document-reader/fila`, () => HttpResponse.json([doc('a', true), doc('c', false)])))
+  renderQueue()
+  expect(await screen.findByRole('button', { name: 'Confirmar 1 sem pendência' })).toBeInTheDocument()
+})

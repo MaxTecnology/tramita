@@ -269,6 +269,32 @@ async function main() {
     await prisma.clientUserAccess.create({ data: { clientUserId: portfolioUser.id, clientId: c.id, departmentId: department.id } })
   }
 
+  // Robot per delivery: "Simples E2E" has "Guia DAS E2E" checked by the robot (obligation DAS-E2E,
+  // org model anchored on "Guia E2E Tramita" — the fixture PDFs in apps/web/e2e/fixtures)
+  const dasE2E = await prisma.obligationType.findFirst({ where: { organizationId: org.id, code: 'DAS-E2E' } })
+    ?? await prisma.obligationType.create({ data: { organizationId: org.id, code: 'DAS-E2E', name: 'DAS E2E' } })
+  await prisma.documentModel.deleteMany({ where: { organizationId: org.id, name: 'Modelo DAS E2E' } })
+  await prisma.documentModel.create({
+    data: {
+      organizationId: org.id, obligationTypeId: dasE2E.id, name: 'Modelo DAS E2E',
+      definicao: {
+        tipoImposto: 'DAS-E2E',
+        ancoras: [{ texto: 'Guia E2E Tramita', pagina: 1, x: 0.1, y: 0.05 }],
+        zonas: [
+          { campo: 'cnpj', pagina: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.02, tipo: 'cnpj' },
+          { campo: 'competencia', pagina: 1, x: 0.1, y: 0.15, w: 0.3, h: 0.02, tipo: 'competencia' },
+        ],
+      },
+    },
+  })
+  await prisma.task.create({
+    data: {
+      title: 'Simples E2E', position: 4, priority: 'MEDIUM', status: 'OPEN', tags: [], creatorId: admin.id, columnId: recurringBoard.columns[0].id,
+      departmentId: department.id, assigneeId: admin.id, visibleToClient: true, competence,
+      deliverables: { create: [{ name: 'Guia DAS E2E (robô)', position: 0, obligationTypeId: dasE2E.id }] },
+    },
+  })
+
   console.log('E2E seed concluído: org G2A + admin@g2a.com.br + cliente@g2a.com.br (ClientUser) + board "Processo E2E" + guia "Guia DAS E2E" + pedido mensal + carteira "Saída E2E"')
 }
 

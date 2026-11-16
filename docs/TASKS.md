@@ -435,7 +435,10 @@ na tela e o Claude conferindo banco e logs.
 5. **Recorrentes avançado** — "Gerar de novo" e alerta de falha de geração.
 6. **Canais externos** — WhatsApp (MaximizeBot) e e-mail (SMTP) reais, toggles e modelos de mensagem;
    resumo diário de prazos (SLA).
-7. **Leitura de Documentos (robô)** — fila e identificação do cliente.
+7. **Leitura de Documentos (robô)** — robô por documento a entregar (seletor 🤖 no modelo de
+   recorrente), fila com selos e "Confirmar os N sem pendência", concluir tarefas prontas, PDF ao lado;
+   entrega manual numa entrega com robô: aviso → "Entregar mesmo assim" (histórico) e bloqueio quando o
+   CNPJ é de outro cliente. Implementado em 2026-11-15 (`feat/robo-por-documento`).
 8. **Portal e celular** — usuário do cliente com várias empresas (seletor), layout no celular,
    troca de senha e perfil.
 9. **Smoke test no online** — login, fluxo curto e sino em tempo real no domínio real (SSE atrás do

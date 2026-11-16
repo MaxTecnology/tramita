@@ -186,6 +186,16 @@ function Check({ ok, label }: { ok: boolean; label: string }) {
 const fmtCompetence = (c: string | null | undefined) => (c ? `${c.slice(5, 7)}/${c.slice(0, 4)}` : '')
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
+// Competence chip: when it does not match, the month read in the document goes next to the task's
+function competenceLabel(ok: boolean, taskCompetence: string | null, fields: Record<string, unknown> | null): string {
+  const task = taskCompetence ? fmtCompetence(taskCompetence) : null
+  if (ok || !task) return `Competência${task ? ` ${task}` : ''}`
+  const read = ['competencia', 'pa']
+    .map((k) => (fields?.[k] as { valor?: unknown } | undefined)?.valor)
+    .find((v): v is string => typeof v === 'string' && /^\d{4}-\d{2}$/.test(v))
+  return read ? `Competência ${fmtCompetence(read)} — tarefa ${task}` : `Competência não lida — tarefa ${task}`
+}
+
 export default function ReviewQueue() {
   const queryClient = useQueryClient()
   const [trocandoId, setTrocandoId] = useState<string | null>(null)
@@ -327,7 +337,7 @@ export default function ReviewQueue() {
               {me && <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />}
               {prontos.length > 0 && (
                 <Button onClick={() => loteMutation.mutate(prontos.map((d) => d.id))} disabled={loteMutation.isPending}>
-                  {loteMutation.isPending ? 'Entregando...' : `Confirmar os ${prontos.length} sem pendência`}
+                  {loteMutation.isPending ? 'Entregando...' : (prontos.length === 1 ? 'Confirmar 1 sem pendência' : `Confirmar os ${prontos.length} sem pendência`)}
                 </Button>
               )}
             </div>
@@ -391,7 +401,7 @@ export default function ReviewQueue() {
                       {s && doc.checks && (
                         <div className="flex flex-wrap gap-1.5">
                           <Check ok={doc.checks.cnpj} label="CNPJ" />
-                          <Check ok={doc.checks.competence} label={`Competência${s.competence ? ` ${fmtCompetence(s.competence)}` : ''}`} />
+                          <Check ok={doc.checks.competence} label={competenceLabel(doc.checks.competence, s.competence, doc.extractedFields)} />
                           {s.requiresPayment && <Check ok={doc.checks.payment} label={doc.checks.payment ? `Valor R$ ${s.amount?.replace('.', ',')} · vence ${s.paymentDueDate?.split('-').reverse().join('/')}` : 'Valor e vencimento'} />}
                         </div>
                       )}

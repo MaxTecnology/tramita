@@ -601,3 +601,15 @@ Resolvido na branch `fix/debitos-notificacoes` (cada item com teste):
 - Índice `organizationId` em `in_app_notifications` (migration `20261114110000_inbox_organization_index`).
 
 Fora do escopo (não é débito, é decisão): aprovação em processo (OS) até o Max pedir; E2E sem upload da prévia (evita o bucket real do B2 — upload coberto em teste de componente e API).
+
+## Robô por documento (2026-11-15)
+
+1. **Entrega manual lê o PDF duas vezes:** o drawer chama `/check` e o `/upload` refaz a conferência
+   (necessário — o upload não pode confiar no cliente). Custo: uma extração a mais por entrega com robô.
+   Se pesar, guardar o resultado do check por hash do arquivo por alguns minutos.
+2. **Entrega avulsa sem robô:** "+ Adicionar documento a entregar" no drawer não tem o seletor 🤖;
+   só entregas vindas do modelo de recorrente têm obrigação. Adicionar quando houver pedido.
+3. **Processos (OS) fora:** a fila não identifica a entrega dentro de um processo. Decidido deixar para
+   depois (mesma ideia: casar pela obrigação da entrega da tarefa do processo).
+4. **Sem entrega automática:** decisão do Max — todo documento do robô passa pela fila de conferência.
+   Reavaliar quando houver histórico de acerto por modelo (`obterMetricas`).
