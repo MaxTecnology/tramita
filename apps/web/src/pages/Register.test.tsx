@@ -3,10 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { beforeEach } from 'vitest'
 import { server } from '@/test/server'
 import Register from './Register'
 
 const API = 'http://localhost:3000'
+
+beforeEach(() => server.use(http.get(`${API}/organizations/signup-status`, () => HttpResponse.json({ enabled: true }))))
 
 it('a paid plan asks for a valid CNPJ before sending anything', async () => {
   let posted = false
@@ -40,4 +43,20 @@ it('promises no trial: the signup is a monthly paid plan', async () => {
   )
   expect(await screen.findByText(/cobrança é mensal, por boleto/)).toBeInTheDocument()
   expect(screen.queryByText(/trial|sem cartão/i)).not.toBeInTheDocument()
+})
+
+it('with the signup closed it shows how to talk to AutoHubs and offers no plan', async () => {
+  server.use(
+    http.get(`${API}/organizations/signup-status`, () => HttpResponse.json({ enabled: false })),
+    http.get(`${API}/organizations/plans`, () => HttpResponse.json([{ id: 'p1', name: 'Pro', priceMonthly: '197.00', maxClients: 100, features: {} }])),
+  )
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter><Register /></MemoryRouter>
+    </QueryClientProvider>,
+  )
+  expect(await screen.findByRole('heading', { name: 'Fale com a gente' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'contato@autohubs.com.br' })).toHaveAttribute('href', 'mailto:contato@autohubs.com.br')
+  expect(screen.getByRole('link', { name: 'Entrar' })).toHaveAttribute('href', '/login')
+  expect(screen.queryByRole('button', { name: 'Escolher' })).not.toBeInTheDocument()
 })

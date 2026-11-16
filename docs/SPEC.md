@@ -115,8 +115,11 @@ Login unificado — role no JWT discrimina acesso (`MASTER`, `ORG_ADMIN`, `ORG_M
 
 ## Escritórios — Cadastro Público
 
+### GET `/organizations/signup-status` — `{ enabled: boolean }` (público)
+→ `enabled` = `PUBLIC_SIGNUP_ENABLED === 'true'`. Desligado por padrão: a AutoHubs cadastra o escritório pelo Master e entrega o acesso; a tela `/register` mostra "Fale com a gente".
+
 ### POST `/organizations/register`
-Cadastro de novo escritório (público — sem autenticação).
+Cadastro de novo escritório (público — sem autenticação). Só com `PUBLIC_SIGNUP_ENABLED=true`; desligado → 404 `'Cadastro indisponível'`.
 ```json
 {
   "name": "string",

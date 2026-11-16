@@ -24,9 +24,17 @@ export default function Register() {
   })
 
 
+  // Closed by default: AutoHubs creates the office and hands over the access (PUBLIC_SIGNUP_ENABLED)
+  const { data: signup, isPending: signupPending } = useQuery<{ enabled: boolean }>({
+    queryKey: ['public', 'signup-status'],
+    queryFn: () => api.get('/organizations/signup-status').then((r) => r.data as { enabled: boolean }),
+  })
+  const signupOpen = signup?.enabled === true
+
   const { data: plans = [], isLoading } = useQuery<Plan[]>({
     queryKey: ['public', 'plans'],
     queryFn: () => api.get('/organizations/plans').then((r) => r.data as Plan[]),
+    enabled: signupOpen,
   })
 
   async function handleSubmit(e: FormEvent) {
@@ -54,6 +62,29 @@ export default function Register() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (signupPending) return <div className="min-h-screen bg-background p-8 text-muted-foreground">Carregando...</div>
+
+  if (!signupOpen) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="bg-surface border-b border-border px-6 py-4 flex items-center gap-3">
+          <HubIcon />
+          <span className="font-bold text-[#185FA5]">Tramita</span>
+        </header>
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Fale com a gente</h1>
+          <p className="text-muted-foreground max-w-md">
+            O cadastro do escritório é feito pela nossa equipe, que libera o acesso para você. Escreva para{' '}
+            <a href="mailto:contato@autohubs.com.br" className="text-[#185FA5] hover:underline font-medium">contato@autohubs.com.br</a>.
+          </p>
+          <p className="text-sm text-muted-foreground mt-6">
+            Já tem conta? <Link to="/login" className="text-[#185FA5] hover:underline font-medium">Entrar</Link>
+          </p>
+        </div>
+      </div>
+    )
   }
 
   if (step === 'plan') {

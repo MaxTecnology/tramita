@@ -7,10 +7,11 @@ import * as asaas from '@/lib/asaas'
 import { createTestPlan, generateValidCnpj } from '@/test/helpers'
 
 beforeEach(() => {
+  vi.stubEnv('PUBLIC_SIGNUP_ENABLED', 'true')
   vi.spyOn(asaas, 'createCustomer').mockResolvedValue({ id: 'cus_1', name: 'X', email: 'x@x.com' })
   vi.spyOn(asaas, 'createSubscription').mockResolvedValue({ id: 'sub_1', status: 'ACTIVE' })
 })
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs() })
 
 const body = (planId: string, extra: object = {}) => ({
   name: 'G2A Soluções Contábeis', email: `g2a-${Date.now()}-${Math.random()}@test.com`, adminName: 'Admin', adminPassword: 'Senha@123', planId, ...extra,
@@ -65,5 +66,24 @@ describe('cadastro do escritório — CNPJ e cobrança', () => {
     expect(JSON.parse(res.body).message).toBe('Erro ao integrar com sistema de cobrança: O CPF/CNPJ informado é inválido.')
     expect(log).toHaveBeenCalledWith(expect.objectContaining({ asaasErrors: ['invalid_cpfCnpj: O CPF/CNPJ informado é inválido.'] }), expect.any(String))
     expect(await prisma.organization.count({ where: { name: 'G2A Soluções Contábeis' } })).toBe(0)
+  })
+})
+
+describe('cadastro público desligado (padrão: o escritório é cadastrado pela AutoHubs)', () => {
+  it('without PUBLIC_SIGNUP_ENABLED the signup is closed: 404 and nothing created', async () => {
+    vi.stubEnv('PUBLIC_SIGNUP_ENABLED', '')
+    const plan = await createTestPlan({ name: 'Pro' })
+    const res = await register(body(plan.id, { cnpj: generateValidCnpj(5) }))
+    expect(res.statusCode).toBe(404)
+    expect(JSON.parse(res.body).message).toBe('Cadastro indisponível')
+    expect(asaas.createCustomer).not.toHaveBeenCalled()
+    expect(await prisma.organization.count({ where: { name: 'G2A Soluções Contábeis' } })).toBe(0)
+  })
+
+  it('tells the screen whether the signup is open', async () => {
+    vi.stubEnv('PUBLIC_SIGNUP_ENABLED', '')
+    expect(JSON.parse((await app.inject({ method: 'GET', url: '/organizations/signup-status' })).body)).toEqual({ enabled: false })
+    vi.stubEnv('PUBLIC_SIGNUP_ENABLED', 'true')
+    expect(JSON.parse((await app.inject({ method: 'GET', url: '/organizations/signup-status' })).body)).toEqual({ enabled: true })
   })
 })

@@ -43,13 +43,23 @@ export async function masterOrgRoutes(app: FastifyInstance) {
   })
 }
 
+// Read on each request (not cached at import), so tests can switch it
+function isPublicSignupEnabled(): boolean {
+  return process.env.PUBLIC_SIGNUP_ENABLED === 'true'
+}
+
 // ── /organizations/* (público, sem auth) ─────────────────────────────────────
 export async function publicOrgRoutes(app: FastifyInstance) {
   app.get('/plans', async (_req, reply) => {
     return reply.send(await listPublicPlans())
   })
 
+  // The office signs up alone only when PUBLIC_SIGNUP_ENABLED=true; by default AutoHubs creates it
+  // (Master) and hands over the access, billed by Asaas or by direct agreement
+  app.get('/signup-status', async (_req, reply) => reply.send({ enabled: isPublicSignupEnabled() }))
+
   app.post('/register', async (request, reply) => {
+    if (!isPublicSignupEnabled()) throw new AppError(404, 'Cadastro indisponível')
     const result = registerOrgSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
     return reply.status(201).send(await register(result.data))
