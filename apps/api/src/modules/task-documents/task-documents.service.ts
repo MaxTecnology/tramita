@@ -49,7 +49,7 @@ async function trailActorName(actor: TrailActor, taskId: string): Promise<{ acto
   return { actorType: 'client', actorId: actor.clientUserId, actorName: company ? `${cu?.name ?? 'Cliente'} (${company})` : (cu?.name ?? 'Cliente') }
 }
 
-async function trail(taskId: string, action: string, actor: TrailActor, fromValue: string | null, toValue: string | null): Promise<void> {
+export async function trail(taskId: string, action: string, actor: TrailActor, fromValue: string | null, toValue: string | null): Promise<void> {
   await prisma.taskHistory.create({ data: { taskId, action, fromValue, toValue, ...(await trailActorName(actor, taskId)) } })
   // Every document step changes what an open panel shows (office or portal): refresh it in real time
   const task = await prisma.task.findUnique({ where: { id: taskId }, select: { column: { select: { boardId: true } } } })

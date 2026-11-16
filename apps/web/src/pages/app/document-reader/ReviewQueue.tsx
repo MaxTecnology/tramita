@@ -285,7 +285,9 @@ export default function ReviewQueue() {
   async function abrirPdf(id: string, name: string) {
     try {
       const { data } = await api.get<{ url: string }>(`/document-reader/${id}/visualizar`)
-      setPdf({ url: data.url, name })
+      // The side panel only exists from lg up (1024px); below that the PDF opens in a new tab
+      if (window.matchMedia?.('(min-width: 1024px)').matches) setPdf({ url: data.url, name })
+      else window.open(data.url, '_blank', 'noopener')
     } catch {
       toast.error('Erro ao abrir o PDF')
     }

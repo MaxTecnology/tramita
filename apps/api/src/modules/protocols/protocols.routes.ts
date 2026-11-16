@@ -9,7 +9,8 @@ import { AppError } from '@/errors/AppError'
 import { readUpload, DEFAULT_MAX_UPLOAD_BYTES } from '@/lib/read-upload'
 import { createProtocolSchema, listProtocolsQuerySchema, updateProtocolPaymentSchema, cancelProtocolSchema, unpaidGuidesQuerySchema } from './protocols.schema'
 import { listUnpaidGuides, getUnpaidGuidesSummary } from './unpaid-guides.service'
-import { replaceProtocolFile, updateProtocolPayment, cancelProtocol } from './protocol-office-actions'
+import { replaceProtocolFile, updateProtocolPayment, cancelProtocol, protocolDeliveryTarget } from './protocol-office-actions'
+import { checkDeliveryFile, type DeliveryCheck } from '@/modules/document-reader/delivery-check'
 import { readMultipartField } from '@/lib/multipart-fields'
 import {
   createProtocol, listProtocolsForOrg, listProtocolsForTask, getProtocolById,
@@ -92,10 +93,23 @@ export async function protocolsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const { file, upload } = await readUpload(request)
+    const organizationId = request.user.organizationId!
+
+    // Same robot check as a delivery: replacing the file must not bypass it
+    const target = await protocolDeliveryTarget(id, organizationId)
+    const check: DeliveryCheck = target?.deliverableId
+      ? await checkDeliveryFile(target.taskId, target.deliverableId, organizationId, upload)
+      : { warnings: [], read: {} }
+    if (check.blocked) throw new AppError(422, check.blocked)
+    if (check.warnings.length > 0 && readMultipartField(file, 'acceptWarnings') !== 'true') {
+      throw new AppError(409, `O robô encontrou divergências: ${check.warnings.join('; ')}`)
+    }
+
     return reply.send(await replaceProtocolFile(
-      id, request.user.organizationId!, { id: request.user.sub, role: request.user.role },
+      id, organizationId, { id: request.user.sub, role: request.user.role },
       upload,
       { amount: readMultipartField(file, 'amount'), paymentDueDate: readMultipartField(file, 'paymentDueDate') },
+      { warnings: check.warnings },
     ))
   })
 

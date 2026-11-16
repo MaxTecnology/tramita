@@ -613,3 +613,10 @@ Fora do escopo (não é débito, é decisão): aprovação em processo (OS) até
    depois (mesma ideia: casar pela obrigação da entrega da tarefa do processo).
 4. **Sem entrega automática:** decisão do Max — todo documento do robô passa pela fila de conferência.
    Reavaliar quando houver histórico de acerto por modelo (`obterMetricas`).
+5. **Revisão final (menores adiados):** (a) corrida — entrega manual entre a leitura de `pendentes` e o
+   download do B2 em `anexarDocumento` faz o robô substituir o arquivo em silêncio (guardar com
+   `deliveredAt IS NULL`); (b) entrega sugerida apagada (SetNull) faz `anexarDocumento` cair no "uma
+   pendente só" e a fila mostra "Sem entrega sugerida" com Confirmar travado; (c) `trocarTarefa` não
+   atualiza `deliverableId`; (d) motivo do ambíguo diz "2 tarefas" quando são 2 entregas da mesma
+   tarefa; (e) falha de banco em `carregarModelosDaOrg` vira aviso aceitável no check; (f) "Concluir
+   prontas" sem tratamento de falha parcial; (g) backfill da migration sem teste de SQL.

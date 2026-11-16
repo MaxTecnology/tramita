@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { beforeEach, expect, it } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { server } from '@/test/server'
 import { AppDialogs } from '@/components/ui/app-dialogs'
 import ReviewQueue from './ReviewQueue'
@@ -79,4 +79,14 @@ it('a single ready document reads "Confirmar 1 sem pendência"', async () => {
   server.use(http.get(`${API}/document-reader/fila`, () => HttpResponse.json([doc('a', true), doc('c', false)])))
   renderQueue()
   expect(await screen.findByRole('button', { name: 'Confirmar 1 sem pendência' })).toBeInTheDocument()
+})
+
+it('on a narrow screen (no side panel) "Ver PDF" opens the PDF in a new tab', async () => {
+  vi.stubGlobal('matchMedia', (q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} }))
+  const open = vi.spyOn(window, 'open').mockReturnValue(null)
+  server.use(http.get(`${API}/document-reader/:id/visualizar`, () => HttpResponse.json({ url: 'https://b2/a.pdf' })))
+  renderQueue()
+  await userEvent.click((await screen.findAllByRole('button', { name: 'Ver PDF' }))[0])
+  await waitFor(() => expect(open).toHaveBeenCalledWith('https://b2/a.pdf', '_blank', 'noopener'))
+  vi.unstubAllGlobals()
 })

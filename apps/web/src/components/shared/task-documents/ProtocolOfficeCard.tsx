@@ -7,8 +7,9 @@ import { cn, mensagemDeErro } from '@/lib/utils'
 import { formatBRL } from '@/lib/money'
 import { formatDateOnlyUTC } from '@/lib/dates'
 import { Button } from '@/components/ui/button'
-import type { Protocol } from '@/types'
+import type { Protocol, DeliveryCheck } from '@/types'
 import { PaymentFields, type PaymentValues } from './PaymentFields'
+import { robotCheckFile } from './robotCheck'
 import { askText } from '@/components/ui/app-dialogs'
 
 const STATUS_LABEL: Record<Protocol['status'], string> = {
@@ -28,7 +29,7 @@ export function ProtocolOfficeCard({ protocol: p, taskId, onReceipt }: {
   const queryClient = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState<'idle' | 'edit' | 'replace'>('idle')
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingFile, setPendingFile] = useState<{ file: File; acceptWarnings: boolean; read: DeliveryCheck['read'] } | null>(null)
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['protocols', taskId] })
     queryClient.invalidateQueries({ queryKey: ['task-documents', taskId] })
@@ -38,8 +39,9 @@ export function ProtocolOfficeCard({ protocol: p, taskId, onReceipt }: {
   const locked = !!p.paidAt || !!p.cancelledAt
 
   const replaceMutation = useMutation({
-    mutationFn: ({ file, values }: { file: File; values: Partial<PaymentValues> }) => {
+    mutationFn: ({ file, values, acceptWarnings }: { file: File; values: Partial<PaymentValues>; acceptWarnings?: boolean }) => {
       const form = new FormData()
+      if (acceptWarnings) form.append('acceptWarnings', 'true')
       if (values.amount) form.append('amount', values.amount)
       if (values.paymentDueDate) form.append('paymentDueDate', values.paymentDueDate)
       form.append('file', file)
@@ -113,11 +115,20 @@ export function ProtocolOfficeCard({ protocol: p, taskId, onReceipt }: {
       </div>
       <input
         ref={fileRef} type="file" accept={UPLOAD_ACCEPT} className="hidden"
-        onChange={(e) => {
+        onChange={async (e) => {
           const file = e.target.files?.[0]
           e.target.value = ''
           if (!file) return
-          if (p.requiresPayment) { setPendingFile(file); setMode('replace') } else replaceMutation.mutate({ file, values: {} })
+          // A replacement goes through the same robot check as a delivery
+          let acceptWarnings = false
+          let read: DeliveryCheck['read'] = {}
+          if (p.deliverableId) {
+            const outcome = await robotCheckFile(p.taskId, p.deliverableId, file)
+            if (!outcome.proceed) return
+            acceptWarnings = outcome.acceptWarnings
+            read = outcome.read
+          }
+          if (p.requiresPayment) { setPendingFile({ file, acceptWarnings, read }); setMode('replace') } else replaceMutation.mutate({ file, values: {}, acceptWarnings })
         }}
       />
 
@@ -129,9 +140,10 @@ export function ProtocolOfficeCard({ protocol: p, taskId, onReceipt }: {
       )}
       {mode === 'replace' && pendingFile && (
         <PaymentFields
-          initialAmount={p.amount} initialDueDate={p.dueDate} submitLabel={`Substituir por ${pendingFile.name}`} amountRequired={false}
+          initialAmount={pendingFile.read.amount ?? p.amount} initialDueDate={pendingFile.read.dueDate ?? p.dueDate}
+          submitLabel={`Substituir por ${pendingFile.file.name}`} amountRequired={false}
           pending={replaceMutation.isPending}
-          onSubmit={(v) => replaceMutation.mutate({ file: pendingFile, values: v })}
+          onSubmit={(v) => replaceMutation.mutate({ file: pendingFile.file, values: v, acceptWarnings: pendingFile.acceptWarnings })}
           onCancel={() => { setMode('idle'); setPendingFile(null) }}
         />
       )}

@@ -4,7 +4,7 @@ import { formatBRL, parseMoney } from '@/lib/money'
 import { actorScope, protocolWhere, actableTaskWhere } from '@/modules/staff-scope/staff-scope'
 import { MUST_ASSUME } from '@/middlewares/staffScope'
 import { createAttachment } from '@/modules/attachments/attachments.service'
-import type { UploadPayload } from '@/modules/task-documents/task-documents.service'
+import { trail, type UploadPayload } from '@/modules/task-documents/task-documents.service'
 import { assertProtocolEditable, replaceProtocolFileCore, lockedProtocolError, discardUploadedAttachment } from './protocol-from-deliverable'
 
 export interface StaffActor {
@@ -35,12 +35,18 @@ export async function findProtocolForStaff(protocolId: string, organizationId: s
   return protocol
 }
 
+// Task and delivery behind a protocol (the robot checks a replacement like a delivery); null if not in the org
+export async function protocolDeliveryTarget(protocolId: string, organizationId: string) {
+  return prisma.protocol.findFirst({ where: { id: protocolId, organizationId }, select: { taskId: true, deliverableId: true } })
+}
+
 export async function replaceProtocolFile(
   protocolId: string,
   organizationId: string,
   actor: StaffActor,
   payload: UploadPayload,
   payment: { amount?: string; paymentDueDate?: string } = {},
+  options: { warnings?: string[] } = {},
 ) {
   const protocol = await findProtocolForStaff(protocolId, organizationId, actor)
   assertProtocolEditable(protocol)
@@ -66,6 +72,12 @@ export async function replaceProtocolFile(
         ...(amount !== undefined ? { amount } : {}),
         ...(dueDate !== undefined ? { paymentDueDate: dueDate } : {}),
       },
+      select: { name: true },
+    }).then(async (deliverable) => {
+      // Replaced despite the robot's warnings: kept in the history like a delivery
+      if (options.warnings?.length) {
+        await trail(protocol.taskId, 'deliverable_delivered_with_warnings', { type: 'user', id: actor.id }, deliverable.name, `${payload.filename} — ${options.warnings.join('; ')}`)
+      }
     })
   }
   return updated

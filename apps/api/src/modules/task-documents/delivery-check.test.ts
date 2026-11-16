@@ -102,4 +102,22 @@ describe('robô confere a entrega manual', () => {
     const c = await setup()
     expect((await send(c, 'check', c.extrato.id, await pdf('45.723.174/0001-10', 'setembro/2026'))).body).toEqual({ warnings: [], read: {} })
   })
+
+  it('replacing the file of the protocol goes through the same check (no bypass through "Protocolos")', async () => {
+    const c = await setup()
+    expect((await send(c, 'upload', c.guia.id, await pdf('11.222.333/0001-81', 'agosto/2026'))).status).toBe(201)
+    const protocol = await prisma.protocol.findFirstOrThrow({ where: { deliverableId: c.guia.id } })
+    const replace = async (content: Buffer, extra: Record<string, string> = {}) => {
+      const mp = multipart(extra, 'nova.pdf', content, 'application/pdf')
+      const res = await app.inject({ method: 'POST', url: `/protocols/${protocol.id}/replace`, headers: { authorization: c.auth, ...mp.headers }, body: mp.body })
+      return { status: res.statusCode, body: JSON.parse(res.body) }
+    }
+    const beta = await replace(await pdf('45.723.174/0001-10', 'agosto/2026'), { acceptWarnings: 'true' })
+    expect([beta.status, beta.body.message]).toEqual([422, 'Este documento é de BETA — não pode ser entregue a ACME'])
+    const wrongMonth = await pdf('11.222.333/0001-81', 'setembro/2026')
+    expect((await replace(wrongMonth)).status).toBe(409)
+    expect((await replace(wrongMonth, { acceptWarnings: 'true' })).status).toBe(200)
+    const h = await prisma.taskHistory.findFirstOrThrow({ where: { taskId: c.task.id, action: 'deliverable_delivered_with_warnings' } })
+    expect([h.fromValue, h.toValue]).toEqual(['Guia', 'nova.pdf — Competência do documento: 09/2026 — a tarefa é de 08/2026'])
+  })
 })

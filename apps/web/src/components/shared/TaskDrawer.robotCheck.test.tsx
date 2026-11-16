@@ -76,3 +76,20 @@ it('no divergence: delivers straight away without asking', async () => {
   await waitFor(() => expect(uploads(post)).toHaveLength(1))
   expect(field(uploads(post)[0][1], 'acceptWarnings')).toBeNull()
 })
+
+it('replacing a delivered guide: the amount read in the new file wins over the previous one', async () => {
+  server.use(http.get(`${API}/tasks/t1/documents`, () => HttpResponse.json({ requirements: [], deliverables: [
+    { id: 'd1', name: 'Guia DAS', deliveredAt: now, requiresPayment: true, amount: '100.00', paymentDueDate: '2026-08-20', signedUrl: null, obligationTypeId: 'das' },
+  ] })))
+  vi.spyOn(api, 'post').mockImplementation(async () => ({ data: { warnings: [], read: { amount: '250.00', dueDate: '2026-09-20' } } }) as never)
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <TaskDrawer task={task} currentUserId="bruna" role="ORG_MEMBER" onClose={() => {}} />
+      <AppDialogs />
+    </QueryClientProvider>,
+  )
+  fireEvent.click(await screen.findByRole('tab', { name: /Documentos/ }))
+  const input = (await screen.findByText('Substituir arquivo')).closest('label')!.querySelector('input')!
+  await userEvent.upload(input, new File(['%PDF'], 'guia-nova.pdf', { type: 'application/pdf' }))
+  expect(await screen.findByDisplayValue(/250,00/)).toBeInTheDocument()
+})

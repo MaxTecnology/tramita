@@ -14,6 +14,7 @@ import type { Task, Attachment, AttachmentPurpose, TaskHistory, DrawerRole, Task
 import { toast } from 'sonner'
 import { formatBRL, toApiAmount } from '@/lib/money'
 import { PaymentFields, type PaymentValues } from './task-documents/PaymentFields'
+import { robotCheckFile } from './task-documents/robotCheck'
 import { ProtocolOfficeCard } from './task-documents/ProtocolOfficeCard'
 import { AddDeliverableForm } from './task-documents/AddDeliverableForm'
 import { ApprovalsSection, useTaskApprovals } from './task-documents/ApprovalsSection'
@@ -357,29 +358,10 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
     let acceptWarnings = false
     let read: DeliveryCheck['read'] = {}
     if (d.obligationTypeId) {
-      const form = new FormData()
-      form.append('file', file)
-      let check: DeliveryCheck
-      try {
-        check = (await api.post(`/tasks/${task.id}/documents/deliveries/${d.id}/check`, form)).data as DeliveryCheck
-      } catch (err) {
-        toast.error(mensagemDeErro(err, 'O robô não conseguiu conferir o arquivo'))
-        return
-      }
-      if (check.blocked) {
-        await askConfirm({ title: 'O robô bloqueou esta entrega', description: check.blocked, confirmLabel: 'Entendi', cancelLabel: 'Fechar' })
-        return
-      }
-      if (check.warnings.length > 0) {
-        const ok = await askConfirm({
-          title: `O robô encontrou divergências em ${file.name}`,
-          description: `${check.warnings.join(' • ')}. Se entregar, isso fica registrado no histórico.`,
-          confirmLabel: 'Entregar mesmo assim', cancelLabel: 'Escolher outro arquivo', danger: true,
-        })
-        if (!ok) return
-        acceptWarnings = true
-      }
-      read = check.read
+      const outcome = await robotCheckFile(task.id, d.id, file)
+      if (!outcome.proceed) return
+      acceptWarnings = outcome.acceptWarnings
+      read = outcome.read
     }
     if (d.requiresPayment) setPendingDelivery({ reqId: d.id, file, acceptWarnings, read })
     else deliverMutation.mutate({ reqId: d.id, file, acceptWarnings })
@@ -885,8 +867,8 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                       )}
                       {pendingDelivery?.reqId === d.id && (
                         <PaymentFields
-                          initialAmount={d.amount ?? pendingDelivery.read?.amount ?? null}
-                          initialDueDate={d.paymentDueDate ?? pendingDelivery.read?.dueDate ?? task.dueDate}
+                          initialAmount={pendingDelivery.read?.amount ?? d.amount}
+                          initialDueDate={pendingDelivery.read?.dueDate ?? d.paymentDueDate ?? task.dueDate}
                           submitLabel={`Enviar ${pendingDelivery.file.name}`}
                           pending={deliverMutation.isPending}
                           onSubmit={(payment) => deliverMutation.mutate({ reqId: d.id, file: pendingDelivery.file, payment, acceptWarnings: pendingDelivery.acceptWarnings })}
