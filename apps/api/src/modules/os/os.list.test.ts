@@ -104,3 +104,15 @@ describe('OS aguardando outra na lista de Tarefas', () => {
     expect((res.items ?? res)[0].waitingFor).toEqual(['Recálculo'])
   })
 })
+
+describe('board do processo traz o prazo e a espera de cada OS', () => {
+  it('each OS in the board brings its model, deadline and what it waits for', async () => {
+    const c = await setup()
+    const t = JSON.parse((await app.inject({ method: 'POST', url: '/process-templates', headers: { authorization: c.auth }, payload: { name: 'P', columns: [{ title: 'A', statusEffect: 'OPEN', documents: [] }], items: [{ osModelId: c.model.id, columnIndex: 0, dependsOn: [] }, { osModelId: c.legalModel.id, columnIndex: 0, dependsOn: [0] }] } })).body)
+    const board = JSON.parse((await app.inject({ method: 'POST', url: '/boards', headers: { authorization: c.auth }, payload: { title: 'P', clientId: c.client.id, processTemplateId: t.id } })).body)
+    const one = JSON.parse((await app.inject({ method: 'GET', url: `/boards/${board.id}`, headers: { authorization: c.auth } })).body)
+    const tasks = one.columns[0].tasks as { title: string; osModel: { name: string }; waitingFor: string[]; deadline: { state: string } }[]
+    const junta = tasks.find((x) => x.title === 'Junta')!
+    expect([junta.osModel.name, junta.waitingFor, junta.deadline.state]).toEqual(['Junta', ['Recálculo'], 'WAITING_DEPENDENCY'])
+  })
+})

@@ -620,3 +620,16 @@ Fora do escopo (não é débito, é decisão): aprovação em processo (OS) até
    atualiza `deliverableId`; (d) motivo do ambíguo diz "2 tarefas" quando são 2 entregas da mesma
    tarefa; (e) falha de banco em `carregarModelosDaOrg` vira aviso aceitável no check; (f) "Concluir
    prontas" sem tratamento de falha parcial; (g) backfill da migration sem teste de SQL.
+
+## OS e Processos (2026-11-16)
+
+1. **Tempo por etapa casa o histórico pelo título da coluna** (`TaskHistory.moved_to` grava títulos):
+   renomear uma coluna faz o tempo antigo sumir do painel. Gravar `columnId` no histórico resolve.
+2. **"Concluir prontas" da fila do robô** pede o motivo de cada OS atrasada uma a uma (sem "aplicar a
+   todas").
+3. **Tarefas abre em "Este mês" pela meta**: uma OS atrasada de meses anteriores não aparece no filtro
+   padrão (aparece na lista de Ordens de Serviço, filtro "Atrasadas").
+4. **Filtro "Tipo" do Dashboard › Produtividade** ainda chama de "OS" o bucket de processos (boards
+   PROCESS); com OS avulsas o nome confunde.
+5. **Concluir pelo drawer não move o cartão** para a coluna de conclusão do processo (comportamento
+   anterior, ficou mais visível com OS de processo).

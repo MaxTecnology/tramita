@@ -68,6 +68,8 @@ async function main() {
   await prisma.protocol.deleteMany({ where: { organizationId: org.id, client: { name: { in: e2eClientNames } } } })
   await prisma.clientAssignment.deleteMany({ where: { client: { name: { in: e2eClientNames }, organizationId: org.id } } })
   await prisma.clientUserAccess.deleteMany({ where: { client: { name: { in: e2eClientNames }, organizationId: org.id } } })
+  // Service requests made by the specs (portal "Solicitar serviço")
+  await prisma.request.deleteMany({ where: { organizationId: org.id, client: { name: { in: e2eClientNames } } } })
   await prisma.client.deleteMany({
     where: { name: { in: e2eClientNames }, organizationId: org.id },
   })
@@ -294,6 +296,54 @@ async function main() {
       deliverables: { create: [{ name: 'Guia DAS E2E (robô)', position: 0, obligationTypeId: dasE2E.id }] },
     },
   })
+
+  // OS and processes: models, a late standalone OS and a process whose second OS waits for the first
+  await prisma.processTemplate.deleteMany({ where: { organizationId: org.id, name: { in: ['Abertura E2E'] } } })
+  await prisma.oSModel.deleteMany({ where: { organizationId: org.id, name: { in: ['Recálculo DAS E2E', 'Certidão E2E', 'Consulta E2E', 'Registro E2E'] } } })
+  const osModel = (name: string, data: object = {}) => prisma.oSModel.create({
+    data: { organizationId: org.id, departmentId: department.id, name, deadlineBusinessDays: 3, usableStandalone: true, usableInProcess: true, ...data },
+  })
+  await osModel('Recálculo DAS E2E', { requiresCompetence: true })
+  const certidao = await osModel('Certidão E2E')
+  const consulta = await osModel('Consulta E2E', { usableStandalone: false })
+  const registro = await osModel('Registro E2E', { usableStandalone: false })
+  await prisma.processTemplate.create({
+    data: {
+      organizationId: org.id, name: 'Abertura E2E', departmentId: department.id, deadlineBusinessDays: 20, clientCanRequest: true,
+      columns: { create: [{ title: 'Andamento', position: 0, statusEffect: 'OPEN' }, { title: 'Concluído', position: 1, statusEffect: 'DONE' }] },
+    },
+  })
+  const services = await prisma.board.create({
+    data: {
+      title: 'Ordens de Serviço (sistema)', organizationId: org.id, clientId: client.id, type: 'SERVICE_SYSTEM',
+      columns: { create: [{ title: 'Abertas', position: 0, statusEffect: 'OPEN' }, { title: 'Concluídas', position: 1, statusEffect: 'DONE' }] },
+    },
+    include: { columns: { orderBy: { position: 'asc' } } },
+  })
+  await prisma.task.create({
+    data: {
+      title: 'OS atrasada E2E', position: 0, priority: 'MEDIUM', status: 'OPEN', tags: [], creatorId: admin.id, columnId: services.columns[0].id,
+      departmentId: department.id, assigneeId: admin.id, visibleToClient: true, osModelId: certidao.id, deadlineBusinessDays: 3,
+      releasedAt: new Date('2026-01-02T12:00:00Z'), targetDate: new Date('2026-01-07T00:00:00Z'),
+    },
+  })
+  const processBoard = await prisma.board.create({
+    data: {
+      title: 'Abertura ACME E2E', organizationId: org.id, clientId: client.id, type: 'PROCESS', deadlineBusinessDays: 20,
+      columns: { create: [{ title: 'Andamento', position: 0, statusEffect: 'OPEN' }, { title: 'Concluído', position: 1, statusEffect: 'DONE' }] },
+    },
+    include: { columns: { orderBy: { position: 'asc' } } },
+  })
+  const step = (title: string, osModelId: string, position: number, released: boolean) => prisma.task.create({
+    data: {
+      title, position, priority: 'MEDIUM', status: 'OPEN', tags: [], creatorId: admin.id, columnId: processBoard.columns[0].id,
+      departmentId: department.id, assigneeId: admin.id, visibleToClient: true, osModelId, deadlineBusinessDays: 3,
+      releasedAt: released ? new Date() : null, targetDate: released ? new Date(Date.now() + 5 * 86_400_000) : null,
+    },
+  })
+  const consultaTask = await step('Consulta E2E', consulta.id, 0, true)
+  const registroTask = await step('Registro E2E', registro.id, 1, false)
+  await prisma.taskDependency.create({ data: { taskId: registroTask.id, dependsOnTaskId: consultaTask.id } })
 
   console.log('E2E seed concluído: org G2A + admin@g2a.com.br + cliente@g2a.com.br (ClientUser) + board "Processo E2E" + guia "Guia DAS E2E" + pedido mensal + carteira "Saída E2E"')
 }

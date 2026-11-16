@@ -423,9 +423,12 @@ na tela e o Claude conferindo banco e logs.
 - Sino em tempo real, som e notificação do navegador; guia paga pelo cliente (vista/baixada/paga)
 
 **⏳ Falta testar (ordem sugerida):**
-1. **Processos (OS)** — criar com template de OS (colunas, documentos), mover no Kanban (coluna que avisa
-   o cliente), responsável do processo e aviso "processo atribuído"; portal: acompanhar, comentar e
-   enviar documento dentro do processo.
+1. **OS e Processos** (redesenhado em 2026-11-16, branch `feat/os-processos`) — Modelos de OS (documentos,
+   robô, prazo em dias úteis, onde é usada) e Modelos de Processo (colunas + OS com dependências);
+   Nova OS e lista de Ordens de Serviço com a situação do prazo; prazo pausa aguardando o cliente; OS
+   que espera outra e "Liberar agora"; motivo de atraso ao concluir fora do prazo; tempo por etapa e
+   indicadores; feriados em Configurações (valem também para recorrentes); portal "Solicitar serviço";
+   robô reconhecendo documento de OS (ex.: recálculo de DAS em lote).
 2. **Solicitações** — cliente abre (sino do responsável); escritório pede mais informação, cliente
    responde e volta para a fila; aprovar (gera tarefa/processo), recusar, cancelar; isolamento por
    departamento.

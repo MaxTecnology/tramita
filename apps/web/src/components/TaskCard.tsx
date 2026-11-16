@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 import type { Task } from '@/types'
 import { computeSlaLevel } from '@/lib/sla'
 import { useSlaConfig } from '@/hooks/useSlaConfig'
+import { DeadlineChip } from '@/components/shared/DeadlineChip'
 
 const PRIORITY_STYLES: Record<Task['priority'], string> = {
   LOW: 'bg-neutral-bg text-muted-foreground',
@@ -70,6 +71,9 @@ export function TaskCard({ task, onClick }: Props) {
         )}
         {effectiveLevel === 'TARGET_WARNING' && (
           <span className="text-xs text-warning-text font-medium">⏰ Meta próxima</span>
+        )}
+        {task.osModel && task.deadline && task.deadline.state !== 'DONE' && (
+          <DeadlineChip deadline={task.deadline} waitingFor={task.waitingFor?.join(', ')} />
         )}
       </div>
       <p className="text-xs text-muted-foreground mt-1.5">{daysOpen(task.createdAt)}</p>

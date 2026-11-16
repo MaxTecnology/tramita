@@ -328,7 +328,7 @@ export default function ProcessTemplateForm() {
               <Label className="flex items-center gap-1.5"><ListChecks size={14} />OS do processo</Label>
               <p className="text-xs text-muted-foreground">Nascem ao abrir o processo; uma OS que depende de outra só começa quando a outra termina.</p>
             </div>
-            <Button type="button" variant="outline" size="sm" className="gap-1.5"
+            <Button type="button" variant="outline" size="sm" className="gap-1.5 whitespace-nowrap flex-shrink-0"
               onClick={() => setForm((f) => ({ ...f, items: [...f.items, { osModelId: '', columnIndex: 0, dependsOn: [] }] }))}>
               <Plus size={14} />Adicionar OS
             </Button>
@@ -336,14 +336,14 @@ export default function ProcessTemplateForm() {
           {form.items.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma OS: o processo nasce só com as colunas.</p>}
           {form.items.map((item, i) => (
             <div key={i} className="rounded-lg border border-border bg-surface p-3 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_11rem_auto] items-center gap-2">
                 <span className="text-xs font-semibold text-muted-foreground">OS {i + 1}</span>
-                <select aria-label={`Modelo da OS ${i + 1}`} className={`${fieldCls} flex-1 min-w-48`} value={item.osModelId}
+                <select aria-label={`Modelo da OS ${i + 1}`} className={fieldCls} value={item.osModelId}
                   onChange={(e) => updateItem(i, { ...item, osModelId: e.target.value })}>
                   <option value="">Escolha o modelo...</option>
                   {processModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
-                <select aria-label={`Coluna da OS ${i + 1}`} className={`${fieldCls} w-44`} value={item.columnIndex}
+                <select aria-label={`Coluna da OS ${i + 1}`} className={`${fieldCls} col-span-2 sm:col-span-1 order-last sm:order-none`} value={item.columnIndex}
                   onChange={(e) => updateItem(i, { ...item, columnIndex: Number(e.target.value) })}>
                   {form.columns.map((c, ci) => <option key={ci} value={ci}>{c.title || `Coluna ${ci + 1}`}</option>)}
                 </select>

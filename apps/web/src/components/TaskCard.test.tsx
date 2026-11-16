@@ -61,3 +61,8 @@ it('exibe badge de solicitação quando sourceRequestId está preenchido', () =>
   render(<TaskCard task={{ ...baseTask, sourceRequestId: 'req-123' }} onClick={() => {}} />)
   expect(screen.getByText('Solicitação')).toBeInTheDocument()
 })
+
+it('an OS waiting for another one says what it waits for', () => {
+  render(<TaskCard task={{ ...baseTask, osModelId: 'm', osModel: { id: 'm', name: 'Registro' }, releasedAt: null, waitingFor: ['Consulta'], deadline: { state: 'WAITING_DEPENDENCY', officeBusinessDays: 0, clientBusinessDays: 0 } }} onClick={() => {}} />)
+  expect(screen.getByText('aguardando Consulta')).toBeInTheDocument()
+})

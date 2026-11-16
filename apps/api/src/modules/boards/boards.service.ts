@@ -132,6 +132,11 @@ export async function getBoardById(
           tasks: {
             where: hideInvisibleTasks ? { visibleToClient: true } : undefined,
             orderBy: { position: 'asc' },
+            include: {
+              osModel: { select: { id: true, name: true } },
+              pauses: { select: { startedAt: true, endedAt: true } },
+              dependsOn: { select: { dependsOn: { select: { title: true, status: true } } } },
+            },
           },
         },
       },
@@ -139,8 +144,25 @@ export async function getBoardById(
     },
   })
   if (!board) throw new AppError(404, 'Board não encontrado')
-  const [withDeadline] = await withProcessDeadline([board], organizationId, new Date())
-  return withDeadline
+  const now = new Date()
+  const [withDeadline] = await withProcessDeadline([board], organizationId, now)
+  // Each OS of the process: its clock and the OS it still waits for (same shape as the Tarefas list)
+  const y = now.getUTCFullYear()
+  const holidays = await loadHolidaySet(organizationId, [y - 1, y, y + 1])
+  const warnDays = await warnDaysFor(organizationId)
+  return {
+    ...withDeadline,
+    columns: withDeadline.columns.map((col) => ({
+      ...col,
+      tasks: col.tasks.map(({ pauses, dependsOn, ...t }) => ({
+        ...t,
+        deadline: deadlineInfo({ ...t, pauses }, now, holidays, warnDays),
+        waitingFor: t.osModelId && !t.releasedAt
+          ? dependsOn.filter((d) => d.dependsOn.status !== 'DONE' && d.dependsOn.status !== 'DISREGARDED').map((d) => d.dependsOn.title)
+          : [],
+      })),
+    })),
+  }
 }
 
 export async function createBoard(

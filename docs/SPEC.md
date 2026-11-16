@@ -222,10 +222,10 @@ Cadastro de novo escritório (público — sem autenticação).
 ### GET `/boards/:id` — board com colunas e tarefas ordenadas por position
 ### POST `/boards` _(ORG_ADMIN | ORG_MANAGER)_
 ```json
-{ "title": "string", "description": "string?", "clientId": "string", "osTemplateId": "string?" }
+{ "title": "string", "description": "string?", "clientId": "string", "processTemplateId": "string?" }
 ```
-→ Sem `osTemplateId`: board nasce com as 3 colunas padrão (`Pendente`/`Em andamento`/`Concluído`)
-→ Com `osTemplateId`: colunas do board são copiadas das colunas do `OSTemplate` (título, ordem, `statusEffect`, `notifyClient` e checklist de documentos) — cópia acontece uma vez na criação, sem vínculo vivo com o template depois
+→ Sem `processTemplateId`: board nasce com as 3 colunas padrão (`Pendente`/`Em andamento`/`Concluído`)
+→ Com `processTemplateId`: colunas do board são copiadas das colunas do `OSTemplate` (título, ordem, `statusEffect`, `notifyClient` e checklist de documentos) — cópia acontece uma vez na criação, sem vínculo vivo com o template depois
 ### PATCH `/boards/:id`
 
 ---
@@ -243,7 +243,7 @@ Cadastro de novo escritório (público — sem autenticação).
 → `statusEffect` (padrão `NONE`): quando a tarefa entra nessa coluna, o `Task.status` é forçado pro valor configurado (exceto `NONE`, que não altera o status atual) — é assim que uma coluna "Fase" intermediária consegue marcar `STARTED` sem depender de `isFinal`, e uma coluna "Bloqueado" mantém `BLOCKED` mesmo movendo entre colunas do tipo Fase
 → `statusEffect: DONE` também dispara `TASK_COMPLETED`, igual ao antigo `isFinal: true`
 → `notifyClient` (padrão `false`): quando `true`, mover uma tarefa pra essa coluna dispara `TASK_MOVED` pro cliente mesmo que o toggle global "Tarefa movida" da organização esteja desligado — é uma notificação por coluna, não a notificação genérica de qualquer movimentação
-→ Documentos vinculados à coluna (via Template de OS) viram `TaskDocumentRequirement` automaticamente na tarefa ao entrar na coluna, sem duplicar se ela passar pela mesma coluna mais de uma vez
+→ Documentos vinculados à coluna (via Modelo de Processo) viram `TaskDocumentRequirement` automaticamente na tarefa ao entrar na coluna, sem duplicar se ela passar pela mesma coluna mais de uma vez
 ### PATCH `/columns/:id`
 ### PATCH `/columns/reorder` — `[{ "id": "string", "position": 0 }]`
 ### DELETE `/columns/:id` _(ORG_ADMIN)_
@@ -254,9 +254,9 @@ Cadastro de novo escritório (público — sem autenticação).
 
 `OSTemplate` define, de uma vez, o conjunto de colunas (com `statusEffect`/`notifyClient`/checklist de documentos) que um board `POST /boards` ou uma Solicitação aprovada com `NEW_BOARD` usa pra nascer já estruturado — sem precisar montar cada coluna manualmente depois. A cópia é feita uma vez na criação do board; editar o template depois não afeta boards já criados a partir dele.
 
-### GET `/os-templates` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — lista templates da org, com colunas e documentos
-### GET `/os-templates/:id` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_
-### POST `/os-templates` _(ORG_ADMIN)_
+### GET `/process-templates` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — lista templates da org, com colunas e documentos
+### GET `/process-templates/:id` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_
+### POST `/process-templates` _(ORG_ADMIN)_
 ```json
 {
   "name": "string",
@@ -273,8 +273,8 @@ Cadastro de novo escritório (público — sem autenticação).
 }
 ```
 → `columns` obrigatório, mínimo 1 item — ordem do array vira `position`
-### PATCH `/os-templates/:id` _(ORG_ADMIN)_ — mesmo payload, todos os campos opcionais; `columns` quando enviado substitui a lista inteira (delete + recreate, não diff incremental)
-### DELETE `/os-templates/:id` _(ORG_ADMIN)_ — soft delete (`isActive: false`)
+### PATCH `/process-templates/:id` _(ORG_ADMIN)_ — mesmo payload, todos os campos opcionais; `columns` quando enviado substitui a lista inteira (delete + recreate, não diff incremental)
+### DELETE `/process-templates/:id` _(ORG_ADMIN)_ — soft delete (`isActive: false`)
 
 ---
 
@@ -423,7 +423,7 @@ ou
 { "mode": "NEW_BOARD" }
 ```
 → `EXISTING_BOARD`: cria a tarefa direto na coluna informada de um board já existente do cliente
-→ `NEW_BOARD`: cria um board novo pro cliente antes de criar a tarefa — se a `Request` tiver `osTemplateId` (escolhido pelo cliente em `POST /portal/requests`, ver `GET /portal/os-templates`), o board nasce com as colunas desse template (igual a `POST /boards` com `osTemplateId`) e o título do board vira `"<codigo do cliente> - <nome do cliente> — <nome do template>"`; sem `osTemplateId`, o board nasce com as 3 colunas padrão e o título é o próprio título da Solicitação
+→ `NEW_BOARD`: cria um board novo pro cliente antes de criar a tarefa — se a `Request` tiver `processTemplateId` (escolhido pelo cliente em `POST /portal/requests`, ver `GET /portal/process-templates`), o board nasce com as colunas desse template (igual a `POST /boards` com `processTemplateId`) e o título do board vira `"<codigo do cliente> - <nome do cliente> — <nome do template>"`; sem `processTemplateId`, o board nasce com as 3 colunas padrão e o título é o próprio título da Solicitação
 ### POST `/requests/:id/reject` _(ORG_ADMIN | ORG_MANAGER)_
 ```json
 { "reason": "string?" }
@@ -488,6 +488,42 @@ Visibilidade do `ORG_MEMBER` nessas rotas e em `GET /protocols`/`summary`: `memb
 
 ---
 
+## Ordens de Serviço e Processos (2026-11-16)
+
+Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma tarefa criada de um **Modelo de OS** (avulsa no board `SERVICE_SYSTEM` do cliente, ou etapa de um processo). **Processo** = board `PROCESS` criado de um **Modelo de Processo** (colunas + OS que nascem nele, com dependências).
+
+**Calendário**
+### GET `/holidays?year=` → `{ national: {date,name}[], custom: {id,date,name}[] }` · POST `/holidays` `{ date: 'AAAA-MM-DD', name }` (ORG_ADMIN; 409 `'Já existe feriado nesta data'`) · DELETE `/holidays/:id`
+### GET `/holidays/days?from=AAAA&to=AAAA` (máx. 5 anos) → `string[]` com todos os dias de feriado (nacionais + do escritório). Dia útil = seg–sex menos esses dias; vale para recorrentes (rolagem de vencimento/meta) e prazos de OS/processo.
+
+**Modelos**
+### `/os-models` — GET `?usage=standalone|process` (ativos por uso), GET `/:id`, POST/PATCH/DELETE (ORG_ADMIN). Body: `{ name, description?, departmentId, priority?, visibleToClient?, requiresCompetence, deadlineBusinessDays?: 1..365, autoCompleteOnAllDelivered, usableStandalone, usableInProcess, isActive?, documentRequests: {name}[], documentDeliveries: {name, requiresPayment?, obligationTypeId?}[] }`. 422 `'Marque onde essa OS é usada'`; 422 `'OS com robô precisa pedir competência'`. DELETE de modelo já usado desativa (`{ deactivated: true }`).
+### `/process-templates` — além das colunas: `departmentId?` (avalia pedidos), `deadlineBusinessDays?`, `clientCanRequest` (exige departamento: 422 `'Escolha o departamento que avalia os pedidos deste processo'`), `items: { osModelId, columnIndex, dependsOn: number[] }[]` (índices na própria lista; 422 `'Dependência circular entre OS'`, `'Essa OS não é usada em processos'`). Resposta traz `items[{ osModelId, osModel{id,name}, columnPosition, position, dependsOn }]`.
+
+**Abrir**
+### POST `/os` `{ osModelId, clientId, competence?: 'AAAA-MM', assigneeId?, dueDate? }` → tarefa da OS (201). 422 `'Informe a competência'`, `'Essa OS é só de processo'`, `'Modelo de OS inativo'`; 404 `'Cliente não encontrado'` fora do escopo.
+### POST `/boards` com `processTemplateId` (+ `competence?`) cria o processo e uma OS por item (OS com dependência nasce com `releasedAt = null`). POST `/boards/:id/os` `{ osModelId, columnId, dependsOnTaskIds?, competence?, assigneeId?, dueDate? }` adiciona OS ao processo.
+
+**Prazo, pausa, dependência**
+- Meta (`targetDate`) = `releasedAt` + `deadlineBusinessDays` + dias úteis pausados. Pausa (`TaskPause`) enquanto houver documento obrigatório do cliente `PENDING`/`REJECTED` ou aprovação do cliente pendente (`UPLOADED` não pausa). Processo: `BoardPause` quando todas as OS liberadas e abertas estão pausadas; meta do processo = abertura + prazo + pausas; `completedAt` quando todas as tarefas terminam.
+- OS não liberada: PATCH de status e `/move` → 409 `'Esta OS aguarda: <títulos>'`. Concluir/desconsiderar libera as dependentes (uma vez; sino `OS_RELEASED`). POST `/tasks/:id/release` `{ reason }` (ORG_ADMIN/ORG_MANAGER) libera antes (histórico `os_released_early`).
+- Listas trazem `deadline: { state: NONE|ON_TIME|DUE_SOON|LATE|PAUSED|WAITING_DEPENDENCY|DONE, businessDaysLeft?, businessDaysLate?, pausedSinceDays?, officeBusinessDays, clientBusinessDays }` (GET `/tasks`, `/boards`, `/boards/:id` — tarefas e processo) e `waitingFor: string[]`.
+
+**Motivo de atraso**
+### `/delay-reasons` — GET (cria os padrões na primeira leitura: Aguardando órgão público, Retrabalho interno, Volume de trabalho, Outro com observação), POST/PATCH/DELETE (ORG_ADMIN; usado → desativa).
+- PATCH `/tasks/:id` com `status: DONE` e `/tasks/:id/move` para coluna de conclusão aceitam `delayReasonId`, `delayNote`, `processDelayReasonId`, `processDelayNote`. OS atrasada sem motivo → 422 `'Informe o motivo do atraso'`; última OS de processo atrasado → 422 `'Informe o motivo do atraso do processo'`; motivo com observação obrigatória → 422 `'Descreva o motivo'`. Conclusão automática não bloqueia: `delayReasonPending = true`.
+- PATCH `/tasks/:id/delay-reason` e `/boards/:id/delay-reason` `{ delayReasonId, delayNote? }` registram antes ou resolvem pendente. Histórico `delay_reason_set` / `process_delay_reason_set`.
+
+**Listas e indicadores**
+### GET `/os?clientId&osModelId&assigneeId&departmentId&boardId&situation&search` — OS (avulsas e de processo) com `deadline`, `process`, `link`; atrasadas primeiro; escopo de Tarefas.
+### GET `/boards/:id/stage-times` → `{ columns: {columnId,title,totalBusinessDays,avgBusinessDays}[], os: {taskId,title,officeBusinessDays,clientBusinessDays,state}[] }` (histórico `moved_to`, casado pelo título da coluna).
+### GET `/dashboard/os?from=AAAA-MM-DD&to=AAAA-MM-DD` → `{ delaysByReason, pendingReasons, byModel: {kind,id,name,count,avgOfficeBusinessDays,avgClientBusinessDays,lateCount}[] }`.
+
+**Portal e solicitações**
+### GET `/portal/services?clientId=` → `{ kind: 'OS'|'PROCESS', id, name, description, departmentId, requiresCompetence }[]` (OS avulsas e processos com `clientCanRequest` dos departamentos do usuário).
+- POST `/portal/requests` aceita `osModelId` ou `processTemplateId` (o departamento vem do modelo) e `competence: 'AAAA-MM'`; 422 `'Serviço indisponível'`, `'Informe a competência'`. Aprovação: `{ mode: 'OS', osModelId? }` abre a OS; `NEW_BOARD` com modelo de processo que tem OS abre o processo (`Request.boardId`); `EXISTING_BOARD` aceita `osModelId` e `dependsOnTaskIds`.
+- Fila do robô: `suggestion.osModelName` e `suggestion.processTitle`.
+
 ## Portal do Cliente — Perfil e Solicitações
 
 `request.user.sub` nas rotas de portal é o id do `ClientUser` (a pessoa logada), não de um `Client`. Rotas que tocam dado de empresa (`requests`, `tasks`, `documents`) exigem `clientId` explícito (body ou query) e validam contra o escopo de acesso do `ClientUser` (`getClientAccessScope`) — 404 se o `ClientUser` não tiver acesso àquele `clientId`.
@@ -503,17 +539,17 @@ Visibilidade do `ORG_MEMBER` nessas rotas e em `GET /protocols`/`summary`: `memb
 
 ### GET `/portal/departments` _(CLIENT)_ — departamentos da organização, pra o formulário de nova solicitação
 
-### GET `/portal/os-templates` _(CLIENT)_ — `{ id, name }[]` — templates de OS ativos da organização, pra o cliente escolher o tipo de solicitação no formulário de nova Solicitação
+### GET `/portal/process-templates` _(CLIENT)_ — `{ id, name }[]` — modelos de processo ativos da organização, pra o cliente escolher o tipo de solicitação no formulário de nova Solicitação
 
 ### GET `/portal/requests` _(CLIENT)_ — `?clientId=` **obrigatório** — 400 se ausente, 404 se o `ClientUser` não tem acesso àquele `clientId`
 ### POST `/portal/requests` _(CLIENT)_
 ```json
 {
   "clientId": "string", "title": "string", "description": "string?", "departmentId": "string?",
-  "osTemplateId": "string?"
+  "processTemplateId": "string?"
 }
 ```
-→ `osTemplateId` (opcional) é o tipo de solicitação escolhido pelo cliente (ver `GET /portal/os-templates`) — fica salvo na `Request` e é usado por `POST /requests/:id/approve` quando o escritório aprova em modo `NEW_BOARD`
+→ `processTemplateId` (opcional) é o tipo de solicitação escolhido pelo cliente (ver `GET /portal/process-templates`) — fica salvo na `Request` e é usado por `POST /requests/:id/approve` quando o escritório aprova em modo `NEW_BOARD`
 → `clientId` **obrigatório** no body — 404 se o `ClientUser` não tem acesso àquele `clientId`
 
 ### GET `/portal/requests/:id` _(CLIENT)_
