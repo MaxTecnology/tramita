@@ -51,3 +51,16 @@ it('a free request can be opened as an OS chosen by the office', async () => {
   await userEvent.click(screen.getAllByRole('button', { name: 'Aprovar' }).at(-1)!)
   await waitFor(() => expect(approved).toEqual({ mode: 'OS', osModelId: 'm2' }))
 })
+
+it('a request for a process model says the process opens from that model', async () => {
+  renderPage({ title: 'Abertura de empresa', processTemplateId: 'p1', processTemplate: { id: 'p1', name: 'Abertura de empresa' } })
+  await userEvent.click(await screen.findByRole('button', { name: 'Aprovar' }))
+  expect(screen.getByText(/Será aberto o processo do modelo "Abertura de empresa"/)).toBeInTheDocument()
+  expect(screen.queryByText(/3 colunas padrão/)).not.toBeInTheDocument()
+})
+
+it('a free request still says the new process gets the default columns', async () => {
+  renderPage({})
+  await userEvent.click(await screen.findByRole('button', { name: 'Aprovar' }))
+  expect(screen.getByText(/3 colunas padrão/)).toBeInTheDocument()
+})

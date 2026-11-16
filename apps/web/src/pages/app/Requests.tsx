@@ -375,7 +375,9 @@ export default function Requests() {
 
             {mode === 'NEW_BOARD' && (
               <p className="text-xs text-muted-foreground">
-                Será criado um novo processo "{approving?.title}" com 3 colunas padrão (Pendente → Em andamento → Concluído).
+                {approving?.processTemplate
+                  ? `Será aberto o processo do modelo "${approving.processTemplate.name}", com as colunas e as OS desse modelo.`
+                  : `Será criado um novo processo "${approving?.title}" com 3 colunas padrão (Pendente → Em andamento → Concluído).`}
               </p>
             )}
 

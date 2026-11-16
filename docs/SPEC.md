@@ -130,6 +130,7 @@ Cadastro de novo escritório (público — sem autenticação).
 ```
 → Cria Organization + User (ORG_ADMIN) + Customer no Asaas + Subscription no Asaas
 → Inicia trial de 14 dias se planId = "trial"
+→ 201 `{ organization, user: { id, name, email, role } }` — nunca devolve o hash da senha
 
 ### GET `/organizations/plans` — lista planos disponíveis (público)
 
@@ -410,7 +411,7 @@ Cadastro de novo escritório (público — sem autenticação).
 
 Contraparte, do lado do escritório, das Solicitações abertas pelo cliente no portal (ver `POST /portal/requests`).
 
-### GET `/requests` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — `?status=PENDING|APPROVED|REJECTED|CANCELLED`
+### GET `/requests` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — `?status=PENDING|APPROVED|REJECTED|CANCELLED` — cada item traz `processTemplate: { id, name } | null` (o modelo de processo que o cliente pediu)
 ### GET `/requests/pending-count` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — `{ count: number }`
 ### GET `/requests/:id` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_
 ### GET `/requests/stream?ticket=<ticket>` — SSE, evento `request:changed` (sem payload) a cada mutação de Solicitação da org
@@ -505,7 +506,7 @@ Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma t
 ### POST `/boards` com `processTemplateId` (+ `competence?`) cria o processo e uma OS por item (OS com dependência nasce com `releasedAt = null`). POST `/boards/:id/os` `{ osModelId, columnId, dependsOnTaskIds?, competence?, assigneeId?, dueDate? }` adiciona OS ao processo. Abrir processo revalida os modelos dos itens (422 `'Modelo de OS inativo'`, `'Essa OS não é usada em processos'`), sem deixar board vazio. Os boards `SERVICE_SYSTEM` e `RECURRING_SYSTEM` são únicos por cliente (índices parciais `boards_client_service_system_key` e `boards_client_recurring_system_key`). Streams SSE reconferem a cada minuto se a pessoa continua ativa (e, no processo, o acesso a ele). O cliente recebe `TASK_CREATED` de uma OS que aguarda outra só quando ela é liberada.
 
 **Prazo, pausa, dependência**
-- Meta (`targetDate`) = `releasedAt` + `deadlineBusinessDays` + dias úteis pausados. Pausa (`TaskPause`) enquanto houver documento obrigatório do cliente `PENDING`/`REJECTED` ou aprovação do cliente pendente (`UPLOADED` não pausa). Processo: `BoardPause` quando todas as OS liberadas e abertas estão pausadas; meta do processo = abertura + prazo + pausas; `completedAt` quando todas as tarefas terminam.
+- Meta (`targetDate`) = `releasedAt` + `deadlineBusinessDays` + dias úteis pausados. Pausa (`TaskPause`) enquanto houver documento obrigatório do cliente `PENDING`/`REJECTED` ou aprovação do cliente pendente (`UPLOADED` não pausa) — inclusive a OS que já nasce liberada pedindo documento (nasce pausada). Processo: `BoardPause` quando todas as OS liberadas e abertas estão pausadas; meta do processo = abertura + prazo + pausas; `completedAt` quando todas as tarefas terminam.
 - OS não liberada: PATCH de status e `/move` → 409 `'Esta OS aguarda: <títulos>'`. Concluir/desconsiderar libera as dependentes (uma vez; sino `OS_RELEASED`). POST `/tasks/:id/release` `{ reason }` (ORG_ADMIN/ORG_MANAGER) libera antes (histórico `os_released_early`).
 - PATCH `/tasks/:id` com `status` move o cartão junto: `DONE` vai para a primeira coluna `statusEffect = DONE` do board; reabrir uma tarefa que está numa coluna `DONE` leva à coluna do novo status (ou à primeira não-DONE). Grava `moved_to`.
 - PATCH `/tasks/reorder` só reordena dentro da coluna atual de cada tarefa; outra coluna → 400 `'Para trocar de coluna, mova a tarefa'`.

@@ -299,3 +299,26 @@ describe('liberar dependentes é isolado por OS', () => {
     expect(await prisma.taskHistory.count({ where: { taskId: stuck.id, action: 'os_released' } })).toBe(0)
   })
 })
+
+describe('OS que nasce pedindo documento ao cliente', () => {
+  const withRequest = (c: Ctx) => prisma.oSModelDocument.create({ data: { requestModelId: c.model.id, name: 'Extrato', position: 0 } })
+
+  it('a standalone OS born with a pending client document starts paused', async () => {
+    const c = await setup()
+    await withRequest(c)
+    const os = await openOS(c)
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: os.id }, include: { pauses: true } })
+    expect(task.status).toBe('BLOCKED')
+    expect(task.pauses.filter((p) => !p.endedAt)).toHaveLength(1)
+    expect(await prisma.taskHistory.count({ where: { taskId: os.id, action: 'os_paused' } })).toBe(1)
+  })
+
+  it('the first OS of a process born with a pending client document pauses it and the process', async () => {
+    const c = await setup()
+    await withRequest(c)
+    const board = json(await openProcess(c))
+    const os = await prisma.task.findFirstOrThrow({ where: { column: { boardId: board.id } }, include: { pauses: true } })
+    expect(os.pauses.filter((p) => !p.endedAt)).toHaveLength(1)
+    expect(await prisma.boardPause.count({ where: { boardId: board.id, endedAt: null } })).toBe(1)
+  })
+})

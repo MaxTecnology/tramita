@@ -38,6 +38,17 @@ describe('cadastro do escritório — CNPJ e cobrança', () => {
     expect((await prisma.organization.findFirstOrThrow({ where: { name: 'G2A Soluções Contábeis' } })).cnpj).toBe(cnpj)
   })
 
+  it('never returns the admin password hash (paid plan and trial)', async () => {
+    const plan = await createTestPlan({ name: 'Pro' })
+    const paid = await register(body(plan.id, { cnpj: generateValidCnpj(9) }))
+    const trial = await register(body('trial'))
+    for (const res of [paid, trial]) {
+      expect(res.statusCode).toBe(201)
+      expect(res.body).not.toContain('passwordHash')
+      expect(JSON.parse(res.body).user).toEqual({ id: expect.any(String), name: 'Admin', email: expect.any(String), role: 'ORG_ADMIN' })
+    }
+  })
+
   it('a billing refusal is logged with its reason and shown to the person', async () => {
     const plan = await createTestPlan({ name: 'Pro' })
     const refusal = new AxiosError('Request failed with status code 400', 'ERR_BAD_REQUEST', undefined, undefined, {

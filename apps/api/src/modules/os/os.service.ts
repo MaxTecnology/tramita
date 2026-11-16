@@ -10,7 +10,7 @@ import { loadStaffScope, clientWhere } from '@/modules/staff-scope/staff-scope'
 import { createBoard } from '@/modules/boards/boards.service'
 import type { CreateBoardBody } from '@/modules/boards/boards.schema'
 import { ensureServiceSystemBoard } from '@/modules/tasks/tasks.service'
-import { scheduleDeadline, scheduleBoardDeadline, releaseIfFree } from './os-deadline.service'
+import { scheduleDeadline, scheduleBoardDeadline, releaseIfFree, syncPause } from './os-deadline.service'
 import { competenceToDate, type OpenOSBody, type AddOSToProcessBody } from './os.schema'
 import { startOfMonthInBRT } from '@/lib/date-only'
 
@@ -110,6 +110,8 @@ async function actorName(actorId: string): Promise<string> {
 
 async function afterOSCreated(taskId: string, organizationId: string, clientId: string, boardId: string, columnId: string, title: string, actor: { id: string; name: string }, released: boolean) {
   await scheduleDeadline(taskId)
+  // Born asking the client for documents: the clock starts paused (and so may the process)
+  if (released) await syncPause(taskId)
   // An OS waiting for another one is announced to the client when it is released (release())
   if (released) await enqueueNotification({ event: 'TASK_CREATED', taskId, organizationId, clientId, metadata: { taskTitle: title } })
   await onTaskAssigned(taskId, { userId: actor.id, name: actor.name })

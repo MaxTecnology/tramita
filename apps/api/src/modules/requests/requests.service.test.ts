@@ -92,6 +92,16 @@ describe('listRequestsForOrg / listRequestsForClient / getRequestById', () => {
     expect(onlyCancelled[0].title).toBe('Pedido 2')
   })
 
+  it('brings the name of the process model the client chose (the approval says what will open)', async () => {
+    const org = await createTestOrg((await createTestPlan()).id)
+    const client = await createTestClient(org.id)
+    const template = await prisma.processTemplate.create({ data: { organizationId: org.id, name: 'Abertura de empresa' } })
+    const r = await createTestRequest(org.id, client.id, { title: 'Abrir empresa' })
+    await prisma.request.update({ where: { id: r.id }, data: { processTemplateId: template.id } })
+    const [listed] = await listRequestsForOrg(org.id)
+    expect(listed.processTemplate).toEqual({ id: template.id, name: 'Abertura de empresa' })
+  })
+
   it('cliente só vê as próprias requests', async () => {
     const plan = await createTestPlan()
     const org = await createTestOrg(plan.id)

@@ -28,6 +28,11 @@ async function uniqueSlug(name: string): Promise<string> {
   return slug
 }
 
+// What the public route may show of the new admin: never the password hash
+function publicUser(user: { id: string; name: string; email: string; role: string }) {
+  return { id: user.id, name: user.name, email: user.email, role: user.role }
+}
+
 export async function register(data: RegisterOrgBody) {
   const existing = await prisma.organization.findUnique({ where: { email: data.email } })
   if (existing) throw new AppError(409, 'E-mail já cadastrado')
@@ -56,7 +61,7 @@ export async function register(data: RegisterOrgBody) {
         role: 'ORG_ADMIN', organizationId: organization.id,
       },
     })
-    return { organization, user }
+    return { organization, user: publicUser(user) }
   }
 
   // Real plan — validate
@@ -111,7 +116,7 @@ export async function register(data: RegisterOrgBody) {
     throw new AppError(502, detail ? `Erro ao integrar com sistema de cobrança: ${detail}` : 'Erro ao integrar com sistema de cobrança. Tente novamente.')
   }
 
-  return { organization, user }
+  return { organization, user: publicUser(user) }
 }
 
 export async function createOrganizationByMaster(data: CreateOrgByMasterBody) {

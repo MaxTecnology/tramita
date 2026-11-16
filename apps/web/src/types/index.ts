@@ -171,6 +171,7 @@ export interface ClientRequest {
   // Service of the catalog the client asked for (standalone OS model or process) and its period
   osModelId?: string | null
   processTemplateId?: string | null
+  processTemplate?: { id: string; name: string } | null
   competence?: string | null
   attachments?: RequestAttachment[]
   client?: { id: string; name: string }

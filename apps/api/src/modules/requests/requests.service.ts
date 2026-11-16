@@ -128,6 +128,7 @@ export async function listRequestsForOrg(
     include: {
       client: { select: { id: true, name: true } },
       task: { select: { column: { select: { boardId: true } } } },
+      processTemplate: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: 'desc' },
   })

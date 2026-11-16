@@ -30,8 +30,10 @@ beforeEach(() => {
       ])
     }),
     http.get(`${API}/os-models`, () => HttpResponse.json([
-      { id: 'm1', name: 'Recálculo DAS', requiresCompetence: true },
-      { id: 'm2', name: 'Certidão', requiresCompetence: false },
+      { id: 'm1', name: 'Recálculo DAS', requiresCompetence: true, usableStandalone: true, isActive: true },
+      { id: 'm2', name: 'Certidão', requiresCompetence: false, usableStandalone: true, isActive: true },
+      { id: 'm3', name: 'Registro na Junta', requiresCompetence: false, usableStandalone: false, isActive: true },
+      { id: 'm4', name: 'Modelo antigo', requiresCompetence: false, usableStandalone: true, isActive: false },
     ])),
     http.get(`${API}/clients`, () => HttpResponse.json([{ id: 'c1', name: 'ACME', codigo: '320' }])),
     http.post(`${API}/os`, async ({ request }) => { opened = (await request.json()) as Record<string, unknown>; return HttpResponse.json({ id: 't9' }, { status: 201 }) }),
@@ -75,4 +77,13 @@ it('opens a new OS, asking the month when the model needs it', async () => {
   await userEvent.type(screen.getByLabelText('Competência'), '2025-03')
   await userEvent.click(screen.getByRole('button', { name: 'Abrir OS' }))
   await waitFor(() => expect(opened).toEqual({ osModelId: 'm1', clientId: 'c1', competence: '2025-03' }))
+})
+
+it('Nova OS offers only active standalone models (process-only ones stay in the list filter)', async () => {
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'Nova OS' }))
+  const options = Array.from((screen.getByLabelText('Modelo de OS') as HTMLSelectElement).options).map((o) => o.textContent)
+  expect(options).toEqual(['Selecione', 'Recálculo DAS', 'Certidão'])
+  const filter = Array.from((screen.getByLabelText('Filtrar por modelo') as HTMLSelectElement).options).map((o) => o.textContent)
+  expect(filter).toContain('Registro na Junta')
 })

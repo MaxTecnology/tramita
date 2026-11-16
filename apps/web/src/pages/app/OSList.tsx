@@ -58,7 +58,7 @@ export default function OSList() {
     queryFn: () => api.get('/os', { params }).then((r) => r.data),
     placeholderData: (prev) => prev,
   })
-  const { data: models = [] } = useQuery<{ id: string; name: string; requiresCompetence: boolean }[]>({
+  const { data: models = [] } = useQuery<OSModelOption[]>({
     queryKey: ['os-models', 'all'],
     queryFn: () => api.get('/os-models').then((r) => r.data),
   })
@@ -150,15 +150,18 @@ export default function OSList() {
         </div>
       )}
 
-      <NewOSDialog open={creating} onClose={() => setCreating(false)} models={models} clients={clients} />
+      {/* Process-only and inactive models can't be opened alone (the list filter still shows them) */}
+      <NewOSDialog open={creating} onClose={() => setCreating(false)} models={models.filter((m) => m.usableStandalone && m.isActive)} clients={clients} />
     </div>
   )
 }
 
+type OSModelOption = { id: string; name: string; requiresCompetence: boolean; usableStandalone: boolean; isActive: boolean }
+
 function NewOSDialog({ open, onClose, models, clients }: {
   open: boolean
   onClose: () => void
-  models: { id: string; name: string; requiresCompetence: boolean }[]
+  models: OSModelOption[]
   clients: { id: string; name: string; codigo: string | null }[]
 }) {
   const qc = useQueryClient()
