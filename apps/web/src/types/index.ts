@@ -348,9 +348,26 @@ export interface ProcessTemplateColumn {
   notifyClient: boolean
   documents: ProcessTemplateColumnDocumentItem[]
 }
+export interface ProcessTemplateItem {
+  id: string; osModelId: string; osModel: { id: string; name: string }; columnPosition: number; position: number
+  // indexes of the items (same list) this OS waits for
+  dependsOn: number[]
+}
 export interface ProcessTemplate {
   id: string; name: string; description: string | null; isActive: boolean
+  departmentId: string | null; deadlineBusinessDays: number | null; clientCanRequest: boolean
   columns: ProcessTemplateColumn[]
+  items: ProcessTemplateItem[]
+}
+
+export interface OSModelDocument { id: string; name: string; position: number; requiresPayment: boolean; obligationTypeId: string | null }
+// Service order model: one task, like a recurring one but sporadic
+export interface OSModel {
+  id: string; name: string; description: string | null; departmentId: string
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'; visibleToClient: boolean
+  requiresCompetence: boolean; deadlineBusinessDays: number | null; autoCompleteOnAllDelivered: boolean
+  usableStandalone: boolean; usableInProcess: boolean; isActive: boolean
+  documentRequests: OSModelDocument[]; documentDeliveries: OSModelDocument[]
 }
 
 export interface ObligationType {

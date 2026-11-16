@@ -21,6 +21,8 @@ import AppSubscription from '@/pages/app/settings/Subscription'
 import Profile from '@/pages/app/settings/Profile'
 import Departments from '@/pages/app/settings/Departments'
 import Holidays from '@/pages/app/settings/Holidays'
+import OSModels from '@/pages/app/settings/OSModels'
+import OSModelForm from '@/pages/app/settings/OSModelForm'
 import RecurringTemplates from '@/pages/app/settings/RecurringTemplates'
 import RecurringTemplateForm from '@/pages/app/settings/RecurringTemplateForm'
 import RecurringTemplateManage from '@/pages/app/settings/RecurringTemplateManage'
@@ -203,6 +205,30 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <RecurringGenerationConsole />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/os-models',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <OSModels />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/os-models/new',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <OSModelForm />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings/os-models/:id/edit',
+        element: (
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <OSModelForm />
           </ProtectedRoute>
         ),
       },

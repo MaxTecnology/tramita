@@ -5,9 +5,10 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Trash2, Plus, GripVertical } from 'lucide-react'
+import { ArrowLeft, Trash2, Plus, GripVertical, ListChecks } from 'lucide-react'
 import { toast } from 'sonner'
-import type { ProcessTemplate } from '@/types'
+import type { ProcessTemplate, OSModel, Department } from '@/types'
+import { Toggle, fieldCls } from './formBlocks'
 
 type StatusEffect = ProcessTemplate['columns'][number]['statusEffect']
 
@@ -27,15 +28,39 @@ interface ColumnFormState {
   documents: { name: string }[]
 }
 
+// OS the process creates when opened: model, column (index) where it is born, items it waits for
+interface ItemFormState {
+  osModelId: string
+  columnIndex: number
+  dependsOn: number[]
+}
+
 interface FormState {
   name: string
   description: string
   isActive: boolean
+  departmentId: string
+  deadlineBusinessDays: string
+  clientCanRequest: boolean
   columns: ColumnFormState[]
+  items: ItemFormState[]
+}
+
+function hasCycle(items: ItemFormState[]): boolean {
+  const state = new Array<number>(items.length).fill(0)
+  const visit = (i: number): boolean => {
+    if (state[i] === 1) return true
+    if (state[i] === 2) return false
+    state[i] = 1
+    const found = items[i].dependsOn.some((d) => d < items.length && visit(d))
+    state[i] = 2
+    return found
+  }
+  return items.some((_, i) => visit(i))
 }
 
 const EMPTY_COLUMN: ColumnFormState = { title: '', statusEffect: 'NONE', notifyClient: false, documents: [] }
-const EMPTY_FORM: FormState = { name: '', description: '', isActive: true, columns: [{ ...EMPTY_COLUMN }] }
+const EMPTY_FORM: FormState = { name: '', description: '', isActive: true, departmentId: '', deadlineBusinessDays: '', clientCanRequest: false, columns: [{ ...EMPTY_COLUMN }], items: [] }
 
 function DocumentListEditor({ items, onChange }: {
   items: { name: string }[]
@@ -140,12 +165,22 @@ export default function ProcessTemplateForm() {
     enabled: isEditing,
   })
 
+  const { data: departments = [] } = useQuery<Department[]>({ queryKey: ['departments'], queryFn: () => api.get('/departments').then((r) => r.data) })
+  const { data: processModels = [] } = useQuery<OSModel[]>({
+    queryKey: ['os-models', 'process'],
+    queryFn: () => api.get('/os-models', { params: { usage: 'process' } }).then((r) => r.data),
+  })
+
   useEffect(() => {
     if (!template) return
     setForm({
       name: template.name,
       description: template.description ?? '',
       isActive: template.isActive,
+      departmentId: template.departmentId ?? '',
+      deadlineBusinessDays: template.deadlineBusinessDays ? String(template.deadlineBusinessDays) : '',
+      clientCanRequest: template.clientCanRequest,
+      items: template.items.map((it) => ({ osModelId: it.osModelId, columnIndex: it.columnPosition, dependsOn: it.dependsOn })),
       columns: template.columns.map((c) => ({
         title: c.title,
         statusEffect: c.statusEffect,
@@ -157,7 +192,13 @@ export default function ProcessTemplateForm() {
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      const base = { name: form.name, isActive: form.isActive, columns: form.columns }
+      const base = {
+        name: form.name, isActive: form.isActive, columns: form.columns,
+        departmentId: form.departmentId || null,
+        deadlineBusinessDays: form.deadlineBusinessDays ? Number(form.deadlineBusinessDays) : null,
+        clientCanRequest: form.clientCanRequest,
+        items: form.items,
+      }
       // No PATCH (edição), descrição vazia precisa virar `null` pra realmente limpar no banco —
       // `undefined` faz o Prisma ignorar o campo. No POST (criação) não há nada a limpar.
       return isEditing
@@ -184,10 +225,30 @@ export default function ProcessTemplateForm() {
   }
 
   function removeColumn(index: number) {
-    setForm((f) => ({ ...f, columns: f.columns.filter((_, i) => i !== index) }))
+    // Items born in a removed column move to the first one; later columns shift down
+    setForm((f) => ({
+      ...f,
+      columns: f.columns.filter((_, i) => i !== index),
+      items: f.items.map((it) => ({ ...it, columnIndex: it.columnIndex === index ? 0 : it.columnIndex > index ? it.columnIndex - 1 : it.columnIndex })),
+    }))
   }
 
+  function updateItem(index: number, item: ItemFormState) {
+    setForm((f) => ({ ...f, items: f.items.map((it, i) => (i === index ? item : it)) }))
+  }
+
+  function removeItem(index: number) {
+    setForm((f) => ({
+      ...f,
+      items: f.items.filter((_, i) => i !== index).map((it) => ({ ...it, dependsOn: it.dependsOn.filter((d) => d !== index).map((d) => (d > index ? d - 1 : d)) })),
+    }))
+  }
+
+  const modelName = (osModelId: string) => processModels.find((m) => m.id === osModelId)?.name ?? 'OS'
+  const cycle = hasCycle(form.items)
+  const needsDepartment = form.clientCanRequest && !form.departmentId
   const canSave = form.name.trim().length > 0 && form.columns.length > 0 && form.columns.every((c) => c.title.trim().length > 0)
+    && form.items.every((it) => !!it.osModelId) && !cycle && !needsDepartment
 
   if (isEditing && isLoading) return <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
 
@@ -207,19 +268,36 @@ export default function ProcessTemplateForm() {
         className="space-y-4"
       >
         <div className="space-y-1.5">
-          <Label>Nome</Label>
-          <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Abertura de empresa" required />
+          <Label htmlFor="pt-name">Nome</Label>
+          <Input id="pt-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Abertura de empresa" required />
         </div>
 
         <div className="space-y-1.5">
-          <Label>Descrição</Label>
-          <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Opcional" />
+          <Label htmlFor="pt-description">Descrição</Label>
+          <Input id="pt-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Opcional" />
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-foreground">
-          <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
-          Ativo
-        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="pt-department">Departamento que avalia os pedidos</Label>
+            <select id="pt-department" className={fieldCls} value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })}>
+              <option value="">Nenhum</option>
+              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="pt-deadline">Prazo do processo (dias úteis)</Label>
+            <Input id="pt-deadline" inputMode="numeric" value={form.deadlineBusinessDays} placeholder="Vazio = sem prazo"
+              onChange={(e) => setForm({ ...form, deadlineBusinessDays: e.target.value.replace(/\D/g, '') })} />
+          </div>
+        </div>
+
+        <div className="divide-y divide-border rounded-lg border border-border px-3">
+          <Toggle checked={form.clientCanRequest} onChange={(v) => setForm({ ...form, clientCanRequest: v })}
+            label="Cliente pode solicitar" hint="Aparece na lista de serviços do portal; a aprovação abre o processo." />
+          <Toggle checked={form.isActive} onChange={(v) => setForm({ ...form, isActive: v })} label="Ativo" hint="Inativo não aparece para abrir novos processos." />
+        </div>
+        {needsDepartment && <p className="text-xs text-danger-text">Escolha o departamento que avalia os pedidos deste processo</p>}
 
         <div className="pt-2 border-t border-border space-y-3">
           <div className="flex items-center justify-between">
@@ -242,6 +320,52 @@ export default function ProcessTemplateForm() {
               />
             ))}
           </div>
+        </div>
+
+        <div className="pt-2 border-t border-border space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="flex items-center gap-1.5"><ListChecks size={14} />OS do processo</Label>
+              <p className="text-xs text-muted-foreground">Nascem ao abrir o processo; uma OS que depende de outra só começa quando a outra termina.</p>
+            </div>
+            <Button type="button" variant="outline" size="sm" className="gap-1.5"
+              onClick={() => setForm((f) => ({ ...f, items: [...f.items, { osModelId: '', columnIndex: 0, dependsOn: [] }] }))}>
+              <Plus size={14} />Adicionar OS
+            </Button>
+          </div>
+          {form.items.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma OS: o processo nasce só com as colunas.</p>}
+          {form.items.map((item, i) => (
+            <div key={i} className="rounded-lg border border-border bg-surface p-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground">OS {i + 1}</span>
+                <select aria-label={`Modelo da OS ${i + 1}`} className={`${fieldCls} flex-1 min-w-48`} value={item.osModelId}
+                  onChange={(e) => updateItem(i, { ...item, osModelId: e.target.value })}>
+                  <option value="">Escolha o modelo...</option>
+                  {processModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+                <select aria-label={`Coluna da OS ${i + 1}`} className={`${fieldCls} w-44`} value={item.columnIndex}
+                  onChange={(e) => updateItem(i, { ...item, columnIndex: Number(e.target.value) })}>
+                  {form.columns.map((c, ci) => <option key={ci} value={ci}>{c.title || `Coluna ${ci + 1}`}</option>)}
+                </select>
+                <button type="button" aria-label={`Remover OS ${i + 1}`} onClick={() => removeItem(i)} className="p-1.5 rounded-md text-muted-foreground hover:bg-danger-bg hover:text-danger-text">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              {form.items.length > 1 && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span>Espera:</span>
+                  {form.items.map((other, j) => j !== i && (
+                    <label key={j} className="inline-flex items-center gap-1 text-foreground">
+                      <input type="checkbox" aria-label={`OS ${i + 1} depende da OS ${j + 1}`} checked={item.dependsOn.includes(j)}
+                        onChange={(e) => updateItem(i, { ...item, dependsOn: e.target.checked ? [...item.dependsOn, j].sort((a, b) => a - b) : item.dependsOn.filter((d) => d !== j) })} />
+                      OS {j + 1}{other.osModelId ? ` · ${modelName(other.osModelId)}` : ''}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          {cycle && <p className="text-xs text-danger-text">Dependência circular</p>}
         </div>
 
         <div className="flex justify-end gap-2 pt-4 border-t border-border">

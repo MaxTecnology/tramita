@@ -41,7 +41,7 @@ export default function ProcessTemplates() {
           <h1 className="text-lg md:text-xl font-bold text-foreground">Modelos de Processo</h1>
           <Button onClick={() => navigate('/app/settings/process-templates/new')} className="gap-2">
             <Plus size={16} />
-            Novo template
+            Novo modelo
           </Button>
         </div>
       </div>
@@ -62,7 +62,9 @@ export default function ProcessTemplates() {
                   {!t.isActive && <span className="text-xs px-1.5 py-0.5 rounded-full bg-neutral-bg text-muted-foreground">Inativo</span>}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {t.columns.length} coluna{t.columns.length !== 1 ? 's' : ''}
+                  {t.columns.length} coluna{t.columns.length !== 1 ? 's' : ''} · {t.items.length} OS
+                  {t.deadlineBusinessDays ? ` · ${t.deadlineBusinessDays} dias úteis` : ''}
+                  {t.clientCanRequest ? ' · cliente pode solicitar' : ''}
                   {t.description ? ` · ${t.description}` : ''}
                 </p>
               </div>
