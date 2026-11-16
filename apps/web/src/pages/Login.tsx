@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { homeForRole } from '@/lib/homeForRole'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -23,11 +24,7 @@ export default function Login() {
       localStorage.setItem('accessToken', data.accessToken)
       localStorage.setItem('refreshToken', data.refreshToken)
       localStorage.setItem('user', JSON.stringify(data.user))
-      const role: string = data.user.role
-      if (role === 'MASTER') navigate('/master/dashboard')
-      else if (role === 'ORG_ADMIN' || role === 'ORG_MANAGER') navigate('/app/dashboard')
-      else if (role === 'ORG_MEMBER') navigate('/app/dashboard')
-      else navigate('/portal/home')
+      navigate(homeForRole(data.user.role))
     } catch {
       setError('E-mail ou senha inválidos')
     } finally {

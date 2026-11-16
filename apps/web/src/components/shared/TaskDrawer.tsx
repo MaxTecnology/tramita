@@ -62,9 +62,9 @@ const CLOSE_REASON_HISTORY: Record<string, string> = {
 }
 
 // History values are stored raw (status enum, user ids): shown with the screen's words and names
-function formatHistoryAction(h: TaskHistory, userName: (id: string) => string): string {
+function formatHistoryAction(h: TaskHistory, userName: (id: string) => string, statusLabels: Record<Task['status'], string> = STATUS_LABEL): string {
   const label = ACTION_LABELS[h.action] ?? h.action
-  if (h.action === 'status_changed' && h.toValue) return `${label} ${STATUS_LABEL[h.toValue as Task['status']] ?? h.toValue}`
+  if (h.action === 'status_changed' && h.toValue) return `${label} ${statusLabels[h.toValue as Task['status']] ?? h.toValue}`
   if ((h.action === 'assigned_to' || h.action === 'updated_assignee') && h.toValue) return `${label} ${userName(h.toValue)}`
   if (h.action === 'assumed') return h.fromValue ? `${label} (era de ${userName(h.fromValue)})` : label
   if (h.action === 'attachment_deleted' && h.fromValue) return `${label} "${h.fromValue}"`
@@ -109,6 +109,15 @@ export const STATUS_LABEL: Record<Task['status'], string> = {
   DONE: 'Concluído',
   DISREGARDED: 'Desconsiderado',
   BLOCKED: 'Com Impedimento',
+}
+
+// The same status in the client's words (the portal): no office jargon
+export const CLIENT_STATUS_LABEL: Record<Task['status'], string> = {
+  OPEN: 'Aberto',
+  STARTED: 'Em andamento',
+  DONE: 'Concluído',
+  DISREGARDED: 'Cancelado',
+  BLOCKED: 'Com pendência',
 }
 
 export const STATUS_COLOR: Record<Task['status'], string> = {
@@ -156,7 +165,8 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   // portfolio / manager scope). A colleague's task seen through the department must be assumed first.
   // Without the API's answer (a screen that does not send it), only the admin or the assignee edits
   const canEdit = isStaff && (task.viewerCanEdit ?? (role === 'ORG_ADMIN' || task.assigneeId === currentUserId))
-  const me = useMyScope()
+  const me = useMyScope(isStaff)
+  const statusLabels = isStaff ? STATUS_LABEL : CLIENT_STATUS_LABEL
   const isOpen = task.status !== 'DONE' && task.status !== 'DISREGARDED'
   const canAssume = isStaff && !!me && isOpen && task.assigneeId !== currentUserId
     && (me.role === 'ORG_ADMIN' || (!!task.departmentId && me.departments.some((d) => d.id === task.departmentId)))
@@ -539,7 +549,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
               </select>
             ) : (
               <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', STATUS_COLOR[task.status])}>
-                {STATUS_LABEL[task.status]}
+                {statusLabels[task.status]}
               </span>
             )}
 
@@ -1146,7 +1156,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                   <p className="text-xs text-muted-foreground">
                     <span className="font-medium text-foreground">{h.actorName}</span>
                     {' — '}
-                    {formatHistoryAction(h, userName)}
+                    {formatHistoryAction(h, userName, statusLabels)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {new Date(h.createdAt).toLocaleString('pt-BR')}

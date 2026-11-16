@@ -18,6 +18,12 @@ const body = (planId: string, extra: object = {}) => ({
 const register = (payload: object) => app.inject({ method: 'POST', url: '/organizations/register', payload })
 
 describe('cadastro do escritório — CNPJ e cobrança', () => {
+  it('"trial" without CNPJ is refused like any plan (there is no public trial)', async () => {
+    const res = await register(body('trial'))
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).message).toBe('Informe o CNPJ do escritório')
+  })
+
   it('a paid plan needs a valid CNPJ (the billing requires it)', async () => {
     const plan = await createTestPlan({ name: 'Pro' })
     const none = await register(body(plan.id))
@@ -38,15 +44,12 @@ describe('cadastro do escritório — CNPJ e cobrança', () => {
     expect((await prisma.organization.findFirstOrThrow({ where: { name: 'G2A Soluções Contábeis' } })).cnpj).toBe(cnpj)
   })
 
-  it('never returns the admin password hash (paid plan and trial)', async () => {
+  it('never returns the admin password hash', async () => {
     const plan = await createTestPlan({ name: 'Pro' })
-    const paid = await register(body(plan.id, { cnpj: generateValidCnpj(9) }))
-    const trial = await register(body('trial'))
-    for (const res of [paid, trial]) {
-      expect(res.statusCode).toBe(201)
-      expect(res.body).not.toContain('passwordHash')
-      expect(JSON.parse(res.body).user).toEqual({ id: expect.any(String), name: 'Admin', email: expect.any(String), role: 'ORG_ADMIN' })
-    }
+    const res = await register(body(plan.id, { cnpj: generateValidCnpj(9) }))
+    expect(res.statusCode).toBe(201)
+    expect(res.body).not.toContain('passwordHash')
+    expect(JSON.parse(res.body).user).toEqual({ id: expect.any(String), name: 'Admin', email: expect.any(String), role: 'ORG_ADMIN' })
   })
 
   it('a billing refusal is logged with its reason and shown to the person', async () => {

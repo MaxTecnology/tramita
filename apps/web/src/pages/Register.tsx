@@ -23,7 +23,6 @@ export default function Register() {
     name: '', cnpj: '', email: '', phone: '', adminName: '', adminPassword: '',
   })
 
-  const cnpjRequired = selectedPlan?.id !== 'trial'
 
   const { data: plans = [], isLoading } = useQuery<Plan[]>({
     queryKey: ['public', 'plans'],
@@ -34,8 +33,8 @@ export default function Register() {
     e.preventDefault()
     if (!selectedPlan) return
     // The billing (Asaas) refuses a paid subscription without a valid CNPJ
-    if (cnpjRequired && !form.cnpj.trim()) { setError('Informe o CNPJ do escritório'); return }
-    if (form.cnpj.trim() && !cnpjValido(form.cnpj)) { setError('CNPJ inválido'); return }
+    if (!form.cnpj.trim()) { setError('Informe o CNPJ do escritório'); return }
+    if (!cnpjValido(form.cnpj)) { setError('CNPJ inválido'); return }
     setError('')
     setLoading(true)
     try {
@@ -67,7 +66,7 @@ export default function Register() {
 
         <div className="flex-1 flex flex-col items-center justify-center p-8">
           <h1 className="text-2xl font-bold text-foreground mb-2">Escolha seu plano</h1>
-          <p className="text-muted-foreground mb-8">Comece com um trial gratuito. Sem cartão de crédito.</p>
+          <p className="text-muted-foreground mb-8">Escolha o plano do seu escritório. A cobrança é mensal, por boleto.</p>
 
           {isLoading ? (
             <p className="text-muted-foreground">Carregando planos...</p>
@@ -136,16 +135,14 @@ export default function Register() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cnpj">
-                CNPJ {!cnpjRequired && <span className="text-muted-foreground font-normal">(opcional)</span>}
-              </Label>
+              <Label htmlFor="cnpj">CNPJ</Label>
               <Input
                 id="cnpj"
                 inputMode="numeric"
                 placeholder="00.000.000/0000-00"
                 value={form.cnpj}
                 onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
-                required={cnpjRequired}
+                required
               />
             </div>
             <div className="space-y-1.5">

@@ -19,7 +19,7 @@ export const registerOrgSchema = z.object({
   planId: z.string().min(1, 'Plano obrigatório'),
 }).superRefine((data, ctx) => {
   if (!data.cnpj) {
-    if (data.planId !== 'trial') ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['cnpj'], message: 'Informe o CNPJ do escritório' })
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['cnpj'], message: 'Informe o CNPJ do escritório' })
     return
   }
   if (!cnpjValido(data.cnpj)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['cnpj'], message: 'CNPJ inválido' })

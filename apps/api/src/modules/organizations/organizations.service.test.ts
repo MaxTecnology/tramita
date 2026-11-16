@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import {
   register, getOrgSubscription, changePlan, getOrganization, createOrganizationByMaster,
 } from '@/modules/organizations/organizations.service'
-import { createTestPlan, createTestOrg, createTestUser } from '@/test/helpers'
+import { createTestPlan, createTestOrg, createTestUser, generateValidCnpj } from '@/test/helpers'
 import * as asaas from '@/lib/asaas'
 
 beforeEach(() => {
@@ -68,19 +68,13 @@ describe('register', () => {
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 
-  it('creates org in TRIAL status when planId = "trial"', async () => {
+  it('the public signup has no trial: "trial" is not a plan and nothing is created', async () => {
     await createTestPlan({ name: 'Starter' })
-
-    const result = await register({
-      name: 'Trial Org',
-      email: `trial-${Date.now()}@test.com`,
-      adminName: 'Admin',
-      adminPassword: 'Senha@123',
-      planId: 'trial',
-    })
-
-    expect(result.organization.subscriptionStatus).toBe('TRIAL')
-    expect(result.organization.trialEndsAt).toBeTruthy()
+    await expect(register({
+      name: 'Trial Org', email: `trial-${Date.now()}@test.com`, cnpj: generateValidCnpj(3),
+      adminName: 'Admin', adminPassword: 'Senha@123', planId: 'trial',
+    })).rejects.toMatchObject({ statusCode: 404 })
+    expect(await prisma.organization.count({ where: { name: 'Trial Org' } })).toBe(0)
     expect(asaas.createCustomer).not.toHaveBeenCalled()
   })
 })

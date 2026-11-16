@@ -73,7 +73,7 @@ export default function PortalHomePage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {cards.map(({ to, icon: Icon, label, value, hint, tone, hintTone }) => (
-          <Link key={to} to={to} className={cn('rounded-lg border-l-4 bg-surface p-4 shadow-sm hover:bg-neutral-bg', tone)}>
+          <Link key={label} to={to} className={cn('rounded-lg border-l-4 bg-surface p-4 shadow-sm hover:bg-neutral-bg', tone)}>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Icon size={16} />
               {label}

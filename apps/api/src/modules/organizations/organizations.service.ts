@@ -37,34 +37,8 @@ export async function register(data: RegisterOrgBody) {
   const existing = await prisma.organization.findUnique({ where: { email: data.email } })
   if (existing) throw new AppError(409, 'E-mail já cadastrado')
 
-  // Trial plan — skip Asaas
-  if (data.planId === 'trial') {
-    const starterPlan = await prisma.plan.findFirst({
-      where: { isActive: true },
-      orderBy: { priceMonthly: 'asc' },
-    })
-    if (!starterPlan) throw new AppError(404, 'Nenhum plano disponível')
-
-    const slug = await uniqueSlug(data.name)
-    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-    const passwordHash = await hashPassword(data.adminPassword)
-
-    const organization = await prisma.organization.create({
-      data: {
-        name: data.name, slug, cnpj: data.cnpj, email: data.email, phone: data.phone,
-        planId: starterPlan.id, subscriptionStatus: 'TRIAL', trialEndsAt,
-      },
-    })
-    const user = await prisma.user.create({
-      data: {
-        name: data.adminName, email: data.email, passwordHash,
-        role: 'ORG_ADMIN', organizationId: organization.id,
-      },
-    })
-    return { organization, user: publicUser(user) }
-  }
-
-  // Real plan — validate
+  // Public signup is always a paid plan with its Asaas subscription (no public trial: it never
+  // expired). Courtesy or manually billed offices are created by the Master.
   const plan = await prisma.plan.findUnique({ where: { id: data.planId } })
   if (!plan || !plan.isActive) throw new AppError(404, 'Plano não encontrado')
 

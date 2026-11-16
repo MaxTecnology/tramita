@@ -30,3 +30,14 @@ it('a paid plan asks for a valid CNPJ before sending anything', async () => {
   await waitFor(() => expect(screen.getByText('CNPJ inválido')).toBeInTheDocument())
   expect(posted).toBe(false)
 })
+
+it('promises no trial: the signup is a monthly paid plan', async () => {
+  server.use(http.get(`${API}/organizations/plans`, () => HttpResponse.json([{ id: 'p1', name: 'Pro', priceMonthly: '197.00', maxClients: 100, features: {} }])))
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter><Register /></MemoryRouter>
+    </QueryClientProvider>,
+  )
+  expect(await screen.findByText(/cobrança é mensal, por boleto/)).toBeInTheDocument()
+  expect(screen.queryByText(/trial|sem cartão/i)).not.toBeInTheDocument()
+})

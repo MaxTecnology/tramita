@@ -120,7 +120,7 @@ Cadastro de novo escritório (público — sem autenticação).
 ```json
 {
   "name": "string",
-  "cnpj": "string?",
+  "cnpj": "string",
   "email": "string",
   "phone": "string?",
   "adminName": "string",
@@ -129,7 +129,7 @@ Cadastro de novo escritório (público — sem autenticação).
 }
 ```
 → Cria Organization + User (ORG_ADMIN) + Customer no Asaas + Subscription no Asaas
-→ Inicia trial de 14 dias se planId = "trial"
+→ Sem trial público: `cnpj` obrigatório e `planId` precisa ser um plano ativo (`"trial"` → 400/404). Escritório cortesia ou com cobrança fora do Asaas é criado pelo Master (`POST /master/organizations`)
 → 201 `{ organization, user: { id, name, email, role } }` — nunca devolve o hash da senha
 
 ### GET `/organizations/plans` — lista planos disponíveis (público)

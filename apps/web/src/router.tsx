@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import AppLayout from '@/components/AppLayout'
 import Login from '@/pages/Login'
+import NotFound from '@/pages/NotFound'
 import Register from '@/pages/Register'
 import MasterLayout from '@/pages/master/Layout'
 import MasterDashboard from '@/pages/master/Dashboard'
@@ -342,5 +343,5 @@ export const router = createBrowserRouter([
       { path: 'notifications', element: <PortalNotifications /> },
     ],
   },
-  { path: '*', element: <Navigate to="/login" replace /> },
+  { path: '*', element: <NotFound /> },
 ])
