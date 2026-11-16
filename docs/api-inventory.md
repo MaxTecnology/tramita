@@ -8,7 +8,7 @@
 
 - Rotas: **209**
 - Públicas (sem login): **6** — `POST /auth/login`, `POST /auth/logout`, `POST /auth/refresh`, `GET /organizations/plans`, `POST /organizations/register`, `GET /organizations/signup-status`
-- Sem uso no web nem chamador externo conhecido: **5**
+- Sem uso no web nem chamador externo conhecido: **2**
 - Sem teste de rota: **58**
 - Cliente (portal) passa fora de /portal: **13** (rotas compartilhadas — o escopo dentro delas é revisado na auditoria de segurança)
 
@@ -16,11 +16,8 @@
 
 | Método | Rota | Quem passa | Teste de rota |
 |---|---|---|---|
-| PATCH | `/boards/:id/delay-reason` | Admin, Gerente, Membro | sim |
 | GET | `/document-reader/metricas` | Admin, Gerente, Membro | sim |
-| POST | `/notifications/config/test-whatsapp` | Admin | sim |
 | GET | `/portal/requests/:id` | Cliente | sim |
-| POST | `/portal/requests/:id/attachments` | Cliente | não |
 
 ## Cliente fora de /portal
 
@@ -67,7 +64,7 @@
 | POST | `/boards` | Admin, Gerente, Membro | web | sim |
 | GET | `/boards/:id` | Admin, Gerente, Membro, Cliente | web | sim |
 | PATCH | `/boards/:id` | Admin, Gerente | web (indireto) | sim |
-| PATCH | `/boards/:id/delay-reason` | Admin, Gerente, Membro | — | sim |
+| PATCH | `/boards/:id/delay-reason` | Admin, Gerente, Membro | web | sim |
 | POST | `/boards/:id/os` | Admin, Gerente, Membro | web | sim |
 | GET | `/boards/:id/stage-times` | Admin, Gerente, Membro | web | sim |
 | GET | `/boards/:id/stream` | token próprio (ticket/webhook) | web (indireto) | sim |
@@ -194,7 +191,7 @@
 | DELETE | `/notifications/config/sla-sound` | Admin | web | sim |
 | POST | `/notifications/config/sla-sound` | Admin | web | sim |
 | POST | `/notifications/config/test-email` | Admin | web | sim |
-| POST | `/notifications/config/test-whatsapp` | Admin | — | sim |
+| POST | `/notifications/config/test-whatsapp` | Admin | web | sim |
 | GET | `/notifications/logs` | Admin | web | **não** |
 | POST | `/notifications/read-all` | Admin, Gerente, Membro, Cliente | web | sim |
 | POST | `/notifications/read-by-task` | Admin, Gerente, Membro, Cliente, Master | web | sim |
@@ -256,7 +253,7 @@
 | GET | `/portal/requests` | Cliente | web | sim |
 | POST | `/portal/requests` | Cliente | web | sim |
 | GET | `/portal/requests/:id` | Cliente | — | sim |
-| POST | `/portal/requests/:id/attachments` | Cliente | — | **não** |
+| POST | `/portal/requests/:id/attachments` | Cliente | web | **não** |
 | PATCH | `/portal/requests/:id/cancel` | Cliente | web | sim |
 | GET | `/portal/services` | Cliente | web | sim |
 | GET | `/portal/tasks/:taskId/documents` | Cliente | web (indireto) | **não** |

@@ -9,12 +9,14 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Comments } from '@/components/shared/Comments'
 import { cn, mensagemDeErro } from '@/lib/utils'
-import { Plus, Inbox, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Inbox, ExternalLink, ChevronDown, ChevronUp, Paperclip } from 'lucide-react'
 import type { ClientRequest, PortalService } from '@/types'
 import { toast } from 'sonner'
 import { usePortalClient } from './Layout'
 import { useLinkedItem } from '@/hooks/useLinkedItem'
 import { askConfirm } from '@/components/ui/app-dialogs'
+import { RequestAttachments, uploadRequestAttachment } from '@/components/requests/RequestAttachments'
+import { UPLOAD_ACCEPT } from '@/lib/upload'
 
 const STATUS_LABEL: Record<ClientRequest['status'], string> = {
   PENDING: 'Em análise',
@@ -38,6 +40,7 @@ export default function PortalRequests() {
   const [open, setOpen] = useState(false)
 const EMPTY = { title: '', description: '', departmentId: '', service: '', competence: '' }
   const [form, setForm] = useState(EMPTY)
+  const [files, setFiles] = useState<File[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   useLinkedItem('request', setExpandedId)
 
@@ -87,12 +90,19 @@ const EMPTY = { title: '', description: '', departmentId: '', service: '', compe
       ...(service
         ? { [service.kind === 'OS' ? 'osModelId' : 'processTemplateId']: service.id, ...(service.requiresCompetence ? { competence: form.competence } : {}) }
         : { departmentId: form.departmentId }),
-    }).then((r) => r.data),
-    onSuccess: () => {
-      toast.success('Solicitação enviada')
+    }).then((r) => r.data as { id: string }),
+    onSuccess: async (created) => {
+      // The files go right after the request exists; one failing does not undo the request
+      let failed = 0
+      for (const file of files) {
+        try { await uploadRequestAttachment(created.id, file) } catch { failed++ }
+      }
+      if (failed > 0) toast.error(`Solicitação enviada, mas ${failed === 1 ? '1 arquivo não foi anexado' : `${failed} arquivos não foram anexados`} — anexe de novo no card`)
+      else toast.success('Solicitação enviada')
       qc.invalidateQueries({ queryKey: ['portal-requests'] })
       setOpen(false)
       setForm(EMPTY)
+      setFiles([])
     },
     onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao enviar solicitação')),
   })
@@ -140,6 +150,7 @@ const EMPTY = { title: '', description: '', departmentId: '', service: '', compe
                     {r.status === 'CANCELLED' && r.cancelledByType === 'USER' && r.cancellationReason && (
                       <p className="text-xs text-muted-foreground mt-1 italic">Cancelada pelo escritório — motivo: {r.cancellationReason}</p>
                     )}
+                    <RequestAttachments requestId={r.id} attachments={r.attachments ?? []} canUpload={r.status === 'PENDING' || r.status === 'NEEDS_INFO'} />
                   </div>
                   <span className={cn('text-xs px-2 py-0.5 rounded-full flex-shrink-0', STATUS_STYLE[r.status])}>
                     {STATUS_LABEL[r.status]}
@@ -258,6 +269,20 @@ const EMPTY = { title: '', description: '', departmentId: '', service: '', compe
               </select>
             </div>
             )}
+            <div className="space-y-1.5">
+              <Label htmlFor="req-files">Arquivos (opcional)</Label>
+              {/* The browser's own picker shows its language ("Choose Files"): a button of ours instead */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground hover:bg-neutral-bg">
+                  <Paperclip size={14} /> Escolher arquivos
+                </span>
+                <span className="text-xs text-muted-foreground truncate">
+                  {files.length === 0 ? 'Nenhum arquivo' : files.map((f) => f.name).join(', ')}
+                </span>
+                <input id="req-files" type="file" multiple accept={UPLOAD_ACCEPT} className="sr-only"
+                  onChange={(e) => setFiles(Array.from(e.target.files ?? []))} />
+              </label>
+            </div>
             {createMutation.isError && <p className="text-sm text-danger-text">Erro ao enviar. Tente novamente.</p>}
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>

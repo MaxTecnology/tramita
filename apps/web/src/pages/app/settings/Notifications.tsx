@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { FileSearch, Search, Send, ArrowLeft, Upload, Volume2, Trash2 } from 'lucide-react'
+import { WhatsAppTestRow } from '@/components/settings/WhatsAppTestRow'
 
 interface Config {
   whatsappEnabled?: boolean
@@ -493,6 +494,9 @@ export default function Notifications() {
                   Salvo: <span className="font-mono text-muted-foreground">{config.maximizebotTokenPreview}</span>
                 </p>
               )}
+            </div>
+            <div className={cn('transition-opacity', !form.whatsappEnabled && 'opacity-40 pointer-events-none')}>
+              <WhatsAppTestRow hasSavedToken={!!config?.maximizebotTokenPreview} />
             </div>
           </Section>
 

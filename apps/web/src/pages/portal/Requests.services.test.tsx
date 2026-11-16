@@ -54,3 +54,20 @@ it('"Outro" keeps the free request with the department', async () => {
   await userEvent.click(screen.getByRole('button', { name: /Enviar/ }))
   await waitFor(() => expect(sent).toMatchObject({ title: 'Alterar endereço', departmentId: 'd1' }))
 })
+
+it('files chosen in the new request are sent right after it is created', async () => {
+  const { api } = await import('@/lib/api')
+  // jsdom's FormData does not survive msw: the uploads are checked through a spy (create goes to msw)
+  const realPost = api.post.bind(api)
+  const post = vi.spyOn(api, 'post').mockImplementation((url: string, body?: unknown) =>
+    url.endsWith('/attachments') ? Promise.resolve({ data: {} }) : realPost(url, body))
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: /Nova solicitação/ }))
+  await userEvent.type(await screen.findByLabelText('Título'), 'Alterar endereço')
+  await userEvent.upload(screen.getByLabelText('Arquivos (opcional)'), [new File(['a'], 'comprovante.pdf'), new File(['b'], 'rg.pdf')])
+  await userEvent.click(screen.getByRole('button', { name: /Enviar/ }))
+  await waitFor(() => expect(post.mock.calls.filter(([u]) => u === '/portal/requests/r1/attachments')).toHaveLength(2))
+  const names = post.mock.calls.filter(([u]) => u === '/portal/requests/r1/attachments').map(([, f]) => ((f as FormData).get('file') as File).name)
+  expect(names).toEqual(['comprovante.pdf', 'rg.pdf'])
+  post.mockRestore()
+})

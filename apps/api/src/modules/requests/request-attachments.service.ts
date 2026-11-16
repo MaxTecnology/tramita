@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { uploadFile } from '@/lib/b2'
+import { uploadFile, getSignedDownloadUrl } from '@/lib/b2'
 import { AppError } from '@/errors/AppError'
 
 interface UploadPayload {
@@ -27,8 +27,9 @@ export async function createRequestAttachment(
     where: { id: requestId, organizationId, clientId },
   })
   if (!request) throw new AppError(404, 'Solicitação não encontrada')
-  if (request.status !== 'PENDING') {
-    throw new AppError(422, 'Só é possível enviar anexos enquanto a solicitação está pendente')
+  // Open = still under evaluation; "needs info" is exactly when the office waits for a file
+  if (request.status !== 'PENDING' && request.status !== 'NEEDS_INFO') {
+    throw new AppError(422, 'Só é possível enviar anexos enquanto a solicitação está em análise')
   }
 
   const orgSlug = await getOrgSlug(organizationId)
@@ -36,7 +37,7 @@ export async function createRequestAttachment(
   const storageKey = `request-attachments/${orgSlug}/${requestId}/${Date.now()}-${safeFilename}`
   await uploadFile(storageKey, payload.buffer, payload.mimeType)
 
-  return prisma.requestAttachment.create({
+  const created = await prisma.requestAttachment.create({
     data: {
       requestId,
       filename: payload.filename,
@@ -46,4 +47,12 @@ export async function createRequestAttachment(
       uploadedBy: clientId,
     },
   })
+  return (await presentRequestAttachments([created]))[0]
+}
+
+type AttachmentRow = { id: string; filename: string; mimeType: string; size: number; storageKey: string; uploadedBy: string; createdAt: Date }
+
+// What a screen may show of a request file: a temporary download link, never the storage key
+export async function presentRequestAttachments(rows: AttachmentRow[]) {
+  return Promise.all(rows.map(async ({ storageKey, ...a }) => ({ ...a, url: await getSignedDownloadUrl(storageKey) })))
 }

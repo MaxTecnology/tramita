@@ -6,6 +6,7 @@ import { getTemplate, renderTemplate, PREVIEW_VARS } from '@/lib/template'
 import { uploadFile, deleteFile } from '@/lib/b2'
 import type { NotificationEvent, MessageChannel, NotificationStatus } from '@prisma/client'
 import type { UpdateConfigBody, UpsertTemplateBody } from './notifications.schema'
+import { normalizarTelefoneBr } from '@/lib/phone'
 
 function maskToken(token: string): string {
   if (token.length <= 12) return '••••••••'
@@ -126,10 +127,12 @@ function providerErrorMessage(err: unknown): string {
 export async function testWhatsApp(organizationId: string, number: string) {
   const config = await prisma.notificationConfig.findUnique({ where: { organizationId } })
   if (!config?.maximizebotToken) throw new AppError(422, 'MaximizeBot não configurado')
+  // Typed as people write it ("(82) 99999-1234"): sent in the provider's format, invalid → 400
+  const to = normalizarTelefoneBr(number)
   const { sendWhatsApp } = await import('@/lib/maximizebot')
   try {
     await sendWhatsApp(config.maximizebotToken, {
-      number,
+      number: to,
       body: 'Teste de integração MaximizeBot — Tramita AutoHubs',
       saveOnTicket: false,
     })

@@ -60,4 +60,31 @@ describe('envio de teste com provedor recusando', () => {
       'Não foi possível enviar o WhatsApp de teste: o MaximizeBot recusou o envio (Request failed with status code 401).',
     )
   })
+
+  it('WhatsApp: accepts the number as people type it and sends it in the MaximizeBot format', async () => {
+    const { org, auth } = await adminAuth()
+    await prisma.notificationConfig.create({ data: { organizationId: org.id, maximizebotToken: 'Bearer x' } })
+    vi.mocked(sendWhatsApp).mockResolvedValueOnce({} as never)
+
+    const res = await app.inject({
+      method: 'POST', url: '/notifications/config/test-whatsapp', headers: { authorization: auth },
+      payload: { number: '(82) 99999-1234' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(vi.mocked(sendWhatsApp)).toHaveBeenCalledWith('Bearer x', expect.objectContaining({ number: '5582999991234' }))
+  })
+
+  it('WhatsApp: a number that is not a Brazilian phone is refused before calling the provider', async () => {
+    const { org, auth } = await adminAuth()
+    await prisma.notificationConfig.create({ data: { organizationId: org.id, maximizebotToken: 'Bearer x' } })
+
+    const res = await app.inject({
+      method: 'POST', url: '/notifications/config/test-whatsapp', headers: { authorization: auth },
+      payload: { number: '9999-1234' },
+    })
+
+    expect(res.statusCode).toBe(400)
+    expect(vi.mocked(sendWhatsApp)).not.toHaveBeenCalled()
+  })
 })

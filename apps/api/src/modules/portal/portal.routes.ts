@@ -134,11 +134,12 @@ export async function portalRoutes(app: FastifyInstance) {
   app.post('/requests/:id/attachments', { preHandler: [checkSubscription] }, async (request, reply) => {
     const { id: requestId } = request.params as { id: string }
 
-    const { upload } = await readUpload(request)
-
+    // Access first: a file is only read for a request this person can see
     const scope = await getClientAccessScope(request.user.sub)
     const found = await getRequestById(requestId, request.user.organizationId!)
     if (!canSeeTask(scope, found.clientId, found.departmentId)) throw new AppError(404, 'Solicitação não encontrada')
+
+    const { upload } = await readUpload(request)
     const attachment = await createRequestAttachment(
       requestId,
       request.user.organizationId!,

@@ -1,5 +1,11 @@
 # Débito Técnico — Tramita
 
+## Teste intermitente: `portal.protocols.routes.test.ts` › "each person who opens it is recorded once" (encontrado em 2026-11-16)
+
+Na suíte completa da API falhou uma vez com `expected 3 to be 2`: a segunda visualização da mesma pessoa gerou outro `VIEWED`. Isolado, passou 3/3, e passou em todas as outras rodadas completas do dia. O dedupe em `protocols.service.ts` (`findFirst` de `VIEWED` com `createdAt >= fileUpdatedAt ?? protocol.createdAt`) compara datas; todas vêm do lado da aplicação, então a hipótese de relógios diferentes (Node × Postgres) não se confirmou. Causa ainda desconhecida.
+
+**Próximo passo:** reproduzir em laço (`for i in $(seq 50)`) dentro da suíte completa; se confirmar, trocar o dedupe por índice único parcial (`protocolId, actorId, versão do arquivo`) com `createMany skipDuplicates`, que não depende de datas.
+
 ## Mocking de dependências externas em testes — padronizado em `vi.spyOn` ✅ (resolvido em 2026-09-20)
 
 **Contexto original:** `apps/api/src/test/setup.ts` cria uma única instância `buildApp()` no carregamento do módulo, antes que os `vi.mock(module, factory)` de cada arquivo de teste tenham chance de fazer hoist. Quando uma rota nova passa a importar de verdade um service que outro arquivo de teste mockava via `vi.mock(...)`, o app compartilhado já capturou o binding real, e o `vi.mock` do outro arquivo deixa de interceptar — causando chamadas reais (rede, fila) vazarem em testes que pareciam isolados.

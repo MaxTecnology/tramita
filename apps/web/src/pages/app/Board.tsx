@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { StageTimesPanel } from '@/components/shared/StageTimesPanel'
 import { AddOSDialog } from '@/components/process/AddOSDialog'
+import { ProcessDelayReason } from '@/components/process/ProcessDelayReason'
 import { DeadlineChip } from '@/components/shared/DeadlineChip'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -159,6 +160,7 @@ export default function Board() {
           <p className="text-xs md:text-sm text-muted-foreground truncate">{board.client.name}</p>
         </div>
         {board.deadline && <DeadlineChip deadline={board.deadline} className="flex-shrink-0" />}
+        {board.type === 'PROCESS' && <ProcessDelayReason boardId={board.id} pending={!!board.delayReasonPending} />}
         <button type="button" onClick={() => setShowStageTimes((v) => !v)} aria-pressed={showStageTimes}
           className="text-xs font-medium text-accent-hover hover:underline flex-shrink-0">
           Tempo por etapa

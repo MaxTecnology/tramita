@@ -15,6 +15,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
 import { useMyScope } from '@/hooks/useMyScope'
 import { useLinkedItem } from '@/hooks/useLinkedItem'
+import { RequestAttachments } from '@/components/requests/RequestAttachments'
 
 const STATUS_LABEL: Record<ClientRequest['status'], string> = {
   PENDING: 'Pendente',
@@ -269,6 +270,7 @@ export default function Requests() {
                     {r.status === 'CANCELLED' && r.cancelledByType === 'USER' && r.cancellationReason && (
                       <p className="text-xs text-muted-foreground mt-1 italic">Cancelada pelo escritório — motivo: {r.cancellationReason}</p>
                     )}
+                    <RequestAttachments requestId={r.id} attachments={r.attachments ?? []} canUpload={false} />
                   </div>
                   <span className={cn('text-xs px-2 py-0.5 rounded-full flex-shrink-0', STATUS_STYLE[r.status])}>
                     {STATUS_LABEL[r.status]}

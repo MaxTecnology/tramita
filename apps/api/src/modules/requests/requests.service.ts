@@ -13,6 +13,7 @@ import { assertDepartmentServesClient } from '@/modules/clients/client-coverage'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
 import type { CreateRequestBody, ApproveRequestBody, RejectRequestBody } from './requests.schema'
 import type { RequestStatus } from '@prisma/client'
+import { presentRequestAttachments } from './request-attachments.service'
 
 const CANCELLABLE_BY_CLIENT: RequestStatus[] = ['PENDING', 'NEEDS_INFO']
 const REVIEWABLE: RequestStatus[] = ['PENDING', 'NEEDS_INFO']
@@ -22,6 +23,12 @@ function withBoardId<T extends { task: { column: { boardId: string } } | null }>
 ): Omit<T, 'task'> & { boardId: string | null } {
   const { task, ...rest } = row
   return { ...rest, boardId: task?.column.boardId ?? null }
+}
+
+// A request as the screens list it: the files come with a download link (presentRequestAttachments)
+async function withAttachments<T extends { task: { column: { boardId: string } } | null; attachments: Parameters<typeof presentRequestAttachments>[0] }>(row: T) {
+  const { attachments, ...rest } = withBoardId(row)
+  return { ...rest, attachments: await presentRequestAttachments(attachments) }
 }
 
 // A service of the catalog brings its department (who evaluates it); a free request names one
@@ -129,19 +136,20 @@ export async function listRequestsForOrg(
       client: { select: { id: true, name: true } },
       task: { select: { column: { select: { boardId: true } } } },
       processTemplate: { select: { id: true, name: true } },
+      attachments: { orderBy: { createdAt: 'asc' } },
     },
     orderBy: { createdAt: 'desc' },
   })
-  return requests.map(withBoardId)
+  return Promise.all(requests.map(withAttachments))
 }
 
 export async function listRequestsForClient(organizationId: string, clientId: string, departmentIds?: string[]) {
   const requests = await prisma.request.findMany({
     where: { organizationId, clientId, ...(departmentIds ? { departmentId: { in: departmentIds } } : {}) },
-    include: { task: { select: { column: { select: { boardId: true } } } } },
+    include: { task: { select: { column: { select: { boardId: true } } } }, attachments: { orderBy: { createdAt: 'asc' } } },
     orderBy: { createdAt: 'desc' },
   })
-  return requests.map(withBoardId)
+  return Promise.all(requests.map(withAttachments))
 }
 
 async function getRequestOrThrow(id: string, organizationId: string, clientId?: string) {
@@ -162,7 +170,7 @@ export async function getRequestById(id: string, organizationId: string, clientI
     where: { requestId: id },
     orderBy: { createdAt: 'asc' },
   })
-  return { ...withBoardId(request), attachments }
+  return { ...withBoardId(request), attachments: await presentRequestAttachments(attachments) }
 }
 
 export async function cancelRequest(id: string, organizationId: string, clientId: string) {

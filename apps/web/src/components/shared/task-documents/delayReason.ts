@@ -76,3 +76,11 @@ export async function registerDelayReason(taskId: string): Promise<boolean> {
   await api.patch(`/tasks/${taskId}/delay-reason`, { delayReasonId: r.id, ...(r.note ? { delayNote: r.note } : {}) })
   return true
 }
+
+// Registers the reason of a process that finished late by itself (its last OS closed automatically)
+export async function registerProcessDelayReason(boardId: string): Promise<boolean> {
+  const r = await askReason('Motivo do atraso do processo', 'O processo terminou depois do prazo. O motivo fica no histórico e nos indicadores de atraso.', 'Registrar')
+  if (!r) return false
+  await api.patch(`/boards/${boardId}/delay-reason`, { delayReasonId: r.id, ...(r.note ? { delayNote: r.note } : {}) })
+  return true
+}

@@ -64,3 +64,9 @@ it('a free request still says the new process gets the default columns', async (
   await userEvent.click(await screen.findByRole('button', { name: 'Aprovar' }))
   expect(screen.getByText(/3 colunas padrão/)).toBeInTheDocument()
 })
+
+it('the office sees and downloads the files the client attached', async () => {
+  renderPage({ attachments: [{ id: 'a1', filename: 'contrato-social.pdf', mimeType: 'application/pdf', size: 5120, createdAt: '2026-11-15T12:00:00.000Z', url: 'https://signed.example/cs' }] })
+  expect(await screen.findByRole('link', { name: /contrato-social\.pdf/ })).toHaveAttribute('href', 'https://signed.example/cs')
+  expect(screen.queryByText('Anexar arquivo')).not.toBeInTheDocument()
+})

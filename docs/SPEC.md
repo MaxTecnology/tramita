@@ -503,7 +503,7 @@ Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma t
 **Motivo de atraso**
 ### `/delay-reasons` — GET (cria os padrões na primeira leitura: Aguardando órgão público, Retrabalho interno, Volume de trabalho, Outro com observação), POST/PATCH/DELETE (ORG_ADMIN; usado → desativa).
 - PATCH `/tasks/:id` com `status: DONE` e `/tasks/:id/move` para coluna de conclusão aceitam `delayReasonId`, `delayNote`, `processDelayReasonId`, `processDelayNote`. OS atrasada sem motivo → 422 `'Informe o motivo do atraso'`; última OS de processo atrasado → 422 `'Informe o motivo do atraso do processo'`; motivo com observação obrigatória → 422 `'Descreva o motivo'`. Conclusão automática não bloqueia: `delayReasonPending = true`.
-- PATCH `/tasks/:id/delay-reason` e `/boards/:id/delay-reason` `{ delayReasonId, delayNote? }` registram antes ou resolvem pendente (escopo de escrita da carteira: fora dela → 404). Histórico `delay_reason_set` / `process_delay_reason_set`.
+- PATCH `/tasks/:id/delay-reason` e `/boards/:id/delay-reason` `{ delayReasonId, delayNote? }` registram antes ou resolvem pendente (escopo de escrita da carteira: fora dela → 404). Histórico `delay_reason_set` / `process_delay_reason_set`. Na web, um processo concluído com atraso sem motivo (fechou sozinho) mostra "Processo concluído com atraso — registrar o motivo" no cabeçalho.
 
 **Listas e indicadores**
 ### GET `/os?clientId&osModelId&assigneeId&departmentId&boardId&situation&search` — OS (avulsas e de processo) com `deadline`, `process`, `link`; atrasadas primeiro; escopo de Tarefas.
@@ -544,6 +544,7 @@ Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma t
 ### GET `/portal/requests/:id` _(CLIENT)_
 ### PATCH `/portal/requests/:id/cancel` _(CLIENT)_
 ### POST `/portal/requests/:id/attachments` _(CLIENT)_ — multipart, max 20MB
+→ Aceito com a solicitação em análise (`PENDING` ou `NEEDS_INFO`; outra situação → 422). O acesso é conferido antes de ler o arquivo. Resposta e listas (`GET /requests`, `GET /requests/:id`, `GET /portal/requests`, `GET /portal/requests/:id`) trazem cada anexo como `{ id, filename, mimeType, size, uploadedBy, createdAt, url }` — `url` é link temporário (1h); a chave do storage nunca sai da API.
 
 ---
 
@@ -611,6 +612,7 @@ Envia mensagem de teste para validar configuração MaximizeBot.
 ```json
 { "number": "5582999999999" }
 ```
+→ `number` pode vir como a pessoa digita (`(82) 99999-1234`): é normalizado para o formato do MaximizeBot (só dígitos, com 55); número inválido → 400 sem chamar o provedor.
 
 ### POST `/notifications/config/test-email` _(ORG_ADMIN)_
 Envia email de teste para validar configuração SMTP.

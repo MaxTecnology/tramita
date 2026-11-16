@@ -156,6 +156,8 @@ export interface RequestAttachment {
   mimeType: string
   size: number
   createdAt: string
+  // Temporary download link (signed)
+  url: string
 }
 
 export interface ClientRequest {
