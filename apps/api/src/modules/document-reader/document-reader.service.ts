@@ -123,6 +123,7 @@ export async function processarDocumento(receivedDocumentId: string): Promise<vo
       base.tarefas = tarefas
         .flatMap((t) => t.deliverables.map((d) => ({
           id: t.id,
+          entregaId: d.id,
           clienteId: cliente.id,
           tipoImposto: d.obligationType?.code ?? '',
           competencia: competenciaParaRotulo(t.competence),
@@ -152,6 +153,7 @@ export async function processarDocumento(receivedDocumentId: string): Promise<vo
       // Não bloqueia — só um aviso pra fila de revisão (ver Task 10/14). Guardamos o id do
       // possível duplicado dentro de extractedFields pra não precisar de coluna nova só pra isso.
       taskId: decisao.acao === 'anexar' ? decisao.tarefaId : undefined,
+      deliverableId: decisao.acao === 'anexar' ? decisao.entregaId : undefined,
     },
   })
 
@@ -246,10 +248,11 @@ export async function listarFilaDeRevisao(
     },
     orderBy: { createdAt: 'asc' },
     include: {
+      deliverable: { select: { id: true, name: true, requiresPayment: true, obligationType: { select: { name: true } } } },
       task: {
         select: {
           id: true, title: true, competence: true,
-          column: { select: { board: { select: { client: { select: { name: true } } } } } },
+          column: { select: { board: { select: { client: { select: { name: true, cnpj: true, cpf: true, cei: true, caepf: true, inscricaoEstadual: true } } } } } },
           deliverables: {
             where: { deliveredAt: null },
             orderBy: { position: 'asc' },
@@ -261,13 +264,32 @@ export async function listarFilaDeRevisao(
   })
 
   return docs.map((doc) => {
-    const { task, ...rest } = doc
+    const { task, deliverable, ...rest } = doc
+    const campos = doc.extractedFields as Campos
+    const client = task?.column.board.client
+    const lido = pagamentoLido(doc)
+    // What the robot checked, for the queue: ✓ only when read and matching the suggested task
+    const checks = {
+      cnpj: client ? cnpjConfere(campos, client) === true : false,
+      competence: task ? competenciaConfere(campos, task.competence) === true : false,
+      payment: deliverable?.requiresPayment ? !!lido.amount && !!lido.paymentDueDate : true,
+    }
     return {
       ...rest,
       filename: filenameDaStorageKey(doc.storageKey),
       task: task
-        ? { id: task.id, title: task.title, competence: task.competence, client: task.column.board.client, pendingDeliverables: task.deliverables }
+        ? { id: task.id, title: task.title, competence: task.competence, client: { name: client!.name }, pendingDeliverables: task.deliverables }
         : null,
+      suggestion: task && deliverable
+        ? {
+            taskId: task.id, taskTitle: task.title, clientName: client!.name, competence: competenciaParaRotulo(task.competence),
+            deliverableId: deliverable.id, deliverableName: deliverable.name, obligationName: deliverable.obligationType?.name ?? null,
+            requiresPayment: deliverable.requiresPayment, amount: lido.amount ?? null, paymentDueDate: lido.paymentDueDate ?? null,
+          }
+        : null,
+      checks,
+      // Confirm in one click (alone or in bulk): suggestion and every check green
+      ready: !!task && !!deliverable && checks.cnpj && checks.competence && checks.payment,
     }
   })
 }
@@ -292,6 +314,23 @@ async function buscarDocumentoRevisavel(receivedDocumentId: string, organization
     throw new AppError(409, `Documento não está mais aguardando revisão (status atual: ${doc.status})`)
   }
   return doc
+}
+
+type ClientIds = { cnpj: string | null; cpf: string | null; cei: string | null; caepf: string | null; inscricaoEstadual: string | null }
+const CLIENT_ID_FIELDS = ['cnpj', 'cpf', 'cei', 'caepf', 'inscricaoEstadual'] as const
+
+// Same rules as the barriers below, as answers for the review queue (✓ / ⚠): null = not read
+function cnpjConfere(campos: Campos, cliente: ClientIds): boolean | null {
+  const lido = campos?.cnpj
+  if (!lido?.valido || !lido.valor) return null
+  const alvo = soDigitos(String(lido.valor))
+  return CLIENT_ID_FIELDS.some((campo) => !!cliente[campo] && soDigitos(cliente[campo]!) === alvo)
+}
+
+function competenciaConfere(campos: Campos, competence: Date | null): boolean | null {
+  const lida = [campos?.competencia, campos?.pa].find((c) => c?.valido && /^\d{4}-\d{2}$/.test(String(c.valor)))
+  if (!lida) return null
+  return competenciaParaRotulo(competence) === String(lida.valor)
 }
 
 // Só vale pra 'trocado' (trocarTarefa) — a tarefa de 'confirmado' já veio do casamento automático
@@ -382,10 +421,16 @@ async function anexarDocumento(
     where: { taskId, deliveredAt: null, task: { column: { board: { organizationId } } } },
     orderBy: { position: 'asc' },
   })
+  // The robot's suggestion names the delivery; a reviewer may pick another one of the same task
+  const escolhida = opcoes.deliverableId ?? (doc.taskId === taskId ? doc.deliverableId : null)
   let entrega = null
-  if (opcoes.deliverableId) {
-    entrega = pendentes.find((d) => d.id === opcoes.deliverableId) ?? null
-    if (!entrega) throw new AppError(404, 'Entrega pendente não encontrada nesta tarefa')
+  if (escolhida) {
+    entrega = pendentes.find((d) => d.id === escolhida) ?? null
+    if (!entrega) {
+      const existe = await prisma.taskDeliverable.findFirst({ where: { id: escolhida, taskId }, select: { deliveredAt: true } })
+      if (existe?.deliveredAt) throw new AppError(409, 'Essa entrega já foi feita')
+      throw new AppError(404, 'Entrega pendente não encontrada nesta tarefa')
+    }
   } else if (pendentes.length === 1) {
     entrega = pendentes[0]
   } else if (pendentes.length > 1) {
@@ -408,7 +453,7 @@ async function anexarDocumento(
     let attachmentId: string
     if (entrega) {
       // Preenche a entrega — gera/atualiza o protocolo que o cliente vê em "Documentos recebidos"
-      const entregue = await deliverDocument(taskId, entrega.id, organizationId, actor, payload, pagamento)
+      const entregue = await deliverDocument(taskId, entrega.id, organizationId, actor, payload, pagamento, { source: 'robot' })
       attachmentId = entregue.attachmentId!
     } else {
       attachmentId = (await createAttachment(taskId, organizationId, actor, payload)).id

@@ -268,6 +268,8 @@ export async function deliverDocument(
   actor: { id: string },
   payload: UploadPayload,
   payment: { amount?: string; paymentDueDate?: string } = {},
+  // robot = confirmed from the document reader queue (history says the robot checked it)
+  options: { source?: 'robot' } = {},
 ) {
   await verifyTaskAccess(taskId, organizationId)
   const deliverable = await prisma.taskDeliverable.findFirst({ where: { id: deliverableId, taskId }, include: { protocol: true } })
@@ -320,7 +322,7 @@ export async function deliverDocument(
 
   const statusBefore = (await prisma.task.findUniqueOrThrow({ where: { id: taskId }, select: { status: true } })).status
   await upsertProtocolForDeliverable(deliverableId, actor)
-  await trail(taskId, 'deliverable_delivered', { type: 'user', id: actor.id }, deliverable.name, payload.filename)
+  await trail(taskId, options.source === 'robot' ? 'deliverable_delivered_robot' : 'deliverable_delivered', { type: 'user', id: actor.id }, deliverable.name, payload.filename)
   await recalculateTaskStatus(taskId)
 
   return { ...updated, completion: await completionAfterDelivery(taskId, statusBefore) }

@@ -96,6 +96,8 @@ export interface Decisao {
   acao: 'anexar' | 'revisar' | 'nao_identificado'
   motivo: string
   tarefaId?: string
+  /** The exact delivery the document fills (with tarefaId) */
+  entregaId?: string
   clienteId?: string
 }
 
@@ -111,4 +113,6 @@ export interface Tarefa {
   tipoImposto: string
   competencia: string // YYYY-MM
   status: 'aberta' | 'concluida'
+  /** Pending delivery of this task marked for the robot with this obligation */
+  entregaId?: string
 }

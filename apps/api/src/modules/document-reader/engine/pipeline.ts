@@ -121,7 +121,7 @@ export function decidir(
   )
 
   if (candidatas.length === 1) {
-    return { acao: 'anexar', motivo: `${tipoImposto} ${rotulo} de ${cliente.razao}`, tarefaId: candidatas[0].id, clienteId: cliente.id }
+    return { acao: 'anexar', motivo: `${tipoImposto} ${rotulo} de ${cliente.razao}`, tarefaId: candidatas[0].id, entregaId: candidatas[0].entregaId, clienteId: cliente.id }
   }
   if (candidatas.length === 0) {
     return { acao: 'revisar', motivo: `Sem tarefa aberta de ${tipoImposto} ${rotulo} para ${cliente.razao}`, clienteId: cliente.id }
