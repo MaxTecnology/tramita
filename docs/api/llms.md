@@ -1430,17 +1430,17 @@ no additional properties
   no additional properties
   - **`departmentId` (required)**: `string`, pattern: `^[cC][^\s-]{8,}$`
   - **`responsibleUserId` (required)**: `string`, pattern: `^[cC][^\s-]{8,}$`
+- **`estado` (required)**: `string`, possible values: `"AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"`
+- **`ibgeCityCode` (required)**: `integer`
 - **`name` (required)**: `string`, minLength: `2`
 - **`bairro`**: `string | null`
 - **`caepf`**: `string | null`
 - **`cei`**: `string | null`
 - **`cep`**: `string | null`
-- **`cidade`**: `string | null`
 - **`clientType`**: `string`, possible values: `"PF", "PJ"`, default: `"PJ"`
 - **`cnpj`**: `string | null`
 - **`complemento`**: `string | null`
 - **`cpf`**: `string | null`
-- **`estado`**: `string | null`
 - **`inscricaoEstadual`**: `string | null`
 - **`logradouro`**: `string | null`
 - **`notes`**: `string | null`
@@ -1466,8 +1466,8 @@ no additional properties
   "phone": null,
   "notes": null,
   "cep": null,
-  "estado": null,
-  "cidade": null,
+  "estado": "AC",
+  "ibgeCityCode": 1,
   "bairro": null,
   "logradouro": null,
   "numero": null,
@@ -1621,17 +1621,17 @@ no additional properties
   no additional properties
   - **`departmentId` (required)**: `string`, pattern: `^[cC][^\s-]{8,}$`
   - **`responsibleUserId` (required)**: `string`, pattern: `^[cC][^\s-]{8,}$`
+- **`estado` (required)**: `string`, possible values: `"AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"`
+- **`ibgeCityCode` (required)**: `integer`
 - **`name` (required)**: `string`, minLength: `2`
 - **`bairro`**: `string | null`
 - **`caepf`**: `string | null`
 - **`cei`**: `string | null`
 - **`cep`**: `string | null`
-- **`cidade`**: `string | null`
 - **`clientType`**: `string`, possible values: `"PF", "PJ"`, default: `"PJ"`
 - **`cnpj`**: `string | null`
 - **`complemento`**: `string | null`
 - **`cpf`**: `string | null`
-- **`estado`**: `string | null`
 - **`inscricaoEstadual`**: `string | null`
 - **`logradouro`**: `string | null`
 - **`notes`**: `string | null`
@@ -1657,8 +1657,8 @@ no additional properties
   "phone": null,
   "notes": null,
   "cep": null,
-  "estado": null,
-  "cidade": null,
+  "estado": "AC",
+  "ibgeCityCode": 1,
   "bairro": null,
   "logradouro": null,
   "numero": null,
@@ -1808,7 +1808,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-17T22:25:59.164Z"
+  "dueDate": "2026-11-17T22:28:56.877Z"
 }
 ```
 
@@ -1882,7 +1882,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-17T22:25:59.167Z"
+  "dueDate": "2026-11-17T22:28:56.880Z"
 }
 ```
 
@@ -1972,7 +1972,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:25:59.169Z",
+  "dueDate": "2026-11-17T22:28:56.883Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2247,14 +2247,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:25:59.178Z",
+  "dueDate": "2026-11-17T22:28:56.893Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-17T22:25:59.178Z",
-  "competence": "2026-11-17T22:25:59.178Z",
+  "targetDate": "2026-11-17T22:28:56.893Z",
+  "competence": "2026-11-17T22:28:56.893Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -4319,7 +4319,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-17T22:25:59.226Z",
+  "dueDate": "2026-11-17T22:28:56.947Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -5318,7 +5318,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:25:59.252Z"
+  "dueDate": "2026-11-17T22:28:56.977Z"
 }
 ```
 
@@ -5375,7 +5375,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:25:59.253Z",
+  "dueDate": "2026-11-17T22:28:56.978Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -6131,7 +6131,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:25:59.269Z",
+  "dueMonth": "2026-11-17T22:28:57.002Z",
   "assignmentIds": [
     ""
   ]
@@ -6183,7 +6183,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:25:59.270Z",
+  "dueMonth": "2026-11-17T22:28:57.003Z",
   "assignmentIds": [
     ""
   ]
@@ -6226,7 +6226,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:25:59.271Z"
+  "dueMonth": "2026-11-17T22:28:57.004Z"
 }
 ```
 

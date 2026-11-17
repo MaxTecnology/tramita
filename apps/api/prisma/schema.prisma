@@ -180,6 +180,8 @@ model Client {
   cep         String?
   estado      String?
   cidade      String?
+  // IBGE code of the city (required by the API since 2026-11-17; null only on older clients)
+  ibgeCityCode Int?
   bairro      String?
   logradouro  String?
   numero      String?
@@ -191,6 +193,7 @@ model Client {
   updatedAt      DateTime @updatedAt
 
   organization             Organization              @relation(fields: [organizationId], references: [id])
+  municipality             Municipality?             @relation(fields: [ibgeCityCode], references: [ibgeCode], onDelete: Restrict)
   boards                   Board[]
   requests                 Request[]
   comments                 Comment[]
@@ -206,6 +209,8 @@ model Client {
   // - CHECK clients_document_by_type_check: PJ exige cnpj, PF exige cpf;
   // - índices únicos parciais (só clientes ativos): clients_codigo_active_key,
   //   clients_cnpj_active_key, clients_cpf_active_key — cliente desativado não trava recadastro.
+  @@index([organizationId, estado])
+  @@index([ibgeCityCode])
   @@map("clients")
 }
 
@@ -1449,6 +1454,8 @@ model Municipality {
   ibgeCode Int    @id
   name     String
   uf       String @db.Char(2)
+
+  clients Client[]
 
   @@index([uf])
   @@map("municipalities")

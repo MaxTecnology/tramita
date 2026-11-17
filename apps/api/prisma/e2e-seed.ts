@@ -92,6 +92,7 @@ async function main() {
       cep: '57312675',
       estado: 'AL',
       cidade: 'Arapiraca',
+      ibgeCityCode: 2700300,
       bairro: 'Centro',
       logradouro: 'Rua E2E',
       numero: '100',
@@ -266,7 +267,7 @@ async function main() {
     create: { name: 'Carteira E2E', email: 'carteira-e2e@g2a.com.br', passwordHash: await bcrypt.hash('Cliente@2025', 10), organizationId: org.id },
   })
   for (const [name, codigo, cnpj] of [['Carteira E2E A', 'E2E-101', '55101101000140'], ['Carteira E2E B', 'E2E-102', '55102202000136']]) {
-    const c = await prisma.client.create({ data: { name, codigo, cnpj, organizationId: org.id, clientType: 'PJ' } })
+    const c = await prisma.client.create({ data: { name, codigo, cnpj, organizationId: org.id, clientType: 'PJ', estado: 'AL', cidade: 'Arapiraca', ibgeCityCode: 2700300 } })
     await prisma.clientAssignment.create({ data: { clientId: c.id, departmentId: department.id, userId: leaving.id } })
     await prisma.clientUserAccess.create({ data: { clientUserId: portfolioUser.id, clientId: c.id, departmentId: department.id } })
   }

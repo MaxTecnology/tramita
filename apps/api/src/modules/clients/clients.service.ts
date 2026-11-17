@@ -13,7 +13,7 @@ const SELECT = {
   id: true, name: true, codigo: true, clientType: true, cnpj: true, cpf: true,
   cei: true, caepf: true, inscricaoEstadual: true,
   whatsapp: true, phone: true, notes: true,
-  cep: true, estado: true, cidade: true, bairro: true, logradouro: true, numero: true, complemento: true,
+  cep: true, estado: true, cidade: true, ibgeCityCode: true, bairro: true, logradouro: true, numero: true, complemento: true,
   isActive: true, createdAt: true,
 }
 
@@ -174,12 +174,21 @@ async function syncServedDepartments(tx: Prisma.TransactionClient, clientId: str
   }
 }
 
-function companyData(data: ClientBody) {
+function companyData(data: ClientBody, cidade: string) {
   const { departments: _departments, clientUsers: _clientUsers, ...company } = data
-  return company
+  return { ...company, cidade }
+}
+
+// The client's city must exist and belong to the informed state; its name comes from the table
+async function resolveClientCity(estado: string, ibgeCityCode: number): Promise<string> {
+  const city = await findMunicipality(ibgeCityCode)
+  if (!city) throw new AppError(400, 'Cidade não encontrada')
+  if (city.uf !== estado) throw new AppError(400, 'A cidade não pertence ao estado informado')
+  return city.name
 }
 
 export async function createClient(organizationId: string, data: ClientBody) {
+  const cidade = await resolveClientCity(data.estado, data.ibgeCityCode)
   try {
     return await prisma.$transaction(async (tx) => {
       const departmentNames = await resolveDepartmentNames(tx, organizationId, data)
@@ -189,7 +198,7 @@ export async function createClient(organizationId: string, data: ClientBody) {
         await findInactiveExistingUserIds(tx, organizationId, data.clientUsers),
       )
 
-      const client = await tx.client.create({ data: { ...companyData(data), organizationId } })
+      const client = await tx.client.create({ data: { ...companyData(data, cidade), organizationId } })
       await syncServedDepartments(tx, client.id, data.departments)
       await upsertClientUserLinks(tx, client.id, organizationId, data.clientUsers)
 
@@ -203,6 +212,7 @@ export async function createClient(organizationId: string, data: ClientBody) {
 }
 
 export async function updateClient(id: string, organizationId: string, data: ClientBody) {
+  const cidade = await resolveClientCity(data.estado, data.ibgeCityCode)
   try {
     return await prisma.$transaction(async (tx) => {
       await lockClients(tx, [id]) // serializes with task creation and client-user changes of this client
@@ -221,7 +231,7 @@ export async function updateClient(id: string, organizationId: string, data: Cli
       const removed = current.map((a) => a.departmentId).filter((departmentId) => !keep.has(departmentId))
       await assertCanUnserveDepartments(tx, id, removed)
 
-      const updated = await tx.client.update({ where: { id }, data: companyData(data), select: SELECT })
+      const updated = await tx.client.update({ where: { id }, data: companyData(data, cidade), select: SELECT })
       await syncServedDepartments(tx, id, data.departments)
 
       const resolvedPairs = await upsertClientUserLinks(tx, id, organizationId, data.clientUsers)

@@ -1,12 +1,30 @@
 import { z } from 'zod'
 import { cnpjValido, cpfValido, soDigitos } from '@/lib/documento'
+import { UFS } from '@/lib/uf'
 
 const optionalText = z
   .string()
   .nullish()
   .transform((v) => (v && v.trim() ? v.trim() : null))
 
-const PJ_ADDRESS_FIELDS = ['cep', 'estado', 'cidade', 'bairro', 'logradouro', 'numero'] as const
+// State and city are required of every client (PF and PJ) and checked on their own; the city's
+// name is not taken from the body: it comes from the IBGE table (service)
+const PJ_ADDRESS_FIELDS = ['cep', 'bairro', 'logradouro', 'numero'] as const
+
+const emptyToUndefined = (v: unknown) => (v === '' || v === null ? undefined : v)
+
+const estadoSchema = z.preprocess(
+  emptyToUndefined,
+  z.enum(UFS, {
+    errorMap: (issue) => ({ message: issue.code === 'invalid_type' ? 'Informe o estado do cliente' : 'Estado inválido' }),
+  }),
+)
+
+const ibgeCityCodeSchema = z.preprocess(
+  emptyToUndefined,
+  z.number({ required_error: 'Informe a cidade do cliente', invalid_type_error: 'Informe a cidade do cliente' })
+    .int('Informe a cidade do cliente'),
+)
 
 const companyFieldsObject = z.object({
   name: z.string({ required_error: 'Informe o nome do cliente' }).trim().min(2, 'Informe o nome do cliente'),
@@ -26,8 +44,8 @@ const companyFieldsObject = z.object({
   phone: optionalText,
   notes: optionalText,
   cep: optionalText,
-  estado: optionalText,
-  cidade: optionalText,
+  estado: estadoSchema,
+  ibgeCityCode: ibgeCityCodeSchema,
   bairro: optionalText,
   logradouro: optionalText,
   numero: optionalText,

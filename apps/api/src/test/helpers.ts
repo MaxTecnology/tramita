@@ -96,11 +96,17 @@ let testClientCounter = 0
 
 export async function createTestClient(
   organizationId: string,
-  overrides: Partial<{ isActive: boolean; name: string; codigo: string; cnpj: string }> = {},
+  overrides: Partial<{ isActive: boolean; name: string; codigo: string; cnpj: string; estado: string | null; ibgeCityCode: number | null }> = {},
 ) {
   const n = ++testClientCounter
+  // Located in Aracaju/SE unless told otherwise (the city name follows the IBGE code, as the API does)
+  const ibgeCityCode = overrides.ibgeCityCode === undefined ? 2800308 : overrides.ibgeCityCode
+  const city = ibgeCityCode === null ? null : await prisma.municipality.findUnique({ where: { ibgeCode: ibgeCityCode } })
   return prisma.client.create({
     data: {
+      estado: overrides.estado === undefined ? city?.uf ?? 'SE' : overrides.estado,
+      ibgeCityCode,
+      cidade: city?.name ?? null,
       name: overrides.name ?? 'Test Client',
       organizationId,
       isActive: overrides.isActive ?? true,

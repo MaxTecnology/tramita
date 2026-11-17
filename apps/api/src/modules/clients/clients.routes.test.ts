@@ -111,7 +111,7 @@ describe('POST /clients', () => {
       headers: { authorization: auth },
       payload: {
         name: 'ACME LTDA', codigo: '1', clientType: 'PJ', cnpj: '11222333000181',
-        cep: '57312675', estado: 'AL', cidade: 'Arapiraca', bairro: 'Centro', logradouro: 'Rua A', numero: '10',
+        cep: '57312675', estado: 'AL', ibgeCityCode: 2700300, bairro: 'Centro', logradouro: 'Rua A', numero: '10',
         clientUsers: [],
       },
     })
@@ -130,7 +130,7 @@ describe('POST /clients', () => {
       headers: { authorization: auth },
       payload: {
         name: 'ACME LTDA', codigo: '1', clientType: 'PJ', cnpj: '11.222.333/0001-81',
-        cep: '57312675', estado: 'AL', cidade: 'Arapiraca', bairro: 'Centro', logradouro: 'Rua A', numero: '10',
+        cep: '57312675', estado: 'AL', ibgeCityCode: 2700300, bairro: 'Centro', logradouro: 'Rua A', numero: '10',
         departments: [{ departmentId: dept.id, responsibleUserId: user.id }],
         clientUsers: [{ name: 'Contato', email: `c-${Date.now()}@x.com`, password: 'Senha@1234', departmentIds: [dept.id] }],
       },

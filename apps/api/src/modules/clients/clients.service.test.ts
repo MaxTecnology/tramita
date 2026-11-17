@@ -48,7 +48,7 @@ function body(overrides: Partial<ClientBody> & Pick<ClientBody, 'departments' | 
     cpf: null,
     cei: null, caepf: null, inscricaoEstadual: null,
     whatsapp: null, phone: null, notes: null,
-    cep: '57312675', estado: 'AL', cidade: 'Arapiraca', bairro: 'Centro', logradouro: 'Rua A', numero: '10',
+    cep: '57312675', estado: 'AL', ibgeCityCode: 2700300, bairro: 'Centro', logradouro: 'Rua A', numero: '10',
     complemento: null,
     ...overrides,
   }

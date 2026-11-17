@@ -21,7 +21,7 @@ function body(departments: ClientBody['departments'], departmentIds: string[]): 
   return {
     name: 'ACME LTDA', codigo: `RD-${Date.now()}-${n}`, clientType: 'PJ', cnpj: generateValidCnpj(Date.now() * 1000 + n), cpf: null,
     cei: null, caepf: null, inscricaoEstadual: null, whatsapp: null, phone: null, notes: null,
-    cep: '57312675', estado: 'AL', cidade: 'Arapiraca', bairro: 'Centro', logradouro: 'Rua A', numero: '10', complemento: null,
+    cep: '57312675', estado: 'AL', ibgeCityCode: 2700300, bairro: 'Centro', logradouro: 'Rua A', numero: '10', complemento: null,
     departments,
     clientUsers: [{ name: 'Contato', email: `rd-${Date.now()}-${n}@x.com`, password: 'Senha@1234', departmentIds }],
   }
