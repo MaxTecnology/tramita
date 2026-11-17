@@ -133,6 +133,8 @@ describe('uma OS libera a próxima', () => {
   it('the manager can release early with a reason; a member cannot', async () => {
     const c = await setup()
     const { tasks: [, b] } = await process(c, [{ dependsOn: [] }, { dependsOn: [0] }])
+    // A member who sees the process (same department) still cannot release: it is the manager's call
+    await prisma.userDepartment.create({ data: { userId: c.member.id, departmentId: c.dept.id } })
     const byMember = await app.inject({ method: 'POST', url: `/tasks/${b.id}/release`, headers: { authorization: c.memberAuth }, payload: { reason: 'Junta liberou antes' } })
     expect(byMember.statusCode).toBe(403)
     const ok = await app.inject({ method: 'POST', url: `/tasks/${b.id}/release`, headers: { authorization: c.auth }, payload: { reason: 'Junta liberou antes' } })

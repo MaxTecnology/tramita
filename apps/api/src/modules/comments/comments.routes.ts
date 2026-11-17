@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
+import { checkSubscription } from '@/middlewares/checkSubscription'
 import { requireRole } from '@/middlewares/requireRole'
 import { staffScope, param, assertStaffSees } from '@/middlewares/staffScope'
 import { getStaffScope } from '@/modules/staff-scope/staff-scope'
@@ -22,7 +23,7 @@ export async function commentsRoutes(app: FastifyInstance) {
   })
 
   app.post('/tasks/:taskId/comments', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT'), checkSubscription],
   }, async (request, reply) => {
     const { taskId } = request.params as { taskId: string }
     const result = createCommentSchema.safeParse(request.body)
@@ -39,6 +40,7 @@ export async function commentsRoutes(app: FastifyInstance) {
   app.delete('/comments/:id', {
     preHandler: [
       requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT'),
+      checkSubscription,
       // Moderating comments stays within the staff scope of the comment's task
       async (request) => {
         if (request.user.role !== 'ORG_MANAGER' && request.user.role !== 'ORG_MEMBER') return

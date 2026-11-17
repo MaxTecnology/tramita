@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
+import { staffScope, param } from '@/middlewares/staffScope'
 import { AppError } from '@/errors/AppError'
 import { openOSSchema, addOSToProcessSchema, releaseEarlySchema, listOSQuerySchema } from './os.schema'
 import { listOS } from './os-list.service'
@@ -49,7 +50,7 @@ export async function osRoutes(app: FastifyInstance) {
   })
 
   // Manager/admin releases an OS before the one it waits for finishes (reason goes to the history)
-  app.post('/tasks/:id/release', { preHandler: staffWrite }, async (request) => {
+  app.post('/tasks/:id/release', { preHandler: [...staffWrite, staffScope((r) => ({ taskIds: param(r, 'id') }), 'write')] }, async (request) => {
     const { id } = request.params as { id: string }
     const body = releaseEarlySchema.safeParse(request.body)
     if (!body.success) throw new AppError(400, body.error.errors[0].message)

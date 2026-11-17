@@ -1,6 +1,8 @@
 // apps/api/src/modules/request-comments/request-comments.routes.ts
 import type { FastifyInstance } from 'fastify'
 import { verifyJWT } from '@/middlewares/verifyJWT'
+import { checkSubscription } from '@/middlewares/checkSubscription'
+import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/middlewares/requireRole'
 import { AppError } from '@/errors/AppError'
 import { createRequestCommentSchema } from './request-comments.schema'
@@ -28,7 +30,7 @@ export async function requestCommentsRoutes(app: FastifyInstance) {
   })
 
   app.post('/requests/:requestId/comments', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT')],
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT'), checkSubscription],
   }, async (request, reply) => {
     const { requestId } = request.params as { requestId: string }
     const result = createRequestCommentSchema.safeParse(request.body)
@@ -43,7 +45,17 @@ export async function requestCommentsRoutes(app: FastifyInstance) {
   })
 
   app.delete('/request-comments/:id', {
-    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT')],
+    preHandler: [
+      requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER', 'CLIENT'),
+      checkSubscription,
+      // Moderation stays within the staff scope of the comment's request (the hook above only sees :requestId)
+      async (request) => {
+        if (request.user.role !== 'ORG_MEMBER' && request.user.role !== 'ORG_MANAGER') return
+        const { id } = request.params as { id: string }
+        const comment = await prisma.requestComment.findFirst({ where: { id, request: { organizationId: request.user.organizationId! } }, select: { requestId: true } })
+        if (comment) await assertRequestInStaffScope(comment.requestId, request.user.organizationId!, await getStaffScope(request))
+      },
+    ],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(

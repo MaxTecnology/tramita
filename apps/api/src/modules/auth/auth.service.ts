@@ -28,14 +28,43 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash)
 }
 
+// Failed logins per account (besides the per-IP limit of the rate-limit plugin): after the budget the
+// account answers 429 until the window passes; a successful login clears it
+const LOGIN_WINDOW_SECONDS = 15 * 60
+const loginAttemptsKey = (email: string) => `login-attempts:${email.trim().toLowerCase()}`
+function loginBudget(): number {
+  const value = Number(process.env.RATE_LIMIT_LOGIN_MAX ?? 10)
+  return Number.isInteger(value) && value > 0 ? value : 10
+}
+// Compared when the e-mail does not exist, so the answer takes as long as for a real account
+const DUMMY_HASH = bcrypt.hashSync('tramita-dummy-password', 10)
+
 export async function login(email: string, password: string): Promise<LoginResponse> {
+  const attemptsKey = loginAttemptsKey(email)
+  if (Number((await redis.get(attemptsKey)) ?? 0) >= loginBudget()) {
+    throw new AppError(429, 'Muitas tentativas de login. Tente de novo em alguns minutos.')
+  }
+  try {
+    const session = await tryLogin(email, password)
+    await redis.del(attemptsKey)
+    return session
+  } catch (err) {
+    if (err instanceof AppError && err.statusCode === 401) {
+      const failures = await redis.incr(attemptsKey)
+      if (failures === 1) await redis.expire(attemptsKey, LOGIN_WINDOW_SECONDS)
+    }
+    throw err
+  }
+}
+
+async function tryLogin(email: string, password: string): Promise<LoginResponse> {
   // Try User table first
   const user = await prisma.user.findUnique({
     where: { email },
     include: { organization: { select: { name: true } } },
   })
   // A deactivated staff member keeps the row (history, authorship) but never signs in again
-  if (user && user.isActive && (await verifyPassword(password, user.passwordHash))) {
+  if (user && (await verifyPassword(password, user.passwordHash)) && user.isActive) {
     return buildSession(user.id, user.name, user.role as Role, user.organizationId, user.organization?.name ?? null)
   }
 
@@ -47,6 +76,8 @@ export async function login(email: string, password: string): Promise<LoginRespo
     where: { email, isActive: true },
     include: { organization: { select: { name: true } } },
   })
+  // Nobody with this e-mail: still one password check (same time as a real account)
+  if (!user && clientUserCandidates.length === 0) await verifyPassword(password, DUMMY_HASH)
   for (const clientUser of clientUserCandidates) {
     if (await verifyPassword(password, clientUser.passwordHash)) {
       return buildSession(

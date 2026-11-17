@@ -62,6 +62,7 @@ Login unificado — role no JWT discrimina acesso (`MASTER`, `ORG_ADMIN`, `ORG_M
 ```
 
 → Usuário da equipe desativado (`isActive=false`) não entra (401, como credencial inválida).
+→ Senha errada conta por conta (e-mail): depois de `RATE_LIMIT_LOGIN_MAX` falhas (padrão 10) em 15 min → 429 `'Muitas tentativas de login. Tente de novo em alguns minutos.'`; login certo zera. E-mail inexistente faz a mesma conferência de senha (sem pista de tempo). Os limites por IP/usuário do plugin ficam no Redis.
 
 ### POST `/auth/refresh` — `{ "refreshToken": "string" }`
 → Equipe/Master: recarrega o usuário do banco — desativado → 401 (e as sessões dele caem); o novo access token sai com o papel e a organização **atuais** (um gerente rebaixado não mantém o papel antigo). CLIENT desativado → 401.
@@ -340,6 +341,7 @@ Não há rota para criar, editar, reordenar ou remover colunas: elas nascem com 
 ### POST `/tasks/:id/attachments` — multipart, max 20MB
 ### GET `/tasks/:id/attachments` — lista com `signedUrl` TTL 1h
 ### DELETE `/tasks/:id/attachments/:attachmentId`
+→ Arquivo que é registro de algo não é removido (409): o arquivo atual de um documento pedido ao cliente ("para trocar, envie outro"), de uma entrega, de um protocolo, o comprovante de pagamento, o lido pelo robô e os de aprovação. Versões antigas e anexos livres podem ser removidos.
 
 ---
 
@@ -449,6 +451,7 @@ ou
 
 ### GET `/portal/tasks/:taskId/documents` _(CLIENT)_ — mesmo formato de `GET /tasks/:id/documents`; 404 se a tarefa não pertence ao cliente ou não é `visibleToClient`
 ### POST `/portal/tasks/:taskId/documents/requests/:reqId/upload` _(CLIENT)_ — multipart, max 20MB — cliente envia o documento pedido pelo escritório
+→ Documento já aprovado → 409 `'Este documento já foi aprovado pelo escritório'`; tarefa concluída/desconsiderada → 409 `'A tarefa já foi encerrada pelo escritório'`. A lista de documentos traz do arquivo só `id, filename, mimeType, size, reviewStatus, createdAt` e o `signedUrl` (nunca a chave do storage).
 ### POST / DELETE `/portal/tasks/:taskId/documents/requests/:reqId/not-applicable` _(CLIENT)_ — "Nada a enviar" (PENDING/REJECTED → `NOT_APPLICABLE`, conta como resolvido igual APPROVED) e desfazer (volta a PENDING; 409 `'A tarefa já foi concluída'` se a tarefa está DONE). O escritório pode recusar um `NOT_APPLICABLE` via `PATCH /tasks/:id/documents/requests/:reqId` `{ decision: 'REJECTED', rejectionReason }`.
 
 ---
@@ -504,7 +507,7 @@ Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma t
 
 **Prazo, pausa, dependência**
 - Meta (`targetDate`) = `releasedAt` + `deadlineBusinessDays` + dias úteis pausados. Pausa (`TaskPause`) enquanto houver documento obrigatório do cliente `PENDING`/`REJECTED` ou aprovação do cliente pendente (`UPLOADED` não pausa) — inclusive a OS que já nasce liberada pedindo documento (nasce pausada). Processo: `BoardPause` quando todas as OS liberadas e abertas estão pausadas; meta do processo = abertura + prazo + pausas; `completedAt` quando todas as tarefas terminam.
-- OS não liberada: PATCH de status e `/move` → 409 `'Esta OS aguarda: <títulos>'`. Concluir/desconsiderar libera as dependentes (uma vez; sino `OS_RELEASED`). POST `/tasks/:id/release` `{ reason }` (ORG_ADMIN/ORG_MANAGER) libera antes (histórico `os_released_early`).
+- OS não liberada: PATCH de status e `/move` → 409 `'Esta OS aguarda: <títulos>'`. Concluir/desconsiderar libera as dependentes (uma vez; sino `OS_RELEASED`). POST `/tasks/:id/release` `{ reason }` (ORG_ADMIN/ORG_MANAGER, dentro do escopo de escrita: fora dele → 404) libera antes (histórico `os_released_early`).
 - PATCH `/tasks/:id` com `status` move o cartão junto: `DONE` vai para a primeira coluna `statusEffect = DONE` do board; reabrir uma tarefa que está numa coluna `DONE` leva à coluna do novo status (ou à primeira não-DONE). Grava `moved_to`.
 - GET `/tasks?dateField=period&dateFrom&dateTo` inclui também as tarefas abertas com meta (ou vencimento, sem meta) antes de `dateFrom`.
 - Listas trazem `deadline: { state: NONE|ON_TIME|DUE_SOON|LATE|PAUSED|WAITING_DEPENDENCY|DONE, businessDaysLeft?, businessDaysLate?, pausedSinceDays?, officeBusinessDays, clientBusinessDays }` (GET `/tasks`, `/boards`, `/boards/:id` — tarefas e processo) e `waitingFor: string[]`.

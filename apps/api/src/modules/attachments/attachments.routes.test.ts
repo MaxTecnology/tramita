@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { app } from '@/test/setup'
+import { prisma } from '@/lib/prisma'
 import * as b2Module from '@/lib/b2'
 import {
   createTestPlan,
@@ -88,5 +89,36 @@ describe('GET /tasks/:id/attachments', () => {
     })
     expect(res.statusCode).toBe(200)
     expect(Array.isArray(JSON.parse(res.body))).toBe(true)
+  })
+})
+
+describe('arquivo que é registro de algo não é apagado', () => {
+  const del = (taskId: string, id: string, auth: string) => app.inject({ method: 'DELETE', url: `/tasks/${taskId}/attachments/${id}`, headers: { authorization: auth } })
+  const attach = (taskId: string, uploadedBy: string) =>
+    prisma.attachment.create({ data: { taskId, uploadedBy, filename: 'x.pdf', mimeType: 'application/pdf', size: 1, storageKey: `k/${Math.random()}` } })
+
+  it('the current file of a client document cannot be deleted (send another to replace it)', async () => {
+    const { task, user, auth } = await setup()
+    const file = await attach(task.id, user.id)
+    await prisma.taskDocumentRequirement.create({ data: { taskId: task.id, name: 'Contrato social', position: 0, status: 'APPROVED', attachmentId: file.id } })
+    const res = await del(task.id, file.id, auth)
+    expect(res.statusCode).toBe(409)
+    expect(JSON.parse(res.body).message).toBe('Esse arquivo é o documento "Contrato social" — para trocar, envie outro')
+    expect(b2Module.deleteFile).not.toHaveBeenCalled()
+  })
+
+  it('the file of a delivery cannot be deleted', async () => {
+    const { task, user, auth } = await setup()
+    const file = await attach(task.id, user.id)
+    await prisma.taskDeliverable.create({ data: { taskId: task.id, name: 'Guia DAS', position: 0, attachmentId: file.id, deliveredAt: new Date() } })
+    const res = await del(task.id, file.id, auth)
+    expect(res.statusCode).toBe(409)
+    expect(JSON.parse(res.body).message).toBe('Esse arquivo é a entrega "Guia DAS" e não pode ser removido')
+  })
+
+  it('a free attachment is still deleted', async () => {
+    const { task, user, auth } = await setup()
+    const file = await attach(task.id, user.id)
+    expect((await del(task.id, file.id, auth)).statusCode).toBe(204)
   })
 })

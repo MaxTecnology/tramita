@@ -1,10 +1,10 @@
 # Débito Técnico — Tramita
 
-## Auditoria de segurança de 2026-11-16 — lotes 2 e 3 pendentes (lote 1 resolvido)
+## Auditoria de segurança de 2026-11-16 — lote 3 pendente (lotes 1 e 2 resolvidos)
 
 Resolvido no lote 1: usuário desativado não loga e o refresh recarrega papel/ativo do banco, com sessões indexadas e revogadas ao desativar, rebaixar, redefinir senha ou trocar a própria senha (ALTO-1, MÉDIO-2); histórico do portal com lista de ações permitidas e sem `actorId` (ALTO-2); stream do board só com o nome do evento para o CLIENT (ALTO-3); responsável de tarefa/OS/processo precisa ser da equipe ativa do mesmo escritório (MÉDIO-1).
 
-**Lote 2 (próximo):**
+**Lote 2 ✅ (resolvido em 2026-11-16):** limite de login por conta no Redis + hash fictício; cliente não troca documento aprovado nem envia em tarefa encerrada; arquivo vinculado não é removido; escopo em `DELETE /request-comments/:id` e `POST /tasks/:id/release`; `listTaskDocuments` sem chave do storage; `checkSubscription` nos comentários. Itens originais:
 - MÉDIO-3: limite de login por conta com store Redis no `@fastify/rate-limit` e `bcrypt.compare` contra hash fictício quando o e-mail não existe (enumeração por tempo).
 - MÉDIO-5: cliente não reenvia arquivo para requisito `APPROVED` nem em tarefa encerrada (`task-documents.service.ts` `uploadForRequirement`).
 - MÉDIO-6: anexo vinculado (requisito, entregável, protocolo, comprovante de pagamento, aprovação) não pode ser apagado; CLIENT só apaga anexo livre.

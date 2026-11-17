@@ -2,6 +2,7 @@ import fp from 'fastify-plugin'
 import rateLimit from '@fastify/rate-limit'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { verifyAccessToken } from '@/lib/jwt'
+import { redis } from '@/lib/redis'
 
 // Budgets per minute. Signed in: per person (an office shares one public IP — a per-IP budget would
 // throttle a whole team in normal use). Not signed in (login, sign-up, forged tokens): per IP and
@@ -28,6 +29,9 @@ export default fp(async function (app: FastifyInstance) {
   const perIp = budget('RATE_LIMIT_MAX', 100)
   const perUser = budget('RATE_LIMIT_USER_MAX', 300)
   await app.register(rateLimit, {
+    // Shared counters: the limit holds with more than one API replica; Redis down → requests pass
+    redis,
+    skipOnError: true,
     timeWindow: '1 minute',
     // CORS preflights carry no work and would halve the real budget
     allowList: (request) => request.method === 'OPTIONS',

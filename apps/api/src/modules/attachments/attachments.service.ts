@@ -173,13 +173,25 @@ export async function deleteAttachment(
 
   const attachment = await prisma.attachment.findFirst({
     where: { id: attachmentId, taskId, deletedAt: null },
-    include: { approvalFileOf: { select: { id: true } }, approvalProofOf: { select: { id: true } } },
+    include: {
+      approvalFileOf: { select: { id: true } }, approvalProofOf: { select: { id: true } },
+      documentRequirement: { select: { name: true } }, deliverable: { select: { name: true } },
+      protocol: { select: { title: true } }, paymentProofOf: { select: { title: true } }, receivedDocument: { select: { id: true } },
+    },
   })
   if (!attachment) throw new AppError(404, 'Anexo não encontrado')
-  // It is the record of a client approval (file sent or proof of the outside approval)
+  // A file that is the record of something stays: removing it would leave the record pointing to
+  // nothing. Older versions of a document and free attachments can still go.
   if (attachment.approvalFileOf || attachment.approvalProofOf) {
     throw new AppError(409, 'Esse arquivo faz parte de uma aprovação do cliente e não pode ser removido')
   }
+  if (attachment.documentRequirement) {
+    throw new AppError(409, `Esse arquivo é o documento "${attachment.documentRequirement.name}" — para trocar, envie outro`)
+  }
+  if (attachment.deliverable) throw new AppError(409, `Esse arquivo é a entrega "${attachment.deliverable.name}" e não pode ser removido`)
+  if (attachment.protocol) throw new AppError(409, `Esse arquivo é do protocolo "${attachment.protocol.title}" e não pode ser removido`)
+  if (attachment.paymentProofOf) throw new AppError(409, `Esse arquivo é o comprovante de pagamento de "${attachment.paymentProofOf.title}" e não pode ser removido`)
+  if (attachment.receivedDocument) throw new AppError(409, 'Esse arquivo foi lido pelo robô de documentos e não pode ser removido')
 
   // An attachment uploaded by "the client" is attributed to the company, not to a single
   // ClientUser — any ClientUser with access to that company (and department, enforced above

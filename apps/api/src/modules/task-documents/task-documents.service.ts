@@ -75,23 +75,26 @@ export async function verifyTaskAccess(taskId: string, organizationId: string, c
   return task
 }
 
+// What a screen gets of a document's file (the client included): no storage key, no uploader ids
+const ATTACHMENT_FILE = { id: true, filename: true, mimeType: true, size: true, reviewStatus: true, createdAt: true, storageKey: true } as const
+
 export async function listTaskDocuments(taskId: string, organizationId: string, clientUserId?: string) {
   await verifyTaskAccess(taskId, organizationId, clientUserId)
 
   const [requirements, deliverables] = await Promise.all([
-    prisma.taskDocumentRequirement.findMany({ where: { taskId }, orderBy: { position: 'asc' }, include: { attachment: true } }),
-    prisma.taskDeliverable.findMany({ where: { taskId }, orderBy: { position: 'asc' }, include: { attachment: true } }),
+    prisma.taskDocumentRequirement.findMany({ where: { taskId }, orderBy: { position: 'asc' }, include: { attachment: { select: ATTACHMENT_FILE } } }),
+    prisma.taskDeliverable.findMany({ where: { taskId }, orderBy: { position: 'asc' }, include: { attachment: { select: ATTACHMENT_FILE } } }),
   ])
+  // The storage key only signs the link: it never leaves the API
+  const present = async <T extends { attachment: { storageKey: string } | null }>(row: T) => {
+    const { attachment, ...rest } = row
+    const { storageKey, ...file } = attachment ?? { storageKey: '' }
+    return { ...rest, attachment: attachment ? file : null, signedUrl: attachment ? await getSignedDownloadUrl(storageKey) : null }
+  }
 
   return {
-    requirements: await Promise.all(requirements.map(async (r) => ({
-      ...r,
-      signedUrl: r.attachment ? await getSignedDownloadUrl(r.attachment.storageKey) : null,
-    }))),
-    deliverables: await Promise.all(deliverables.map(async (d) => ({
-      ...d,
-      signedUrl: d.attachment ? await getSignedDownloadUrl(d.attachment.storageKey) : null,
-    }))),
+    requirements: await Promise.all(requirements.map(present)),
+    deliverables: await Promise.all(deliverables.map(present)),
   }
 }
 
@@ -125,6 +128,12 @@ export async function uploadForRequirement(
   const task = await verifyTaskAccess(taskId, organizationId, clientUserId)
   const requirement = await prisma.taskDocumentRequirement.findFirst({ where: { id: requirementId, taskId } })
   if (!requirement) throw new AppError(404, 'Documento não encontrado')
+  // The client sends while the office still waits for it: an approved document is the record of what
+  // was accepted, and a finished task takes nothing more (the office itself may still replace a file)
+  if (actor.type === 'client') {
+    if (requirement.status === 'APPROVED') throw new AppError(409, 'Este documento já foi aprovado pelo escritório')
+    if (task.status === 'DONE' || task.status === 'DISREGARDED') throw new AppError(409, 'A tarefa já foi encerrada pelo escritório')
+  }
 
   const orgSlug = await getOrgSlug(organizationId)
   const storageKey = `task-documents/${orgSlug}/${taskId}/${Date.now()}-${storageSafeName(payload.filename)}`

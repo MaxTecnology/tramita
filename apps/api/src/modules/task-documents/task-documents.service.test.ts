@@ -283,3 +283,66 @@ describe('notifyIfBlocked (via recalculateTaskStatus)', () => {
     spy.mockRestore()
   })
 })
+
+describe('cliente não troca documento já aprovado nem envia em tarefa encerrada', () => {
+  async function setup() {
+    const org = await createTestOrg((await createTestPlan()).id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const col = await createTestColumn((await createTestBoard(org.id, client.id)).id, { position: 0 })
+    const task = await createTestTask(col.id, user.id)
+    const { clientUser } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, task.departmentId)
+    const requirement = await addDocumentRequirement(task.id, org.id, 'Contrato social', task.creatorId!)
+    const file = (name: string) => ({ filename: name, mimeType: 'application/pdf', size: 10, buffer: Buffer.from('x') })
+    const asClient = (name: string) => uploadForRequirement(task.id, requirement.id, org.id, { id: clientUser.id, type: 'client' }, clientUser.id, file(name))
+    return { org, user, task, requirement, asClient, file }
+  }
+
+  it('an approved document stays as approved: the client cannot replace it (the office still can)', async () => {
+    const c = await setup()
+    await c.asClient('contrato.pdf')
+    await reviewDocumentRequirement(c.task.id, c.requirement.id, c.org.id, c.user.id, 'APPROVED', undefined)
+    const approved = await prisma.taskDocumentRequirement.findUniqueOrThrow({ where: { id: c.requirement.id } })
+
+    await expect(c.asClient('outro.pdf')).rejects.toMatchObject({ statusCode: 409 })
+    const after = await prisma.taskDocumentRequirement.findUniqueOrThrow({ where: { id: c.requirement.id } })
+    expect(after).toMatchObject({ status: 'APPROVED', attachmentId: approved.attachmentId })
+
+    await uploadForRequirement(c.task.id, c.requirement.id, c.org.id, { id: c.user.id, type: 'user' }, undefined, c.file('versao-escritorio.pdf'))
+  })
+
+  it('a finished task takes no more files from the client', async () => {
+    const c = await setup()
+    await prisma.task.update({ where: { id: c.task.id }, data: { status: 'DONE' } })
+    await expect(c.asClient('tarde.pdf')).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('a pending, refused or not yet reviewed document can still be sent again', async () => {
+    const c = await setup()
+    await c.asClient('v1.pdf')
+    await c.asClient('v2.pdf')
+    await reviewDocumentRequirement(c.task.id, c.requirement.id, c.org.id, c.user.id, 'REJECTED', 'Ilegível')
+    await c.asClient('v3.pdf')
+    expect((await prisma.taskDocumentRequirement.findUniqueOrThrow({ where: { id: c.requirement.id } })).status).toBe('UPLOADED')
+  })
+})
+
+it('the document list brings the file name and a link, never the storage key nor internal ids', async () => {
+  const org = await createTestOrg((await createTestPlan()).id)
+  const user = await createTestUser(org.id)
+  const client = await createTestClient(org.id)
+  const col = await createTestColumn((await createTestBoard(org.id, client.id)).id, { position: 0 })
+  const task = await createTestTask(col.id, user.id)
+  const { clientUser } = await createTestClientUser(org.id)
+  await grantClientAccess(clientUser.id, client.id, task.departmentId)
+  const requirement = await addDocumentRequirement(task.id, org.id, 'Contrato', task.creatorId!)
+  await uploadForRequirement(task.id, requirement.id, org.id, { id: clientUser.id, type: 'client' }, clientUser.id,
+    { filename: 'contrato.pdf', mimeType: 'application/pdf', size: 10, buffer: Buffer.from('x') })
+
+  const docs = await listTaskDocuments(task.id, org.id, clientUser.id)
+  expect(docs.requirements[0]).toMatchObject({ attachment: { filename: 'contrato.pdf' }, signedUrl: 'https://signed-url' })
+  const body = JSON.stringify(docs)
+  expect(body).not.toContain('storageKey')
+  expect(body).not.toContain('uploadedByClientUserId')
+})
