@@ -8002,6 +8002,82 @@
                       "additionalProperties": false
                     },
                     "default": []
+                  },
+                  "dueScope": {
+                    "type": "string",
+                    "enum": [
+                      "FEDERAL",
+                      "STATE",
+                      "CITY"
+                    ],
+                    "default": "FEDERAL"
+                  },
+                  "onlyListedLocations": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "dueRules": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "uf": {
+                          "type": "string",
+                          "enum": [
+                            "AC",
+                            "AL",
+                            "AP",
+                            "AM",
+                            "BA",
+                            "CE",
+                            "DF",
+                            "ES",
+                            "GO",
+                            "MA",
+                            "MT",
+                            "MS",
+                            "MG",
+                            "PA",
+                            "PB",
+                            "PR",
+                            "PE",
+                            "PI",
+                            "RJ",
+                            "RN",
+                            "RS",
+                            "RO",
+                            "RR",
+                            "SC",
+                            "SP",
+                            "SE",
+                            "TO"
+                          ]
+                        },
+                        "ibgeCityCode": {
+                          "type": "integer"
+                        },
+                        "dueDayOfPeriod": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 31
+                        },
+                        "dueBusinessDayRoll": {
+                          "type": "string",
+                          "enum": [
+                            "NONE",
+                            "FORWARD",
+                            "BACKWARD"
+                          ],
+                          "default": "NONE"
+                        }
+                      },
+                      "required": [
+                        "dueDayOfPeriod"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 5600,
+                    "default": []
                   }
                 },
                 "required": [
@@ -8244,6 +8320,82 @@
                       ],
                       "additionalProperties": false
                     },
+                    "default": []
+                  },
+                  "dueScope": {
+                    "type": "string",
+                    "enum": [
+                      "FEDERAL",
+                      "STATE",
+                      "CITY"
+                    ],
+                    "default": "FEDERAL"
+                  },
+                  "onlyListedLocations": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "dueRules": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "uf": {
+                          "type": "string",
+                          "enum": [
+                            "AC",
+                            "AL",
+                            "AP",
+                            "AM",
+                            "BA",
+                            "CE",
+                            "DF",
+                            "ES",
+                            "GO",
+                            "MA",
+                            "MT",
+                            "MS",
+                            "MG",
+                            "PA",
+                            "PB",
+                            "PR",
+                            "PE",
+                            "PI",
+                            "RJ",
+                            "RN",
+                            "RS",
+                            "RO",
+                            "RR",
+                            "SC",
+                            "SP",
+                            "SE",
+                            "TO"
+                          ]
+                        },
+                        "ibgeCityCode": {
+                          "type": "integer"
+                        },
+                        "dueDayOfPeriod": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 31
+                        },
+                        "dueBusinessDayRoll": {
+                          "type": "string",
+                          "enum": [
+                            "NONE",
+                            "FORWARD",
+                            "BACKWARD"
+                          ],
+                          "default": "NONE"
+                        }
+                      },
+                      "required": [
+                        "dueDayOfPeriod"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 5600,
                     "default": []
                   }
                 },

@@ -1808,7 +1808,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-17T22:28:56.877Z"
+  "dueDate": "2026-11-17T22:40:23.402Z"
 }
 ```
 
@@ -1882,7 +1882,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-17T22:28:56.880Z"
+  "dueDate": "2026-11-17T22:40:23.405Z"
 }
 ```
 
@@ -1972,7 +1972,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:28:56.883Z",
+  "dueDate": "2026-11-17T22:40:23.407Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2247,14 +2247,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:28:56.893Z",
+  "dueDate": "2026-11-17T22:40:23.416Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-17T22:28:56.893Z",
-  "competence": "2026-11-17T22:28:56.893Z",
+  "targetDate": "2026-11-17T22:40:23.416Z",
+  "competence": "2026-11-17T22:40:23.416Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -4319,7 +4319,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-17T22:28:56.947Z",
+  "dueDate": "2026-11-17T22:40:23.469Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -5318,7 +5318,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:28:56.977Z"
+  "dueDate": "2026-11-17T22:40:23.500Z"
 }
 ```
 
@@ -5375,7 +5375,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:28:56.978Z",
+  "dueDate": "2026-11-17T22:40:23.501Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -5724,10 +5724,21 @@ no additional properties
   - **`name` (required)**: `string`, minLength: `1`
 - **`dueBusinessDayRoll`**: `string`, possible values: `"NONE", "FORWARD", "BACKWARD"`, default: `"NONE"`
 - **`dueMonthAnchor`**: `integer`, default: `1`, minimum: `1`, maximum: `12`
+- **`dueRules`**: `array`, default: `[]`, maxItems: `5600`
+
+  **Items:**
+
+  no additional properties
+  - **`dueDayOfPeriod` (required)**: `integer`, minimum: `1`, maximum: `31`
+  - **`dueBusinessDayRoll`**: `string`, possible values: `"NONE", "FORWARD", "BACKWARD"`, default: `"NONE"`
+  - **`ibgeCityCode`**: `integer`
+  - **`uf`**: `string`, possible values: `"AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"`
+- **`dueScope`**: `string`, possible values: `"FEDERAL", "STATE", "CITY"`, default: `"FEDERAL"`
 - **`generationMonthOffset`**: `integer`, default: `1`, minimum: `0`
 - **`isActive`**: `boolean`, default: `true`
 - **`notifyViaEmail`**: `boolean`, default: `false`
 - **`notifyViaWhatsapp`**: `boolean`, default: `true`
+- **`onlyListedLocations`**: `boolean`, default: `false`
 - **`priority`**: `string`, possible values: `"LOW", "MEDIUM", "HIGH", "URGENT"`, default: `"MEDIUM"`
 - **`targetBusinessDayRoll`**: `string`, possible values: `"NONE", "FORWARD", "BACKWARD"`, default: `"NONE"`
 - **`targetOffsetDays`**: `integer`, default: `0`
@@ -5758,7 +5769,10 @@ no additional properties
   "visibleToClient": true,
   "isActive": true,
   "documentRequests": [],
-  "documentDeliveries": []
+  "documentDeliveries": [],
+  "dueScope": "FEDERAL",
+  "onlyListedLocations": false,
+  "dueRules": []
 }
 ```
 
@@ -5883,11 +5897,22 @@ no additional properties
 - **`dueBusinessDayRoll`**: `string`, possible values: `"NONE", "FORWARD", "BACKWARD"`, default: `"NONE"`
 - **`dueDayOfPeriod`**: `integer`, minimum: `1`, maximum: `31`
 - **`dueMonthAnchor`**: `integer`, default: `1`, minimum: `1`, maximum: `12`
+- **`dueRules`**: `array`, default: `[]`, maxItems: `5600`
+
+  **Items:**
+
+  no additional properties
+  - **`dueDayOfPeriod` (required)**: `integer`, minimum: `1`, maximum: `31`
+  - **`dueBusinessDayRoll`**: `string`, possible values: `"NONE", "FORWARD", "BACKWARD"`, default: `"NONE"`
+  - **`ibgeCityCode`**: `integer`
+  - **`uf`**: `string`, possible values: `"AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"`
+- **`dueScope`**: `string`, possible values: `"FEDERAL", "STATE", "CITY"`, default: `"FEDERAL"`
 - **`generationDayOfPeriod`**: `integer`, minimum: `1`, maximum: `31`
 - **`generationMonthOffset`**: `integer`, default: `1`, minimum: `0`
 - **`isActive`**: `boolean`, default: `true`
 - **`notifyViaEmail`**: `boolean`, default: `false`
 - **`notifyViaWhatsapp`**: `boolean`, default: `true`
+- **`onlyListedLocations`**: `boolean`, default: `false`
 - **`periodicity`**: `string`, possible values: `"WEEKLY", "MONTHLY", "QUARTERLY", "ANNUAL"`
 - **`priority`**: `string`, possible values: `"LOW", "MEDIUM", "HIGH", "URGENT"`, default: `"MEDIUM"`
 - **`targetBusinessDayRoll`**: `string`, possible values: `"NONE", "FORWARD", "BACKWARD"`, default: `"NONE"`
@@ -5920,7 +5945,10 @@ no additional properties
   "visibleToClient": true,
   "isActive": true,
   "documentRequests": [],
-  "documentDeliveries": []
+  "documentDeliveries": [],
+  "dueScope": "FEDERAL",
+  "onlyListedLocations": false,
+  "dueRules": []
 }
 ```
 
@@ -6131,7 +6159,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:28:57.002Z",
+  "dueMonth": "2026-11-17T22:40:23.518Z",
   "assignmentIds": [
     ""
   ]
@@ -6183,7 +6211,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:28:57.003Z",
+  "dueMonth": "2026-11-17T22:40:23.519Z",
   "assignmentIds": [
     ""
   ]
@@ -6226,7 +6254,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:28:57.004Z"
+  "dueMonth": "2026-11-17T22:40:23.520Z"
 }
 ```
 

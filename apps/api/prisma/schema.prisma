@@ -625,10 +625,16 @@ model RecurringTaskTemplate {
 
   visibleToClient Boolean @default(true)
 
+  // Where the due date changes: FEDERAL (one date for all), STATE (rules by UF) or CITY (rules by
+  // IBGE city). onlyListedLocations: clients outside the listed places get no task (fails, visible)
+  dueScope            LocationScope @default(FEDERAL)
+  onlyListedLocations Boolean       @default(false)
+
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  dueRules           RecurringDueRule[]
   organization       Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   department         Department                      @relation(fields: [departmentId], references: [id])
   documentRequests   RecurringTaskTemplateDocument[] @relation("TemplateDocumentRequests")
@@ -651,6 +657,30 @@ enum BusinessDayRoll {
   NONE
   FORWARD
   BACKWARD
+}
+
+enum LocationScope {
+  FEDERAL
+  STATE
+  CITY
+}
+
+// The due date of a recurring template in one place: a UF (scope STATE) or an IBGE city (scope CITY).
+// Only the day and the business-day roll change; everything else is the template's.
+model RecurringDueRule {
+  id                 String          @id @default(cuid())
+  templateId         String
+  uf                 String?         @db.Char(2)
+  ibgeCityCode       Int?
+  dueDayOfPeriod     Int
+  dueBusinessDayRoll BusinessDayRoll @default(NONE)
+
+  template     RecurringTaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  municipality Municipality?         @relation(fields: [ibgeCityCode], references: [ibgeCode], onDelete: Restrict)
+
+  @@unique([templateId, uf])
+  @@unique([templateId, ibgeCityCode])
+  @@map("recurring_due_rules")
 }
 
 model RecurringTaskTemplateDocument {
@@ -1455,7 +1485,8 @@ model Municipality {
   name     String
   uf       String @db.Char(2)
 
-  clients Client[]
+  clients  Client[]
+  dueRules RecurringDueRule[]
 
   @@index([uf])
   @@map("municipalities")

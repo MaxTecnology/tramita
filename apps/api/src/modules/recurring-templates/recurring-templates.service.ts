@@ -2,7 +2,7 @@ import { loadHolidaySet } from '@/modules/holidays/holidays.service'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
-import { Prisma, type MessageChannel } from '@prisma/client'
+import { Prisma, type BusinessDayRoll, type MessageChannel } from '@prisma/client'
 import { enqueueNotification } from '@/lib/queue'
 import { logger } from '@/lib/logger'
 import { ensureRecurringSystemBoard } from '@/modules/tasks/tasks.service'
@@ -52,7 +52,7 @@ function assertDayOfPeriodValid(periodicity: string, dueDayOfPeriod: number, gen
 export async function listTemplates(organizationId: string) {
   return prisma.recurringTaskTemplate.findMany({
     where: { organizationId },
-    include: { department: { select: { id: true, name: true } }, documentRequests: true, documentDeliveries: true },
+    include: { department: { select: { id: true, name: true } }, documentRequests: true, documentDeliveries: true, dueRules: DUE_RULES_INCLUDE },
     orderBy: { title: 'asc' },
   })
 }
@@ -60,7 +60,7 @@ export async function listTemplates(organizationId: string) {
 export async function getTemplateById(id: string, organizationId: string) {
   const template = await prisma.recurringTaskTemplate.findFirst({
     where: { id, organizationId },
-    include: { department: { select: { id: true, name: true } }, documentRequests: true, documentDeliveries: true },
+    include: { department: { select: { id: true, name: true } }, documentRequests: true, documentDeliveries: true, dueRules: DUE_RULES_INCLUDE },
   })
   if (!template) throw new AppError(404, 'Template não encontrado')
   return template
@@ -73,12 +73,54 @@ export async function assertDeliveryObligations(deliveries: { obligationTypeId?:
   }
 }
 
-export async function createTemplate(organizationId: string, data: CreateTemplateBody) {
+const DUE_RULES_INCLUDE = {
+  include: { municipality: { select: { name: true, uf: true } } },
+  orderBy: [{ uf: 'asc' }, { ibgeCityCode: 'asc' }],
+} satisfies Prisma.RecurringTaskTemplate$dueRulesArgs
+
+type DueScope = 'FEDERAL' | 'STATE' | 'CITY'
+type RuleShape = { uf?: string; ibgeCityCode?: number; dueDayOfPeriod: number; dueBusinessDayRoll: BusinessDayRoll }
+// Location fields are optional to callers: without them the template is federal, as before
+type NewTemplate = Omit<CreateTemplateBody, 'dueScope' | 'onlyListedLocations' | 'dueRules'> &
+  Partial<Pick<CreateTemplateBody, 'dueScope' | 'onlyListedLocations' | 'dueRules'>>
+
+// Rules must fit the scope (state rules only name a UF, city rules only a city), name each place
+// once, point to an existing city and use a day valid for the periodicity
+async function assertDueRulesValid(
+  scope: DueScope, onlyListedLocations: boolean, rules: RuleShape[], periodicity: string, generationDayOfPeriod: number,
+) {
+  if (scope === 'FEDERAL') {
+    if (rules.length > 0) throw new AppError(400, 'Recorrência federal não tem exceções por localidade')
+    if (onlyListedLocations) throw new AppError(400, '"Só para os locais listados" exige abrangência estadual ou municipal')
+    return
+  }
+  for (const rule of rules) {
+    if (scope === 'STATE' && (!rule.uf || rule.ibgeCityCode !== undefined)) throw new AppError(400, 'Exceção estadual precisa só do estado')
+    if (scope === 'CITY' && (rule.ibgeCityCode === undefined || rule.uf)) throw new AppError(400, 'Exceção municipal precisa só da cidade')
+  }
+  const places = rules.map((r) => (scope === 'STATE' ? r.uf : r.ibgeCityCode))
+  if (new Set(places).size !== places.length) {
+    throw new AppError(400, scope === 'STATE' ? 'Estado repetido nas exceções' : 'Cidade repetida nas exceções')
+  }
+  if (scope === 'CITY') {
+    const codes = rules.map((r) => r.ibgeCityCode).filter((c): c is number => c !== undefined)
+    const found = await prisma.municipality.count({ where: { ibgeCode: { in: codes } } })
+    if (found !== codes.length) throw new AppError(400, 'Cidade não encontrada')
+  }
+  for (const rule of rules) assertDayOfPeriodValid(periodicity, rule.dueDayOfPeriod, generationDayOfPeriod)
+}
+
+const toRuleRows = (rules: RuleShape[]) =>
+  rules.map((r) => ({ uf: r.uf ?? null, ibgeCityCode: r.ibgeCityCode ?? null, dueDayOfPeriod: r.dueDayOfPeriod, dueBusinessDayRoll: r.dueBusinessDayRoll }))
+
+export async function createTemplate(organizationId: string, input: NewTemplate) {
+  const data = { ...input, dueScope: input.dueScope ?? 'FEDERAL', onlyListedLocations: input.onlyListedLocations ?? false, dueRules: input.dueRules ?? [] }
   await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
   await assertDeliveryObligations(data.documentDeliveries, organizationId)
   assertDayOfPeriodValid(data.periodicity, data.dueDayOfPeriod, data.generationDayOfPeriod)
+  await assertDueRulesValid(data.dueScope, data.onlyListedLocations, data.dueRules, data.periodicity, data.generationDayOfPeriod)
 
-  const { documentRequests, documentDeliveries, ...templateData } = data
+  const { documentRequests, documentDeliveries, dueRules, ...templateData } = data
 
   return prisma.recurringTaskTemplate.create({
     data: {
@@ -86,8 +128,9 @@ export async function createTemplate(organizationId: string, data: CreateTemplat
       organizationId,
       documentRequests: { create: documentRequests.map((d, i) => ({ name: d.name, position: i })) },
       documentDeliveries: { create: documentDeliveries.map((d, i) => ({ name: d.name, requiresPayment: d.requiresPayment, obligationTypeId: d.obligationTypeId ?? null, position: i })) },
+      dueRules: { create: toRuleRows(dueRules) },
     },
-    include: { documentRequests: true, documentDeliveries: true },
+    include: { documentRequests: true, documentDeliveries: true, dueRules: DUE_RULES_INCLUDE },
   })
 }
 
@@ -112,13 +155,22 @@ export async function updateTemplate(id: string, organizationId: string, data: U
     }
   }
   if (data.documentDeliveries) await assertDeliveryObligations(data.documentDeliveries, organizationId)
-  assertDayOfPeriodValid(
-    data.periodicity ?? existing.periodicity,
-    data.dueDayOfPeriod ?? existing.dueDayOfPeriod,
-    data.generationDayOfPeriod ?? existing.generationDayOfPeriod,
-  )
+  const periodicity = data.periodicity ?? existing.periodicity
+  const generationDayOfPeriod = data.generationDayOfPeriod ?? existing.generationDayOfPeriod
+  assertDayOfPeriodValid(periodicity, data.dueDayOfPeriod ?? existing.dueDayOfPeriod, generationDayOfPeriod)
 
-  const { documentRequests, documentDeliveries, ...templateData } = data
+  // Changing the scope makes the stored rules meaningless: the new ones come in the same request
+  const dueScope = data.dueScope ?? existing.dueScope
+  if (dueScope !== existing.dueScope && data.dueRules === undefined) throw new AppError(400, 'Envie as exceções da nova abrangência')
+  const rules: RuleShape[] = data.dueRules ?? existing.dueRules.map((r) => ({
+    uf: r.uf ?? undefined, ibgeCityCode: r.ibgeCityCode ?? undefined, dueDayOfPeriod: r.dueDayOfPeriod, dueBusinessDayRoll: r.dueBusinessDayRoll,
+  }))
+  // Going federal drops "only listed places" unless the request insists on it (then it is refused)
+  const onlyListedLocations = data.onlyListedLocations ?? (dueScope === 'FEDERAL' ? false : existing.onlyListedLocations)
+  await assertDueRulesValid(dueScope, onlyListedLocations, rules, periodicity, generationDayOfPeriod)
+
+  const { documentRequests, documentDeliveries, dueRules, ...rest } = data
+  const templateData = { ...rest, onlyListedLocations }
 
   return prisma.$transaction(async (tx) => {
     if (documentRequests) {
@@ -133,10 +185,14 @@ export async function updateTemplate(id: string, organizationId: string, data: U
         data: documentDeliveries.map((d, i) => ({ deliveryTemplateId: id, name: d.name, requiresPayment: d.requiresPayment, obligationTypeId: d.obligationTypeId ?? null, position: i })),
       })
     }
+    if (dueRules) {
+      await tx.recurringDueRule.deleteMany({ where: { templateId: id } })
+      await tx.recurringDueRule.createMany({ data: toRuleRows(dueRules).map((r) => ({ ...r, templateId: id })) })
+    }
     return tx.recurringTaskTemplate.update({
       where: { id },
       data: templateData,
-      include: { documentRequests: true, documentDeliveries: true },
+      include: { documentRequests: true, documentDeliveries: true, dueRules: DUE_RULES_INCLUDE },
     })
   })
 }

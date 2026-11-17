@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ufSchema } from '@/lib/uf'
 
 export const documentRequestItemSchema = z.object({
   name: z.string().trim().min(1, 'Nome do documento obrigatório'),
@@ -12,6 +13,17 @@ export const documentDeliveryItemSchema = z.object({
   // Robot: the obligation the document reader recognizes for this document (DAS, FGTS...)
   obligationTypeId: z.string().cuid().nullable().optional(),
 })
+
+// Due date of the template in one place: a state (scope STATE) or a city (scope CITY). The shape is
+// checked against the template's scope in the service (on update the scope may be the stored one).
+export const dueRuleSchema = z.object({
+  uf: ufSchema.optional(),
+  ibgeCityCode: z.number().int().optional(),
+  dueDayOfPeriod: z.number().int().min(1).max(31),
+  dueBusinessDayRoll: z.enum(['NONE', 'FORWARD', 'BACKWARD']).default('NONE'),
+})
+
+export type DueRuleInput = z.infer<typeof dueRuleSchema>
 
 export const createTemplateSchema = z.object({
   departmentId: z.string().cuid(),
@@ -43,6 +55,11 @@ export const createTemplateSchema = z.object({
 
   documentRequests: z.array(documentRequestItemSchema).default([]),
   documentDeliveries: z.array(documentDeliveryItemSchema).default([]),
+
+  dueScope: z.enum(['FEDERAL', 'STATE', 'CITY']).default('FEDERAL'),
+  onlyListedLocations: z.boolean().default(false),
+  // Sent → replaces the template's rules
+  dueRules: z.array(dueRuleSchema).max(5600).default([]),
 })
 
 export const updateTemplateSchema = createTemplateSchema.partial().extend({
