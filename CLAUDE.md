@@ -311,7 +311,7 @@ openssl rsa -in private.pem -pubout -out public.pem
 # raiz (antes o CLI direto não achava DATABASE_URL e aplicava no banco errado); um DATABASE_URL
 # passado na linha de comando continua tendo prioridade (ex.: banco de teste).
 
-pnpm --filter api migrate:dev -- --name <nome>   # desenvolvimento (DATABASE_URL do .env raiz)
+pnpm --filter api migrate:dev --name <nome>      # desenvolvimento (DATABASE_URL do .env raiz). Sem `--` antes de --name: com ele o Prisma ignora o nome e fica esperando input
 pnpm --filter api migrate:deploy                  # produção / CI
 pnpm --filter api migrate:reset                   # reset completo (destrutivo — confirmar antes)
 

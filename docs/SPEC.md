@@ -214,7 +214,7 @@ Cadastro de novo escritório (público — sem autenticação). Só com `PUBLIC_
   "name": "string", "clientType": "PF | PJ", "cnpj": "string?", "cpf": "string?",
   "codigo": "string?",
   "whatsapp": "string?", "phone": "string?", "notes": "string?",
-  "cep": "string?", "estado": "string?", "cidade": "string?", "bairro": "string?",
+  "cep": "string?", "estado": "UF", "ibgeCityCode": 2800308, "bairro": "string?",
   "logradouro": "string?", "numero": "string?", "complemento": "string?",
   "clientUsers": [
     { "existingId": "string", "departmentIds": ["string"] },
@@ -224,14 +224,22 @@ Cadastro de novo escritório (público — sem autenticação). Só com `PUBLIC_
 ```
 → `codigo` é um identificador curto opcional que o escritório escolhe pra localizar o cliente rapidamente (ex.: código do sistema de gestão interno); aparece na listagem/busca de clientes e é usado como prefixo do título do board quando uma Solicitação é aprovada com `NEW_BOARD` (`"<codigo> - <nome> — <template>"`)
 → Middleware `checkPlanLimit` valida `clientsCount < plan.maxClients` antes de criar
+→ **Estado e cidade obrigatórios para PF e PJ (2026-11-17):** `estado` só aceita as 27 UFs (400 `'Informe o estado do cliente'` / `'Estado inválido'`); `ibgeCityCode` é o código IBGE da cidade (400 `'Informe a cidade do cliente'`, `'Cidade não encontrada'`, `'A cidade não pertence ao estado informado'`). `cidade` não vem do corpo: o servidor grava o nome da tabela do IBGE. PJ continua exigindo `cep`, `bairro`, `logradouro`, `numero`. Cliente cadastrado antes fica com `ibgeCityCode: null` até ser editado — editar exige escolher a cidade (sem migração de dados). Listagens devolvem `ibgeCityCode`
 → `email`/`password` não existem mais direto no `Client` — o login do portal é do `ClientUser`, não da empresa. `clientUsers` é obrigatório (mínimo 1 item), cada item vincula um `ClientUser` existente (`existingId`) ou cria um novo (`name`/`email`/`password`), sempre com `departmentIds` (mínimo 1) definindo o escopo de acesso daquele usuário àquele cliente
 
 ### PATCH `/clients/:id` — mesmo payload, todos os campos opcionais; `clientUsers` quando enviado substitui os vínculos existentes
 ### DELETE `/clients/:id` — soft delete (não conta no limite ao desativar)
 
-### GET `/clients/lookup-cnpj/:cnpj` _(ORG_ADMIN | ORG_MANAGER)_ — consulta a API pública do CNPJ.ws e retorna razão social + endereço pra preencher o formulário de cadastro
-→ Sem autenticação própria, proxied pelo backend (`src/lib/cnpjws.ts`) pra evitar CORS e centralizar o tratamento de erro
-→ Limite de 3 requisições/minuto por IP no plano gratuito da API pública — mapeado pra 429 com mensagem amigável
+### GET `/clients/lookup-cnpj/:cnpj` _(ORG_ADMIN | ORG_MANAGER)_ — razão social + endereço, estado (UF) e cidade (`ibgeCityCode`) pra preencher o formulário de cadastro
+→ Proxied pelo backend (`src/lib/cnpj-lookup.ts`): **BrasilAPI** primeiro (traz o código IBGE); **CNPJ.ws** (3 req/min por IP, instável) só se a BrasilAPI falhar por 5xx, 429, timeout (8 s) ou resposta inválida. 404 da BrasilAPI = `'CNPJ não encontrado'` sem consultar a reserva
+→ A cidade é casada com a tabela de municípios (por código, ou por nome + UF quando a reserva não traz o código); não reconhecida → `ibgeCityCode: null` (a tela pede a cidade)
+→ As duas fora → 502 `'Serviço de consulta de CNPJ indisponível no momento. Tente de novo ou preencha os dados à mão.'`
+→ Respostas externas validadas com Zod (payload estranho da BrasilAPI → reserva; da reserva → 502); sem redirect, corpo até 200 KB; log `warn` com o motivo de cada serviço (nunca o CNPJ)
+→ **Cache Redis** por CNPJ (`cnpj-lookup:<dígitos>`): resultado 6 h, "não encontrado" 10 min; indisponível nunca é guardado; Redis fora → consulta sem cache
+→ **Limite próprio:** `RATE_LIMIT_CNPJ_MAX` por pessoa por minuto (padrão 10) — protege a cota do IP do servidor nos serviços externos
+
+### GET `/municipalities?uf=SE` _(ORG_ADMIN | ORG_MANAGER | ORG_MEMBER)_ — `[{ ibgeCode, name }]` em ordem alfabética
+→ Tabela global `municipalities` (5.571 do IBGE), carregada pela migration a partir de `apps/api/prisma/data/municipios-ibge.json` (`scripts/municipalities/fetch-ibge.mjs` atualiza o JSON; nova migration com upsert se o IBGE mudar). Nenhuma chamada ao IBGE em runtime. UF inválida → 400 `'Estado inválido'`
 
 ### GET `/clients/search-users` _(ORG_ADMIN | ORG_MANAGER)_ — `?q=` busca `ClientUser` da org por nome/email, pra reaproveitar um usuário já cadastrado ao vincular a um novo cliente
 ### GET `/clients/:id/users` _(ORG_ADMIN | ORG_MANAGER)_ — lista os `ClientUser` vinculados àquele cliente, com os departamentos de acesso de cada um
@@ -402,14 +410,19 @@ Não há rota para criar, editar, reordenar ou remover colunas: elas nascem com 
   "visibleToClient": true,
   "isActive": true,
   "documentRequests": [{ "name": "string" }],
-  "documentDeliveries": [{ "name": "string" }]
+  "documentDeliveries": [{ "name": "string" }],
+  "dueScope": "FEDERAL|STATE|CITY",
+  "onlyListedLocations": false,
+  "dueRules": [{ "uf": "SE", "dueDayOfPeriod": 15, "dueBusinessDayRoll": "FORWARD" }]
 }
 ```
+→ **Vencimento por localidade (2026-11-17):** `dueScope` padrão `FEDERAL` (uma data para todos, como antes). `STATE`/`CITY`: `dueRules` são exceções de dia + rolagem por UF (`uf`) ou por cidade (`ibgeCityCode`) — competência, meta, documentos e responsável são os da recorrência. Validação (400): federal sem exceções nem `onlyListedLocations`; exceção estadual só com `uf`, municipal só com `ibgeCityCode`; sem local repetido; cidade existente; dia válido para a periodicidade (também ao trocar a periodicidade). No PATCH, `dueRules` enviado substitui a lista; trocar `dueScope` exige mandar as novas exceções (`'Envie as exceções da nova abrangência'`). Tabela `recurring_due_rules` (CHECK manual: exatamente um de `uf`/`ibgeCityCode`)
+→ **Geração:** `resolveDueRule` (`recurrence-location.ts`) usa a exceção do estado/cidade do cliente, senão a data padrão. Cliente sem estado/cidade válidos numa recorrência estadual/municipal, ou fora dos locais com `onlyListedLocations`, gera FAILED com o motivo (`'Cliente X sem estado cadastrado'`, `'... sem cidade cadastrada'`, `'... fora dos locais desta recorrência'`) e é reprocessado ao corrigir. Feriados: o calendário do escritório de sempre (nacionais + do escritório)
 → Vencimento é a âncora: `dueDayOfPeriod`/`dueBusinessDayRoll` definem o vencimento dentro do mês de vencimento; `competenceMonthOffset` deriva a competência subtraindo esse número de meses do mês de vencimento (exceto WEEKLY, onde a competência É a segunda-feira da semana — não há mês de vencimento isolado)
 ### PATCH `/recurring-templates/:id` _(ORG_ADMIN)_ — mesmo payload, todos os campos opcionais
 ### DELETE `/recurring-templates/:id` _(ORG_ADMIN)_ — 409 se houver vínculo de cliente ativo
 
-### GET `/recurring-templates/:id/assignments` _(ORG_ADMIN | ORG_MANAGER)_ — lista vínculos de cliente do template — `?q=` filtra por nome do cliente
+### GET `/recurring-templates/:id/assignments` _(ORG_ADMIN | ORG_MANAGER)_ — lista vínculos de cliente do template — `?q=` filtra por nome do cliente; `client` traz `estado`, `cidade`, `ibgeCityCode`
 ### POST `/recurring-templates/:id/assignments` _(ORG_ADMIN)_
 ```json
 { "clientId": "string" }

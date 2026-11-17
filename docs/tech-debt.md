@@ -717,3 +717,18 @@ Achados da revisão destas correções — ✅ resolvidos em 2026-11-16:
   teste de contagem operações × catálogo pega se aparecer.
 - Imagem de produção carrega `@scalar/fastify-api-reference` sem usar (import dinâmico só fora de prod).
 
+## Vencimento por localidade — pendências (2026-11-17)
+
+- **Exceção por cliente** (ex.: ISS de serviço prestado em outra cidade): fora do escopo; se aparecer,
+  uma exceção no vínculo cliente × recorrência, por cima da regra de localidade.
+- **Feriado estadual/municipal:** feriados continuam só do escritório (decisão do Max: quem envia a guia
+  é o colaborador; a meta interna dá a folga). Catálogo global de feriados por localidade mantido pela
+  AutoHubs fica para depois, se surgir necessidade.
+- **Lista do IBGE desatualizada:** município criado depois de 2026-11-17 não existe na tabela (o
+  buscador devolve a cidade sem código e o cadastro não acha a cidade). Atualizar com
+  `scripts/municipalities/fetch-ibge.mjs` + migration nova com upsert.
+- **Prévia das próximas gerações** na tela da recorrência mostra só a data padrão (avisa quantos
+  locais vencem em outro dia), não a data de cada local.
+- **Clientes antigos** sem estado/cidade não são migrados (decisão do Max): recorrência estadual/municipal
+  falha para eles até a edição do cadastro.
+
