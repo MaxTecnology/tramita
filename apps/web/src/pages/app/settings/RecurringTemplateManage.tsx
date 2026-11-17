@@ -66,6 +66,18 @@ function computeCompetenceForDueMonth(dueMonth: string, template: RecurringTaskT
   return toMonthValue(d)
 }
 
+type Located = { estado?: string | null; cidade?: string | null; ibgeCityCode?: number | null }
+
+// With "only listed places", a client whose state/city has no rule gets no task (the generation fails)
+function isInListedPlaces(template: RecurringTaskTemplate, client: Located): boolean {
+  if (!template.onlyListedLocations || template.dueScope === 'FEDERAL') return true
+  return template.dueRules.some((r) => (template.dueScope === 'STATE' ? r.uf === client.estado : r.ibgeCityCode === client.ibgeCityCode))
+}
+
+function placeLabel(client: Located): string {
+  return client.cidade && client.estado ? `${client.cidade} (${client.estado})` : 'Sem estado/cidade'
+}
+
 export default function RecurringTemplateManage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
@@ -226,7 +238,8 @@ export default function RecurringTemplateManage() {
   }
 
   function selectAll() {
-    setSelected(new Set(assignments.map((a) => a.id)))
+    const inside = template ? assignments.filter((a) => isInListedPlaces(template, a.client)) : assignments
+    setSelected(new Set(inside.map((a) => a.id)))
   }
 
   if (loadingTemplate || !template) return <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
@@ -318,10 +331,14 @@ export default function RecurringTemplateManage() {
               const log = logs.find((l) => l.clientId === a.clientId && l.competence.slice(0, 7) === competenceValue)
               return (
                 <div key={a.id} className="flex items-center justify-between text-sm bg-neutral-bg rounded px-2 py-1.5">
-                  <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                  <label className="flex items-center gap-2 flex-1 cursor-pointer min-w-0">
                     <input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelected(a.id)} />
-                    {a.client.codigo ? `${a.client.codigo} - ${a.client.name}` : a.client.name}
+                    <span className="truncate">{a.client.codigo ? `${a.client.codigo} - ${a.client.name}` : a.client.name}</span>
+                    {template.dueScope !== 'FEDERAL' && <span className="text-xs text-muted-foreground flex-shrink-0">{placeLabel(a.client)}</span>}
                   </label>
+                  {!isInListedPlaces(template, a.client) && (
+                    <span className="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 mr-2 bg-warning-bg text-warning-text">Fora dos locais</span>
+                  )}
                   <span
                     className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 mr-2 ${
                       !log ? 'bg-neutral-bg text-muted-foreground border border-border'
@@ -345,15 +362,18 @@ export default function RecurringTemplateManage() {
       <Card className="px-4 py-3 space-y-2">
         <Label className="text-xs uppercase tracking-wide text-muted-foreground">Vincular novo cliente</Label>
         <div className="flex flex-col sm:flex-row gap-2">
-          <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="h-9 flex-1 rounded-md border border-border bg-surface text-foreground px-2 text-sm">
+          <select aria-label="Cliente a vincular" value={clientId} onChange={(e) => setClientId(e.target.value)} className="h-9 flex-1 rounded-md border border-border bg-surface text-foreground px-2 text-sm">
             <option value="">Cliente</option>
             {clients.map((c) => {
               const label = c.codigo ? `${c.codigo} - ${c.name}` : c.name
               // Vínculo só pra cliente atendido pelo departamento do template (a API recusa os demais).
               const served = !template || (c.servedDepartmentIds ?? []).includes(template.departmentId)
+              const inside = !template || isInListedPlaces(template, c)
               return (
                 <option key={c.id} value={c.id} disabled={!served}>
-                  {served ? label : `${label} — não é atendido pelo departamento ${template?.department.name ?? ''}`}
+                  {!served
+                    ? `${label} — não é atendido pelo departamento ${template?.department.name ?? ''}`
+                    : inside ? label : `${label} — fora dos locais da recorrência`}
                 </option>
               )
             })}
@@ -362,6 +382,12 @@ export default function RecurringTemplateManage() {
             Vincular cliente
           </Button>
         </div>
+        {(() => {
+          const chosen = clients.find((c) => c.id === clientId)
+          return chosen && !isInListedPlaces(template, chosen) ? (
+            <p className="text-xs text-warning-text">Este cliente está fora dos locais da recorrência: a tarefa dele não será gerada.</p>
+          ) : null
+        })()}
       </Card>
 
       <Card className="px-4 py-3 space-y-2">

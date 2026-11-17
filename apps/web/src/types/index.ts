@@ -270,13 +270,23 @@ export interface RecurringTaskTemplate {
   isActive: boolean
   documentRequests: RecurringTaskTemplateDocumentItem[]
   documentDeliveries: RecurringTaskTemplateDocumentItem[]
+  dueScope: 'FEDERAL' | 'STATE' | 'CITY'
+  onlyListedLocations: boolean
+  dueRules: {
+    id: string
+    uf: string | null
+    ibgeCityCode: number | null
+    dueDayOfPeriod: number
+    dueBusinessDayRoll: 'NONE' | 'FORWARD' | 'BACKWARD'
+    municipality: { name: string; uf: string } | null
+  }[]
 }
 
 export interface RecurringTaskAssignment {
   id: string
   templateId: string
   clientId: string
-  client: { id: string; name: string; codigo: string | null }
+  client: { id: string; name: string; codigo: string | null; estado?: string | null; cidade?: string | null; ibgeCityCode?: number | null }
   isActive: boolean
 }
 

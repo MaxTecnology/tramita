@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { app } from '@/test/setup'
-import { createTestPlan, createTestOrg, createTestUser, createTestDepartment, getAuthHeader } from '@/test/helpers'
+import { createTestPlan, createTestOrg, createTestUser, createTestDepartment, createTestClient, createTestRecurringAssignment, getAuthHeader } from '@/test/helpers'
 
 async function setup() {
   const org = await createTestOrg((await createTestPlan()).id)
@@ -101,5 +101,14 @@ describe('abrangência do vencimento — validação', () => {
     const other = await setup()
     const id = (await create(other, { dueScope: 'STATE', dueRules: [SE] })).json().id as string
     expect((await patch(c, id, { dueRules: [AL] })).statusCode).toBe(404)
+  })
+
+  it('the assignment list shows where each client is', async () => {
+    const c = await setup()
+    const id = (await create(c, { dueScope: 'STATE', dueRules: [SE] })).json().id as string
+    const client = await createTestClient(c.org.id, { estado: 'AL', ibgeCityCode: 2704302 })
+    await createTestRecurringAssignment(id, c.org.id, { clientId: client.id })
+    const res = await app.inject({ method: 'GET', url: `/recurring-templates/${id}/assignments`, headers: { authorization: c.auth } })
+    expect(res.json()[0].client).toMatchObject({ estado: 'AL', cidade: 'Maceió', ibgeCityCode: 2704302 })
   })
 })

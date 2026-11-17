@@ -12,6 +12,8 @@ import { PRIORITY_LABEL } from '@/components/shared/TaskDrawer'
 import { Section, Field, Segmented, Toggle, DocumentList, fieldCls } from './formBlocks'
 import { nextOccurrences, describeRule } from './recurringPreview'
 import { useHolidayDays } from '@/lib/holidays'
+import { askConfirm } from '@/components/ui/app-dialogs'
+import { DueRulesEditor, type DueRuleDraft, type DueScope } from '@/components/recurring/DueRulesEditor'
 
 const PERIODICITY_LABEL: Record<RecurringTaskTemplate['periodicity'], string> = {
   MONTHLY: 'Mensal',
@@ -31,6 +33,11 @@ const ROLL_OPTIONS: { value: Roll; label: string }[] = [
   { value: 'NONE', label: 'Manter' },
   { value: 'BACKWARD', label: 'Antecipar' },
   { value: 'FORWARD', label: 'Adiar' },
+]
+const SCOPE_OPTIONS: { value: DueScope; label: string }[] = [
+  { value: 'FEDERAL', label: 'Federal' },
+  { value: 'STATE', label: 'Estadual' },
+  { value: 'CITY', label: 'Municipal' },
 ]
 const COMPETENCE_OPTIONS = [
   { value: 0, label: 'Mesmo mês' },
@@ -67,6 +74,10 @@ interface FormState {
   documentRequests: { name: string }[]
   // obligationTypeId: the robot (document reader) fills this delivery when it reads that obligation
   documentDeliveries: { name: string; requiresPayment?: boolean; obligationTypeId?: string }[]
+  // Due date by place: federal = one date for every client
+  dueScope: DueScope
+  onlyListedLocations: boolean
+  dueRules: DueRuleDraft[]
 }
 
 const EMPTY_FORM: FormState = {
@@ -76,6 +87,7 @@ const EMPTY_FORM: FormState = {
   generationMonthOffset: 1, generationDayOfPeriod: 20,
   autoCompleteOnAllActivitiesDone: false, notifyViaWhatsapp: true, notifyViaEmail: false,
   visibleToClient: true, isActive: true, documentRequests: [], documentDeliveries: [],
+  dueScope: 'FEDERAL', onlyListedLocations: false, dueRules: [],
 }
 
 const fmtDay = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' })
@@ -121,12 +133,25 @@ export default function RecurringTemplateForm() {
       isActive: template.isActive,
       documentRequests: template.documentRequests.map((d) => ({ name: d.name })),
       documentDeliveries: template.documentDeliveries.map((d) => ({ name: d.name, requiresPayment: d.requiresPayment, obligationTypeId: d.obligationTypeId ?? undefined })),
+      dueScope: template.dueScope ?? 'FEDERAL',
+      onlyListedLocations: template.onlyListedLocations ?? false,
+      dueRules: (template.dueRules ?? []).map((r) => ({
+        uf: r.uf ?? r.municipality?.uf ?? '', ibgeCityCode: r.ibgeCityCode, cityName: r.municipality?.name ?? '',
+        dueDayOfPeriod: r.dueDayOfPeriod, dueBusinessDayRoll: r.dueBusinessDayRoll,
+      })),
     })
   }, [template])
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      const payload = form
+      const { dueRules, ...rest } = form
+      // State rules name the UF, city rules only the IBGE code (the server checks the shape)
+      const payload = {
+        ...rest,
+        dueRules: dueRules.map((r) => form.dueScope === 'CITY'
+          ? { ibgeCityCode: r.ibgeCityCode, dueDayOfPeriod: r.dueDayOfPeriod, dueBusinessDayRoll: r.dueBusinessDayRoll }
+          : { uf: r.uf, dueDayOfPeriod: r.dueDayOfPeriod, dueBusinessDayRoll: r.dueBusinessDayRoll }),
+      }
       return isEditing
         ? api.patch(`/recurring-templates/${id}`, payload).then((r) => r.data)
         : api.post('/recurring-templates', payload).then((r) => r.data)
@@ -141,6 +166,21 @@ export default function RecurringTemplateForm() {
       toast.error(message ?? 'Erro ao salvar template')
     },
   })
+
+  // Rules belong to one scope: changing it clears them, after asking
+  async function changeScope(next: DueScope) {
+    if (next === form.dueScope) return
+    if (form.dueRules.length > 0) {
+      const ok = await askConfirm({
+        title: 'Trocar a abrangência?',
+        description: 'As datas por estado/cidade cadastradas serão apagadas.',
+        confirmLabel: 'Trocar e apagar',
+        danger: true,
+      })
+      if (!ok) return
+    }
+    setForm((f) => ({ ...f, dueScope: next, dueRules: [], onlyListedLocations: next === 'FEDERAL' ? false : f.onlyListedLocations }))
+  }
 
   const isWeekly = form.periodicity === 'WEEKLY'
   const dayOptions = isWeekly ? [1, 2, 3, 4, 5, 6, 7] : Array.from({ length: 31 }, (_, i) => i + 1)
@@ -244,6 +284,27 @@ export default function RecurringTemplateForm() {
               <Segmented label="Se o vencimento cair no fim de semana" value={form.dueBusinessDayRoll} options={ROLL_OPTIONS} onChange={(v) => set('dueBusinessDayRoll', v)} />
             </div>
 
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium text-foreground">Abrangência do vencimento</p>
+              <Segmented label="Abrangência do vencimento" value={form.dueScope} options={SCOPE_OPTIONS} onChange={(v) => void changeScope(v)} />
+              <p className="text-xs text-muted-foreground">
+                {form.dueScope === 'FEDERAL'
+                  ? 'Mesma data para todos os clientes.'
+                  : `A data acima é a padrão; cadastre as ${form.dueScope === 'STATE' ? 'UFs' : 'cidades'} que vencem em outro dia. Vale o ${form.dueScope === 'STATE' ? 'estado' : 'município'} do cadastro do cliente.`}
+              </p>
+            </div>
+            {form.dueScope !== 'FEDERAL' && (
+              <>
+                <DueRulesEditor scope={form.dueScope} weekly={isWeekly} rules={form.dueRules} onChange={(rules) => set('dueRules', rules)} />
+                <Toggle
+                  checked={form.onlyListedLocations}
+                  onChange={(v) => set('onlyListedLocations', v)}
+                  label="Só para os locais listados"
+                  hint={`Cliente de ${form.dueScope === 'STATE' ? 'outro estado' : 'outra cidade'} não recebe a tarefa (aparece em "Gerações que falharam").`}
+                />
+              </>
+            )}
+
             {!isWeekly && (
               <div className="space-y-1.5">
                 <p className="text-sm font-medium text-foreground">Refere-se a (competência)</p>
@@ -346,6 +407,11 @@ export default function RecurringTemplateForm() {
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Próximas gerações</p>
+              {form.dueScope !== 'FEDERAL' && form.dueRules.length > 0 && (
+                <p className="text-xs text-muted-foreground mb-2">
+                  Data padrão. {form.dueRules.length} {form.dueScope === 'STATE' ? (form.dueRules.length === 1 ? 'estado vence' : 'estados vencem') : (form.dueRules.length === 1 ? 'cidade vence' : 'cidades vencem')} em outro dia.
+                </p>
+              )}
               {occurrences.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Semanal: uma tarefa por semana, sem prévia mensal.</p>
               ) : (

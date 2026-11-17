@@ -217,7 +217,8 @@ export async function listAssignments(templateId: string, organizationId: string
       templateId,
       ...(search ? { client: { name: { contains: search, mode: 'insensitive' } } } : {}),
     },
-    include: { client: { select: { id: true, name: true, codigo: true } } },
+    // Where each client is: the screen marks those outside the template's listed places
+    include: { client: { select: { id: true, name: true, codigo: true, estado: true, cidade: true, ibgeCityCode: true } } },
     orderBy: { createdAt: 'asc' },
   })
 }

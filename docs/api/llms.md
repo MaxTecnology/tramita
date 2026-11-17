@@ -1808,7 +1808,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-17T22:40:23.402Z"
+  "dueDate": "2026-11-17T22:54:11.182Z"
 }
 ```
 
@@ -1882,7 +1882,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-17T22:40:23.405Z"
+  "dueDate": "2026-11-17T22:54:11.184Z"
 }
 ```
 
@@ -1972,7 +1972,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:40:23.407Z",
+  "dueDate": "2026-11-17T22:54:11.187Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2247,14 +2247,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:40:23.416Z",
+  "dueDate": "2026-11-17T22:54:11.195Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-17T22:40:23.416Z",
-  "competence": "2026-11-17T22:40:23.416Z",
+  "targetDate": "2026-11-17T22:54:11.196Z",
+  "competence": "2026-11-17T22:54:11.196Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -4319,7 +4319,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-17T22:40:23.469Z",
+  "dueDate": "2026-11-17T22:54:11.253Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -5318,7 +5318,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:40:23.500Z"
+  "dueDate": "2026-11-17T22:54:11.279Z"
 }
 ```
 
@@ -5375,7 +5375,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:40:23.501Z",
+  "dueDate": "2026-11-17T22:54:11.281Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -6159,7 +6159,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:40:23.518Z",
+  "dueMonth": "2026-11-17T22:54:11.298Z",
   "assignmentIds": [
     ""
   ]
@@ -6211,7 +6211,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:40:23.519Z",
+  "dueMonth": "2026-11-17T22:54:11.299Z",
   "assignmentIds": [
     ""
   ]
@@ -6254,7 +6254,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:40:23.520Z"
+  "dueMonth": "2026-11-17T22:54:11.300Z"
 }
 ```
 
