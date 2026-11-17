@@ -95,7 +95,7 @@ describe('robô confere a entrega manual', () => {
   it('a CNPJ that is no client of the office and an unreadable file are warnings', async () => {
     const c = await setup()
     expect((await send(c, 'check', c.guia.id, await pdf('11.444.777/0001-61', 'agosto/2026'))).body.warnings).toEqual(['O CNPJ do documento (11.444.777/0001-61) não é de nenhum cliente do escritório'])
-    expect((await send(c, 'check', c.guia.id, Buffer.from('not a pdf'), {}, 'foto.png')).body.warnings).toEqual(['O robô não conseguiu conferir este arquivo'])
+    expect((await send(c, 'check', c.guia.id, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]), {}, 'foto.png')).body.warnings).toEqual(['O robô não conseguiu conferir este arquivo'])
   })
 
   it('a delivery without robot is not checked', async () => {

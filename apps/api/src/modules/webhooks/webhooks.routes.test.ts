@@ -71,7 +71,7 @@ describe('POST /webhooks/asaas', () => {
 
     const res = await app.inject({
       method: 'POST',
-      url: `/webhooks/asaas?accessToken=${SECRET}`,
+      url: '/webhooks/asaas', headers: { 'asaas-access-token': SECRET },
       payload: webhookPayload('PAYMENT_CONFIRMED', org.asaasSubscriptionId!),
     })
     expect(res.statusCode).toBe(200)
@@ -87,7 +87,7 @@ describe('POST /webhooks/asaas', () => {
 
     await app.inject({
       method: 'POST',
-      url: `/webhooks/asaas?accessToken=${SECRET}`,
+      url: '/webhooks/asaas', headers: { 'asaas-access-token': SECRET },
       payload: webhookPayload('PAYMENT_CONFIRMED', org.asaasSubscriptionId!, 197),
     })
 
@@ -102,7 +102,7 @@ describe('POST /webhooks/asaas', () => {
 
     const res = await app.inject({
       method: 'POST',
-      url: `/webhooks/asaas?accessToken=${SECRET}`,
+      url: '/webhooks/asaas', headers: { 'asaas-access-token': SECRET },
       payload: webhookPayload('PAYMENT_OVERDUE', org.asaasSubscriptionId!),
     })
     expect(res.statusCode).toBe(200)
@@ -117,27 +117,75 @@ describe('POST /webhooks/asaas', () => {
     expect(daysUntil).toBeLessThan(8)
   })
 
-  it('PAYMENT_DELETED suspends org', async () => {
+  it('a deleted charge (a single boleto removed or renegotiated) is recorded but does not suspend the office', async () => {
     const plan = await createTestPlan()
     const org = await orgWithSubscription(plan.id)
+    await prisma.organization.update({ where: { id: org.id }, data: { subscriptionStatus: 'ACTIVE' } })
 
     const res = await app.inject({
       method: 'POST',
-      url: `/webhooks/asaas?accessToken=${SECRET}`,
+      url: '/webhooks/asaas', headers: { 'asaas-access-token': SECRET },
       payload: webhookPayload('PAYMENT_DELETED', org.asaasSubscriptionId!),
     })
     expect(res.statusCode).toBe(200)
 
     const updated = await prisma.organization.findUnique({ where: { id: org.id } })
-    expect(updated?.subscriptionStatus).toBe('SUSPENDED')
+    expect(updated?.subscriptionStatus).toBe('ACTIVE')
+    expect(await prisma.subscriptionHistory.count({ where: { organizationId: org.id, event: 'PAYMENT_DELETED' } })).toBe(1)
+  })
+
+  it('the subscription deleted in Asaas cancels the office', async () => {
+    const plan = await createTestPlan()
+    const org = await orgWithSubscription(plan.id)
+    const res = await app.inject({
+      method: 'POST', url: '/webhooks/asaas', headers: { 'asaas-access-token': SECRET },
+      payload: { event: 'SUBSCRIPTION_DELETED', subscription: { id: org.asaasSubscriptionId } },
+    })
+    expect(res.statusCode).toBe(200)
+    expect((await prisma.organization.findUniqueOrThrow({ where: { id: org.id } })).subscriptionStatus).toBe('CANCELLED')
+  })
+
+  it('the token is accepted only in the header (a token in the URL ends up in proxy logs)', async () => {
+    const plan = await createTestPlan()
+    const org = await orgWithSubscription(plan.id)
+    const res = await app.inject({ method: 'POST', url: `/webhooks/asaas?accessToken=${SECRET}`, payload: webhookPayload('PAYMENT_CONFIRMED', org.asaasSubscriptionId!) })
+    expect(res.statusCode).toBe(401)
   })
 
   it('returns 200 and ignores unknown subscription', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: `/webhooks/asaas?accessToken=${SECRET}`,
+      url: '/webhooks/asaas', headers: { 'asaas-access-token': SECRET },
       payload: webhookPayload('PAYMENT_CONFIRMED', 'sub_nonexistent'),
     })
     expect(res.statusCode).toBe(200)
+  })
+})
+
+describe('webhook do Asaas: reentrega, ordem e payload', () => {
+  const post = (payload: object) => app.inject({ method: 'POST', url: '/webhooks/asaas', headers: { 'asaas-access-token': SECRET }, payload })
+
+  it('the same event of the same payment, delivered twice, is applied once', async () => {
+    const plan = await createTestPlan()
+    const org = await orgWithSubscription(plan.id)
+    for (let i = 0; i < 2; i++) expect((await post(webhookPayload('PAYMENT_CONFIRMED', org.asaasSubscriptionId!))).statusCode).toBe(200)
+    expect(await prisma.subscriptionHistory.count({ where: { organizationId: org.id, event: 'PAYMENT_CONFIRMED' } })).toBe(1)
+  })
+
+  it('an "overdue" that arrives after the same payment was confirmed does not put the office back in grace period', async () => {
+    const plan = await createTestPlan()
+    const org = await orgWithSubscription(plan.id)
+    await post(webhookPayload('PAYMENT_CONFIRMED', org.asaasSubscriptionId!))
+    await post(webhookPayload('PAYMENT_OVERDUE', org.asaasSubscriptionId!))
+    const after = await prisma.organization.findUniqueOrThrow({ where: { id: org.id } })
+    expect([after.subscriptionStatus, after.gracePeriodEndsAt]).toEqual(['ACTIVE', null])
+  })
+
+  it('a malformed body is refused without touching anything; an event we do not handle is acknowledged', async () => {
+    const plan = await createTestPlan()
+    const org = await orgWithSubscription(plan.id)
+    expect((await post({ event: 'PAYMENT_CONFIRMED', payment: { id: 42 } })).statusCode).toBe(400)
+    expect((await post({ event: 'PAYMENT_CREATED', payment: { id: 'pay_x', subscription: org.asaasSubscriptionId, customer: 'c', value: 1 } })).statusCode).toBe(200)
+    expect(await prisma.subscriptionHistory.count({ where: { organizationId: org.id } })).toBe(0)
   })
 })

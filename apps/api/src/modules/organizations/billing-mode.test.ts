@@ -67,7 +67,7 @@ describe('como o escritório paga a AutoHubs (billingMode)', () => {
     const org = await createTestOrg((await createTestPlan()).id)
     await prisma.organization.update({ where: { id: org.id }, data: { billingMode: 'MANUAL', asaasSubscriptionId: 'sub_antiga', subscriptionStatus: 'ACTIVE' } })
     const res = await app.inject({
-      method: 'POST', url: '/webhooks/asaas?accessToken=segredo',
+      method: 'POST', url: '/webhooks/asaas', headers: { 'asaas-access-token': 'segredo' },
       payload: { event: 'PAYMENT_DELETED', payment: { id: 'pay_1', subscription: 'sub_antiga', customer: 'c', value: 97 } },
     })
     expect(res.statusCode).toBe(200)

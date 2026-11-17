@@ -39,6 +39,14 @@ describe('escopo e assinatura nas rotas que faltavam', () => {
     expect((await prisma.task.findUniqueOrThrow({ where: { id: c.task.id } })).releasedAt).toBeNull()
   })
 
+  it('a cancelled office cannot change anything either (only reading)', async () => {
+    const c = await setup()
+    await prisma.organization.update({ where: { id: c.org.id }, data: { subscriptionStatus: 'CANCELLED' } })
+    const res = await app.inject({ method: 'POST', url: `/tasks/${c.task.id}/comments`, headers: { authorization: c.adminAuth }, payload: { content: 'oi' } })
+    expect(res.statusCode).toBe(403)
+    expect(JSON.parse(res.body).message).toBe('Assinatura cancelada. Fale com a AutoHubs para reativar.')
+  })
+
   it('a suspended office cannot comment (like every other change)', async () => {
     const c = await setup()
     await prisma.organization.update({ where: { id: c.org.id }, data: { subscriptionStatus: 'SUSPENDED' } })

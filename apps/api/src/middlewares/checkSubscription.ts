@@ -26,4 +26,8 @@ export async function checkSubscription(request: FastifyRequest, _reply: Fastify
   if (org?.subscriptionStatus === 'SUSPENDED') {
     throw new AppError(403, 'Assinatura suspensa. Regularize o pagamento para continuar.')
   }
+  // Cancelled (subscription deleted in Asaas, or by the Master): reading only, like suspended
+  if (org?.subscriptionStatus === 'CANCELLED') {
+    throw new AppError(403, 'Assinatura cancelada. Fale com a AutoHubs para reativar.')
+  }
 }

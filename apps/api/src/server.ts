@@ -2,6 +2,7 @@ import Fastify from 'fastify'
 import type { FastifyError } from 'fastify'
 import corsPlugin from '@/plugins/cors'
 import rateLimitPlugin from '@/plugins/rate-limit'
+import helmet from '@fastify/helmet'
 import { authRoutes } from '@/modules/auth/auth.routes'
 import { masterRoutes } from '@/modules/master/index'
 import { publicOrgRoutes, orgRoutes } from '@/modules/organizations/organizations.routes'
@@ -43,6 +44,9 @@ export function buildApp() {
   })
 
   app.register(corsPlugin)
+  // Security headers on every answer (nosniff, frame, HSTS...). Same-site resources: the web is on the
+  // same domain in production and on another port in development
+  app.register(helmet, { crossOriginResourcePolicy: { policy: 'same-site' } })
   app.register(rateLimitPlugin)
 
   app.get('/health', { logLevel: 'silent' }, async () => ({ status: 'ok' }))

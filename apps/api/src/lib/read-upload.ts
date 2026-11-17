@@ -1,7 +1,7 @@
 import type { FastifyRequest } from 'fastify'
 import type { MultipartFile } from '@fastify/multipart'
 import { AppError } from '@/errors/AppError'
-import { resolveUploadMimeType, UPLOAD_TYPE_NOT_ALLOWED } from './upload-policy'
+import { resolveUploadMimeType, UPLOAD_TYPE_NOT_ALLOWED, contentMatchesType, UPLOAD_CONTENT_MISMATCH } from './upload-policy'
 
 export const DEFAULT_MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
@@ -68,6 +68,7 @@ export async function readUpload(request: FastifyRequest, opts: ReadUploadOption
     throw err
   }
   if (buffer.length > maxBytes) throw tooLarge()
+  if (!contentMatchesType(mimeType, buffer)) throw new AppError(422, UPLOAD_CONTENT_MISMATCH)
 
   return { file, upload: { filename: file.filename, mimeType, size: buffer.length, buffer } }
 }

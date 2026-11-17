@@ -65,7 +65,7 @@ describe('POST /tasks/:id/attachments', () => {
   it('uploads allowed file and returns 201', async () => {
     const { task, auth } = await setup()
     const boundary = 'boundary789'
-    const body = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="doc.pdf"\r\nContent-Type: application/pdf\r\n\r\nPDF content\r\n--${boundary}--`
+    const body = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="doc.pdf"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.4 content\r\n--${boundary}--`
 
     const res = await app.inject({
       method: 'POST',

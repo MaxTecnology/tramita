@@ -1,6 +1,6 @@
 # Débito Técnico — Tramita
 
-## Auditoria de segurança de 2026-11-16 — lote 3 pendente (lotes 1 e 2 resolvidos)
+## Auditoria de segurança de 2026-11-16 ✅ (lotes 1, 2 e 3 resolvidos em 2026-11-17)
 
 Resolvido no lote 1: usuário desativado não loga e o refresh recarrega papel/ativo do banco, com sessões indexadas e revogadas ao desativar, rebaixar, redefinir senha ou trocar a própria senha (ALTO-1, MÉDIO-2); histórico do portal com lista de ações permitidas e sem `actorId` (ALTO-2); stream do board só com o nome do evento para o CLIENT (ALTO-3); responsável de tarefa/OS/processo precisa ser da equipe ativa do mesmo escritório (MÉDIO-1).
 
@@ -12,7 +12,7 @@ Resolvido no lote 1: usuário desativado não loga e o refresh recarrega papel/a
 - BAIXO-2: `listTaskDocuments` devolve o `Attachment` inteiro ao cliente (`storageKey`, ids internos) — usar `select`.
 - BAIXO-4: `checkSubscription` faltando em POST/DELETE de comentários e comentários de solicitação.
 
-**Lote 3:** webhook do Asaas idempotente por `payment.id`, ordem de eventos, `PAYMENT_DELETED` só da cobrança atual, payload com Zod e token só por header (BAIXO-5); `@fastify/helmet`, política de senha (BAIXO-6); conferência de magic bytes no upload (BAIXO-3); register público com limite estrito e tratamento de P2002 se um dia for religado (MÉDIO-4).
+**Lote 3 ✅ (2026-11-17):** webhook validado, idempotente e só por header; `PAYMENT_DELETED` só registra; `SUBSCRIPTION_DELETED` → `CANCELLED`, e `CANCELLED` passa a bloquear alterações como `SUSPENDED`; helmet; conteúdo do upload conferido com a extensão. Itens originais: webhook do Asaas idempotente por `payment.id`, ordem de eventos, `PAYMENT_DELETED` só da cobrança atual, payload com Zod e token só por header (BAIXO-5); `@fastify/helmet`, política de senha (BAIXO-6); conferência de magic bytes no upload (BAIXO-3); register público com limite estrito e tratamento de P2002 se um dia for religado (MÉDIO-4).
 
 **Verificar:** `trustProxy: 1` vs. a cadeia real de proxies em produção (Traefik/Cloudflare) e número de réplicas da API (rate limit em memória).
 

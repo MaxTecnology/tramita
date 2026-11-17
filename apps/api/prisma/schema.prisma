@@ -95,6 +95,8 @@ model SubscriptionHistory {
 
   organization Organization @relation(fields: [organizationId], references: [id])
 
+  // Asaas resends events: the same event of the same payment is applied once
+  @@unique([asaasPaymentId, event])
   @@map("subscription_history")
 }
 

@@ -343,6 +343,7 @@ Não há rota para criar, editar, reordenar ou remover colunas: elas nascem com 
 ## Anexos
 
 ### POST `/tasks/:id/attachments` — multipart, max 20MB
+→ Todo upload (anexo, documento, protocolo, comprovante, aprovação, solicitação, robô): o tipo vem da extensão (lista permitida) e o **conteúdo precisa conferir** com ela (assinatura do PDF/PNG/JPG/GIF/WEBP/Office/ZIP; texto sem bytes binários) — senão 422 `'O conteúdo do arquivo não confere com a extensão dele. Envie o arquivo original.'`
 ### GET `/tasks/:id/attachments` — lista com `signedUrl` TTL 1h
 ### DELETE `/tasks/:id/attachments/:attachmentId`
 → Arquivo que é registro de algo não é removido (409): o arquivo atual de um documento pedido ao cliente ("para trocar, envie outro"), de uma entrega, de um protocolo, o comprovante de pagamento, o lido pelo robô e os de aprovação. Versões antigas e anexos livres podem ser removidos.
@@ -753,14 +754,21 @@ await axios.post(
 ## Webhook Asaas
 
 ### POST `/webhooks/asaas`
-Recebe eventos de pagamento do Asaas.
+Recebe eventos do Asaas. Token **só** no header `asaas-access-token` (o configurado no painel do Asaas; `?accessToken=` na URL → 401, porque ficaria em log de proxy). Corpo validado com Zod (inválido → 400); evento não tratado → 200 e ignorado. Só age em escritório `billingMode: ASAAS`.
 
 | Evento Asaas            | Ação no Tramita                                 |
 |-------------------------|--------------------------------------------------|
 | `PAYMENT_CONFIRMED`     | `subscriptionStatus = ACTIVE`, renova período   |
-| `PAYMENT_OVERDUE`       | `subscriptionStatus = GRACE_PERIOD` (7 dias)    |
-| `PAYMENT_DELETED`       | `subscriptionStatus = SUSPENDED`                |
-| `SUBSCRIPTION_DELETED`  | `subscriptionStatus = CANCELLED`                |
+| `PAYMENT_OVERDUE`       | `subscriptionStatus = GRACE_PERIOD` (7 dias); ignorado se o mesmo pagamento já foi confirmado (evento fora de ordem) |
+| `PAYMENT_DELETED`       | só registra no histórico (cobrança apagada/renegociada não suspende o escritório) |
+| `SUBSCRIPTION_DELETED`  | `subscriptionStatus = CANCELLED` (reentrega não duplica) |
+
+**Idempotência:** histórico e mudança de status na mesma transação, histórico primeiro; o índice único `(asaasPaymentId, event)` faz a reentrega do mesmo evento de um pagamento ser só confirmada (200), sem reaplicar.
+**Suspensão:** vem da carência vencida (`checkSubscription` suspende na próxima ação) ou do Master. `SUSPENDED` e `CANCELLED` bloqueiam toda alteração (403); a leitura continua.
+
+---
+
+**Cabeçalhos de segurança:** toda resposta da API leva os do `@fastify/helmet` (`X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, HSTS, `Cross-Origin-Resource-Policy: same-site`).
 
 ---
 
