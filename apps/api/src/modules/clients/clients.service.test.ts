@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
+import { redis } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import * as cnpjws from '@/lib/cnpj-lookup'
 import {
@@ -367,6 +368,8 @@ describe('listClientUserLinks', () => {
 
 describe('lookupClientByCnpj', () => {
   afterEach(() => vi.restoreAllMocks())
+  // The answer is cached per CNPJ: every test starts without it
+  beforeEach(async () => { await redis.del('cnpj-lookup:11222333000181') })
 
   const found = (over: Partial<cnpjws.CnpjLookupResult>): cnpjws.CnpjLookupResult => ({
     razaoSocial: 'Cliente Teste LTDA', nomeFantasia: null, cep: '49000000', estado: 'SE', cidade: 'ARACAJU',
@@ -491,3 +494,46 @@ describe('mesmo CNPJ com e sem máscara', () => {
       .rejects.toMatchObject({ statusCode: 409, message: 'Já existe um cliente ativo com este CNPJ nesta organização' })
   })
 })
+
+describe('lookupClientByCnpj — cache', () => {
+  afterEach(() => vi.restoreAllMocks())
+  beforeEach(async () => { await redis.del('cnpj-lookup:11222333000181') })
+
+  const found: cnpjws.CnpjLookupResult = {
+    razaoSocial: 'Cliente Teste LTDA', nomeFantasia: null, cep: '49000000', estado: 'SE', cidade: 'ARACAJU',
+    ibgeCityCode: 2800308, bairro: null, logradouro: null, numero: null, complemento: null,
+  }
+
+  it('the same CNPJ again is answered from the cache (the outside services are asked once)', async () => {
+    const spy = vi.spyOn(cnpjws, 'lookupCnpj').mockResolvedValue(found)
+    await lookupClientByCnpj('11222333000181')
+    expect(await lookupClientByCnpj('11.222.333/0001-81')).toMatchObject({ razaoSocial: 'Cliente Teste LTDA', cidade: 'Aracaju', ibgeCityCode: 2800308 })
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(await redis.ttl('cnpj-lookup:11222333000181')).toBeGreaterThan(5 * 3600)
+  })
+
+  it('"not found" is remembered for a short while', async () => {
+    const spy = vi.spyOn(cnpjws, 'lookupCnpj').mockRejectedValue(new cnpjws.CnpjNotFoundError())
+    await expect(lookupClientByCnpj('11222333000181')).rejects.toMatchObject({ statusCode: 404 })
+    await expect(lookupClientByCnpj('11222333000181')).rejects.toMatchObject({ statusCode: 404 })
+    expect(spy).toHaveBeenCalledTimes(1)
+    const ttl = await redis.ttl('cnpj-lookup:11222333000181')
+    expect(ttl).toBeGreaterThan(0)
+    expect(ttl).toBeLessThanOrEqual(600)
+  })
+
+  it('"unavailable" is never cached', async () => {
+    const spy = vi.spyOn(cnpjws, 'lookupCnpj').mockRejectedValueOnce(new cnpjws.CnpjUnavailableError()).mockResolvedValueOnce(found)
+    await expect(lookupClientByCnpj('11222333000181')).rejects.toMatchObject({ statusCode: 502 })
+    expect(await lookupClientByCnpj('11222333000181')).toMatchObject({ ibgeCityCode: 2800308 })
+    expect(spy).toHaveBeenCalledTimes(2)
+  })
+
+  it('Redis down: the lookup still works, without cache', async () => {
+    vi.spyOn(redis, 'get').mockRejectedValue(new Error('connection refused'))
+    vi.spyOn(redis, 'set').mockRejectedValue(new Error('connection refused'))
+    vi.spyOn(cnpjws, 'lookupCnpj').mockResolvedValue(found)
+    expect(await lookupClientByCnpj('11222333000181')).toMatchObject({ ibgeCityCode: 2800308 })
+  })
+})
+

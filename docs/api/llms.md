@@ -1431,7 +1431,7 @@ no additional properties
   - **`departmentId` (required)**: `string`, pattern: `^[cC][^\s-]{8,}$`
   - **`responsibleUserId` (required)**: `string`, pattern: `^[cC][^\s-]{8,}$`
 - **`estado` (required)**: `string`, possible values: `"AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"`
-- **`ibgeCityCode` (required)**: `integer`
+- **`ibgeCityCode` (required)**: `integer`, minimum: `1`, maximum: `9999999`
 - **`name` (required)**: `string`, minLength: `2`
 - **`bairro`**: `string | null`
 - **`caepf`**: `string | null`
@@ -1622,7 +1622,7 @@ no additional properties
   - **`departmentId` (required)**: `string`, pattern: `^[cC][^\s-]{8,}$`
   - **`responsibleUserId` (required)**: `string`, pattern: `^[cC][^\s-]{8,}$`
 - **`estado` (required)**: `string`, possible values: `"AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"`
-- **`ibgeCityCode` (required)**: `integer`
+- **`ibgeCityCode` (required)**: `integer`, minimum: `1`, maximum: `9999999`
 - **`name` (required)**: `string`, minLength: `2`
 - **`bairro`**: `string | null`
 - **`caepf`**: `string | null`
@@ -1808,7 +1808,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-17T22:54:11.182Z"
+  "dueDate": "2026-11-17T23:01:42.820Z"
 }
 ```
 
@@ -1882,7 +1882,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-17T22:54:11.184Z"
+  "dueDate": "2026-11-17T23:01:42.824Z"
 }
 ```
 
@@ -1972,7 +1972,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:54:11.187Z",
+  "dueDate": "2026-11-17T23:01:42.828Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2247,14 +2247,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:54:11.195Z",
+  "dueDate": "2026-11-17T23:01:42.854Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-17T22:54:11.196Z",
-  "competence": "2026-11-17T22:54:11.196Z",
+  "targetDate": "2026-11-17T23:01:42.854Z",
+  "competence": "2026-11-17T23:01:42.854Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -4319,7 +4319,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-17T22:54:11.253Z",
+  "dueDate": "2026-11-17T23:01:42.968Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -5318,7 +5318,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:54:11.279Z"
+  "dueDate": "2026-11-17T23:01:43.021Z"
 }
 ```
 
@@ -5375,7 +5375,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:54:11.281Z",
+  "dueDate": "2026-11-17T23:01:43.022Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -5731,7 +5731,7 @@ no additional properties
   no additional properties
   - **`dueDayOfPeriod` (required)**: `integer`, minimum: `1`, maximum: `31`
   - **`dueBusinessDayRoll`**: `string`, possible values: `"NONE", "FORWARD", "BACKWARD"`, default: `"NONE"`
-  - **`ibgeCityCode`**: `integer`
+  - **`ibgeCityCode`**: `integer`, minimum: `1`, maximum: `9999999`
   - **`uf`**: `string`, possible values: `"AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"`
 - **`dueScope`**: `string`, possible values: `"FEDERAL", "STATE", "CITY"`, default: `"FEDERAL"`
 - **`generationMonthOffset`**: `integer`, default: `1`, minimum: `0`
@@ -5904,7 +5904,7 @@ no additional properties
   no additional properties
   - **`dueDayOfPeriod` (required)**: `integer`, minimum: `1`, maximum: `31`
   - **`dueBusinessDayRoll`**: `string`, possible values: `"NONE", "FORWARD", "BACKWARD"`, default: `"NONE"`
-  - **`ibgeCityCode`**: `integer`
+  - **`ibgeCityCode`**: `integer`, minimum: `1`, maximum: `9999999`
   - **`uf`**: `string`, possible values: `"AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"`
 - **`dueScope`**: `string`, possible values: `"FEDERAL", "STATE", "CITY"`, default: `"FEDERAL"`
 - **`generationDayOfPeriod`**: `integer`, minimum: `1`, maximum: `31`
@@ -6159,7 +6159,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:54:11.298Z",
+  "dueMonth": "2026-11-17T23:01:43.055Z",
   "assignmentIds": [
     ""
   ]
@@ -6211,7 +6211,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:54:11.299Z",
+  "dueMonth": "2026-11-17T23:01:43.057Z",
   "assignmentIds": [
     ""
   ]
@@ -6254,7 +6254,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:54:11.300Z"
+  "dueMonth": "2026-11-17T23:01:43.060Z"
 }
 ```
 

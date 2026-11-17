@@ -103,12 +103,22 @@ async function assertDueRulesValid(
   if (new Set(places).size !== places.length) {
     throw new AppError(400, scope === 'STATE' ? 'Estado repetido nas exceções' : 'Cidade repetida nas exceções')
   }
+  const cityNames = new Map<number, string>()
   if (scope === 'CITY') {
     const codes = rules.map((r) => r.ibgeCityCode).filter((c): c is number => c !== undefined)
-    const found = await prisma.municipality.count({ where: { ibgeCode: { in: codes } } })
-    if (found !== codes.length) throw new AppError(400, 'Cidade não encontrada')
+    const found = await prisma.municipality.findMany({ where: { ibgeCode: { in: codes } }, select: { ibgeCode: true, name: true, uf: true } })
+    if (found.length !== codes.length) throw new AppError(400, 'Cidade não encontrada')
+    for (const c of found) cityNames.set(c.ibgeCode, `${c.name} (${c.uf})`)
   }
-  for (const rule of rules) assertDayOfPeriodValid(periodicity, rule.dueDayOfPeriod, generationDayOfPeriod)
+  // Same day rule as the default due day, with the place in the message (a periodicity change can
+  // make a stored rule invalid; the person must know which one)
+  if (periodicity === 'WEEKLY') {
+    const invalid = rules.find((r) => r.dueDayOfPeriod > 7)
+    if (invalid) {
+      const place = scope === 'STATE' ? invalid.uf : cityNames.get(invalid.ibgeCityCode ?? 0)
+      throw new AppError(400, `Exceção ${place}: na periodicidade semanal o dia deve ser de 1 (segunda) a 7 (domingo)`)
+    }
+  }
 }
 
 const toRuleRows = (rules: RuleShape[]) =>

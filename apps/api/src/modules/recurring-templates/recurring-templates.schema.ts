@@ -18,7 +18,7 @@ export const documentDeliveryItemSchema = z.object({
 // checked against the template's scope in the service (on update the scope may be the stored one).
 export const dueRuleSchema = z.object({
   uf: ufSchema.optional(),
-  ibgeCityCode: z.number().int().optional(),
+  ibgeCityCode: z.number().int().min(1).max(9999999, 'Cidade não encontrada').optional(),
   dueDayOfPeriod: z.number().int().min(1).max(31),
   dueBusinessDayRoll: z.enum(['NONE', 'FORWARD', 'BACKWARD']).default('NONE'),
 })

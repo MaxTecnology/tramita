@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { lookupCnpj, CnpjNotFoundError, CnpjUnavailableError, type CnpjLookupResult } from '@/lib/cnpj-lookup'
 import { isUf } from '@/lib/uf'
+import { z } from 'zod'
+import { redis } from '@/lib/redis'
+import { logger } from '@/lib/logger'
 import { findMunicipality, findMunicipalityByName } from '@/modules/municipalities/municipalities.service'
 import { hashPassword } from '@/modules/auth/auth.service'
 import { normalizarTelefoneBr } from '@/lib/phone'
@@ -262,17 +265,61 @@ export async function lookupClientByCnpj(cnpj: string): Promise<CnpjLookupResult
   const digits = cnpj.replace(/\D/g, '')
   if (digits.length !== 14) throw new AppError(400, 'CNPJ inválido')
 
+  const cacheKey = `cnpj-lookup:${digits}`
+  const cached = await readLookupCache(cacheKey)
+  if (cached === 'NOT_FOUND') throw new AppError(404, 'CNPJ não encontrado')
+  if (cached) return cached
+
   let found: CnpjLookupResult
   try {
     found = await lookupCnpj(digits)
   } catch (err) {
-    if (err instanceof CnpjNotFoundError) throw new AppError(404, 'CNPJ não encontrado')
+    if (err instanceof CnpjNotFoundError) {
+      await writeLookupCache(cacheKey, 'NOT_FOUND', LOOKUP_NOT_FOUND_TTL_SECONDS)
+      throw new AppError(404, 'CNPJ não encontrado')
+    }
     if (err instanceof CnpjUnavailableError) {
       throw new AppError(502, 'Serviço de consulta de CNPJ indisponível no momento. Tente de novo ou preencha os dados à mão.')
     }
     throw err
   }
-  return { ...found, ...(await resolveLookupCity(found)) }
+  const result = { ...found, ...(await resolveLookupCity(found)) }
+  await writeLookupCache(cacheKey, result, LOOKUP_TTL_SECONDS)
+  return result
+}
+
+// Company data barely changes: a CNPJ is asked outside once every few hours, which also keeps the
+// shared quota of the outside services (one server IP) out of reach of repeated lookups. Redis
+// down → no cache, never an error.
+const LOOKUP_TTL_SECONDS = 6 * 3600
+const LOOKUP_NOT_FOUND_TTL_SECONDS = 10 * 60
+const cachedLookupSchema = z.union([
+  z.literal('NOT_FOUND'),
+  z.object({
+    razaoSocial: z.string(), nomeFantasia: z.string().nullable(), cep: z.string().nullable(), estado: z.string().nullable(),
+    cidade: z.string().nullable(), ibgeCityCode: z.number().int().nullable(), bairro: z.string().nullable(),
+    logradouro: z.string().nullable(), numero: z.string().nullable(), complemento: z.string().nullable(),
+  }),
+])
+
+async function readLookupCache(key: string): Promise<CnpjLookupResult | 'NOT_FOUND' | null> {
+  try {
+    const raw = await redis.get(key)
+    if (!raw) return null
+    const parsed = cachedLookupSchema.safeParse(JSON.parse(raw))
+    return parsed.success ? parsed.data : null
+  } catch (err) {
+    logger.warn({ reason: err instanceof Error ? err.message : String(err) }, 'Cache da consulta de CNPJ indisponível')
+    return null
+  }
+}
+
+async function writeLookupCache(key: string, value: CnpjLookupResult | 'NOT_FOUND', ttlSeconds: number): Promise<void> {
+  try {
+    await redis.set(key, JSON.stringify(value), 'EX', ttlSeconds)
+  } catch (err) {
+    logger.warn({ reason: err instanceof Error ? err.message : String(err) }, 'Cache da consulta de CNPJ indisponível')
+  }
 }
 
 // The city as the form will save it: the IBGE table's name and code, or no code (chosen by hand)

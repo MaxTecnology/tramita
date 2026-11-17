@@ -57,13 +57,14 @@ describe('abrangência do vencimento — validação', () => {
     await expect400(await create(c, { dueScope: 'STATE', dueRules: [SE, { ...SE, dueDayOfPeriod: 5 }] }), 'Estado repetido nas exceções')
     await expect400(await create(c, { dueScope: 'CITY', dueRules: [ARACAJU, ARACAJU] }), 'Cidade repetida nas exceções')
     await expect400(await create(c, { dueScope: 'CITY', dueRules: [{ ...ARACAJU, ibgeCityCode: 9999999 }] }), 'Cidade não encontrada')
+    expect((await create(c, { dueScope: 'CITY', dueRules: [{ ...ARACAJU, ibgeCityCode: 3000000000 }] })).statusCode).toBe(400)
     await expect400(await create(c, { dueScope: 'STATE', dueRules: [{ ...SE, uf: 'XX' }] }), 'Estado inválido')
   })
 
   it('the rule day follows the periodicity like the default day', async () => {
     const c = await setup()
     const res = await create(c, { periodicity: 'WEEKLY', dueDayOfPeriod: 5, dueScope: 'STATE', dueRules: [{ ...SE, dueDayOfPeriod: 8 }] })
-    await expect400(res, 'Periodicidade semanal: dia do vencimento deve ser de 1 (segunda) a 7 (domingo)')
+    await expect400(res, 'Exceção SE: na periodicidade semanal o dia deve ser de 1 (segunda) a 7 (domingo)')
   })
 
   it('saves and replaces the rules; the answer brings the city name', async () => {
@@ -93,7 +94,9 @@ describe('abrangência do vencimento — validação', () => {
   it('changing to weekly keeps the stored rules valid or refuses', async () => {
     const c = await setup()
     const id = (await create(c, { dueScope: 'STATE', dueRules: [SE] })).json().id as string
-    await expect400(await patch(c, id, { periodicity: 'WEEKLY', dueDayOfPeriod: 5 }), 'Periodicidade semanal: dia do vencimento deve ser de 1 (segunda) a 7 (domingo)')
+    await expect400(await patch(c, id, { periodicity: 'WEEKLY', dueDayOfPeriod: 5 }), 'Exceção SE: na periodicidade semanal o dia deve ser de 1 (segunda) a 7 (domingo)')
+    const city = (await create(c, { dueScope: 'CITY', dueRules: [ARACAJU] })).json().id as string
+    await expect400(await patch(c, city, { periodicity: 'WEEKLY', dueDayOfPeriod: 5 }), 'Exceção Aracaju (SE): na periodicidade semanal o dia deve ser de 1 (segunda) a 7 (domingo)')
   })
 
   it('another office template stays out of reach', async () => {

@@ -124,4 +124,16 @@ describe('abrangência do vencimento na recorrência', () => {
     expect(within(screen.getByLabelText('Dia da exceção')).getByRole('option', { name: 'Sexta' })).toBeInTheDocument()
     expect(within(screen.getByLabelText('Dia da exceção')).queryByRole('option', { name: '15' })).not.toBeInTheDocument()
   })
+
+  it('switching to weekly marks an exception whose day is no weekday, instead of showing nonsense', async () => {
+    renderForm()
+    await fillBasics()
+    await userEvent.click(screen.getByRole('radio', { name: 'Estadual' }))
+    await addRule({ uf: 'SE' }, '15', 'NONE')
+    await userEvent.click(screen.getByRole('radio', { name: 'Semanal' }))
+    expect(screen.getByText(/SE · dia inválido para semanal/)).toBeInTheDocument()
+    expect(screen.queryByText(/undefined/)).not.toBeInTheDocument()
+    expect(screen.getByText('Remova ou refaça as exceções marcadas: na periodicidade semanal o dia vai de segunda a domingo.')).toBeInTheDocument()
+  })
 })
+

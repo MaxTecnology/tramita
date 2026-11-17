@@ -16,6 +16,8 @@ import {
   listClientUserLinks,
 } from './clients.service'
 
+const CNPJ_LOOKUPS_PER_MINUTE = Number(process.env.RATE_LIMIT_CNPJ_MAX ?? 10)
+
 export async function clientsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', verifyJWT)
 
@@ -28,8 +30,10 @@ export async function clientsRoutes(app: FastifyInstance) {
   })
 
   // Rotas fixas antes de "/:id" — evita colisão com o parâmetro de rota
+  // Each lookup may hit two outside services from the server's single IP: a tight budget per person
   app.get('/lookup-cnpj/:cnpj', {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER')],
+    config: { rateLimit: { max: CNPJ_LOOKUPS_PER_MINUTE, timeWindow: '1 minute' } },
   }, async (request, reply) => {
     const { cnpj } = request.params as { cnpj: string }
     return reply.send(await lookupClientByCnpj(cnpj))

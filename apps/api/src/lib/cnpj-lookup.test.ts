@@ -37,7 +37,7 @@ describe('lookupCnpj (BrasilAPI com CNPJ.ws de reserva)', () => {
     const get = vi.spyOn(axios, 'get').mockResolvedValue({ data: brasilApiBody })
     const result = await lookupCnpj('11.222.333/0001-81')
     expect(get).toHaveBeenCalledTimes(1)
-    expect(get).toHaveBeenCalledWith(BRASIL_API, { timeout: 8000 })
+    expect(get).toHaveBeenCalledWith(BRASIL_API, { timeout: 8000, maxRedirects: 0, maxContentLength: 200_000 })
     expect(result).toEqual({
       razaoSocial: 'AutoHubs Tecnologia LTDA', nomeFantasia: 'AutoHubs', cep: '49000000',
       estado: 'SE', cidade: 'ARACAJU', ibgeCityCode: 2800308,
@@ -50,7 +50,7 @@ describe('lookupCnpj (BrasilAPI com CNPJ.ws de reserva)', () => {
   ])('BrasilAPI %s → falls back to the CNPJ.ws (no IBGE code there)', async (_label, failure) => {
     const get = vi.spyOn(axios, 'get').mockRejectedValueOnce(failure).mockResolvedValueOnce({ data: cnpjWsBody })
     const result = await lookupCnpj('11222333000181')
-    expect(get).toHaveBeenNthCalledWith(2, CNPJ_WS, { timeout: 8000 })
+    expect(get).toHaveBeenNthCalledWith(2, CNPJ_WS, { timeout: 8000, maxRedirects: 0, maxContentLength: 200_000 })
     expect(result).toMatchObject({ estado: 'AL', cidade: 'Maceió', ibgeCityCode: null, logradouro: 'Rua das Flores' })
   })
 
@@ -69,4 +69,18 @@ describe('lookupCnpj (BrasilAPI com CNPJ.ws de reserva)', () => {
     vi.spyOn(axios, 'get').mockRejectedValueOnce(httpError(500)).mockRejectedValueOnce(httpError(404))
     await expect(lookupCnpj('11222333000181')).rejects.toBeInstanceOf(CnpjNotFoundError)
   })
+
+  it('an odd BrasilAPI answer (200 but wrong shape) is not trusted: the reserve answers', async () => {
+    const get = vi.spyOn(axios, 'get')
+      .mockResolvedValueOnce({ data: { ...brasilApiBody, razao_social: undefined, codigo_municipio_ibge: '2800308' } })
+      .mockResolvedValueOnce({ data: cnpjWsBody })
+    expect(await lookupCnpj('11222333000181')).toMatchObject({ razaoSocial: 'AutoHubs Tecnologia LTDA', estado: 'AL' })
+    expect(get).toHaveBeenCalledTimes(2)
+  })
+
+  it('an odd reserve answer after the BrasilAPI was down → unavailable', async () => {
+    vi.spyOn(axios, 'get').mockRejectedValueOnce(httpError(500)).mockResolvedValueOnce({ data: { razao_social: 42 } })
+    await expect(lookupCnpj('11222333000181')).rejects.toBeInstanceOf(CnpjUnavailableError)
+  })
 })
+

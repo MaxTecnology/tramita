@@ -23,7 +23,7 @@ const estadoSchema = z.preprocess(
 const ibgeCityCodeSchema = z.preprocess(
   emptyToUndefined,
   z.number({ required_error: 'Informe a cidade do cliente', invalid_type_error: 'Informe a cidade do cliente' })
-    .int('Informe a cidade do cliente'),
+    .int('Informe a cidade do cliente').min(1, 'Informe a cidade do cliente').max(9999999, 'Informe a cidade do cliente'),
 )
 
 const companyFieldsObject = z.object({

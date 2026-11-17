@@ -23,7 +23,9 @@ const selectCls = 'h-9 w-full rounded-md border border-border bg-surface text-fo
 
 export function describeDueRule(rule: DueRuleDraft, scope: DueScope, weekly: boolean): string {
   const place = scope === 'CITY' ? `${rule.cityName} (${rule.uf})` : rule.uf
-  const day = weekly ? WEEKDAY[rule.dueDayOfPeriod]?.toLowerCase() : `dia ${rule.dueDayOfPeriod}`
+  const day = weekly
+    ? WEEKDAY[rule.dueDayOfPeriod]?.toLowerCase() ?? 'dia inválido para semanal'
+    : `dia ${rule.dueDayOfPeriod}`
   return `${place} · ${day} · ${ROLL_LABEL[rule.dueBusinessDayRoll].toLowerCase()}`
 }
 
@@ -46,6 +48,8 @@ export function DueRulesEditor({ scope, weekly, rules, onChange }: {
   const cityOptions = cities.filter((c) => !usedCities.has(c.ibgeCode))
   const dayOptions = weekly ? [1, 2, 3, 4, 5, 6, 7] : Array.from({ length: 31 }, (_, i) => i + 1)
   const complete = !!uf && (scope === 'STATE' || city !== null)
+  // A monthly day (8–31) kept after switching to weekly: the server refuses it, so say which ones
+  const hasInvalid = weekly && rules.some((r) => r.dueDayOfPeriod > 7)
   // A day picked for a monthly template is no weekday: weekly falls back to Friday
   const effectiveDay = weekly && day > 7 ? 5 : day
 
@@ -66,7 +70,7 @@ export function DueRulesEditor({ scope, weekly, rules, onChange }: {
         <ul className="space-y-1">
           {rules.map((r, i) => (
             <li key={`${r.uf}-${r.ibgeCityCode ?? ''}`} className="flex items-center justify-between rounded-md bg-surface px-2.5 py-1.5 text-sm">
-              <span className="text-foreground">{describeDueRule(r, scope, weekly)}</span>
+              <span className={weekly && r.dueDayOfPeriod > 7 ? 'text-danger-text' : 'text-foreground'}>{describeDueRule(r, scope, weekly)}</span>
               <button
                 type="button"
                 aria-label={`Remover exceção ${scope === 'CITY' ? r.cityName : r.uf}`}
@@ -78,6 +82,9 @@ export function DueRulesEditor({ scope, weekly, rules, onChange }: {
             </li>
           ))}
         </ul>
+      )}
+      {hasInvalid && (
+        <p className="text-xs text-danger-text">Remova ou refaça as exceções marcadas: na periodicidade semanal o dia vai de segunda a domingo.</p>
       )}
       <div className={cn('grid gap-2 items-end', scope === 'CITY' ? 'sm:grid-cols-[repeat(4,minmax(0,1fr))_auto]' : 'sm:grid-cols-[repeat(3,minmax(0,1fr))_auto]')}>
         <label className="space-y-1 text-xs text-muted-foreground">

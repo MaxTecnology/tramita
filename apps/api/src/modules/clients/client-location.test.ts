@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import * as cnpjLookup from '@/lib/cnpj-lookup'
+import { redis } from '@/lib/redis'
 import { app } from '@/test/setup'
 import { prisma } from '@/lib/prisma'
 import { createTestPlan, createTestOrg, createTestUser, createTestClient, createTestDepartment, getAuthHeader, generateValidCnpj } from '@/test/helpers'
@@ -30,6 +32,13 @@ describe('estado e cidade do cliente', () => {
     const res = await create(c, { cidade: 'Qualquer coisa' })
     expect(res.statusCode).toBe(201)
     expect(res.json()).toMatchObject({ estado: 'SE', cidade: 'Aracaju', ibgeCityCode: 2800308 })
+  })
+
+  it('a forged huge city code is a 400, not a server error', async () => {
+    const c = await setup()
+    const res = await create(c, { ibgeCityCode: 3000000000 })
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({ message: 'Informe a cidade do cliente' })
   })
 
   it('refuses a city of another state, and an unknown city, saving nothing', async () => {
@@ -71,3 +80,20 @@ describe('estado e cidade do cliente', () => {
     expect(res.json()[0]).toMatchObject({ estado: 'AL', cidade: 'Maceió', ibgeCityCode: 2704302 })
   })
 })
+
+describe('buscador de CNPJ — limite por pessoa', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('10 lookups a minute per person; the 11th waits (429)', async () => {
+    await redis.del('cnpj-lookup:11222333000181')
+    vi.spyOn(cnpjLookup, 'lookupCnpj').mockResolvedValue({
+      razaoSocial: 'ACME', nomeFantasia: null, cep: null, estado: 'SE', cidade: 'ARACAJU', ibgeCityCode: 2800308,
+      bairro: null, logradouro: null, numero: null, complemento: null,
+    })
+    const c = await setup()
+    const lookup = () => app.inject({ method: 'GET', url: '/clients/lookup-cnpj/11222333000181', headers: { authorization: c.auth } })
+    for (let i = 0; i < 10; i++) expect((await lookup()).statusCode).toBe(200)
+    expect((await lookup()).statusCode).toBe(429)
+  })
+})
+

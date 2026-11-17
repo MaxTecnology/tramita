@@ -1,4 +1,6 @@
 import axios from 'axios'
+import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 // Company data by CNPJ for the client form. BrasilAPI first (fast, brings the city's IBGE code);
 // the public CNPJ.ws (3 requests/min per IP, unstable) only when the BrasilAPI is down. HTTP only:
@@ -20,52 +22,56 @@ export interface CnpjLookupResult {
 export class CnpjNotFoundError extends Error {}
 export class CnpjUnavailableError extends Error {}
 
-const TIMEOUT_MS = 8000
+// No redirects (fixed hosts) and a small body: a company record is a few KB
+const HTTP_OPTIONS = { timeout: 8000, maxRedirects: 0, maxContentLength: 200_000 }
 
-interface BrasilApiResponse {
-  razao_social: string
-  nome_fantasia: string | null
-  cep: string | null
-  uf: string | null
-  municipio: string | null
-  codigo_municipio_ibge: number | null
-  bairro: string | null
-  descricao_tipo_de_logradouro: string | null
-  logradouro: string | null
-  numero: string | null
-  complemento: string | null
-}
+// Outside answers are validated like any input: a shape we do not expect is not trusted
+const text = z.string().max(500).nullish()
+const brasilApiSchema = z.object({
+  razao_social: z.string().min(1).max(500),
+  nome_fantasia: text,
+  cep: text,
+  uf: text,
+  municipio: text,
+  codigo_municipio_ibge: z.number().int().nullish(),
+  bairro: text,
+  descricao_tipo_de_logradouro: text,
+  logradouro: text,
+  numero: text,
+  complemento: text,
+})
+const cnpjWsSchema = z.object({
+  razao_social: z.string().min(1).max(500),
+  estabelecimento: z.object({
+    cep: text,
+    bairro: text,
+    tipo_logradouro: text,
+    logradouro: text,
+    numero: text,
+    complemento: text,
+    nome_fantasia: text,
+    estado: z.object({ sigla: z.string().max(2) }).nullish(),
+    cidade: z.object({ nome: z.string().max(200) }).nullish(),
+  }),
+})
+type BrasilApiResponse = z.infer<typeof brasilApiSchema>
+type CnpjWsResponse = z.infer<typeof cnpjWsSchema>
 
-interface CnpjWsResponse {
-  razao_social: string
-  estabelecimento: {
-    cep: string | null
-    bairro: string | null
-    tipo_logradouro: string | null
-    logradouro: string | null
-    numero: string | null
-    complemento: string | null
-    nome_fantasia: string | null
-    estado: { sigla: string } | null
-    cidade: { nome: string } | null
-  }
-}
-
-const text = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null)
-const street = (type: string | null, name: string | null) => [type, name].filter(Boolean).join(' ').trim() || null
+const clean = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null)
+const street = (type: string | null | undefined, name: string | null | undefined) => [type, name].filter(Boolean).join(' ').trim() || null
 
 function fromBrasilApi(d: BrasilApiResponse): CnpjLookupResult {
   return {
     razaoSocial: d.razao_social,
-    nomeFantasia: text(d.nome_fantasia),
-    cep: text(d.cep),
-    estado: text(d.uf),
-    cidade: text(d.municipio),
-    ibgeCityCode: typeof d.codigo_municipio_ibge === 'number' ? d.codigo_municipio_ibge : null,
-    bairro: text(d.bairro),
+    nomeFantasia: clean(d.nome_fantasia),
+    cep: clean(d.cep),
+    estado: clean(d.uf),
+    cidade: clean(d.municipio),
+    ibgeCityCode: d.codigo_municipio_ibge ?? null,
+    bairro: clean(d.bairro),
     logradouro: street(d.descricao_tipo_de_logradouro, d.logradouro),
-    numero: text(d.numero),
-    complemento: text(d.complemento),
+    numero: clean(d.numero),
+    complemento: clean(d.complemento),
   }
 }
 
@@ -73,34 +79,39 @@ function fromCnpjWs(d: CnpjWsResponse): CnpjLookupResult {
   const e = d.estabelecimento
   return {
     razaoSocial: d.razao_social,
-    nomeFantasia: text(e.nome_fantasia),
-    cep: text(e.cep),
+    nomeFantasia: clean(e.nome_fantasia),
+    cep: clean(e.cep),
     estado: e.estado?.sigla ?? null,
     cidade: e.cidade?.nome ?? null,
     ibgeCityCode: null,
-    bairro: text(e.bairro),
+    bairro: clean(e.bairro),
     logradouro: street(e.tipo_logradouro, e.logradouro),
-    numero: text(e.numero),
-    complemento: text(e.complemento),
+    numero: clean(e.numero),
+    complemento: clean(e.complemento),
   }
 }
 
 const isNotFound = (err: unknown) => axios.isAxiosError(err) && err.response?.status === 404
+// What went wrong, for the log (never the CNPJ)
+const reason = (err: unknown) => (axios.isAxiosError(err) ? err.response?.status ?? err.code ?? 'network' : 'invalid payload')
 
 export async function lookupCnpj(cnpj: string): Promise<CnpjLookupResult> {
   const digits = cnpj.replace(/\D/g, '')
+  let primaryFailure: unknown
   try {
-    const res = await axios.get<BrasilApiResponse>(`https://brasilapi.com.br/api/cnpj/v1/${digits}`, { timeout: TIMEOUT_MS })
-    return fromBrasilApi(res.data)
+    const res = await axios.get<unknown>(`https://brasilapi.com.br/api/cnpj/v1/${digits}`, HTTP_OPTIONS)
+    return fromBrasilApi(brasilApiSchema.parse(res.data))
   } catch (err) {
     // Not found is an answer; anything else (5xx, 429, timeout, odd payload) tries the reserve
     if (isNotFound(err)) throw new CnpjNotFoundError()
+    primaryFailure = err
   }
   try {
-    const res = await axios.get<CnpjWsResponse>(`https://publica.cnpj.ws/cnpj/${digits}`, { timeout: TIMEOUT_MS })
-    return fromCnpjWs(res.data)
+    const res = await axios.get<unknown>(`https://publica.cnpj.ws/cnpj/${digits}`, HTTP_OPTIONS)
+    return fromCnpjWs(cnpjWsSchema.parse(res.data))
   } catch (err) {
     if (isNotFound(err)) throw new CnpjNotFoundError()
+    logger.warn({ brasilApi: reason(primaryFailure), cnpjWs: reason(err) }, 'Consulta de CNPJ indisponível nos dois serviços')
     throw new CnpjUnavailableError()
   }
 }

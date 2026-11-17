@@ -1473,7 +1473,9 @@
                     ]
                   },
                   "ibgeCityCode": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9999999
                   },
                   "bairro": {
                     "type": [
@@ -1788,7 +1790,9 @@
                     ]
                   },
                   "ibgeCityCode": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9999999
                   },
                   "bairro": {
                     "type": [
@@ -8054,7 +8058,9 @@
                           ]
                         },
                         "ibgeCityCode": {
-                          "type": "integer"
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9999999
                         },
                         "dueDayOfPeriod": {
                           "type": "integer",
@@ -8373,7 +8379,9 @@
                           ]
                         },
                         "ibgeCityCode": {
-                          "type": "integer"
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9999999
                         },
                         "dueDayOfPeriod": {
                           "type": "integer",
