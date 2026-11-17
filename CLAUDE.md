@@ -54,6 +54,25 @@ src/modules/<nome>/
 
 ---
 
+## Documentação da API (obrigatória ao mexer em rota)
+
+Criou, alterou ou removeu rota (caminho, método, papel, body, query)? No **mesmo commit**:
+
+1. Atualizar a entrada no catálogo `apps/api/src/api-docs/` (`access` / `work` / `client` / `system.ts`):
+   chave `"MÉTODO /caminho/:param"`, `summary` em pt-BR, `body`/`querystring` apontando para o schema Zod
+   que o handler usa, `upload` para multipart. Rota removida → remover a entrada.
+2. Papel checado **dentro do service** (o probe não enxerga, o body falha antes) → declarar `roles` na entrada.
+3. Rota pública nova → incluir em `PUBLIC` de `apps/api/src/plugins/openapi.ts`.
+4. Regenerar e commitar: `pnpm --filter api audit:routes && pnpm --filter api docs:api`
+   (atualiza `docs/api-inventory.md`, `docs/api/openapi.json` e `docs/api/llms.md`).
+5. Atualizar `docs/SPEC.md` se o comportamento mudou.
+
+`src/plugins/openapi.test.ts` falha se faltar entrada ou sobrar entrada sem rota; texto desatualizado o
+teste não pega — revisar o resumo/descrição à mão. Referência local: `API_DOCS_ENABLED=true` →
+`http://localhost:3000/reference/` (nunca em produção).
+
+---
+
 ## Middlewares Críticos
 
 | Middleware          | Onde aplicar                        | O que faz                                      |
