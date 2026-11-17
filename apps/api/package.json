@@ -15,7 +15,8 @@
     "migrate:dev": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config ./node_modules/prisma/build/index.js migrate dev",
     "migrate:deploy": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config ./node_modules/prisma/build/index.js migrate deploy",
     "migrate:reset": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config ./node_modules/prisma/build/index.js migrate reset",
-    "audit:routes": "vitest run --config vitest.audit.config.ts && node scripts/route-audit/build-inventory.mjs"
+    "audit:routes": "vitest run --config vitest.audit.config.ts && node scripts/route-audit/build-inventory.mjs",
+    "docs:api": "tsx --tsconfig tsconfig.json scripts/api-docs/generate.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1060.0",
@@ -24,7 +25,9 @@
     "@fastify/helmet": "^13.2.0",
     "@fastify/multipart": "^10.0.0",
     "@fastify/rate-limit": "^10.3.0",
+    "@fastify/swagger": "^9.9.5",
     "@prisma/client": "^6.9.0",
+    "@scalar/fastify-api-reference": "^1.79.0",
     "axios": "^1.16.1",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.56.0",
@@ -38,9 +41,11 @@
     "prisma": "^6.9.0",
     "resend": "^6.17.1",
     "uuid": "^11.1.0",
-    "zod": "^3.24.4"
+    "zod": "^3.24.4",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
+    "@scalar/openapi-to-markdown": "^1.7.7",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.15.29",

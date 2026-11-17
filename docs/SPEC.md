@@ -1,6 +1,33 @@
 # API Spec — Tramita
 
-## Base URL: `/api/v1`
+## Base URL
+
+Rotas na raiz da API, sem prefixo de versão: produção `https://tramitaapi.autohubs.com.br`,
+local `http://localhost:3000`.
+
+## Documentação da API (2026-11-17)
+
+- **Referência interativa (Scalar):** `GET /reference/` — opt-in: só com `API_DOCS_ENABLED=true` **e**
+  `NODE_ENV !== 'production'` (senão a rota não existe, 404). Lista só o servidor local, para o "Try it"
+  nunca chamar produção. A página roda sem o CSP do helmet (script inline do Scalar);
+  todas as outras rotas mantêm o CSP.
+- **Fonte:** `@fastify/swagger` coleta todas as rotas; resumo, descrição, body e query vêm do catálogo
+  `apps/api/src/api-docs/` (chave `"MÉTODO /caminho/:param"`), usando os mesmos schemas Zod que os
+  handlers validam. As rotas não recebem `schema` do Fastify: a validação continua no `safeParse` de
+  cada handler (respostas 400 `{ message }` inalteradas).
+- **Rota nova sem documentação quebra o teste** `src/plugins/openapi.test.ts` (toda operação precisa de
+  entrada no catálogo; entrada sem rota também falha).
+- **Arquivos gerados:** `pnpm --filter api docs:api` escreve `docs/api/openapi.json` e `docs/api/llms.md`
+  (Markdown para agentes de IA). "Quem pode" (`x-roles` + linha na descrição) vem do probe de
+  `pnpm --filter api audit:routes` — rodar o audit antes; sem o probe, ou com rota fora dele, o gerador
+  falha. Papel checado dentro do service (o probe não enxerga, o body falha antes) é declarado no
+  catálogo (`roles`), ex.: `POST /tasks/:id/release` → Admin, Gerente. O arquivo gerado tem `servers`
+  fixos (produção + local), não depende de quem gerou.
+- Schemas no dialeto do OpenAPI 3.1 (JSON Schema; `zod-to-json-schema` com `jsonSchema7`).
+- Tags por primeiro segmento do caminho; segurança: `bearerAuth` em tudo, exceto as públicas
+  (`[]`), o webhook (`asaas-access-token`) e os streams SSE (`?ticket=`).
+- Ocultas do spec: `/reference`, preflight `OPTIONS` e o curinga `*`; a duplicata `/x/` de rotas `'/'`
+  com prefixo é normalizada para `/x`.
 
 ---
 

@@ -3,6 +3,7 @@ import type { FastifyError } from 'fastify'
 import corsPlugin from '@/plugins/cors'
 import rateLimitPlugin from '@/plugins/rate-limit'
 import helmet from '@fastify/helmet'
+import openapiPlugin from '@/plugins/openapi'
 import { authRoutes } from '@/modules/auth/auth.routes'
 import { masterRoutes } from '@/modules/master/index'
 import { publicOrgRoutes, orgRoutes } from '@/modules/organizations/organizations.routes'
@@ -43,6 +44,8 @@ export function buildApp() {
     trustProxy: 1,
   })
 
+  // First: the OpenAPI collector must see every route registered after it
+  app.register(openapiPlugin)
   app.register(corsPlugin)
   // Security headers on every answer (nosniff, frame, HSTS...). Same-site resources: the web is on the
   // same domain in production and on another port in development

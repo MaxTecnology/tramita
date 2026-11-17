@@ -697,3 +697,23 @@ Achados da revisão destas correções — ✅ resolvidos em 2026-11-16:
   ação da pessoa, pelo drawer.
 - SSE: a reconferência não se sobrepõe e vale para todos os streams (sino, solicitações, processo) e
   perfis: usuário ou usuário do portal desativado perde o stream em até 1 min (`streamRecheck`).
+
+## Documentação da API — pendências (2026-11-17)
+
+- **Respostas sem schema:** a referência mostra "Default Response" em todas as rotas. Documentar o
+  formato das respostas principais (login, tarefa, processo, portal) quando a API for aberta a terceiros
+  — exige schema de resposta sem ligar o serializer do Fastify (que descartaria campos não listados).
+- **`scripts/` fora do typecheck:** `tsconfig` inclui só `src/`; `scripts/api-docs/generate.ts` e
+  `scripts/route-audit/*` só são checados ao rodar. Incluir um `tsconfig.scripts.json` se crescerem.
+- **`docs/api/*` é gerado:** pode ficar defasado se alguém mudar rota e não rodar `docs:api`. O catálogo
+  (fonte) está protegido por teste; o arquivo gerado não. Considerar no CI: `audit:routes && docs:api`
+  + `git diff --exit-code docs/api`.
+- **Lista de rotas públicas manual** (`PUBLIC` em `plugins/openapi.ts`): uma rota pública nova
+  esquecida aparece como `bearerAuth` na referência (o "quem pode" do arquivo gerado continua certo,
+  vem do probe). Derivar do probe se começar a divergir.
+- **Uploads sem limite documentado:** a referência não mostra tamanho máximo nem tipos aceitos por
+  upload (padrão `DEFAULT_MAX_UPLOAD_BYTES`, 20 MB no robô, limite próprio no som de SLA).
+- **Rota com vários métodos** documentaria só o primeiro (`route.method[0]`) — nenhuma existe hoje; o
+  teste de contagem operações × catálogo pega se aparecer.
+- Imagem de produção carrega `@scalar/fastify-api-reference` sem usar (import dinâmico só fora de prod).
+
