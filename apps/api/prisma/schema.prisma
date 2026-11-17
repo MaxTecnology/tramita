@@ -866,6 +866,8 @@ model Comment {
   deletedAt     DateTime?
   deletedBy     String?
   deletedByType DeletedByType?
+  // Office-only note: never shown nor announced to the client (portal, notifications)
+  isInternal    Boolean           @default(false)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 

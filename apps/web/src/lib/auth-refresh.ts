@@ -20,6 +20,12 @@ export function isTokenExpired(token: string, skewSeconds = EXPIRY_SKEW_SECONDS)
   }
 }
 
+// The API answered that this session is no longer valid (expired, revoked, deactivated person)
+export function isSessionRefused(err: unknown): boolean {
+  const status = (err as { response?: { status?: number } })?.response?.status
+  return status === 401 || status === 400
+}
+
 export function clearSession(): void {
   localStorage.removeItem('accessToken')
   localStorage.removeItem('refreshToken')
@@ -45,7 +51,8 @@ export function refreshAccessToken(): Promise<string> {
       localStorage.setItem('accessToken', data.accessToken)
       return data.accessToken
     } catch (err) {
-      clearSession()
+      // Only a refusal ends the session; the API down for a moment (deploy, network, 5xx, 429) does not
+      if (isSessionRefused(err)) clearSession()
       throw err
     }
   })().finally(() => {

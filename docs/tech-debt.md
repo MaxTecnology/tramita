@@ -20,9 +20,9 @@ Resolvido no lote 1: usuário desativado não loga e o refresh recarrega papel/a
 
 Hoje o membro só passa tarefa para quem é do departamento da tarefa (`assertMemberCanPassTask`), e o escopo de quem enxerga segue departamento/carteira. Max quer que valha "de quem é a tarefa": ex.: uma tarefa do Fiscal enviada a um usuário do Contábil, que passa a vê-la. A decidir antes de implementar: a tarefa continua do departamento Fiscal (indicadores, filas) ou muda; o gerente do Contábil também passa a ver; o colaborador vê só essa tarefa ou o processo inteiro; e como fica a carteira do cliente (o Contábil atende esse cliente?).
 
-## Comentário interno na tarefa (pedido em 2026-11-16)
+## Comentário interno na tarefa ✅ (pedido e resolvido em 2026-11-16)
 
-Hoje todo comentário da equipe numa tarefa visível aparece no portal. Max quer comentário só interno (não chega ao cliente nem dispara notificação a ele). A implementar.
+`Comment.isInternal`: a equipe marca "Interno (o cliente não vê)" em tarefa visível ao cliente; o cliente não vê, não remove, não é notificado, e a conversa interna não leva a tarefa ao "Enviar documentos".
 
 ## Teste intermitente: `portal.protocols.routes.test.ts` › "each person who opens it is recorded once" (encontrado em 2026-11-16)
 

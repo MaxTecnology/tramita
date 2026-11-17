@@ -89,7 +89,7 @@ export function onOSReleased(taskId: string, actor: { id: string; name: string }
   })
 }
 
-export function onTaskComment(taskId: string, actor: Actor, content: string) {
+export function onTaskComment(taskId: string, actor: Actor, content: string, opts: { internal?: boolean } = {}) {
   return safe('TASK_COMMENT', async () => {
     const t = await taskContext(taskId)
     if (!t) return
@@ -99,7 +99,8 @@ export function onTaskComment(taskId: string, actor: Actor, content: string) {
       ...base, title: `${actor.name} comentou em "${t.title}" — ${t.clientName}`, link: staffTaskLink(t),
       to: { userIds: await taskOwners(t) }, exclude: { userId: actor.userId },
     })
-    if (actor.userId) {
+    // An internal note is only for the office
+    if (actor.userId && !opts.internal) {
       await notifyInApp({
         ...base, title: `Novo comentário do escritório em "${t.title}"`, link: clientTaskLink(t),
         to: { clientUserIds: await clientRecipientsForTask(t) },

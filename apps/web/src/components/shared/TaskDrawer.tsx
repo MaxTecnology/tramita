@@ -790,7 +790,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                   )}
                 </div>
               )}
-              <Comments entityType="task" entityId={task.id} currentUserId={currentUserId} role={role} />
+              <Comments entityType="task" entityId={task.id} currentUserId={currentUserId} role={role} allowInternal={isStaff && task.visibleToClient} />
             </div>
           )}
 

@@ -53,10 +53,21 @@ describe('refreshAccessToken', () => {
     expect(post).toHaveBeenCalledTimes(2)
   })
 
-  it('clears the session and rejects when refresh fails', async () => {
+  it('keeps the session when the API is unreachable or fails for a moment (deploy, network): only a refusal logs out', async () => {
     localStorage.setItem('accessToken', 'old')
     localStorage.setItem('user', '{}')
-    post.mockRejectedValueOnce(new Error('401'))
+    for (const failure of [new Error('Network Error'), Object.assign(new Error('500'), { response: { status: 500 } }), Object.assign(new Error('429'), { response: { status: 429 } })]) {
+      post.mockRejectedValueOnce(failure)
+      await expect(refreshAccessToken()).rejects.toThrow()
+      expect(localStorage.getItem('refreshToken')).toBe('r1')
+      expect(localStorage.getItem('user')).toBe('{}')
+    }
+  })
+
+  it('clears the session and rejects when the API refuses the session', async () => {
+    localStorage.setItem('accessToken', 'old')
+    localStorage.setItem('user', '{}')
+    post.mockRejectedValueOnce(Object.assign(new Error('401'), { response: { status: 401 } }))
 
     await expect(refreshAccessToken()).rejects.toThrow()
     expect(localStorage.getItem('accessToken')).toBeNull()

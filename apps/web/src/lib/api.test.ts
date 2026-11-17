@@ -35,3 +35,21 @@ it('an expired token is refreshed and the request repeated only once', async () 
   expect(calls).toBe(2)
   expect(refreshes).toBe(1)
 })
+
+it('when the API is down while renewing the session (deploy), the person stays logged in', async () => {
+  server.use(
+    http.get(`${API}/tasks`, () => HttpResponse.json({ message: 'Token inválido' }, { status: 401 })),
+    http.post(`${API}/auth/refresh`, () => HttpResponse.json({ message: 'Erro interno do servidor' }, { status: 502 })),
+  )
+  await expect(api.get('/tasks')).rejects.toBeTruthy()
+  expect(localStorage.getItem('refreshToken')).toBe('r-old')
+})
+
+it('a refused session (401 on renewal) logs out', async () => {
+  server.use(
+    http.get(`${API}/tasks`, () => HttpResponse.json({ message: 'Token inválido' }, { status: 401 })),
+    http.post(`${API}/auth/refresh`, () => HttpResponse.json({ message: 'Refresh token inválido ou expirado' }, { status: 401 })),
+  )
+  await expect(api.get('/tasks')).rejects.toBeTruthy()
+  expect(localStorage.getItem('refreshToken')).toBeNull()
+})

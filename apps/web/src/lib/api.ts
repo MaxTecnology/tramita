@@ -1,5 +1,5 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
-import { redirectToLogin, refreshAccessToken } from './auth-refresh'
+import { isSessionRefused, redirectToLogin, refreshAccessToken } from './auth-refresh'
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3000',
@@ -28,8 +28,9 @@ api.interceptors.response.use(
           config._retried = true
           config.headers.Authorization = `Bearer ${accessToken}`
           return api.request(config)
-        } catch {
-          redirectToLogin()
+        } catch (refreshError) {
+          // Session refused → login; the API unreachable for a moment keeps the person signed in
+          if (isSessionRefused(refreshError)) redirectToLogin()
         }
       }
     }

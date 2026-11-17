@@ -40,7 +40,8 @@ export async function listComments(
   }
 
   const comments = await prisma.comment.findMany({
-    where: { taskId },
+    // The client never sees office-only notes
+    where: { taskId, ...(scope ? { isInternal: false } : {}) },
     orderBy: { createdAt: 'asc' },
     include: {
       user: { select: { id: true, name: true } },
@@ -85,9 +86,12 @@ export async function createComment(
     throw new AppError(404, 'Tarefa não encontrada')
   }
 
+  // Only the office writes internal notes
+  const isInternal = !isClient && data.isInternal === true
   const comment = await prisma.comment.create({
     data: {
       content: data.content,
+      isInternal,
       taskId,
       authorType: isClient ? 'CLIENT' : 'USER',
       userId: isClient ? undefined : actor.id,
@@ -133,8 +137,8 @@ export async function createComment(
         }),
       ),
     )
-  } else {
-    // Collaborator commented → notify the client
+  } else if (!isInternal) {
+    // Collaborator commented → notify the client (an internal note stays in the office)
     await enqueueNotification({
       event: 'TASK_COMMENT_ADDED',
       taskId,
@@ -151,7 +155,7 @@ export async function createComment(
   const clientUserName = isClient
     ? (await prisma.clientUser.findUnique({ where: { id: actor.id }, select: { name: true } }))?.name ?? authorName
     : authorName
-  await onTaskComment(taskId, isClient ? { clientUserId: actor.id, name: clientUserName } : { userId: actor.id, name: authorName }, data.content)
+  await onTaskComment(taskId, isClient ? { clientUserId: actor.id, name: clientUserName } : { userId: actor.id, name: authorName }, data.content, { internal: isInternal })
 
   return comment
 }
@@ -183,7 +187,7 @@ export async function deleteComment(id: string, actor: CommentActor) {
   // this comment exists (same "never reveal" rule as listComments/createComment).
   if (actor.role === 'CLIENT') {
     const scope = await getClientAccessScope(actor.id)
-    if (!canSeeTask(scope, comment.task.column.board.clientId, comment.task.departmentId)) {
+    if (comment.isInternal || !canSeeTask(scope, comment.task.column.board.clientId, comment.task.departmentId)) {
       throw new AppError(404, 'Comentário não encontrado')
     }
   }

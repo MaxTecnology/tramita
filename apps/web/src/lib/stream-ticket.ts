@@ -1,9 +1,9 @@
 import { api } from './api'
-import { getFreshAccessToken } from './auth-refresh'
+import { getFreshAccessToken, isSessionRefused } from './auth-refresh'
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000'
 
-// The session could not be refreshed: the caller sends the user to login.
+// The API refused the session: the caller sends the user to login.
 export class StreamAuthError extends Error {}
 
 // EventSource can't send headers: trade the (fresh) access token for a one-time ticket that opens
@@ -13,8 +13,10 @@ export async function openStreamUrl(path: string): Promise<string | null> {
   let token: string | null
   try {
     token = await getFreshAccessToken()
-  } catch {
-    throw new StreamAuthError()
+  } catch (err) {
+    // Refused session → login; the API down for a moment is transient (the caller retries)
+    if (isSessionRefused(err)) throw new StreamAuthError()
+    throw err
   }
   if (!token) return null
   const { data } = await api.post<{ ticket: string }>('/stream/ticket')

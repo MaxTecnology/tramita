@@ -117,6 +117,8 @@ export interface Comment {
   deletedBy: string | null
   deletedByType: 'USER' | 'CLIENT' | null
   deletedContent?: string
+  // Office-only note (the client never receives these)
+  isInternal?: boolean
   createdAt: string
 }
 

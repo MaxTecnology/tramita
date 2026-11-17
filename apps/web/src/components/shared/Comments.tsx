@@ -13,6 +13,9 @@ interface Props {
   entityId: string
   currentUserId: string
   role: DrawerRole
+  // The office may write notes the client never sees (only on tasks the client sees: on a hidden
+  // task everything is already internal)
+  allowInternal?: boolean
 }
 
 const CAN_SEE_DELETED = new Set<DrawerRole>(['ORG_ADMIN', 'ORG_MANAGER'])
@@ -25,9 +28,10 @@ function deletePath(entityType: EntityType, commentId: string): string {
   return entityType === 'task' ? `/comments/${commentId}` : `/request-comments/${commentId}`
 }
 
-export function Comments({ entityType, entityId, currentUserId, role }: Props) {
+export function Comments({ entityType, entityId, currentUserId, role, allowInternal = false }: Props) {
   const queryClient = useQueryClient()
   const [content, setContent] = useState('')
+  const [internal, setInternal] = useState(false)
   const queryKey = [entityType === 'task' ? 'comments' : 'request-comments', entityId]
 
   const { data: comments = [] } = useQuery<Comment[]>({
@@ -37,7 +41,7 @@ export function Comments({ entityType, entityId, currentUserId, role }: Props) {
 
   const createMutation = useMutation({
     mutationFn: () =>
-      api.post(basePath(entityType, entityId), { content }).then((r) => r.data),
+      api.post(basePath(entityType, entityId), { content, ...(allowInternal && internal ? { isInternal: true } : {}) }).then((r) => r.data),
     onSuccess: () => {
       toast.success('Comentário adicionado')
       queryClient.invalidateQueries({ queryKey })
@@ -51,6 +55,7 @@ export function Comments({ entityType, entityId, currentUserId, role }: Props) {
         queryClient.invalidateQueries({ queryKey: ['requests'] })
       }
       setContent('')
+      setInternal(false)
     },
     onError: () => toast.error('Erro ao adicionar comentário'),
   })
@@ -85,7 +90,7 @@ export function Comments({ entityType, entityId, currentUserId, role }: Props) {
               key={c.id}
               className={cn(
                 'rounded-lg p-3 border-l-2',
-                isClient ? 'bg-blue-500/10 border-accent' : 'bg-violet-500/10 border-violet-400',
+                isClient ? 'bg-blue-500/10 border-accent' : c.isInternal ? 'bg-warning-bg border-warning-text' : 'bg-violet-500/10 border-violet-400',
                 isDeleted && 'opacity-60',
               )}
             >
@@ -93,6 +98,7 @@ export function Comments({ entityType, entityId, currentUserId, role }: Props) {
                 <span className={cn('text-xs font-semibold', isClient ? 'text-blue-700 dark:text-blue-300' : 'text-violet-700 dark:text-violet-300')}>
                   {author?.name ?? (isClient ? 'Cliente' : 'Colaborador')}
                   {isClient && <span className="ml-1 text-blue-500 dark:text-blue-400 font-normal">(cliente)</span>}
+                  {c.isInternal && <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase bg-warning-text/15 text-warning-text">Interno</span>}
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
@@ -132,6 +138,12 @@ export function Comments({ entityType, entityId, currentUserId, role }: Props) {
         })}
       </div>
 
+      {allowInternal && (
+        <label className="flex items-center gap-2 text-xs text-muted-foreground -mb-1">
+          <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
+          Interno (o cliente não vê)
+        </label>
+      )}
       <div className="flex gap-2 items-start mt-1">
         <textarea
           value={content}

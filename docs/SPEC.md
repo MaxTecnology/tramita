@@ -70,6 +70,8 @@ Login unificado — role no JWT discrimina acesso (`MASTER`, `ORG_ADMIN`, `ORG_M
 ### POST `/auth/change-password` — `{ currentPassword, newPassword, keepRefreshToken? }`
 → Encerra as outras sessões da pessoa; mantém a do `keepRefreshToken` quando ele é dela.
 
+**Web:** a sessão só é encerrada quando a API recusa a renovação (401/400); API fora do ar por um instante (deploy, rede, 5xx, 429) mantém a pessoa logada e as telas/streams tentam de novo.
+
 **Sessões:** cada refresh token fica indexado por pessoa (`sessions:<id>` no Redis). Desativar alguém, mudar o papel de um usuário da equipe, o admin redefinir a senha (equipe), ou o escritório desativar/trocar a senha de um usuário do portal encerra todas as sessões abertas dele. Um access token já emitido vale até expirar (15 min).
 
 ---
@@ -326,6 +328,7 @@ Não há rota para criar, editar, reordenar ou remover colunas: elas nascem com 
 
 ### GET `/tasks/:taskId/comments`
 ### POST `/tasks/:taskId/comments`
+→ `{ content, isInternal? }`: `isInternal: true` (só a equipe; do cliente é ignorado) é nota interna — o cliente não a vê na lista, não pode removê-la (404), não recebe WhatsApp/e-mail nem sino, e ela não faz a tarefa aparecer em "Enviar documentos" do portal. A lista da equipe traz `isInternal`.
 ```json
 { "content": "string" }
 ```
