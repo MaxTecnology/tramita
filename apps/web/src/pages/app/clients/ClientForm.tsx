@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useMunicipalities } from '@/hooks/useMunicipalities'
+import { UFS, isUf } from '@/lib/uf'
 import {
   computeClientFormStatus,
   type ClientFormState,
@@ -34,6 +36,12 @@ interface Props {
 
 export function ClientForm({ initial, submitLabel, isSaving, onSubmit, onCancel }: Props) {
   const [form, setForm] = useState<ClientFormState>(initial)
+  // A client saved before state/city were standardized: show what was typed then, as a reference
+  const [previousPlace] = useState(() => {
+    const { estado, cidade, ibgeCityCode } = initial.company
+    if (ibgeCityCode !== null || (!cidade && !estado)) return null
+    return [cidade, estado].filter(Boolean).join(' — ')
+  })
   const [tab, setTab] = useState<Tab>('empresa')
 
   const { data: departments = [] } = useQuery<Department[]>({
@@ -104,7 +112,7 @@ export function ClientForm({ initial, submitLabel, isSaving, onSubmit, onCancel 
         ))}
       </div>
 
-      {tab === 'empresa' && <CompanyTab company={form.company} onChange={setCompany} />}
+      {tab === 'empresa' && <CompanyTab company={form.company} onChange={setCompany} previousPlace={previousPlace} />}
 
       {tab === 'departamentos' && (
         <DepartmentsTab
@@ -169,6 +177,7 @@ interface CnpjLookupResult {
   cep: string | null
   estado: string | null
   cidade: string | null
+  ibgeCityCode: number | null
   bairro: string | null
   logradouro: string | null
   numero: string | null
@@ -189,19 +198,76 @@ function Field({
   )
 }
 
-function CompanyTab({ company, onChange }: { company: CompanyForm; onChange: (patch: Partial<CompanyForm>) => void }) {
+const SELECT_CLASS =
+  'flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60'
+
+function LocationFields({ company, onChange, previousPlace, lookupMissedCity }: {
+  company: CompanyForm
+  onChange: (patch: Partial<CompanyForm>) => void
+  previousPlace: string | null
+  lookupMissedCity: boolean
+}) {
+  const uf = isUf(company.estado) ? company.estado : ''
+  const { data: cities = [], isLoading } = useMunicipalities(uf)
+  return (
+    <>
+      <div className="space-y-1">
+        <Label htmlFor="cf-estado">Estado *</Label>
+        <select
+          id="cf-estado"
+          value={uf}
+          onChange={(e) => onChange({ estado: e.target.value, ibgeCityCode: null, cidade: '' })}
+          className={SELECT_CLASS}
+        >
+          <option value="">Selecione</option>
+          {UFS.map((u) => <option key={u} value={u}>{u}</option>)}
+        </select>
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="cf-cidade">Cidade *</Label>
+        <select
+          id="cf-cidade"
+          value={company.ibgeCityCode === null ? '' : String(company.ibgeCityCode)}
+          disabled={!uf || isLoading}
+          onChange={(e) => {
+            const code = e.target.value ? Number(e.target.value) : null
+            onChange({ ibgeCityCode: code, cidade: cities.find((c) => c.ibgeCode === code)?.name ?? '' })
+          }}
+          className={SELECT_CLASS}
+        >
+          <option value="">{uf ? (isLoading ? 'Carregando...' : 'Selecione') : 'Escolha o estado primeiro'}</option>
+          {cities.map((c) => <option key={c.ibgeCode} value={c.ibgeCode}>{c.name}</option>)}
+        </select>
+        {uf && company.ibgeCityCode === null && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">{lookupMissedCity ? 'Escolha a cidade' : 'Informe a cidade do cliente'}</p>
+        )}
+      </div>
+      {previousPlace && (
+        <p className="sm:col-span-2 text-xs text-muted-foreground">Cadastro anterior: {previousPlace}</p>
+      )}
+    </>
+  )
+}
+
+function CompanyTab({ company, onChange, previousPlace }: {
+  company: CompanyForm
+  onChange: (patch: Partial<CompanyForm>) => void
+  previousPlace: string | null
+}) {
   const isPJ = company.clientType === 'PJ'
   const cnpjDigits = company.cnpj.replace(/\D/g, '')
+  const [lookupMissedCity, setLookupMissedCity] = useState(false)
 
   const lookupMutation = useMutation({
     mutationFn: () => api.get<CnpjLookupResult>(`/clients/lookup-cnpj/${cnpjDigits}`).then((r) => r.data),
     onSuccess: (data) => {
       toast.success('Dados do CNPJ carregados')
+      const placed = isUf(data.estado)
+      setLookupMissedCity(placed && data.ibgeCityCode === null)
       onChange({
         name: company.name || data.razaoSocial,
         cep: data.cep ?? company.cep,
-        estado: data.estado ?? company.estado,
-        cidade: data.cidade ?? company.cidade,
+        ...(placed ? { estado: data.estado ?? '', ibgeCityCode: data.ibgeCityCode, cidade: data.ibgeCityCode !== null ? data.cidade ?? '' : '' } : {}),
         bairro: data.bairro ?? company.bairro,
         logradouro: data.logradouro ?? company.logradouro,
         numero: data.numero ?? company.numero,
@@ -270,12 +336,11 @@ function CompanyTab({ company, onChange }: { company: CompanyForm; onChange: (pa
       </div>
 
       <p className="pt-2 border-t border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-        Endereço {isPJ ? '(obrigatório para pessoa jurídica)' : '(opcional)'}
+        Endereço {isPJ ? '(obrigatório para pessoa jurídica)' : '(estado e cidade obrigatórios)'}
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <LocationFields company={company} onChange={onChange} previousPlace={previousPlace} lookupMissedCity={lookupMissedCity} />
         <Field id="cf-cep" label="CEP" required={isPJ} value={company.cep} onChange={(v) => onChange({ cep: v })} placeholder="57000-000" />
-        <Field id="cf-estado" label="Estado" required={isPJ} value={company.estado} onChange={(v) => onChange({ estado: v })} placeholder="AL" maxLength={2} />
-        <Field id="cf-cidade" label="Cidade" required={isPJ} value={company.cidade} onChange={(v) => onChange({ cidade: v })} />
         <Field id="cf-bairro" label="Bairro" required={isPJ} value={company.bairro} onChange={(v) => onChange({ bairro: v })} />
         <Field id="cf-logradouro" label="Logradouro" required={isPJ} className="sm:col-span-2" value={company.logradouro} onChange={(v) => onChange({ logradouro: v })} />
         <Field id="cf-numero" label="Número" required={isPJ} value={company.numero} onChange={(v) => onChange({ numero: v })} />

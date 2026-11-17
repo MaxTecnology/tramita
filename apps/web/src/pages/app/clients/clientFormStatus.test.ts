@@ -5,7 +5,7 @@ const names = new Map([['fiscal', 'Fiscal'], ['folha', 'Folha']])
 
 const pj = {
   ...EMPTY_COMPANY, name: 'ACME LTDA', codigo: '1', clientType: 'PJ' as const, cnpj: '11.222.333/0001-81',
-  cep: '57312675', estado: 'AL', cidade: 'Arapiraca', bairro: 'Centro', logradouro: 'Rua A', numero: '10',
+  cep: '57312675', estado: 'AL', cidade: 'Arapiraca', ibgeCityCode: 2700300, bairro: 'Centro', logradouro: 'Rua A', numero: '10',
 }
 
 function form(overrides: Partial<ClientFormState> = {}): ClientFormState {
@@ -28,12 +28,17 @@ describe('computeClientFormStatus', () => {
 
   it('PJ sem CNPJ válido ou sem endereço deixa a aba Empresa incompleta', () => {
     expect(computeClientFormStatus(form({ company: { ...pj, cnpj: '11222333000180' } }), names).empresa).toBe(false)
-    expect(computeClientFormStatus(form({ company: { ...pj, cidade: '' } }), names).empresa).toBe(false)
+    expect(computeClientFormStatus(form({ company: { ...pj, bairro: '' } }), names).empresa).toBe(false)
     expect(computeClientFormStatus(form({ company: { ...pj, codigo: ' ' } }), names).empresa).toBe(false)
   })
 
-  it('PF não exige endereço, mas exige CPF válido', () => {
-    const pf = { ...EMPTY_COMPANY, name: 'Fulano', codigo: '2', clientType: 'PF' as const, cpf: '529.982.247-25' }
+  it('estado e cidade são obrigatórios para PF e PJ', () => {
+    expect(computeClientFormStatus(form({ company: { ...pj, ibgeCityCode: null } }), names).empresa).toBe(false)
+    expect(computeClientFormStatus(form({ company: { ...pj, estado: 'Alagoas' } }), names).empresa).toBe(false)
+  })
+
+  it('PF não exige o resto do endereço, mas exige CPF válido', () => {
+    const pf = { ...EMPTY_COMPANY, name: 'Fulano', codigo: '2', clientType: 'PF' as const, cpf: '529.982.247-25', estado: 'SE', ibgeCityCode: 2800308 }
     expect(computeClientFormStatus(form({ company: pf }), names).empresa).toBe(true)
     expect(computeClientFormStatus(form({ company: { ...pf, cpf: '11111111111' } }), names).empresa).toBe(false)
   })

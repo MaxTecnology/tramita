@@ -96,6 +96,8 @@ export interface Client {
   cep: string | null
   estado: string | null
   cidade: string | null
+  /** código IBGE da cidade (null em cliente cadastrado antes de 2026-11-17) */
+  ibgeCityCode: number | null
   bairro: string | null
   logradouro: string | null
   numero: string | null

@@ -1,4 +1,5 @@
 import { cnpjValido, cpfValido } from '@/lib/documento'
+import { isUf } from '@/lib/uf'
 
 export type ClientType = 'PF' | 'PJ'
 
@@ -16,7 +17,10 @@ export interface CompanyForm {
   notes: string
   cep: string
   estado: string
+  /** nome da cidade (vem da tabela do IBGE; em cliente antigo, o texto digitado na época) */
   cidade: string
+  /** código IBGE da cidade: é o que o servidor grava e valida */
+  ibgeCityCode: number | null
   bairro: string
   logradouro: string
   numero: string
@@ -25,7 +29,7 @@ export interface CompanyForm {
 
 export const EMPTY_COMPANY: CompanyForm = {
   name: '', codigo: '', clientType: 'PJ', cnpj: '', cpf: '', cei: '', caepf: '', inscricaoEstadual: '',
-  whatsapp: '', phone: '', notes: '', cep: '', estado: '', cidade: '', bairro: '', logradouro: '', numero: '', complemento: '',
+  whatsapp: '', phone: '', notes: '', cep: '', estado: '', cidade: '', ibgeCityCode: null, bairro: '', logradouro: '', numero: '', complemento: '',
 }
 
 export interface ServedDepartmentForm {
@@ -67,10 +71,13 @@ export interface ClientFormStatus {
   coverage: CoverageRow[]
 }
 
-const PJ_ADDRESS_FIELDS = ['cep', 'estado', 'cidade', 'bairro', 'logradouro', 'numero'] as const
+const PJ_ADDRESS_FIELDS = ['cep', 'bairro', 'logradouro', 'numero'] as const
 
+// Estado e cidade valem para todo cliente (PF e PJ): o vencimento de impostos estaduais e
+// municipais depende deles
 function isCompanyComplete(c: CompanyForm): boolean {
   if (c.name.trim().length < 2 || !c.codigo.trim()) return false
+  if (!isUf(c.estado) || c.ibgeCityCode === null) return false
   if (c.clientType === 'PJ') return cnpjValido(c.cnpj) && PJ_ADDRESS_FIELDS.every((f) => c[f].trim())
   return cpfValido(c.cpf)
 }

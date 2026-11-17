@@ -17,8 +17,10 @@ interface AssignmentRow { departmentId: string; userId: string }
 interface ClientUserLinkRow { existingId: string; name: string; email: string; phone: string | null; isActive: boolean; departmentIds: string[] }
 
 function toPayload(state: ClientFormState) {
+  // The city name is not sent: the server takes it from the IBGE code
+  const { cidade: _cidade, ...company } = state.company
   return {
-    ...state.company,
+    ...company,
     departments: state.departments,
     clientUsers: state.clientUsers.map((u) =>
       u.existingId
@@ -44,6 +46,7 @@ function companyFromClient(client: Client): CompanyForm {
     cep: client.cep ?? '',
     estado: client.estado ?? '',
     cidade: client.cidade ?? '',
+    ibgeCityCode: client.ibgeCityCode ?? null,
     bairro: client.bairro ?? '',
     logradouro: client.logradouro ?? '',
     numero: client.numero ?? '',
