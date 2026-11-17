@@ -16,9 +16,9 @@ Resolvido no lote 1: usuário desativado não loga e o refresh recarrega papel/a
 
 **Verificar:** `trustProxy: 1` vs. a cadeia real de proxies em produção (Traefik/Cloudflare) e número de réplicas da API (rate limit em memória).
 
-## Decisão em aberto: tarefa passada para alguém de outro departamento (levantado em 2026-11-16)
+## Tarefa passada para alguém de outro departamento ✅ (decidido e resolvido em 2026-11-17)
 
-Hoje o membro só passa tarefa para quem é do departamento da tarefa (`assertMemberCanPassTask`), e o escopo de quem enxerga segue departamento/carteira. Max quer que valha "de quem é a tarefa": ex.: uma tarefa do Fiscal enviada a um usuário do Contábil, que passa a vê-la. A decidir antes de implementar: a tarefa continua do departamento Fiscal (indicadores, filas) ou muda; o gerente do Contábil também passa a ver; o colaborador vê só essa tarefa ou o processo inteiro; e como fica a carteira do cliente (o Contábil atende esse cliente?).
+Regra (Max aprovou as sugestões): a tarefa continua no departamento dela; quem recebe vê a tarefa e o processo (contexto) e só altera o que é dele; o gerente do outro departamento não passa a ver; a carteira não é exigida; ao concluir, fica com quem recebeu. `assertMemberCanPassTask` removido; o seletor de responsável mostra "Do departamento" e "Outros departamentos".
 
 ## Comentário interno na tarefa ✅ (pedido e resolvido em 2026-11-16)
 

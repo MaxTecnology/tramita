@@ -113,12 +113,3 @@ export async function assumeTasksBulk(
   return { count: movedTasks.length }
 }
 
-// A member hands their own task to a colleague: only to someone of the task's department.
-export async function assertMemberCanPassTask(taskId: string, newAssigneeId: string): Promise<void> {
-  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { departmentId: true, assigneeId: true } })
-  if (!task || task.assigneeId === newAssigneeId) return
-  const belongs = task.departmentId
-    ? await prisma.userDepartment.count({ where: { userId: newAssigneeId, departmentId: task.departmentId } })
-    : 0
-  if (!belongs) throw new AppError(400, 'Só é possível passar a tarefa para alguém do departamento dela')
-}

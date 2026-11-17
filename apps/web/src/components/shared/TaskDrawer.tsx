@@ -158,7 +158,11 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   })
   const userName = (id: string) => userOptions.find((u) => u.id === id)?.name ?? 'outro colaborador'
   // The task goes to someone of its department (the API refuses anyone else for a member)
-  const assigneeChoices = userOptions.filter((u) => u.id === task.assigneeId || (!!task.departmentId && u.departmentIds?.includes(task.departmentId)))
+  // The task may go to anyone of the team: its department first, then the others (it stays in its
+  // department; the person who receives it sees it and the process)
+  const inTaskDepartment = (u: { id: string; departmentIds?: string[] }) => u.id === task.assigneeId || (!!task.departmentId && !!u.departmentIds?.includes(task.departmentId))
+  const sameDepartmentChoices = userOptions.filter(inTaskDepartment)
+  const otherDepartmentChoices = userOptions.filter((u) => !inTaskDepartment(u))
   const { data: approvals = [] } = useTaskApprovals(task.id, isStaff)
   const awaitingApproval = approvals.some((a) => a.status === 'PENDING')
   // Office staff sees everything in the drawer; changing it needs the task to be theirs (or their
@@ -575,9 +579,14 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                   className="text-xs font-medium px-2 py-0.5 rounded-full border border-border text-foreground cursor-pointer bg-surface"
                 >
                   {!task.assigneeId && <option value="">Sem responsável</option>}
-                  {assigneeChoices.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
+                  <optgroup label="Do departamento">
+                    {sameDepartmentChoices.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </optgroup>
+                  {otherDepartmentChoices.length > 0 && (
+                    <optgroup label="Outros departamentos">
+                      {otherDepartmentChoices.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </optgroup>
+                  )}
                 </select>
               </label>
             ) : task.assigneeId && (

@@ -5,7 +5,7 @@ import { staffScope, bodyIds, param } from '@/middlewares/staffScope'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
 import { createTaskSchema, updateTaskSchema, moveTaskSchema, listTasksQuerySchema, assumeTaskSchema, assumeBulkSchema } from './tasks.schema'
-import { assumeTask, assumeTasksBulk, assertMemberCanPassTask } from './task-assume.service'
+import { assumeTask, assumeTasksBulk } from './task-assume.service'
 import { createTask, moveTask, updateTask, deleteTask, getTaskHistory, listTasks } from './tasks.service'
 import { regenerateTask } from '@/modules/recurring-templates/recurring-templates.service'
 
@@ -71,8 +71,8 @@ export async function tasksRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const result = updateTaskSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
-    // A member hands their task only to someone of its department (managers/admins: free)
-    if (request.user.role === 'ORG_MEMBER' && result.data.assigneeId) await assertMemberCanPassTask(id, result.data.assigneeId)
+    // Anyone who may change the task hands it to anyone active of the team, also of another department
+    // (the task stays in its department; updateTask checks the person belongs to this office)
     const actor = { id: request.user.sub, type: 'user' as const }
     return reply.send(await updateTask(id, request.user.organizationId!, result.data, actor))
   })

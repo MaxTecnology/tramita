@@ -94,15 +94,13 @@ describe('assumir em lote', () => {
 })
 
 describe('passar tarefa para colega', () => {
-  it('a member passes their task to someone of its department, not outside it', async () => {
+  it('a member passes their task to anyone of the team, also of another department (the task stays in its department)', async () => {
     const c = await setup()
     await prisma.task.update({ where: { id: c.f1.id }, data: { assigneeId: c.bruna.id } })
-    const patch = (assigneeId: string) => app.inject({ method: 'PATCH', url: `/tasks/${c.f1.id}`, headers: { authorization: c.brunaAuth }, payload: { assigneeId } })
-
-    const outside = await patch(c.dani.id)
-    expect(outside.statusCode).toBe(400)
-    expect(JSON.parse(outside.body).message).toBe('Só é possível passar a tarefa para alguém do departamento dela')
-    expect((await patch(c.carlos.id)).statusCode).toBe(200)
+    const res = await app.inject({ method: 'PATCH', url: `/tasks/${c.f1.id}`, headers: { authorization: c.brunaAuth }, payload: { assigneeId: c.dani.id } })
+    expect(res.statusCode).toBe(200)
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: c.f1.id } })
+    expect([task.assigneeId, task.departmentId]).toEqual([c.dani.id, c.f1.departmentId])
   })
 })
 

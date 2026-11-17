@@ -46,9 +46,18 @@ it('the owner passes the task to a colleague of the same department', async () =
   render(<TaskDrawer task={task} currentUserId="ingrite" role="ORG_MANAGER" onClose={() => {}} />, { wrapper })
   const select = await screen.findByLabelText('Responsável')
   await waitFor(() => expect(screen.getByRole('option', { name: 'Bruna' })).toBeInTheDocument())
-  expect(screen.queryByRole('option', { name: 'Carla' })).not.toBeInTheDocument() // not in Pessoal
   fireEvent.change(select, { target: { value: 'bruna' } })
   await waitFor(() => expect(patched).toHaveBeenCalledWith({ assigneeId: 'bruna' }))
+})
+
+it('people of other departments are offered too, grouped after the ones of the task department', async () => {
+  render(<TaskDrawer task={task} currentUserId="ingrite" role="ORG_MANAGER" onClose={() => {}} />, { wrapper })
+  const select = await screen.findByLabelText('Responsável')
+  await waitFor(() => expect(screen.getByRole('option', { name: 'Carla' })).toBeInTheDocument())
+  const groups = Array.from(select.querySelectorAll('optgroup')).map((g) => [g.label, Array.from(g.querySelectorAll('option')).map((o) => o.textContent)])
+  expect(groups).toEqual([['Do departamento', ['Ingrite', 'Bruna']], ['Outros departamentos', ['Carla']]])
+  fireEvent.change(select, { target: { value: 'carla' } })
+  await waitFor(() => expect(patched).toHaveBeenCalledWith({ assigneeId: 'carla' }))
 })
 
 it('the history speaks the user language: status label and people names', async () => {

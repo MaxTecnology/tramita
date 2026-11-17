@@ -309,6 +309,7 @@ Não há rota para criar, editar, reordenar ou remover colunas: elas nascem com 
 → Status possíveis (`TaskStatus`): `OPEN` (padrão) | `STARTED` (em andamento, atribuído por coluna com `statusEffect: STARTED`) | `BLOCKED` (impedimento, geralmente por checklist de documento pendente/rejeitado) | `DISREGARDED` (desconsiderada) | `DONE` (concluída)
 
 **Responsável:** `assigneeId` (tarefa/OS) e `responsibleUserId` (processo) precisam ser de usuário ativo da equipe do mesmo escritório — outro escritório ou desativado → 404 `'Usuário não encontrado'` (nada é atribuído nem notificado).
+**Tarefa para outro departamento:** quem pode alterar a tarefa (inclusive o membro com a tarefa dele) a passa para qualquer pessoa ativa da equipe, de qualquer departamento. A tarefa **continua no departamento dela** (filas e indicadores); quem recebe passa a vê-la e a ver o processo (contexto), mas só altera as tarefas que são dele; o gerente do outro departamento não passa a vê-la; o departamento de quem recebe não precisa atender o cliente. Ao concluir, fica com quem recebeu (o histórico mostra o caminho).
 
 ### DELETE `/tasks/:id` _(ORG_ADMIN | ORG_MANAGER)_
 ### GET `/boards/:id/tasks/search?q=&priority=&assigneeId=&status=&dueBefore=&dueAfter=`
