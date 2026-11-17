@@ -6,10 +6,10 @@
 
 ## Resumo
 
-- Rotas: **209**
+- Rotas: **210**
 - Públicas (sem login): **6** — `POST /auth/login`, `POST /auth/logout`, `POST /auth/refresh`, `GET /organizations/plans`, `POST /organizations/register`, `GET /organizations/signup-status`
-- Sem uso no web nem chamador externo conhecido: **2**
-- Sem teste de rota: **58**
+- Sem uso no web nem chamador externo conhecido: **3**
+- Sem teste de rota: **57**
 - Cliente (portal) passa fora de /portal: **13** (rotas compartilhadas — o escopo dentro delas é revisado na auditoria de segurança)
 
 ## Sem uso
@@ -17,6 +17,7 @@
 | Método | Rota | Quem passa | Teste de rota |
 |---|---|---|---|
 | GET | `/document-reader/metricas` | Admin, Gerente, Membro | sim |
+| GET | `/municipalities` | Admin, Gerente, Membro | não |
 | GET | `/portal/requests/:id` | Cliente | sim |
 
 ## Cliente fora de /portal
@@ -49,7 +50,7 @@
 
 | Método | Rota | Quem passa | Usada por | Teste de rota |
 |---|---|---|---|---|
-| POST | `/auth/change-password` | Admin, Gerente, Membro, Cliente, Master | web | **não** |
+| POST | `/auth/change-password` | Admin, Gerente, Membro, Cliente, Master | web | sim |
 | POST | `/auth/login` | **público** | web | sim |
 | POST | `/auth/logout` | **público** | web | sim |
 | GET | `/auth/me` | Admin, Gerente, Membro, Cliente, Master | web | **não** |
@@ -178,6 +179,12 @@
 | DELETE | `/master/plans/:id` | Master | web | sim |
 | PATCH | `/master/plans/:id` | Master | web | sim |
 | GET | `/master/revenue` | Master | web | **não** |
+
+### /municipalities
+
+| Método | Rota | Quem passa | Usada por | Teste de rota |
+|---|---|---|---|---|
+| GET | `/municipalities` | Admin, Gerente, Membro | — | **não** |
 
 ### /notifications
 
@@ -366,7 +373,7 @@
 | PATCH | `/tasks/:id/move` | Admin, Gerente, Membro | web | sim |
 | POST | `/tasks/:id/regenerate` | Admin | web | **não** |
 | POST | `/tasks/:id/release` | Admin, Gerente, Membro | web | sim |
-| GET | `/tasks/:taskId/comments` | Admin, Gerente, Membro, Cliente | web (indireto) | **não** |
+| GET | `/tasks/:taskId/comments` | Admin, Gerente, Membro, Cliente | web (indireto) | sim |
 | POST | `/tasks/:taskId/comments` | Admin, Gerente, Membro, Cliente | web (indireto) | sim |
 | GET | `/tasks/:taskId/protocols` | Admin, Gerente, Membro | web | **não** |
 | POST | `/tasks/:taskId/protocols` | Admin, Gerente, Membro | web | sim |

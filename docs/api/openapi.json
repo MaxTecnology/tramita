@@ -6657,6 +6657,69 @@
         "description": "**Quem pode:** Admin"
       }
     },
+    "/municipalities": {
+      "get": {
+        "summary": "Cidades de um estado (IBGE)",
+        "tags": [
+          "Municípios"
+        ],
+        "description": "Código IBGE e nome, em ordem alfabética. Usado no cadastro do cliente e nas exceções de vencimento.\n\n**Quem pode:** Admin, Gerente, Membro",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AC",
+                "AL",
+                "AP",
+                "AM",
+                "BA",
+                "CE",
+                "DF",
+                "ES",
+                "GO",
+                "MA",
+                "MT",
+                "MS",
+                "MG",
+                "PA",
+                "PB",
+                "PR",
+                "PE",
+                "PI",
+                "RJ",
+                "RN",
+                "RS",
+                "RO",
+                "RR",
+                "SC",
+                "SP",
+                "SE",
+                "TO"
+              ]
+            },
+            "in": "query",
+            "name": "uf",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Gerente",
+          "Membro"
+        ]
+      }
+    },
     "/os-models": {
       "get": {
         "summary": "Listar modelos de OS",

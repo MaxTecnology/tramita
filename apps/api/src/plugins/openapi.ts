@@ -26,7 +26,7 @@ const TAG_BY_SEGMENT: Record<string, string> = {
   dashboard: 'Dashboard', departments: 'Departamentos', holidays: 'Feriados', 'os-models': 'Modelos de OS',
   os: 'Ordens de Serviço', 'delay-reasons': 'Motivos de atraso', 'recurring-templates': 'Tarefas recorrentes',
   'client-users': 'Usuários do portal', 'process-templates': 'Modelos de processo', sla: 'SLA',
-  'document-reader': 'Robô de documentos', approvals: 'Aprovações', health: 'Sistema',
+  'document-reader': 'Robô de documentos', municipalities: 'Municípios', approvals: 'Aprovações', health: 'Sistema',
 }
 
 // Routes that do not take the bearer token

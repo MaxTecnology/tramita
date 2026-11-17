@@ -1442,3 +1442,14 @@ model DelayReason {
   @@unique([organizationId, name])
   @@map("delay_reasons")
 }
+
+// Brazil's municipalities (IBGE), shared by every office: loaded by migration from
+// prisma/data/municipios-ibge.json. Clients and recurring due rules point here by IBGE code.
+model Municipality {
+  ibgeCode Int    @id
+  name     String
+  uf       String @db.Char(2)
+
+  @@index([uf])
+  @@map("municipalities")
+}

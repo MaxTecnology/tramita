@@ -23,6 +23,7 @@ import { requestCommentsRoutes } from '@/modules/request-comments/request-commen
 import { protocolsRoutes } from '@/modules/protocols/protocols.routes'
 import { dashboardRoutes } from '@/modules/dashboard/dashboard.routes'
 import { departmentsRoutes } from '@/modules/departments/departments.routes'
+import { municipalitiesRoutes } from '@/modules/municipalities/municipalities.routes'
 import { holidaysRoutes } from '@/modules/holidays/holidays.routes'
 import { osModelsRoutes } from '@/modules/os-models/os-models.routes'
 import { osRoutes } from '@/modules/os/os.routes'
@@ -75,6 +76,7 @@ export function buildApp() {
   app.register(dashboardRoutes, { prefix: '/dashboard' })
   app.register(departmentsRoutes, { prefix: '/departments' })
   app.register(holidaysRoutes, { prefix: '/holidays' })
+  app.register(municipalitiesRoutes, { prefix: '/municipalities' })
   app.register(osModelsRoutes, { prefix: '/os-models' })
   app.register(osRoutes)
   app.register(delayReasonsRoutes)

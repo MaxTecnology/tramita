@@ -144,6 +144,7 @@ API do Tramita (AutoHubs): processos, ordens de serviço, tarefas e portal do cl
 - [POST /holidays](#scalar-operation-post-holidays)
 - [GET /holidays/days](#scalar-operation-get-holidaysdays)
 - [DELETE /holidays/{id}](#scalar-operation-delete-holidaysid)
+- [GET /municipalities](#scalar-operation-get-municipalities)
 - [GET /os-models](#scalar-operation-get-os-models)
 - [POST /os-models](#scalar-operation-post-os-models)
 - [GET /os-models/{id}](#scalar-operation-get-os-modelsid)
@@ -1807,7 +1808,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-17T08:56:58.037Z"
+  "dueDate": "2026-11-17T22:23:33.267Z"
 }
 ```
 
@@ -1881,7 +1882,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-17T08:56:58.040Z"
+  "dueDate": "2026-11-17T22:23:33.270Z"
 }
 ```
 
@@ -1971,7 +1972,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-17T08:56:58.042Z",
+  "dueDate": "2026-11-17T22:23:33.272Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2246,14 +2247,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-17T08:56:58.052Z",
+  "dueDate": "2026-11-17T22:23:33.283Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-17T08:56:58.052Z",
-  "competence": "2026-11-17T08:56:58.052Z",
+  "targetDate": "2026-11-17T22:23:33.283Z",
+  "competence": "2026-11-17T22:23:33.283Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -4318,7 +4319,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-17T08:56:58.104Z",
+  "dueDate": "2026-11-17T22:23:33.349Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -4942,6 +4943,32 @@ no additional properties
 
 ##### 200 Default Response
 
+<a id="scalar-operation-get-municipalities"></a>
+
+### Cidades de um estado (IBGE)
+
+- **Method:** `GET`
+- **Path:** `/municipalities`
+- **Tags:** Municípios
+
+Código IBGE e nome, em ordem alfabética. Usado no cadastro do cliente e nas exceções de vencimento.
+
+**Quem pode:** Admin, Gerente, Membro
+
+**Servers:** [Inherited servers](#scalar-context-global-servers)
+
+#### Authentication
+
+- **bearerAuth**: HTTP bearer (`JWT`)
+
+#### Query parameters
+
+- **`uf` (required)**: `string`, possible values: `"AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"`
+
+#### Responses
+
+##### 200 Default Response
+
 <a id="scalar-operation-get-os-models"></a>
 
 ### Listar modelos de OS
@@ -5291,7 +5318,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-17T08:56:58.129Z"
+  "dueDate": "2026-11-17T22:23:33.381Z"
 }
 ```
 
@@ -5348,7 +5375,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-17T08:56:58.130Z",
+  "dueDate": "2026-11-17T22:23:33.383Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -6104,7 +6131,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T08:56:58.146Z",
+  "dueMonth": "2026-11-17T22:23:33.402Z",
   "assignmentIds": [
     ""
   ]
@@ -6156,7 +6183,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T08:56:58.147Z",
+  "dueMonth": "2026-11-17T22:23:33.404Z",
   "assignmentIds": [
     ""
   ]
@@ -6199,7 +6226,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T08:56:58.148Z"
+  "dueMonth": "2026-11-17T22:23:33.405Z"
 }
 ```
 

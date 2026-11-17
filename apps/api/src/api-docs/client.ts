@@ -1,5 +1,6 @@
 import type { RouteDocs } from '@/api-docs/types'
 import { clientBodySchema } from '@/modules/clients/clients.schema'
+import { listMunicipalitiesQuerySchema } from '@/modules/municipalities/municipalities.schema'
 import { documentRequestsQuerySchema, markPaidSchema, portalClientQuerySchema, portalProtocolsQuerySchema } from '@/modules/portal/portal.schema'
 import { approveSchema, requestChangesSchema } from '@/modules/approvals/approvals.schema'
 import {
@@ -20,6 +21,8 @@ export const CLIENT_DOCS: RouteDocs = {
   'DELETE /clients/:id': { summary: 'Remover cliente' },
   'GET /clients/:id/users': { summary: 'Usuários do portal ligados ao cliente' },
   'GET /clients/:id/assignments': { summary: 'Departamentos que atendem o cliente e seus responsáveis' },
+
+  'GET /municipalities': { summary: 'Cidades de um estado (IBGE)', description: 'Código IBGE e nome, em ordem alfabética. Usado no cadastro do cliente e nas exceções de vencimento.', querystring: listMunicipalitiesQuerySchema },
 
   'GET /portal/clients': { summary: 'Empresas que posso acompanhar', description: 'Portal: um usuário pode acompanhar mais de uma empresa.' },
   'GET /portal/home': { summary: 'Início do portal', description: 'Pendências, processos em andamento e guias a pagar da empresa escolhida.', querystring: portalClientQuerySchema },
