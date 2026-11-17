@@ -1597,7 +1597,7 @@
         "tags": [
           "Clientes"
         ],
-        "description": "Preenche razão social e endereço no cadastro; avisa se o CNPJ já é cliente.\n\n**Quem pode:** Admin, Gerente",
+        "description": "Preenche razão social e endereço no cadastro, com estado e cidade (código IBGE). Consulta a BrasilAPI e, se ela estiver fora, o CNPJ.ws. `ibgeCityCode: null` quando a cidade não foi reconhecida — escolher à mão. 502 quando os dois serviços estão fora.\n\n**Quem pode:** Admin, Gerente",
         "security": [
           {
             "bearerAuth": []

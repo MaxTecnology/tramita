@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import * as cnpjws from '@/lib/cnpjws'
+import * as cnpjws from '@/lib/cnpj-lookup'
 import {
   createClient,
   updateClient,
@@ -368,48 +368,50 @@ describe('listClientUserLinks', () => {
 describe('lookupClientByCnpj', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  it('returns the mapped address when the CNPJ is valid', async () => {
-    vi.spyOn(cnpjws, 'lookupCnpj').mockResolvedValue({
-      razaoSocial: 'Cliente Teste LTDA',
-      nomeFantasia: null,
-      cep: '57000-000',
-      estado: 'AL',
-      cidade: 'Maceió',
-      bairro: 'Centro',
-      logradouro: 'RUA das Flores',
-      numero: '123',
-      complemento: null,
-    })
+  const found = (over: Partial<cnpjws.CnpjLookupResult>): cnpjws.CnpjLookupResult => ({
+    razaoSocial: 'Cliente Teste LTDA', nomeFantasia: null, cep: '49000000', estado: 'SE', cidade: 'ARACAJU',
+    ibgeCityCode: 2800308, bairro: 'Centro', logradouro: 'RUA das Flores', numero: '123', complemento: null, ...over,
+  })
 
+  it('returns the city name from the IBGE table when the service brings the code', async () => {
+    vi.spyOn(cnpjws, 'lookupCnpj').mockResolvedValue(found({}))
     const result = await lookupClientByCnpj('11.222.333/0001-81')
-
     expect(cnpjws.lookupCnpj).toHaveBeenCalledWith('11222333000181')
-    expect(result.razaoSocial).toBe('Cliente Teste LTDA')
-    expect(result.cidade).toBe('Maceió')
+    expect(result).toMatchObject({ razaoSocial: 'Cliente Teste LTDA', estado: 'SE', cidade: 'Aracaju', ibgeCityCode: 2800308 })
   })
 
-  it('throws 400 when the CNPJ does not have 14 digits', async () => {
-    await expect(lookupClientByCnpj('123')).rejects.toMatchObject({ statusCode: 400 })
+  it('without the code (reserve service), finds the city by name + state', async () => {
+    vi.spyOn(cnpjws, 'lookupCnpj').mockResolvedValue(found({ estado: 'AL', cidade: 'MACEIO', ibgeCityCode: null }))
+    expect(await lookupClientByCnpj('11222333000181')).toMatchObject({ estado: 'AL', cidade: 'Maceió', ibgeCityCode: 2704302 })
   })
 
-  it('throws 404 when the external API responds with 404', async () => {
-    const err = Object.assign(new Error('Not Found'), {
-      isAxiosError: true,
-      response: { status: 404 },
+  it('a code missing from the table (new municipality) leaves the city to be chosen, no error', async () => {
+    vi.spyOn(cnpjws, 'lookupCnpj').mockResolvedValue(found({ cidade: 'CIDADE NOVA', ibgeCityCode: 2899999 }))
+    expect(await lookupClientByCnpj('11222333000181')).toMatchObject({ estado: 'SE', cidade: 'CIDADE NOVA', ibgeCityCode: null })
+  })
+
+  it('a code of another state than the one informed is not trusted', async () => {
+    vi.spyOn(cnpjws, 'lookupCnpj').mockResolvedValue(found({ estado: 'AL', ibgeCityCode: 2800308 }))
+    expect(await lookupClientByCnpj('11222333000181')).toMatchObject({ estado: 'AL', ibgeCityCode: null })
+  })
+
+  it('throws 400 when the CNPJ does not have 14 digits, without calling the service', async () => {
+    const spy = vi.spyOn(cnpjws, 'lookupCnpj')
+    await expect(lookupClientByCnpj('123')).rejects.toMatchObject({ statusCode: 400, message: 'CNPJ inválido' })
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('not found → 404', async () => {
+    vi.spyOn(cnpjws, 'lookupCnpj').mockRejectedValue(new cnpjws.CnpjNotFoundError())
+    await expect(lookupClientByCnpj('11222333000181')).rejects.toMatchObject({ statusCode: 404, message: 'CNPJ não encontrado' })
+  })
+
+  it('both services down → 502 telling to try again or fill in by hand', async () => {
+    vi.spyOn(cnpjws, 'lookupCnpj').mockRejectedValue(new cnpjws.CnpjUnavailableError())
+    await expect(lookupClientByCnpj('11222333000181')).rejects.toMatchObject({
+      statusCode: 502,
+      message: 'Serviço de consulta de CNPJ indisponível no momento. Tente de novo ou preencha os dados à mão.',
     })
-    vi.spyOn(cnpjws, 'lookupCnpj').mockRejectedValue(err)
-
-    await expect(lookupClientByCnpj('11222333000181')).rejects.toMatchObject({ statusCode: 404 })
-  })
-
-  it('throws 429 when the external API responds with 429 (rate limit)', async () => {
-    const err = Object.assign(new Error('Too Many Requests'), {
-      isAxiosError: true,
-      response: { status: 429 },
-    })
-    vi.spyOn(cnpjws, 'lookupCnpj').mockRejectedValue(err)
-
-    await expect(lookupClientByCnpj('11222333000181')).rejects.toMatchObject({ statusCode: 429 })
   })
 })
 

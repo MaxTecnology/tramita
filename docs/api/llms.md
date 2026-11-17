@@ -1501,7 +1501,7 @@ no additional properties
 - **Path:** `/clients/lookup-cnpj/{cnpj}`
 - **Tags:** Clientes
 
-Preenche razão social e endereço no cadastro; avisa se o CNPJ já é cliente.
+Preenche razão social e endereço no cadastro, com estado e cidade (código IBGE). Consulta a BrasilAPI e, se ela estiver fora, o CNPJ.ws. `ibgeCityCode: null` quando a cidade não foi reconhecida — escolher à mão. 502 quando os dois serviços estão fora.
 
 **Quem pode:** Admin, Gerente
 
@@ -1808,7 +1808,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-17T22:23:33.267Z"
+  "dueDate": "2026-11-17T22:25:59.164Z"
 }
 ```
 
@@ -1882,7 +1882,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-17T22:23:33.270Z"
+  "dueDate": "2026-11-17T22:25:59.167Z"
 }
 ```
 
@@ -1972,7 +1972,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:23:33.272Z",
+  "dueDate": "2026-11-17T22:25:59.169Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2247,14 +2247,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:23:33.283Z",
+  "dueDate": "2026-11-17T22:25:59.178Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-17T22:23:33.283Z",
-  "competence": "2026-11-17T22:23:33.283Z",
+  "targetDate": "2026-11-17T22:25:59.178Z",
+  "competence": "2026-11-17T22:25:59.178Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -4319,7 +4319,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-17T22:23:33.349Z",
+  "dueDate": "2026-11-17T22:25:59.226Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -5318,7 +5318,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:23:33.381Z"
+  "dueDate": "2026-11-17T22:25:59.252Z"
 }
 ```
 
@@ -5375,7 +5375,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-17T22:23:33.383Z",
+  "dueDate": "2026-11-17T22:25:59.253Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -6131,7 +6131,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:23:33.402Z",
+  "dueMonth": "2026-11-17T22:25:59.269Z",
   "assignmentIds": [
     ""
   ]
@@ -6183,7 +6183,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:23:33.404Z",
+  "dueMonth": "2026-11-17T22:25:59.270Z",
   "assignmentIds": [
     ""
   ]
@@ -6226,7 +6226,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-17T22:23:33.405Z"
+  "dueMonth": "2026-11-17T22:25:59.271Z"
 }
 ```
 

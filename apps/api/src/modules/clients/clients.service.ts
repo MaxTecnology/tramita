@@ -1,8 +1,9 @@
-import axios from 'axios'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
-import { lookupCnpj, type CnpjLookupResult } from '@/lib/cnpjws'
+import { lookupCnpj, CnpjNotFoundError, CnpjUnavailableError, type CnpjLookupResult } from '@/lib/cnpj-lookup'
+import { isUf } from '@/lib/uf'
+import { findMunicipality, findMunicipalityByName } from '@/modules/municipalities/municipalities.service'
 import { hashPassword } from '@/modules/auth/auth.service'
 import { normalizarTelefoneBr } from '@/lib/phone'
 import type { ClientBody } from './clients.schema'
@@ -251,15 +252,27 @@ export async function lookupClientByCnpj(cnpj: string): Promise<CnpjLookupResult
   const digits = cnpj.replace(/\D/g, '')
   if (digits.length !== 14) throw new AppError(400, 'CNPJ inválido')
 
+  let found: CnpjLookupResult
   try {
-    return await lookupCnpj(digits)
+    found = await lookupCnpj(digits)
   } catch (err) {
-    if (axios.isAxiosError(err)) {
-      if (err.response?.status === 429) throw new AppError(429, 'Limite de consultas de CNPJ atingido, tente novamente em instantes')
-      if (err.response?.status === 404) throw new AppError(404, 'CNPJ não encontrado')
+    if (err instanceof CnpjNotFoundError) throw new AppError(404, 'CNPJ não encontrado')
+    if (err instanceof CnpjUnavailableError) {
+      throw new AppError(502, 'Serviço de consulta de CNPJ indisponível no momento. Tente de novo ou preencha os dados à mão.')
     }
-    throw new AppError(502, 'Erro ao consultar CNPJ')
+    throw err
   }
+  return { ...found, ...(await resolveLookupCity(found)) }
+}
+
+// The city as the form will save it: the IBGE table's name and code, or no code (chosen by hand)
+async function resolveLookupCity(found: CnpjLookupResult): Promise<{ cidade: string | null; ibgeCityCode: number | null }> {
+  if (!isUf(found.estado)) return { cidade: found.cidade, ibgeCityCode: null }
+  const city = found.ibgeCityCode !== null
+    ? await findMunicipality(found.ibgeCityCode)
+    : found.cidade ? await findMunicipalityByName(found.cidade, found.estado) : null
+  if (!city || city.uf !== found.estado) return { cidade: found.cidade, ibgeCityCode: null }
+  return { cidade: city.name, ibgeCityCode: city.ibgeCode }
 }
 
 export async function searchClientUsers(organizationId: string, q: string) {

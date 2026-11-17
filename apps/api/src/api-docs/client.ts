@@ -14,7 +14,7 @@ import {
 // The office's clients, the client portal, service requests and protocols (guides and receipts)
 export const CLIENT_DOCS: RouteDocs = {
   'GET /clients': { summary: 'Listar clientes do escritório' },
-  'GET /clients/lookup-cnpj/:cnpj': { summary: 'Buscar dados da empresa pelo CNPJ', description: 'Preenche razão social e endereço no cadastro; avisa se o CNPJ já é cliente.' },
+  'GET /clients/lookup-cnpj/:cnpj': { summary: 'Buscar dados da empresa pelo CNPJ', description: 'Preenche razão social e endereço no cadastro, com estado e cidade (código IBGE). Consulta a BrasilAPI e, se ela estiver fora, o CNPJ.ws. `ibgeCityCode: null` quando a cidade não foi reconhecida — escolher à mão. 502 quando os dois serviços estão fora.' },
   'GET /clients/search-users': { summary: 'Buscar usuários do portal para vincular ao cliente' },
   'POST /clients': { summary: 'Cadastrar cliente', description: 'Respeita o limite de clientes do plano.', body: clientBodySchema },
   'PATCH /clients/:id': { summary: 'Alterar cliente', body: clientBodySchema },
