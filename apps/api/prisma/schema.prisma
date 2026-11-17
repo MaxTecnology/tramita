@@ -667,6 +667,8 @@ enum LocationScope {
 
 // The due date of a recurring template in one place: a UF (scope STATE) or an IBGE city (scope CITY).
 // Only the day and the business-day roll change; everything else is the template's.
+// The migration also adds a hand-written CHECK (exactly one of uf / ibgeCityCode) that Prisma does
+// not model: keep it if this table's migration is ever regenerated.
 model RecurringDueRule {
   id                 String          @id @default(cuid())
   templateId         String

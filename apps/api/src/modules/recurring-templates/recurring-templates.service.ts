@@ -1,4 +1,5 @@
 import { loadHolidaySet } from '@/modules/holidays/holidays.service'
+import { resolveDueRule } from './recurrence-location'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { assertDepartmentBelongsToOrg } from '@/modules/departments/departments.service'
@@ -314,7 +315,7 @@ export async function generateTaskForAssignment(
 ): Promise<GenerationOutcome> {
   const template = await prisma.recurringTaskTemplate.findUnique({
     where: { id: templateId },
-    include: { documentRequests: true, documentDeliveries: true },
+    include: { documentRequests: true, documentDeliveries: true, dueRules: true },
   })
   if (!template) return { status: 'FAILED', errorMessage: 'Template não encontrado' }
 
@@ -351,10 +352,18 @@ export async function generateTaskForAssignment(
     const systemBoard = await ensureRecurringSystemBoard(assignment.clientId, template.organizationId)
     const columnId = systemBoard.columns[0].id
 
+    // The due day of the client's place (state/city rules); a client the scope cannot place fails here
+    const location = await prisma.client.findUniqueOrThrow({
+      where: { id: assignment.clientId }, select: { name: true, estado: true, ibgeCityCode: true },
+    })
+    const placed = resolveDueRule(template, location)
+    if (!placed.ok) throw new GenerationUserFacingError(placed.message)
+    const clientRules: RecurrenceDateRules = { ...rules, dueDayOfPeriod: placed.dueDayOfPeriod, dueBusinessDayRoll: placed.dueBusinessDayRoll }
+
     // One business-day calendar: national + office holidays (the due date can roll into next year)
     const holidays = await loadHolidaySet(template.organizationId, [dueMonth.getUTCFullYear(), dueMonth.getUTCFullYear() + 1])
-    const dueDate = rules.periodicity === 'WEEKLY' ? computeDueDate(dueMonth, rules, holidays) : computeDueDateFromMonth(dueMonth, rules, holidays)
-    const targetDate = computeTargetDate(dueDate, rules, holidays)
+    const dueDate = clientRules.periodicity === 'WEEKLY' ? computeDueDate(dueMonth, clientRules, holidays) : computeDueDateFromMonth(dueMonth, clientRules, holidays)
+    const targetDate = computeTargetDate(dueDate, clientRules, holidays)
     const initialStatus = template.documentRequests.length > 0 ? 'BLOCKED' : 'OPEN'
 
     const taskId = await prisma.$transaction(async (tx) => {
