@@ -12,8 +12,27 @@ export async function getTaskHistory(taskId: string, organizationId: string, cli
     throw new AppError(404, 'Tarefa não encontrada')
   }
 
-  return prisma.taskHistory.findMany({ where: { taskId }, orderBy: { createdAt: 'asc' } })
+  return prisma.taskHistory.findMany({
+    where: { taskId, action: { in: CLIENT_HISTORY_ACTIONS } },
+    // No internal ids (who did it is shown by name)
+    select: { id: true, action: true, fromValue: true, toValue: true, actorType: true, actorName: true, createdAt: true },
+    orderBy: { createdAt: 'asc' },
+  })
 }
+
+// What the client may read of a task's history. Office-only entries stay out: who holds the task
+// (assigned_to, assumed), priority and department changes, delay reasons and notes, an early release
+// with its justification, robot warnings and an approval closed by the office (internal note).
+// A new action is hidden from the portal until it is listed here.
+const CLIENT_HISTORY_ACTIONS = [
+  'created', 'moved', 'moved_to', 'status_changed',
+  'attachment_added', 'attachment_deleted',
+  'document_requested', 'document_uploaded', 'document_approved', 'document_rejected', 'document_contested',
+  'document_not_applicable', 'document_not_applicable_undone',
+  'deliverable_requested', 'deliverable_delivered', 'deliverable_delivered_robot',
+  'approval_requested', 'approval_approved', 'approval_changes_requested',
+  'os_released', 'os_paused', 'os_resumed',
+]
 
 export async function listAccessibleClients(clientUserId: string) {
   const scope = await getClientAccessScope(clientUserId)

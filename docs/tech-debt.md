@@ -1,5 +1,29 @@
 # Débito Técnico — Tramita
 
+## Auditoria de segurança de 2026-11-16 — lotes 2 e 3 pendentes (lote 1 resolvido)
+
+Resolvido no lote 1: usuário desativado não loga e o refresh recarrega papel/ativo do banco, com sessões indexadas e revogadas ao desativar, rebaixar, redefinir senha ou trocar a própria senha (ALTO-1, MÉDIO-2); histórico do portal com lista de ações permitidas e sem `actorId` (ALTO-2); stream do board só com o nome do evento para o CLIENT (ALTO-3); responsável de tarefa/OS/processo precisa ser da equipe ativa do mesmo escritório (MÉDIO-1).
+
+**Lote 2 (próximo):**
+- MÉDIO-3: limite de login por conta com store Redis no `@fastify/rate-limit` e `bcrypt.compare` contra hash fictício quando o e-mail não existe (enumeração por tempo).
+- MÉDIO-5: cliente não reenvia arquivo para requisito `APPROVED` nem em tarefa encerrada (`task-documents.service.ts` `uploadForRequirement`).
+- MÉDIO-6: anexo vinculado (requisito, entregável, protocolo, comprovante de pagamento, aprovação) não pode ser apagado; CLIENT só apaga anexo livre.
+- BAIXO-1: `DELETE /request-comments/:id` e `POST /tasks/:id/release` sem `assertStaffSees`.
+- BAIXO-2: `listTaskDocuments` devolve o `Attachment` inteiro ao cliente (`storageKey`, ids internos) — usar `select`.
+- BAIXO-4: `checkSubscription` faltando em POST/DELETE de comentários e comentários de solicitação.
+
+**Lote 3:** webhook do Asaas idempotente por `payment.id`, ordem de eventos, `PAYMENT_DELETED` só da cobrança atual, payload com Zod e token só por header (BAIXO-5); `@fastify/helmet`, política de senha (BAIXO-6); conferência de magic bytes no upload (BAIXO-3); register público com limite estrito e tratamento de P2002 se um dia for religado (MÉDIO-4).
+
+**Verificar:** `trustProxy: 1` vs. a cadeia real de proxies em produção (Traefik/Cloudflare) e número de réplicas da API (rate limit em memória).
+
+## Decisão em aberto: tarefa passada para alguém de outro departamento (levantado em 2026-11-16)
+
+Hoje o membro só passa tarefa para quem é do departamento da tarefa (`assertMemberCanPassTask`), e o escopo de quem enxerga segue departamento/carteira. Max quer que valha "de quem é a tarefa": ex.: uma tarefa do Fiscal enviada a um usuário do Contábil, que passa a vê-la. A decidir antes de implementar: a tarefa continua do departamento Fiscal (indicadores, filas) ou muda; o gerente do Contábil também passa a ver; o colaborador vê só essa tarefa ou o processo inteiro; e como fica a carteira do cliente (o Contábil atende esse cliente?).
+
+## Comentário interno na tarefa (pedido em 2026-11-16)
+
+Hoje todo comentário da equipe numa tarefa visível aparece no portal. Max quer comentário só interno (não chega ao cliente nem dispara notificação a ele). A implementar.
+
 ## Teste intermitente: `portal.protocols.routes.test.ts` › "each person who opens it is recorded once" (encontrado em 2026-11-16)
 
 Na suíte completa da API falhou uma vez com `expected 3 to be 2`: a segunda visualização da mesma pessoa gerou outro `VIEWED`. Isolado, passou 3/3, e passou em todas as outras rodadas completas do dia. O dedupe em `protocols.service.ts` (`findFirst` de `VIEWED` com `createdAt >= fileUpdatedAt ?? protocol.createdAt`) compara datas; todas vêm do lado da aplicação, então a hipótese de relógios diferentes (Node × Postgres) não se confirmou. Causa ainda desconhecida.

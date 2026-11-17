@@ -9,6 +9,7 @@ import type { LoginResponse, Role } from '@/modules/auth/auth.types'
 import type { UpdateProfileBody } from '@/modules/auth/auth.schema'
 
 const REFRESH_TTL_SECONDS = 60 * 60 * 24 * 7 // 7 days
+const sessionsKey = (sub: string) => `sessions:${sub}`
 const PASSWORD_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%'
 
 export function generateRandomPassword(length = 12): string {
@@ -33,7 +34,8 @@ export async function login(email: string, password: string): Promise<LoginRespo
     where: { email },
     include: { organization: { select: { name: true } } },
   })
-  if (user && (await verifyPassword(password, user.passwordHash))) {
+  // A deactivated staff member keeps the row (history, authorship) but never signs in again
+  if (user && user.isActive && (await verifyPassword(password, user.passwordHash))) {
     return buildSession(user.id, user.name, user.role as Role, user.organizationId, user.organization?.name ?? null)
   }
 
@@ -70,12 +72,13 @@ async function buildSession(
   const accessToken = generateAccessToken({ sub: id, role, organizationId })
   const refreshToken = uuidv4()
 
-  await redis.set(
-    `refresh:${refreshToken}`,
-    JSON.stringify({ sub: id, role, organizationId }),
-    'EX',
-    REFRESH_TTL_SECONDS,
-  )
+  await redis
+    .multi()
+    .set(`refresh:${refreshToken}`, JSON.stringify({ sub: id, role, organizationId }), 'EX', REFRESH_TTL_SECONDS)
+    // Index of the person's sessions, so deactivating, demoting or a new password ends all of them
+    .sadd(sessionsKey(id), refreshToken)
+    .expire(sessionsKey(id), REFRESH_TTL_SECONDS)
+    .exec()
 
   return { accessToken, refreshToken, user: { id, name, role, organizationId, orgName } }
 }
@@ -102,14 +105,38 @@ export async function refreshSession(refreshToken: string): Promise<{ accessToke
     if (!clientUser || !clientUser.isActive) {
       throw new AppError(401, 'Refresh token inválido ou expirado')
     }
+    return { accessToken: generateAccessToken(payload) }
   }
 
-  const accessToken = generateAccessToken(payload)
-  return { accessToken }
+  // Staff and Master: the token carries what the database says now (a demoted manager does not keep
+  // the old role until the session expires) and a deactivated person gets nothing
+  const user = await prisma.user.findUnique({
+    where: { id: payload.sub },
+    select: { isActive: true, role: true, organizationId: true },
+  })
+  if (!user || !user.isActive) {
+    await revokeSessions(payload.sub)
+    throw new AppError(401, 'Refresh token inválido ou expirado')
+  }
+  return { accessToken: generateAccessToken({ sub: payload.sub, role: user.role as Role, organizationId: user.organizationId }) }
+}
+
+
+// Ends every open session of a person (refresh tokens; an access token already issued lives its
+// last minutes). keepRefreshToken: the session the person is using right now, when it is theirs.
+export async function revokeSessions(sub: string, keepRefreshToken?: string): Promise<void> {
+  const tokens = await redis.smembers(sessionsKey(sub))
+  const drop = tokens.filter((t) => t !== keepRefreshToken)
+  const tx = redis.multi()
+  for (const t of drop) tx.del(`refresh:${t}`)
+  if (drop.length > 0) tx.srem(sessionsKey(sub), ...drop)
+  await tx.exec()
 }
 
 export async function logout(refreshToken: string): Promise<void> {
+  const stored = await redis.get(`refresh:${refreshToken}`)
   await redis.del(`refresh:${refreshToken}`)
+  if (stored) await redis.srem(sessionsKey((JSON.parse(stored) as { sub: string }).sub), refreshToken)
 }
 
 export async function getMyProfile(sub: string, role: string) {
@@ -153,6 +180,7 @@ export async function changePassword(
   role: string,
   currentPassword: string,
   newPassword: string,
+  keepRefreshToken?: string,
 ): Promise<void> {
   if (role === 'CLIENT') {
     const clientUser = await prisma.clientUser.findUnique({ where: { id: sub } })
@@ -169,4 +197,9 @@ export async function changePassword(
     }
     await prisma.user.update({ where: { id: sub }, data: { passwordHash: await hashPassword(newPassword) } })
   }
+  // A new password ends the other sessions (a stolen one included); the current one stays only when
+  // the token sent is really this person's
+  const kept = keepRefreshToken ? await redis.get(`refresh:${keepRefreshToken}`) : null
+  const keep = kept && (JSON.parse(kept) as { sub: string }).sub === sub ? keepRefreshToken : undefined
+  await revokeSessions(sub, keep)
 }

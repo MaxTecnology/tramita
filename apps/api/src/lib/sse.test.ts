@@ -74,4 +74,20 @@ describe('attachSSESubscriber', () => {
     await vi.advanceTimersByTimeAsync(SSE_RECHECK_MS * 3)
     expect(recheck).toHaveBeenCalledTimes(1)
   })
+
+  it('event-only subscribers (the portal) get the event name and no data: titles and ids stay in the API', () => {
+    const { sub, raw, reply, request } = fakeConnection()
+    attachSSESubscriber(request, reply, 'board:b1', { eventOnly: true })
+    const onMessage = sub.on.mock.calls.find(([name]) => name === 'message')![1] as (c: string, m: string) => void
+    onMessage('board:b1', JSON.stringify({ event: 'task:created', data: { taskId: 't1', title: 'Controle interno SPED' } }))
+    expect(raw.write).toHaveBeenLastCalledWith('event: task:created\ndata: {}\n\n')
+  })
+
+  it('office subscribers keep the full event', () => {
+    const { sub, raw, reply, request } = fakeConnection()
+    attachSSESubscriber(request, reply, 'board:b1')
+    const onMessage = sub.on.mock.calls.find(([name]) => name === 'message')![1] as (c: string, m: string) => void
+    onMessage('board:b1', JSON.stringify({ event: 'task:created', data: { taskId: 't1', title: 'Guia' } }))
+    expect(raw.write).toHaveBeenLastCalledWith('event: task:created\ndata: {"taskId":"t1","title":"Guia"}\n\n')
+  })
 })

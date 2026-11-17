@@ -41,7 +41,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/change-password', { preHandler: verifyJWT }, async (request, reply) => {
     const result = changePasswordSchema.safeParse(request.body)
     if (!result.success) throw new AppError(400, result.error.errors[0].message)
-    await changePassword(request.user.sub, request.user.role, result.data.currentPassword, result.data.newPassword)
+    await changePassword(request.user.sub, request.user.role, result.data.currentPassword, result.data.newPassword, result.data.keepRefreshToken)
     return reply.status(204).send()
   })
 

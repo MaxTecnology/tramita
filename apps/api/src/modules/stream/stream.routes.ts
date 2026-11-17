@@ -43,10 +43,9 @@ export async function streamRoutes(app: FastifyInstance) {
     if (staffCheck) await staffCheck()
 
     // CLIENT subscribers are additionally gated at the company level — a ClientUser must have
-    // access to the board's client, or the board effectively doesn't exist to them. Department
-    // filtering is intentionally not applied here: the events pushed on this stream are already
-    // coarse (task id/title/column), matching the concern being board-level access, not
-    // per-event department leakage.
+    // access to the board's client, or the board effectively doesn't exist to them. The events are
+    // not filtered per task (department, visibleToClient), so a client gets only their names
+    // (eventOnly below) and reloads through the API.
     const clientCheck = user.role === 'CLIENT'
       ? async () => {
         const scope = await getClientAccessScope(user.sub)
@@ -56,6 +55,6 @@ export async function streamRoutes(app: FastifyInstance) {
     if (clientCheck) await clientCheck()
 
     // Scope can shrink while the panel is open ("ver colegas" turned off, portfolio moved)
-    attachSSESubscriber(request, reply, `board:${id}`, streamRecheck(user, staffCheck ?? clientCheck ?? undefined))
+    attachSSESubscriber(request, reply, `board:${id}`, { ...streamRecheck(user, staffCheck ?? clientCheck ?? undefined), eventOnly: user.role === 'CLIENT' })
   })
 }

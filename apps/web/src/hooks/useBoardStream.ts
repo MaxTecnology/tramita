@@ -18,10 +18,11 @@ export function useBoardStream(boardId: string | undefined) {
     queryClient.invalidateQueries({ queryKey: ['portal-board', boardId] })
     queryClient.invalidateQueries({ queryKey: ['boards'] })
     queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    // The portal gets only the event name (no task id): every open task panel reloads (only the
+    // queries in use refetch)
     const taskId = taskIdOf(data)
-    if (!taskId) return
     for (const key of ['task-documents', 'task-history', 'comments', 'task-approvals', 'attachments', 'protocols']) {
-      queryClient.invalidateQueries({ queryKey: [key, taskId] })
+      queryClient.invalidateQueries({ queryKey: taskId ? [key, taskId] : [key] })
     }
   }
   useEventStream(`/boards/${boardId}/stream`, {

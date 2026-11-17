@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
-import { hashPassword } from '@/modules/auth/auth.service'
+import { hashPassword, revokeSessions } from '@/modules/auth/auth.service'
 import { normalizarTelefoneBr } from '@/lib/phone'
 import type { CreateClientUserBody, UpdateClientUserBody } from './client-users.schema'
 import { assertAccessesServed, assertClientUserChangeKeepsCoverage, lockClients } from '@/modules/clients/client-coverage'
@@ -82,7 +82,7 @@ export async function updateClientUser(id: string, organizationId: string, data:
 
   if (data.accesses) await assertAccessesBelongToOrg(data.accesses, organizationId)
 
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     await lockClients(tx, await clientsTouchedBy(tx, id, data.accesses))
     if (data.accesses) await assertAccessesServed(tx, data.accesses)
     const currentAccesses = data.accesses
@@ -110,6 +110,9 @@ export async function updateClientUser(id: string, organizationId: string, data:
 
     return tx.clientUser.findUniqueOrThrow({ where: { id }, select: SELECT })
   })
+  // A new password or a deactivation set by the office ends the sessions open in the portal
+  if (data.password || data.isActive === false) await revokeSessions(id)
+  return updated
 }
 
 // Companies whose coverage a change of this client user can affect: the ones they access today plus
@@ -127,9 +130,11 @@ export async function deleteClientUser(id: string, organizationId: string) {
   const clientUser = await prisma.clientUser.findFirst({ where: { id, organizationId } })
   if (!clientUser) throw new AppError(404, 'Usuário de cliente não encontrado')
 
-  return prisma.$transaction(async (tx) => {
+  const deactivated = await prisma.$transaction(async (tx) => {
     await lockClients(tx, await clientsTouchedBy(tx, id))
     await assertClientUserChangeKeepsCoverage(tx, id, { accesses: [], isActive: false })
     return tx.clientUser.update({ where: { id }, data: { isActive: false }, select: SELECT })
   })
+  await revokeSessions(id)
+  return deactivated
 }

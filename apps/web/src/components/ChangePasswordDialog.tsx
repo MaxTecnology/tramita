@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from 'react'
-import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,6 +10,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { KeyRound } from 'lucide-react'
+import { changePassword } from '@/lib/change-password'
 
 interface Props {
   triggerClassName?: string
@@ -40,7 +40,7 @@ export function ChangePasswordDialog({ triggerClassName }: Props) {
     }
     setLoading(true)
     try {
-      await api.post('/auth/change-password', { currentPassword, newPassword })
+      await changePassword(currentPassword, newPassword)
       setOpen(false)
       resetForm()
     } catch (err: unknown) {

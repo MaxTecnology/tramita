@@ -18,6 +18,7 @@ class FakeEventSource {
 const b64 = (o: object) => btoa(JSON.stringify(o)).replace(/=+$/, '')
 
 beforeEach(() => {
+  FakeEventSource.last = null
   vi.stubGlobal('EventSource', FakeEventSource)
   localStorage.setItem('accessToken', `${b64({ alg: 'RS256' })}.${b64({ exp: Math.floor(Date.now() / 1000) + 900 })}.sig`)
   server.use(http.post(`${API}/stream/ticket`, () => HttpResponse.json({ ticket: 'tk' })))
@@ -34,4 +35,14 @@ it('a change on the board refreshes the open task panel (documents, history, com
   expect(keys).toEqual(expect.arrayContaining([
     '["board","b1"]', '["tasks"]', '["task-documents","t1"]', '["task-history","t1"]', '["comments","t1"]', '["task-approvals","t1"]', '["attachments","t1"]',
   ]))
+})
+
+it('an event without a task (the portal gets only event names) refreshes every open task panel', async () => {
+  const qc = new QueryClient()
+  const invalidate = vi.spyOn(qc, 'invalidateQueries')
+  renderHook(() => useBoardStream('b1'), { wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider> })
+  await waitFor(() => expect(FakeEventSource.last?.url).toBe(`${API}/boards/b1/stream?ticket=tk`))
+  FakeEventSource.last!.listeners['task:created']({ data: '{}' })
+  const keys = invalidate.mock.calls.map(([f]) => JSON.stringify(f?.queryKey))
+  expect(keys).toEqual(expect.arrayContaining(['["portal-board","b1"]', '["task-documents"]', '["task-history"]', '["comments"]', '["attachments"]']))
 })

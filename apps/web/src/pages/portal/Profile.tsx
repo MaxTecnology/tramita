@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/useAuth'
 import { Lock, Mail } from 'lucide-react'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
+import { changePassword } from '@/lib/change-password'
 
 interface Profile {
   id: string; name: string; email: string; phone: string | null
@@ -46,10 +47,7 @@ export default function PortalProfile() {
   })
 
   const pwMutation = useMutation({
-    mutationFn: () => api.post('/auth/change-password', {
-      currentPassword: pwForm.currentPassword,
-      newPassword: pwForm.newPassword,
-    }),
+    mutationFn: () => changePassword(pwForm.currentPassword, pwForm.newPassword),
     onSuccess: () => {
       toast.success('Senha alterada com sucesso')
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' })

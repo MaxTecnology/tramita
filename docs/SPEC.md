@@ -61,8 +61,15 @@ Login unificado — role no JWT discrimina acesso (`MASTER`, `ORG_ADMIN`, `ORG_M
 }
 ```
 
+→ Usuário da equipe desativado (`isActive=false`) não entra (401, como credencial inválida).
+
 ### POST `/auth/refresh` — `{ "refreshToken": "string" }`
+→ Equipe/Master: recarrega o usuário do banco — desativado → 401 (e as sessões dele caem); o novo access token sai com o papel e a organização **atuais** (um gerente rebaixado não mantém o papel antigo). CLIENT desativado → 401.
 ### POST `/auth/logout` — invalida refresh token no Redis
+### POST `/auth/change-password` — `{ currentPassword, newPassword, keepRefreshToken? }`
+→ Encerra as outras sessões da pessoa; mantém a do `keepRefreshToken` quando ele é dela.
+
+**Sessões:** cada refresh token fica indexado por pessoa (`sessions:<id>` no Redis). Desativar alguém, mudar o papel de um usuário da equipe, o admin redefinir a senha (equipe), ou o escritório desativar/trocar a senha de um usuário do portal encerra todas as sessões abertas dele. Um access token já emitido vale até expirar (15 min).
 
 ---
 
@@ -298,6 +305,8 @@ Não há rota para criar, editar, reordenar ou remover colunas: elas nascem com 
 → Dispara `TASK_MOVED` (com canais `WHATSAPP`+`EMAIL` forçados se `Column.notifyClient: true`, independente do toggle global da org). Se `Column.statusEffect: DONE` → também aplica o status na tarefa e dispara `TASK_COMPLETED`
 → Status possíveis (`TaskStatus`): `OPEN` (padrão) | `STARTED` (em andamento, atribuído por coluna com `statusEffect: STARTED`) | `BLOCKED` (impedimento, geralmente por checklist de documento pendente/rejeitado) | `DISREGARDED` (desconsiderada) | `DONE` (concluída)
 
+**Responsável:** `assigneeId` (tarefa/OS) e `responsibleUserId` (processo) precisam ser de usuário ativo da equipe do mesmo escritório — outro escritório ou desativado → 404 `'Usuário não encontrado'` (nada é atribuído nem notificado).
+
 ### DELETE `/tasks/:id` _(ORG_ADMIN | ORG_MANAGER)_
 ### GET `/boards/:id/tasks/search?q=&priority=&assigneeId=&status=&dueBefore=&dueAfter=`
 
@@ -530,6 +539,9 @@ Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma t
 
 ### GET `/portal/departments` _(CLIENT)_ — departamentos da organização, pra o formulário de nova solicitação
 
+### GET `/portal/tasks/:taskId/history` _(CLIENT)_ — histórico da tarefa visível ao cliente
+→ Só as ações que o cliente pode ver (criação, movimentação, status, documentos, entregas, aprovações, anexos, pausa/liberação da OS). Ficam fora responsável/assumir, prioridade, departamento, motivos de atraso, liberação antecipada, avisos do robô e fechamento de aprovação pelo escritório. Campos: `id, action, fromValue, toValue, actorType, actorName, createdAt` (sem `actorId`).
+
 ### GET `/portal/requests` _(CLIENT)_ — `?clientId=` **obrigatório** — 400 se ausente, 404 se o `ClientUser` não tem acesso àquele `clientId`
 ### POST `/portal/requests` _(CLIENT)_
 ```json
@@ -759,6 +771,7 @@ ticket novo a cada (re)conexão. `?token=` não é mais aceito (401).
 
 401 sem ticket, ticket inválido/expirado/já usado. 404 se o processo não existe na org, se o
 CLIENT não tem acesso à empresa ou se o ORG_MEMBER não enxerga o processo.
+Para o CLIENT os eventos chegam **só com o nome** (`data: {}`): título e ids não saem pelo stream (ele não filtra por departamento nem por `visibleToClient`); o portal recarrega pela API, que filtra.
 
 **Eventos emitidos:**
 ```

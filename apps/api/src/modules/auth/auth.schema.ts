@@ -16,6 +16,8 @@ export const logoutBodySchema = z.object({
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Senha atual obrigatória'),
   newPassword: z.string().min(8, 'Nova senha deve ter no mínimo 8 caracteres'),
+  // The session in use: kept when the other ones are ended
+  keepRefreshToken: z.string().uuid().optional(),
 })
 
 export const updateProfileSchema = z.object({

@@ -411,3 +411,36 @@ describe('Portal — solicitações isoladas por departamento', () => {
     expect([detail.statusCode, cancel.statusCode, comments.statusCode, comment.statusCode]).toEqual([404, 404, 404, 404])
   })
 })
+
+describe('histórico no portal: só o que o cliente pode ver', () => {
+  it('leaves out office-only entries (delay reason, who holds the task, priority, department) and internal ids', async () => {
+    const org = await createTestOrg((await createTestPlan()).id)
+    const user = await createTestUser(org.id)
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    const col = await createTestColumn((await createTestBoard(org.id, client.id)).id, { position: 0 })
+    const task = await createTestTask(col.id, user.id, { departmentId: department.id })
+    const entry = (action: string, fromValue: string | null, toValue: string | null) =>
+      ({ taskId: task.id, action, fromValue, toValue, actorType: 'user', actorId: user.id, actorName: 'Bruna' })
+    await prisma.taskHistory.createMany({
+      data: [
+        entry('moved_to', 'A fazer', 'Prefeitura'),
+        entry('document_requested', null, 'Contrato social'),
+        entry('delay_reason_set', 'Retrabalho interno', 'Erro nosso na guia'),
+        entry('assigned_to', null, user.id),
+        entry('assumed', user.id, null),
+        entry('priority_changed', 'MEDIUM', 'URGENT'),
+        entry('department_changed', department.id, department.id),
+        entry('os_released_early', null, 'Cliente VIP, furar a fila'),
+      ],
+    })
+
+    const res = await app.inject({ method: 'GET', url: `/portal/tasks/${task.id}/history`, headers: { authorization: await getAuthHeader(clientUser.email, password) } })
+    const rows = JSON.parse(res.body) as { action: string }[]
+    expect(rows.map((r) => r.action)).toEqual(['moved_to', 'document_requested'])
+    expect(res.body).not.toContain(user.id)
+    expect(res.body).not.toContain('Erro nosso na guia')
+  })
+})

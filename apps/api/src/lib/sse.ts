@@ -47,7 +47,9 @@ export function attachSSESubscriber(
   channel: string,
   // Access checked again every minute (e.g. a member who stopped seeing colleagues); false or an
   // error closes the stream and the client reconnects through the full check
-  opts: { recheck?: () => Promise<boolean> } = {},
+  // eventOnly: the subscriber gets only the event name (portal: titles and ids of tasks it may not
+  // see stay out; the screen reloads through the API, which filters by department and visibility)
+  opts: { recheck?: () => Promise<boolean>; eventOnly?: boolean } = {},
 ): void {
   reply.hijack()
   const raw = reply.raw
@@ -71,7 +73,7 @@ export function attachSSESubscriber(
   sub.on('message', (_channel: string, message: string) => {
     try {
       const parsed = JSON.parse(message) as { event: string; data: unknown }
-      raw.write(`event: ${parsed.event}\ndata: ${JSON.stringify(parsed.data)}\n\n`)
+      raw.write(`event: ${parsed.event}\ndata: ${opts.eventOnly ? '{}' : JSON.stringify(parsed.data)}\n\n`)
     } catch { /* ignore malformed messages */ }
   })
 

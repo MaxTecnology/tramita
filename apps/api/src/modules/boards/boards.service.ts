@@ -7,6 +7,7 @@ import { AppError } from '@/errors/AppError'
 import type { CreateBoardBody, UpdateBoardBody, SearchQuery } from './boards.schema'
 import { todayInBRT, startOfTodayInBRT } from '@/lib/date-only'
 import { boardWhere, clientWhere, loadStaffScope, type StaffScope } from '@/modules/staff-scope/staff-scope'
+import { assertActiveStaffUser } from '@/modules/users/assert-staff-user'
 
 const DEFAULT_COLUMNS = [
   { title: 'Pendente', position: 0, color: '#6B7280', statusEffect: 'NONE' as const },
@@ -179,6 +180,7 @@ export async function createBoard(
 
   const responsibleUserId =
     userRole === 'ORG_MEMBER' ? userId : (data.responsibleUserId ?? null)
+  await assertActiveStaffUser(organizationId, responsibleUserId)
 
   const columns = data.processTemplateId
     ? await buildColumnsFromTemplate(data.processTemplateId, organizationId)
@@ -224,6 +226,7 @@ async function buildColumnsFromTemplate(processTemplateId: string, organizationI
 export async function updateBoard(id: string, organizationId: string, data: UpdateBoardBody) {
   const board = await prisma.board.findFirst({ where: { id, organizationId, isActive: true, type: 'PROCESS' } })
   if (!board) throw new AppError(404, 'Board não encontrado')
+  if (data.responsibleUserId && data.responsibleUserId !== board.responsibleUserId) await assertActiveStaffUser(organizationId, data.responsibleUserId)
 
   return prisma.board.update({
     where: { id },

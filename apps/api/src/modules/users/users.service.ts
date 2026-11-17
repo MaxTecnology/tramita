@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
-import { hashPassword, generateRandomPassword } from '@/modules/auth/auth.service'
+import { hashPassword, generateRandomPassword, revokeSessions } from '@/modules/auth/auth.service'
 import type { CreateUserBody, UpdateUserBody, UpdateMyProfileBody } from './users.schema'
 
 const SELECT = {
@@ -77,7 +77,7 @@ export async function updateUser(id: string, organizationId: string, data: Updat
   if (!user) throw new AppError(404, 'Usuário não encontrado')
   const { departmentIds, ...fields } = data
 
-  return present(await prisma.$transaction(async (tx) => {
+  const updated = present(await prisma.$transaction(async (tx) => {
     if (departmentIds) {
       const next = await assertDepartmentsOfOrg(tx, organizationId, departmentIds)
       // Same exclusive lock as deactivation: nobody makes them responsible in a department being removed
@@ -97,13 +97,16 @@ export async function updateUser(id: string, organizationId: string, data: Updat
     }
     return tx.user.update({ where: { id }, data: fields, select: SELECT })
   }))
+  // A new role takes effect now: the sessions issued with the old one end
+  if (fields.role && fields.role !== user.role) await revokeSessions(id)
+  return updated
 }
 
 export async function deleteUser(id: string, organizationId: string) {
   const user = await prisma.user.findFirst({ where: { id, organizationId, isActive: true } })
   if (!user) throw new AppError(404, 'Usuário não encontrado')
 
-  return prisma.$transaction(async (tx) => {
+  const deactivated = await prisma.$transaction(async (tx) => {
     // Exclusive lock on this user: a client form or transfer making them responsible right now
     // (lockUsersForShare) finishes first and is counted below, or waits and sees them inactive.
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${id} FOR UPDATE`
@@ -117,6 +120,8 @@ export async function deleteUser(id: string, organizationId: string) {
     }
     return present(await tx.user.update({ where: { id }, data: { isActive: false }, select: SELECT }))
   })
+  await revokeSessions(id)
+  return deactivated
 }
 
 export async function getMyProfile(id: string) {
@@ -148,5 +153,6 @@ export async function resetUserPassword(id: string, organizationId?: string) {
     where: { id },
     data: { passwordHash: await hashPassword(temporaryPassword) },
   })
+  await revokeSessions(id)
   return { id: user.id, name: user.name, email: user.email, temporaryPassword }
 }

@@ -13,6 +13,7 @@ import { ensureServiceSystemBoard } from '@/modules/tasks/tasks.service'
 import { scheduleDeadline, scheduleBoardDeadline, releaseIfFree, syncPause } from './os-deadline.service'
 import { competenceToDate, type OpenOSBody, type AddOSToProcessBody } from './os.schema'
 import { startOfMonthInBRT } from '@/lib/date-only'
+import { assertActiveStaffUser } from '@/modules/users/assert-staff-user'
 
 export interface OSActor { id: string; role: string }
 
@@ -35,12 +36,6 @@ async function assertClientInScope(organizationId: string, actor: OSActor, clien
   const scope = await loadStaffScope({ sub: actor.id, role: actor.role, organizationId })
   const client = await prisma.client.findFirst({ where: { id: clientId, organizationId, isActive: true, ...clientWhere(scope) }, select: { id: true } })
   if (!client) throw new AppError(404, 'Cliente não encontrado')
-}
-
-async function assertAssignee(organizationId: string, assigneeId: string | undefined) {
-  if (!assigneeId) return
-  const found = await prisma.user.count({ where: { id: assigneeId, organizationId, isActive: true } })
-  if (!found) throw new AppError(404, 'Usuário não encontrado')
 }
 
 function osTitle(model: { name: string }, competence: Date | null): string {
@@ -131,7 +126,7 @@ export async function openOS(organizationId: string, actor: OSActor, body: OpenO
   if (!model.usableStandalone) throw new AppError(422, 'Essa OS é só de processo')
   if (model.requiresCompetence && !body.competence) throw new AppError(422, 'Informe a competência')
   await assertClientInScope(organizationId, actor, body.clientId)
-  await assertAssignee(organizationId, body.assigneeId)
+  await assertActiveStaffUser(organizationId, body.assigneeId)
 
   const board = await ensureServiceSystemBoard(body.clientId, organizationId)
   const columnId = board.columns.sort((a, b) => a.position - b.position)[0].id
@@ -162,7 +157,7 @@ export async function addOSToProcess(organizationId: string, actor: OSActor, boa
   if (model.requiresCompetence && !competence) throw new AppError(422, 'Informe a competência')
   const column = await prisma.column.findFirst({ where: { id: body.columnId, boardId }, select: { id: true } })
   if (!column) throw new AppError(404, 'Coluna não encontrada neste processo')
-  await assertAssignee(organizationId, body.assigneeId)
+  await assertActiveStaffUser(organizationId, body.assigneeId)
   const deps = await prisma.task.findMany({ where: { id: { in: body.dependsOnTaskIds }, column: { boardId } }, select: { id: true, status: true } })
   if (deps.length !== new Set(body.dependsOnTaskIds).size) throw new AppError(404, 'OS de que ela depende não encontrada neste processo')
 

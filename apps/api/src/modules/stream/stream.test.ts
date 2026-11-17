@@ -207,3 +207,29 @@ describe('SSE — usuário desativado', () => {
     for (const call of spy.mock.calls) expect(await call[3]!.recheck!()).toBe(false)
   })
 })
+
+describe('stream do board para o cliente: só o nome do evento', () => {
+  async function setup() {
+    const org = await createTestOrg((await createTestPlan()).id)
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    const client = await createTestClient(org.id)
+    const department = await createTestDepartment(org.id)
+    const board = await createTestBoard(org.id, client.id)
+    const { clientUser, password } = await createTestClientUser(org.id)
+    await grantClientAccess(clientUser.id, client.id, department.id)
+    return { board, clientAuth: await getAuthHeader(clientUser.email, password), adminAuth: await getAuthHeader(admin.email, 'Test@1234') }
+  }
+  // The real subscriber keeps the connection open (inject never resolves): answer at once, keep the options
+  async function optionsFor(boardId: string, auth: string) {
+    const sse = await import('@/lib/sse')
+    const spy = vi.spyOn(sse, 'attachSSESubscriber').mockImplementation((_req, reply) => { void reply.code(200).send() })
+    await app.inject({ method: 'GET', url: `/boards/${boardId}/stream?ticket=${await getStreamTicket(auth)}` })
+    return spy.mock.calls.at(-1)?.[3]
+  }
+
+  it('a client subscriber gets events without titles or ids; the office keeps the full event', async () => {
+    const c = await setup()
+    expect(await optionsFor(c.board.id, c.clientAuth)).toMatchObject({ eventOnly: true })
+    expect(await optionsFor(c.board.id, c.adminAuth)).not.toMatchObject({ eventOnly: true })
+  })
+})

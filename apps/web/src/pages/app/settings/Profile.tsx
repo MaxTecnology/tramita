@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
 import { Lock, Mail, Volume2 } from 'lucide-react'
 import { playSound } from '@/lib/sla-sound'
+import { changePassword } from '@/lib/change-password'
 
 interface Profile {
   id: string
@@ -72,10 +73,7 @@ export default function Profile() {
   })
 
   const pwMutation = useMutation({
-    mutationFn: () => api.post('/auth/change-password', {
-      currentPassword: pwForm.currentPassword,
-      newPassword: pwForm.newPassword,
-    }),
+    mutationFn: () => changePassword(pwForm.currentPassword, pwForm.newPassword),
     onSuccess: () => {
       toast.success('Senha alterada com sucesso')
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' })

@@ -17,6 +17,7 @@ import { warnDaysFor } from '@/modules/os/os-list.service'
 import { loadHolidaySet } from '@/modules/holidays/holidays.service'
 import type { HolidaySet } from '@/lib/business-days'
 import { planDelayReasonsOnFinish, applyDelayReasons, type FinishPlan } from '@/modules/delay-reasons/delay-reasons.service'
+import { assertActiveStaffUser } from '@/modules/users/assert-staff-user'
 
 export interface Actor {
   id: string
@@ -76,6 +77,7 @@ export async function createTask(
 ) {
   const column = await verifyColumnBelongsToOrg(columnId, organizationId)
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
+  await assertActiveStaffUser(organizationId, data.assigneeId)
   const departmentId = data.departmentId
   const actorName = await resolveActorName(actor.id, actor.type)
 
@@ -374,6 +376,7 @@ export async function updateTask(
   actor: Actor,
 ) {
   const task = await verifyTaskBelongsToOrg(id, organizationId)
+  if (data.assigneeId && data.assigneeId !== task.assigneeId) await assertActiveStaffUser(organizationId, data.assigneeId)
   if (data.status !== undefined && data.status !== task.status) await assertReleased(id)
   const delayPlan: FinishPlan = data.status === 'DONE' && task.status !== 'DONE'
     ? await planDelayReasonsOnFinish(id, organizationId, data)
