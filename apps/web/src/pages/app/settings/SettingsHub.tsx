@@ -1,101 +1,65 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { Card } from '@/components/ui/card'
-import { Settings, Bell, CreditCard, Building2, UserCog, Repeat, FileStack, Zap, FileText, CalendarOff, ListChecks, AlarmClock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { FailedGeneration } from '@/types'
+import { ADMIN_ONLY, settingsGroupsFor } from './settingsNav'
 
-const ADMIN_ROLES = ['ORG_ADMIN']
-const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
-
-interface SettingsCard {
-  to: string
-  icon: React.ReactNode
-  title: string
-  description: string
-  roles: string[]
-  badge?: number
-}
-
-interface SettingsSection {
-  title: string
-  cards: SettingsCard[]
-}
-
+// Entry of the settings: every page the person can open, grouped like the side menu
 export default function SettingsHub() {
   const { user } = useAuth()
   const role = user?.role ?? ''
+  const groups = settingsGroupsFor(role)
 
   const { data: failures = [] } = useQuery<FailedGeneration[]>({
     queryKey: ['recurring-failed-generations'],
     queryFn: () => api.get('/recurring-templates/failed-generations').then((r) => r.data),
-    enabled: ADMIN_ROLES.includes(role),
+    enabled: ADMIN_ONLY.includes(role),
   })
 
-  const sections: SettingsSection[] = [
-    {
-      title: 'Organização',
-      cards: [
-        { to: '/app/settings/departments', icon: <Building2 size={20} />, title: 'Departamentos', description: 'Áreas internas do escritório', roles: ADMIN_ROLES },
-        { to: '/app/settings/holidays', icon: <CalendarOff size={20} />, title: 'Feriados', description: 'Dias que não contam nos prazos em dias úteis', roles: ADMIN_ROLES },
-        { to: '/app/settings/client-users', icon: <UserCog size={20} />, title: 'Usuários de Cliente', description: 'Acessos do portal do cliente', roles: MANAGER_ROLES },
-        { to: '/app/settings/subscription', icon: <CreditCard size={20} />, title: 'Assinatura', description: 'Plano e cobrança', roles: ADMIN_ROLES },
-      ],
-    },
-    {
-      title: 'Automação de tarefas',
-      cards: [
-        { to: '/app/settings/recurring-templates', icon: <Repeat size={20} />, title: 'Tarefas Recorrentes', description: 'Templates de geração automática', roles: ADMIN_ROLES },
-        { to: '/app/settings/delay-reasons', icon: <AlarmClock size={20} />, title: 'Motivos de atraso', description: 'Pedidos ao concluir OS ou processo fora do prazo', roles: ADMIN_ROLES },
-        { to: '/app/settings/os-models', icon: <ListChecks size={20} />, title: 'Modelos de OS', description: 'Serviços avulsos: documentos, robô, prazo', roles: ADMIN_ROLES },
-        { to: '/app/settings/process-templates', icon: <FileStack size={20} />, title: 'Modelos de Processo', description: 'Etapas e OS de cada tipo de processo', roles: ADMIN_ROLES },
-        { to: '/app/settings/recurring-generation', icon: <Zap size={20} />, title: 'Geração manual', description: 'Rodar geração de tarefas recorrentes fora do ciclo automático', roles: ADMIN_ROLES, badge: failures.length },
-      ],
-    },
-    {
-      title: 'Comunicação e documentos',
-      cards: [
-        { to: '/app/settings/templates', icon: <Settings size={20} />, title: 'Templates', description: 'Mensagens de notificação por evento', roles: ADMIN_ROLES },
-        { to: '/app/settings/notifications', icon: <Bell size={20} />, title: 'Notificações', description: 'WhatsApp e e-mail por organização', roles: ADMIN_ROLES },
-        { to: '/app/settings/document-models', icon: <FileText size={20} />, title: 'Modelos de Documento', description: 'Ensina o robô a reconhecer o layout dos seus documentos', roles: ADMIN_ROLES },
-      ],
-    },
-  ]
-
   return (
-    <div className="p-4 md:p-6">
-      <h1 className="text-lg md:text-xl font-bold text-foreground mb-4">Configurações</h1>
-      <div className="space-y-6">
-        {sections.map((section) => {
-          const cards = section.cards.filter((c) => c.roles.includes(role))
-          if (cards.length === 0) return null
-          return (
-            <div key={section.title}>
-              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                {section.title}
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {cards.map((c) => (
-                  <Link key={c.to} to={c.to}>
-                    <Card className="p-4 h-full hover:border-accent transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="text-accent mb-2">{c.icon}</div>
-                        {!!c.badge && c.badge > 0 && (
-                          <span className="flex-shrink-0 min-w-[1.25rem] h-5 px-1 rounded-full bg-danger-text text-danger-foreground text-xs font-medium flex items-center justify-center">
-                            {c.badge > 9 ? '9+' : c.badge}
+    <div className="p-4 md:p-6 max-w-5xl">
+      <div className="mb-6">
+        <h1 className="text-lg md:text-xl font-bold text-foreground">Configurações</h1>
+        <p className="text-sm text-muted-foreground">Como o escritório trabalha no Tramita: estrutura, rotinas, comunicação e robô.</p>
+      </div>
+      <div className="space-y-7">
+        {groups.map((group) => (
+          <section key={group.title}>
+            <h2 className="mb-2 text-sm font-semibold text-foreground">{group.title}</h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {group.pages.map((p) => {
+                const Icon = p.icon
+                const badge = p.failuresBadge ? failures.length : 0
+                return (
+                  <Link
+                    key={p.to}
+                    to={p.to}
+                    className="group flex items-start gap-3 rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-neutral-bg text-accent">
+                      <Icon size={18} aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground">{p.title}</span>
+                        {badge > 0 && (
+                          <span
+                            aria-label={`${badge} ${badge === 1 ? 'geração com falha' : 'gerações com falha'}`}
+                            className="min-w-5 rounded-full bg-danger-text px-1.5 text-center text-xs font-medium text-danger-foreground"
+                          >
+                            {badge > 9 ? '9+' : badge}
                           </span>
                         )}
-                      </div>
-                      <h2 className="text-sm font-medium text-foreground">{c.title}</h2>
-                      <p className="text-xs text-muted-foreground mt-0.5">{c.description}</p>
-                    </Card>
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">{p.description}</span>
+                    </span>
                   </Link>
-                ))}
-              </div>
+                )
+              })}
             </div>
-          )
-        })}
+          </section>
+        ))}
       </div>
     </div>
   )

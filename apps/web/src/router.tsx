@@ -16,6 +16,7 @@ import Clients from '@/pages/app/Clients'
 import Users from '@/pages/app/Users'
 import UserTransfer from '@/pages/app/UserTransfer'
 import SettingsHub from '@/pages/app/settings/SettingsHub'
+import SettingsLayout from '@/pages/app/settings/SettingsLayout'
 import Templates from '@/pages/app/settings/Templates'
 import Notifications from '@/pages/app/settings/Notifications'
 import AppSubscription from '@/pages/app/settings/Subscription'
@@ -123,196 +124,202 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'settings',
-        element: (
-          <ProtectedRoute allowedRoles={MANAGER_ROLES}>
-            <SettingsHub />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/templates',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <Templates />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/notifications',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <Notifications />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/subscription',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <AppSubscription />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/holidays',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <Holidays />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/departments',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <Departments />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/recurring-templates',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <RecurringTemplates />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/recurring-templates/new',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <RecurringTemplateForm />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/recurring-templates/:id/edit',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <RecurringTemplateForm />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/recurring-templates/:id/manage',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <RecurringTemplateManage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/recurring-generation',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <RecurringGenerationConsole />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/delay-reasons',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <DelayReasons />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/os-models',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <OSModels />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/os-models/new',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <OSModelForm />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/os-models/:id/edit',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <OSModelForm />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/process-templates',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <ProcessTemplates />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/document-models',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <DocumentModels />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/document-models/new',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <DocumentModelForm />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/document-models/:id/edit',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <DocumentModelForm />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/process-templates/new',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <ProcessTemplateForm />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/process-templates/:id/edit',
-        element: (
-          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-            <ProcessTemplateForm />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/client-users',
-        element: (
-          <ProtectedRoute allowedRoles={MANAGER_ROLES}>
-            <ClientUsers />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/client-users/new',
-        element: (
-          <ProtectedRoute allowedRoles={MANAGER_ROLES}>
-            <ClientUserForm />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'settings/client-users/:id/edit',
-        element: (
-          <ProtectedRoute allowedRoles={MANAGER_ROLES}>
-            <ClientUserForm />
-          </ProtectedRoute>
-        ),
+        // Settings pages share the side menu
+        element: <SettingsLayout />,
+        children: [
+          {
+            path: 'settings',
+            element: (
+              <ProtectedRoute allowedRoles={MANAGER_ROLES}>
+                <SettingsHub />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/templates',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <Templates />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/notifications',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <Notifications />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/subscription',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <AppSubscription />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/holidays',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <Holidays />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/departments',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <Departments />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/recurring-templates',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <RecurringTemplates />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/recurring-templates/new',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <RecurringTemplateForm />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/recurring-templates/:id/edit',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <RecurringTemplateForm />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/recurring-templates/:id/manage',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <RecurringTemplateManage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/recurring-generation',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <RecurringGenerationConsole />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/delay-reasons',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <DelayReasons />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/os-models',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <OSModels />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/os-models/new',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <OSModelForm />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/os-models/:id/edit',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <OSModelForm />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/process-templates',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <ProcessTemplates />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/document-models',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <DocumentModels />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/document-models/new',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <DocumentModelForm />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/document-models/:id/edit',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <DocumentModelForm />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/process-templates/new',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <ProcessTemplateForm />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/process-templates/:id/edit',
+            element: (
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <ProcessTemplateForm />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/client-users',
+            element: (
+              <ProtectedRoute allowedRoles={MANAGER_ROLES}>
+                <ClientUsers />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/client-users/new',
+            element: (
+              <ProtectedRoute allowedRoles={MANAGER_ROLES}>
+                <ClientUserForm />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings/client-users/:id/edit',
+            element: (
+              <ProtectedRoute allowedRoles={MANAGER_ROLES}>
+                <ClientUserForm />
+              </ProtectedRoute>
+            ),
+          },
+        ],
       },
       { path: 'perfil', element: <Profile /> },
       { path: 'notifications', element: <AppNotifications /> },
