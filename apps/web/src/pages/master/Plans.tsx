@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { formatPrice } from '@/lib/money'
 
 interface Plan {
   id: string
@@ -167,7 +168,7 @@ export default function MasterPlans() {
                   </td>
                   <td className="px-4 py-3 text-foreground">{plan.maxClients}</td>
                   <td className="px-4 py-3 text-foreground">
-                    R$ {Number(plan.priceMonthly).toFixed(2)}
+                    {formatPrice(plan.priceMonthly)}
                   </td>
                   <td className="px-4 py-3">
                     <Badge

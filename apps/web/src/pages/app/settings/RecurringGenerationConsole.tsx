@@ -77,7 +77,7 @@ export default function RecurringGenerationConsole() {
         <h1 className="text-lg md:text-xl font-bold text-foreground">Geração manual</h1>
       </div>
       <p className="text-sm text-muted-foreground">
-        Ferramenta de exceção — recuperar uma geração que o cron não fez, ou adiantar um mês inteiro antes do disparo automático. Roda todos os templates ativos de uma vez.
+        Use quando precisar gerar um mês fora do horário automático: recuperar uma geração que falhou ou adiantar o mês inteiro. Gera as tarefas de todas as recorrências ativas de uma vez.
       </p>
 
       {Object.keys(failuresByTemplate).length > 0 && (

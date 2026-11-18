@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { AlertTriangle, Clock, CheckCircle2, Check } from 'lucide-react'
+import { formatPrice } from '@/lib/money'
 
 interface Plan { id: string; name: string; maxClients: number; priceMonthly: number }
 interface HistoryItem { id: string; event: string; amount: number | null; createdAt: string }
@@ -106,7 +107,7 @@ export default function OrgSubscription() {
             <h2 className="text-2xl font-bold text-foreground">{data.plan.name}</h2>
             <p className="text-sm text-muted-foreground mt-1">
               <span className="text-lg font-semibold text-foreground">
-                R$ {Number(data.plan.priceMonthly).toFixed(2)}
+                {formatPrice(data.plan.priceMonthly)}
               </span>
               <span className="text-muted-foreground">/mês</span>
             </p>
@@ -180,7 +181,7 @@ export default function OrgSubscription() {
                     {isCurrent && <Check size={16} className="text-[#185FA5] flex-shrink-0" />}
                   </div>
                   <p className="text-lg font-bold text-foreground mb-0.5">
-                    R$ {Number(plan.priceMonthly).toFixed(2)}
+                    {formatPrice(plan.priceMonthly)}
                     <span className="text-xs font-normal text-muted-foreground">/mês</span>
                   </p>
                   <p className="text-xs text-muted-foreground mb-4">Até {plan.maxClients} clientes</p>

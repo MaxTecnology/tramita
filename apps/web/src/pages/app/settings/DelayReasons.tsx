@@ -45,7 +45,7 @@ export default function DelayReasons() {
       <Card className="p-4">
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (name.trim().length >= 2) add.mutate() }}>
           <Input aria-label="Novo motivo" placeholder="Ex.: Sistema da prefeitura fora do ar" value={name} onChange={(e) => setName(e.target.value)} />
-          <Button type="submit" disabled={add.isPending}>Adicionar motivo</Button>
+          <Button type="submit" disabled={add.isPending} className="flex-shrink-0 whitespace-nowrap">Adicionar motivo</Button>
         </form>
       </Card>
 

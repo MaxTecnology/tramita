@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toApiAmount, formatBRL, toInputAmount } from './money'
+import { toApiAmount, formatBRL, toInputAmount, formatPrice } from './money'
 
 describe('toApiAmount', () => {
   it('converts the Brazilian format typed by the user to the API dot-decimal string', () => {
@@ -23,3 +23,13 @@ describe('formatBRL / toInputAmount', () => {
     expect(toInputAmount('1234.5')).toBe('1.234,50')
   })
 })
+
+describe('formatPrice (plan prices come as numbers or decimal strings)', () => {
+  it('uses the Brazilian format, always with cents', () => {
+    expect(formatPrice(97)).toBe('R$ 97,00')
+    expect(formatPrice(197.5)).toBe('R$ 197,50')
+    expect(formatPrice('1290.9')).toBe('R$ 1.290,90')
+    expect(formatPrice(0)).toBe('R$ 0,00')
+  })
+})
+

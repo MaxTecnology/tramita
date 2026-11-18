@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { BillingBadge, type BillingMode } from '@/components/master/BillingBadge'
+import { formatPrice } from '@/lib/money'
 
 interface Org {
   id: string
@@ -255,7 +256,7 @@ export default function MasterOrganizations() {
                   >
                     <option value="">Selecione um plano</option>
                     {plans.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} — R$ {p.priceMonthly}/mês</option>
+                      <option key={p.id} value={p.id}>{p.name} — {formatPrice(p.priceMonthly)}/mês</option>
                     ))}
                   </select>
                 </div>

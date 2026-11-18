@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft } from 'lucide-react'
 import { cnpjValido } from '@/lib/documento'
 import { TramitaLogo } from '@/components/brand/TramitaLogo'
+import { formatPrice } from '@/lib/money'
 
 interface Plan { id: string; name: string; maxClients: number; priceMonthly: number }
 type Step = 'plan' | 'form'
@@ -111,7 +112,7 @@ export default function Register() {
                   <CardContent className="pt-6">
                     <h2 className="text-lg font-bold text-foreground mb-1">{plan.name}</h2>
                     <p className="text-3xl font-bold text-[#185FA5] mb-1">
-                      R$ {Number(plan.priceMonthly).toFixed(0)}
+                      {formatPrice(plan.priceMonthly)}
                       <span className="text-sm font-normal text-muted-foreground">/mês</span>
                     </p>
                     <p className="text-sm text-muted-foreground mb-4">Até {plan.maxClients} clientes</p>
@@ -151,7 +152,7 @@ export default function Register() {
         <div className="w-full max-w-md">
           <h1 className="text-2xl font-bold text-foreground mb-1">Criar conta</h1>
           <p className="text-muted-foreground text-sm mb-6">
-            Plano <strong>{selectedPlan?.name}</strong> — R$ {Number(selectedPlan?.priceMonthly).toFixed(2)}/mês
+            Plano <strong>{selectedPlan?.name}</strong> — {formatPrice(selectedPlan?.priceMonthly ?? 0)}/mês
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">

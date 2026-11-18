@@ -10,6 +10,7 @@ const EVENTS = [
   'RECURRING_GENERATION_FAILED', 'SLA_DIGEST', 'TASK_ASSUMED', 'APPROVAL_REQUESTED', 'APPROVAL_CHANGES_REQUESTED',
 ] as const
 const CHANNELS = ['WHATSAPP', 'EMAIL'] as const
+const CHANNEL_LABEL: Record<(typeof CHANNELS)[number], string> = { WHATSAPP: 'WhatsApp', EMAIL: 'E-mail' }
 
 const EVENT_LABEL: Record<string, string> = {
   TASK_CREATED: 'Tarefa criada',
@@ -72,7 +73,7 @@ export default function Templates() {
                 className="flex h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5] focus:border-transparent transition"
               >
                 {CHANNELS.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>{CHANNEL_LABEL[c]}</option>
                 ))}
               </select>
             </div>
