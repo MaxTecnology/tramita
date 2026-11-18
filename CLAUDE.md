@@ -87,7 +87,7 @@ teste não pega — revisar o resumo/descrição à mão. Referência local: `AP
 
 ## Interpolação de Templates de Mensagem
 
-Variáveis disponíveis para templates (WhatsApp e Email):
+Variáveis disponíveis para templates (WhatsApp e Email) — a lista completa e o que cada aviso preenche ficam em `EVENT_VARIABLES` (`src/lib/template.ts`):
 
 ```typescript
 interface TemplateVars {
@@ -96,7 +96,6 @@ interface TemplateVars {
   taskTitle: string        // Título da tarefa/processo
   fromColumn?: string      // Etapa anterior (task.moved)
   toColumn?: string        // Nova etapa (task.moved)
-  dueDate?: string         // Data de vencimento formatada (dd/MM/yyyy)
   portalUrl: string        // https://tramita.autohubs.com.br/portal
   commentText?: string     // Texto do comentário (comment_added)
   commentAuthorName?: string

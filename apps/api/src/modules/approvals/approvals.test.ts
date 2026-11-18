@@ -113,7 +113,11 @@ describe('cliente decide', () => {
     const res = await post(`/portal/approvals/${id}/request-changes`, c.rhAuth, { note: 'Faltou o adicional noturno' })
     expect(res.statusCode).toBe(200)
     expect(await prisma.taskApproval.findUniqueOrThrow({ where: { id } })).toMatchObject({ status: 'CHANGES_REQUESTED', decisionNote: 'Faltou o adicional noturno' })
-    expect(enqueued).toContainEqual(expect.objectContaining({ event: 'APPROVAL_CHANGES_REQUESTED', userId: c.dani.id }))
+    expect(enqueued).toContainEqual(expect.objectContaining({
+      event: 'APPROVAL_CHANGES_REQUESTED', userId: c.dani.id,
+      // the default text opens with {{clientName}}: the company must come along, or it reads " pediu ajuste"
+      metadata: expect.objectContaining({ clientName: 'ACME', commentAuthorName: 'RH' }),
+    }))
   })
 
   it('a client user without the department never sees nor decides it (404)', async () => {

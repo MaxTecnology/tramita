@@ -1841,7 +1841,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-18T02:12:31.427Z"
+  "dueDate": "2026-11-18T11:18:08.674Z"
 }
 ```
 
@@ -1915,7 +1915,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-18T02:12:31.429Z"
+  "dueDate": "2026-11-18T11:18:08.676Z"
 }
 ```
 
@@ -2005,7 +2005,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-18T02:12:31.431Z",
+  "dueDate": "2026-11-18T11:18:08.679Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2280,14 +2280,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-18T02:12:31.441Z",
+  "dueDate": "2026-11-18T11:18:08.689Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-18T02:12:31.441Z",
-  "competence": "2026-11-18T02:12:31.441Z",
+  "targetDate": "2026-11-18T11:18:08.690Z",
+  "competence": "2026-11-18T11:18:08.690Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -2693,7 +2693,7 @@ no additional properties
 - **Path:** `/notifications/templates/{event}/{channel}`
 - **Tags:** Notificações
 
-A personalizada do escritório ou, sem ela, a padrão do sistema.
+A personalizada do escritório ou, sem ela, a padrão do sistema. `variables` lista os campos que esse aviso preenche no envio.
 
 **Quem pode:** Admin
 
@@ -4352,7 +4352,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-18T02:12:31.491Z",
+  "dueDate": "2026-11-18T11:18:08.752Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -5357,7 +5357,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-18T02:12:31.516Z"
+  "dueDate": "2026-11-18T11:18:08.782Z"
 }
 ```
 
@@ -5414,7 +5414,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-18T02:12:31.517Z",
+  "dueDate": "2026-11-18T11:18:08.783Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -6198,7 +6198,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T02:12:31.536Z",
+  "dueMonth": "2026-11-18T11:18:08.804Z",
   "assignmentIds": [
     ""
   ]
@@ -6250,7 +6250,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T02:12:31.537Z",
+  "dueMonth": "2026-11-18T11:18:08.806Z",
   "assignmentIds": [
     ""
   ]
@@ -6293,7 +6293,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T02:12:31.538Z"
+  "dueMonth": "2026-11-18T11:18:08.807Z"
 }
 ```
 

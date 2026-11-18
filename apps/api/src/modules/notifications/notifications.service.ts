@@ -2,7 +2,7 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { logger } from '@/lib/logger'
-import { getTemplate, renderTemplate, PREVIEW_VARS } from '@/lib/template'
+import { getTemplate, renderTemplate, PREVIEW_VARS, EVENT_VARIABLES } from '@/lib/template'
 import { uploadFile, deleteFile } from '@/lib/b2'
 import type { NotificationEvent, MessageChannel, NotificationStatus } from '@prisma/client'
 import type { UpdateConfigBody, UpsertTemplateBody } from './notifications.schema'
@@ -79,7 +79,7 @@ export async function getTemplateForOrg(
     where: { organizationId_event_channel: { organizationId, event, channel } },
   })
   const template = await getTemplate(organizationId, event, channel)
-  return { ...template, isDefault: !custom }
+  return { ...template, isDefault: !custom, variables: EVENT_VARIABLES[event] }
 }
 
 export async function upsertTemplate(

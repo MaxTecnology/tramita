@@ -3578,7 +3578,7 @@
         "tags": [
           "Notificações"
         ],
-        "description": "A personalizada do escritório ou, sem ela, a padrão do sistema.\n\n**Quem pode:** Admin",
+        "description": "A personalizada do escritório ou, sem ela, a padrão do sistema. `variables` lista os campos que esse aviso preenche no envio.\n\n**Quem pode:** Admin",
         "security": [
           {
             "bearerAuth": []

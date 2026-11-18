@@ -617,7 +617,8 @@ Spec: `docs/superpowers/specs/2026-11-15-os-processos-design.md`. **OS** = uma t
 ## Templates de Mensagem
 
 ### GET `/notifications/templates/:event/:channel` _(ORG_ADMIN)_
-Retorna template atual ou o template padrão do sistema se não configurado.
+Retorna template atual ou o template padrão do sistema se não configurado: `{ body, subject?, isDefault, variables: string[] }`.
+`variables` = o que esse aviso preenche no envio (`EVENT_VARIABLES` em `src/lib/template.ts`); variável fora da lista sai vazia. A tela de Mensagens só oferece essas e avisa quando o texto usa outra.
 
 ### PUT `/notifications/templates/:event/:channel` _(ORG_ADMIN)_
 Cria ou atualiza template para o evento + canal.

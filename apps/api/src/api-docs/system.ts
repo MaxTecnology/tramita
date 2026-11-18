@@ -16,7 +16,7 @@ export const SYSTEM_DOCS: RouteDocs = {
   'POST /notifications/config/sla-sound': { summary: 'Enviar som de alerta de prazo personalizado', upload: {} },
   'DELETE /notifications/config/sla-sound': { summary: 'Voltar ao som de alerta padrão' },
   'POST /notifications/templates/preview': { summary: 'Pré-visualizar mensagem com as variáveis preenchidas', body: previewSchema },
-  'GET /notifications/templates/:event/:channel': { summary: 'Mensagem usada no evento e canal', description: 'A personalizada do escritório ou, sem ela, a padrão do sistema.' },
+  'GET /notifications/templates/:event/:channel': { summary: 'Mensagem usada no evento e canal', description: 'A personalizada do escritório ou, sem ela, a padrão do sistema. `variables` lista os campos que esse aviso preenche no envio.' },
   'PUT /notifications/templates/:event/:channel': { summary: 'Personalizar mensagem do evento e canal', body: upsertTemplateSchema },
   'DELETE /notifications/templates/:event/:channel': { summary: 'Voltar à mensagem padrão' },
   'GET /notifications/logs': { summary: 'Mensagens enviadas aos clientes', querystring: logsQuerySchema },

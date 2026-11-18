@@ -387,3 +387,34 @@ describe('processNotificationJob — falha no envio aparece no log da aplicaçã
     expect(call?.[0]).toMatchObject({ organizationId: org.id, event: 'SLA_DIGEST', channel: 'EMAIL', reason: 'API key is invalid' })
   })
 })
+
+describe('processNotificationJob — o que o emissor manda chega ao texto', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('DOCUMENT_REJECTED diz qual documento foi recusado', async () => {
+    const { org, client, task } = await setup(false)
+    await processNotificationJob({
+      data: {
+        event: 'DOCUMENT_REJECTED', organizationId: org.id, clientId: client.id, taskId: task.id,
+        metadata: { taskTitle: task.title, documentName: 'Extrato de outubro', rejectionReason: 'Ilegível' },
+      },
+    })
+    const sentBody = (maximizebot.sendWhatsApp as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string
+    expect(sentBody).toContain('Extrato de outubro')
+  })
+
+  it('RECURRING_GENERATION_FAILED diz qual recorrente falhou e por quê', async () => {
+    const org = await createTestOrg((await createTestPlan()).id)
+    await prisma.notificationConfig.create({ data: { organizationId: org.id, emailEnabled: true } })
+    const admin = await createTestUser(org.id, { role: 'ORG_ADMIN' })
+    await processNotificationJob({
+      data: {
+        event: 'RECURRING_GENERATION_FAILED', organizationId: org.id, recipientType: 'USER', userId: admin.id,
+        metadata: { templateTitle: 'ICMS mensal', errorMessage: 'Cliente sem departamento' },
+      },
+    })
+    const [, subject, text] = (mailer.sendEmail as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string, string]
+    expect(`${subject} ${text}`).toContain('ICMS mensal')
+    expect(text).toContain('Cliente sem departamento')
+  })
+})

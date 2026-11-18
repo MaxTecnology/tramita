@@ -107,6 +107,7 @@ async function processClientNotification(
     taskTitle: task?.title,
     requestTitle: metadata.requestTitle,
     rejectionReason: metadata.rejectionReason,
+    documentName: metadata.documentName,
     fromColumn: metadata.fromColumn,
     toColumn: metadata.toColumn,
     dueDate: metadata.dueDate,
@@ -242,6 +243,8 @@ async function processUserNotification(
     taskListText: metadata.taskListText,
     assumedByName: metadata.assumedByName,
     approvalTitle: metadata.approvalTitle,
+    templateTitle: metadata.templateTitle,
+    errorMessage: metadata.errorMessage,
     portalUrl: await staffPortalUrl(appUrl, event, taskId),
   }
 

@@ -173,7 +173,7 @@ export async function closeApproval(id: string, organizationId: string, actor: S
 async function clientTask(taskId: string, organizationId: string, clientUserId: string) {
   const task = await prisma.task.findFirst({
     where: { id: taskId, column: { board: { organizationId } } },
-    include: { column: { select: { board: { select: { id: true, clientId: true } } } } },
+    include: { column: { select: { board: { select: { id: true, clientId: true, client: { select: { name: true } } } } } } },
   })
   const scope = await getClientAccessScope(clientUserId)
   if (!task || !task.visibleToClient || !canSeeTask(scope, task.column.board.clientId, task.departmentId)) {
@@ -206,7 +206,7 @@ export async function decideAsClient(id: string, organizationId: string, clientU
     for (const userId of new Set([approval.requestedById, ...(task.assigneeId ? [task.assigneeId] : [])])) {
       await enqueueNotification({
         event: 'APPROVAL_CHANGES_REQUESTED', organizationId, recipientType: 'USER', userId, taskId: task.id,
-        metadata: { taskTitle: task.title, approvalTitle: approval.title, commentText: note, commentAuthorName: clientUser.name },
+        metadata: { taskTitle: task.title, clientName: task.column.board.client.name, approvalTitle: approval.title, commentText: note, commentAuthorName: clientUser.name },
       })
     }
   }

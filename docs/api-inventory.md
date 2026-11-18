@@ -8,7 +8,7 @@
 
 - Rotas: **211**
 - Públicas (sem login): **6** — `POST /auth/login`, `POST /auth/logout`, `POST /auth/refresh`, `GET /organizations/plans`, `POST /organizations/register`, `GET /organizations/signup-status`
-- Sem uso no web nem chamador externo conhecido: **3**
+- Sem uso no web nem chamador externo conhecido: **2**
 - Sem teste de rota: **53**
 - Cliente (portal) passa fora de /portal: **13** (rotas compartilhadas — o escopo dentro delas é revisado na auditoria de segurança)
 
@@ -18,7 +18,6 @@
 |---|---|---|---|
 | GET | `/document-reader/metricas` | Admin, Gerente, Membro | sim |
 | GET | `/portal/requests/:id` | Cliente | sim |
-| POST | `/users/:id/reactivate` | Admin | sim |
 
 ## Cliente fora de /portal
 
@@ -203,10 +202,10 @@
 | POST | `/notifications/read-all` | Admin, Gerente, Membro, Cliente | web | sim |
 | POST | `/notifications/read-by-task` | Admin, Gerente, Membro, Cliente, Master | web | sim |
 | GET | `/notifications/stream` | token próprio (ticket/webhook) | web (indireto) | sim |
-| DELETE | `/notifications/templates/:event/:channel` | Admin | web (indireto) | **não** |
-| GET | `/notifications/templates/:event/:channel` | Admin | web (indireto) | sim |
+| DELETE | `/notifications/templates/:event/:channel` | Admin | web | **não** |
+| GET | `/notifications/templates/:event/:channel` | Admin | web | sim |
 | PUT | `/notifications/templates/:event/:channel` | Admin | web | sim |
-| POST | `/notifications/templates/preview` | Admin | web (indireto) | sim |
+| POST | `/notifications/templates/preview` | Admin | web | sim |
 | GET | `/notifications/unread-count` | Admin, Gerente, Membro, Cliente | web | **não** |
 
 ### /org
@@ -388,7 +387,7 @@
 | DELETE | `/users/:id` | Admin | web | **não** |
 | PATCH | `/users/:id` | Admin | web | sim |
 | GET | `/users/:id/portfolio` | Admin | web | sim |
-| POST | `/users/:id/reactivate` | Admin | — | sim |
+| POST | `/users/:id/reactivate` | Admin | web | sim |
 | POST | `/users/:id/reset-password` | Admin | web | sim |
 | POST | `/users/:id/transfer` | Admin | web | sim |
 | GET | `/users/me` | Admin, Gerente, Membro, Cliente, Master | web | sim |

@@ -45,6 +45,37 @@ export const PREVIEW_VARS: TemplateVars = {
   taskListText: '- Abertura de LTDA (João Silva) — vence 20/10/2026 [crítico]\n- Folha de pagamento (Maria Souza) — meta 25/10/2026 [atenção]',
   protocolTitle: 'Guia de DARF — Outubro/2026',
   paymentInfo: '\nValor: R$ 1.234,56 — vencimento 20/11/2026',
+  requestTitle: 'Alteração de endereço',
+  rejectionReason: 'Falta o comprovante de residência',
+  approvalTitle: 'Folha de outubro',
+  assumedByName: 'Ana Paula',
+}
+
+export type TemplateVarKey = keyof TemplateVars
+
+// What each notice actually fills when sent (from what its emitter and the worker provide).
+// A variable outside this list goes out empty — the template screen only offers these.
+const CLIENT_BASE = ['clientName', 'orgName', 'portalUrl'] as const
+export const EVENT_VARIABLES: Record<NotificationEvent, readonly TemplateVarKey[]> = {
+  TASK_CREATED: [...CLIENT_BASE, 'taskTitle'],
+  TASK_MOVED: [...CLIENT_BASE, 'taskTitle', 'fromColumn', 'toColumn'],
+  TASK_COMPLETED: [...CLIENT_BASE, 'taskTitle'],
+  TASK_COMMENT_ADDED: [...CLIENT_BASE, 'taskTitle', 'commentText', 'commentAuthorName'],
+  TASK_BLOCKED: [...CLIENT_BASE, 'taskTitle'],
+  DOCUMENT_REJECTED: [...CLIENT_BASE, 'taskTitle', 'documentName', 'rejectionReason'],
+  REQUEST_CREATED: [...CLIENT_BASE, 'requestTitle'],
+  REQUEST_APPROVED: [...CLIENT_BASE, 'requestTitle'],
+  REQUEST_REJECTED: [...CLIENT_BASE, 'requestTitle', 'rejectionReason'],
+  REQUEST_NEEDS_INFO: [...CLIENT_BASE, 'requestTitle', 'commentText'],
+  REQUEST_COMMENT_ADDED: [...CLIENT_BASE, 'requestTitle', 'commentText', 'commentAuthorName'],
+  REQUEST_CANCELLED: [...CLIENT_BASE, 'requestTitle', 'rejectionReason'],
+  PROTOCOL_CREATED: [...CLIENT_BASE, 'protocolTitle', 'paymentInfo'],
+  APPROVAL_REQUESTED: [...CLIENT_BASE, 'taskTitle', 'approvalTitle', 'commentText'],
+  // Office-side notices
+  RECURRING_GENERATION_FAILED: ['orgName', 'portalUrl', 'templateTitle', 'errorMessage'],
+  SLA_DIGEST: ['orgName', 'portalUrl', 'taskCount', 'criticalCount', 'taskListText'],
+  TASK_ASSUMED: [...CLIENT_BASE, 'taskTitle', 'assumedByName'],
+  APPROVAL_CHANGES_REQUESTED: [...CLIENT_BASE, 'taskTitle', 'approvalTitle', 'commentText', 'commentAuthorName'],
 }
 
 export function renderTemplate(body: string, vars: TemplateVars): string {
