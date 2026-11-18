@@ -7,30 +7,39 @@ import { Textarea } from '@/components/ui/textarea'
 import { askConfirm } from '@/components/ui/app-dialogs'
 import { toast } from 'sonner'
 
-// What can go into a message, by the name the office knows it (the code goes in the text)
-const TEMPLATE_VARS: { key: string; label: string }[] = [
-  { key: 'clientName', label: 'Nome do cliente' },
-  { key: 'orgName', label: 'Nome do escritório' },
-  { key: 'taskTitle', label: 'Título da tarefa' },
-  { key: 'fromColumn', label: 'Etapa anterior' },
-  { key: 'toColumn', label: 'Nova etapa' },
-  { key: 'dueDate', label: 'Data de vencimento' },
-  { key: 'portalUrl', label: 'Link do portal' },
-  { key: 'commentText', label: 'Texto do comentário' },
-  { key: 'commentAuthorName', label: 'Autor do comentário' },
-  { key: 'taskCount', label: 'Quantidade de tarefas em alerta' },
-  { key: 'criticalCount', label: 'Quantidade de tarefas críticas' },
-  { key: 'taskListText', label: 'Lista de tarefas em alerta' },
-  { key: 'assumedByName', label: 'Quem assumiu a tarefa' },
-  { key: 'approvalTitle', label: 'Título da aprovação' },
-]
+// Plain name of each field the office can put in a message; which ones a notice fills comes from the API
+const VAR_LABEL: Record<string, string> = {
+  clientName: 'Nome do cliente',
+  orgName: 'Nome do escritório',
+  taskTitle: 'Título da tarefa',
+  fromColumn: 'Etapa anterior',
+  toColumn: 'Nova etapa',
+  portalUrl: 'Link do portal',
+  commentText: 'Texto do comentário',
+  commentAuthorName: 'Autor do comentário',
+  requestTitle: 'Título da solicitação',
+  rejectionReason: 'Motivo',
+  documentName: 'Nome do documento',
+  protocolTitle: 'Título do protocolo',
+  paymentInfo: 'Valor e vencimento da guia',
+  templateTitle: 'Nome da tarefa recorrente',
+  errorMessage: 'Motivo da falha',
+  taskCount: 'Quantidade de tarefas em alerta',
+  criticalCount: 'Quantidade de tarefas críticas',
+  taskListText: 'Lista de tarefas em alerta',
+  assumedByName: 'Quem assumiu a tarefa',
+  approvalTitle: 'Título da aprovação',
+}
+const varLabel = (key: string) => VAR_LABEL[key] ?? `{{${key}}}`
 
 interface Props {
   event: string
   channel: string
+  // Called whenever the text starts or stops differing from the saved one
+  onDirtyChange?: (dirty: boolean) => void
 }
 
-export function TemplateEditor({ event, channel }: Props) {
+export function TemplateEditor({ event, channel, onDirtyChange }: Props) {
   const queryClient = useQueryClient()
   const [body, setBody] = useState('')
   const [preview, setPreview] = useState<string | null>(null)
@@ -42,12 +51,19 @@ export function TemplateEditor({ event, channel }: Props) {
   const { data } = useQuery({
     queryKey: key,
     queryFn: () =>
-      api.get<{ body: string; subject?: string; isDefault: boolean }>(`/notifications/templates/${event}/${channel}`).then((r) => r.data),
+      api.get<{ body: string; subject?: string; isDefault: boolean; variables: string[] }>(`/notifications/templates/${event}/${channel}`).then((r) => r.data),
   })
 
   useEffect(() => {
     if (data?.body !== undefined) { setBody(data.body); setPreview(null); cursor.current = null }
   }, [data?.body])
+
+  const dirty = data !== undefined && body !== data.body
+  useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
+
+  const variables = data?.variables ?? []
+  // Fields in the text this notice never fills: they go out empty
+  const emptyOnSend = [...new Set([...body.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))].filter((v) => !variables.includes(v))
 
   const previewMutation = useMutation({
     mutationFn: () => api.post<{ rendered: string }>('/notifications/templates/preview', { event, channel, body }).then((r) => r.data),
@@ -118,13 +134,18 @@ export function TemplateEditor({ event, channel }: Props) {
           placeholder={data ? undefined : 'Carregando a mensagem...'}
           className="resize-y font-mono text-sm"
         />
+        {data && emptyOnSend.length > 0 && (
+          <p role="status" aria-label="Campos que saem vazios" className="mt-2 rounded-md bg-warning-bg px-3 py-2 text-xs text-warning-text">
+            Este aviso não preenche {emptyOnSend.map((v) => VAR_LABEL[v] ? `${VAR_LABEL[v]} ({{${v}}})` : `{{${v}}}`).join(', ')}. Esse trecho sai vazio no envio.
+          </p>
+        )}
       </div>
 
       <div>
         <p className="mb-1.5 text-sm font-medium text-foreground">Inserir no texto</p>
         <p className="mb-2 text-xs text-muted-foreground">Clique para colocar onde está o cursor. No envio, cada campo vira o dado real do cliente e da tarefa.</p>
         <div className="flex flex-wrap gap-1.5">
-          {TEMPLATE_VARS.map(({ key: k, label }) => (
+          {variables.map((k) => (
             <button
               key={k}
               type="button"
@@ -132,7 +153,7 @@ export function TemplateEditor({ event, channel }: Props) {
               onClick={() => insert(k)}
               className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs text-foreground transition-colors hover:border-accent hover:bg-neutral-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              {label}
+              {varLabel(k)}
             </button>
           ))}
         </div>

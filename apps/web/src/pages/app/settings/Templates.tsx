@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PageHeader, SETTINGS_BACK } from '@/components/ui/page-header'
 import { TemplateEditor } from '@/components/TemplateEditor'
+import { askConfirm } from '@/components/ui/app-dialogs'
 
 const EVENTS = [
   'TASK_CREATED', 'TASK_MOVED', 'TASK_COMPLETED', 'TASK_COMMENT_ADDED', 'TASK_BLOCKED',
@@ -36,6 +37,28 @@ const EVENT_LABEL: Record<string, string> = {
 export default function Templates() {
   const [event, setEvent] = useState<string>('TASK_MOVED')
   const [channel, setChannel] = useState<string>('WHATSAPP')
+  const dirty = useRef(false)
+  const onDirtyChange = useCallback((d: boolean) => { dirty.current = d }, [])
+
+  // Closing or reloading the tab with an edited text: the browser asks first
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => { if (dirty.current) e.preventDefault() }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [])
+
+  async function change(apply: () => void) {
+    if (dirty.current) {
+      const ok = await askConfirm({
+        title: 'Descartar a mudança não salva?',
+        description: 'O texto editado deste aviso ainda não foi salvo e se perde ao trocar.',
+        confirmLabel: 'Descartar',
+      })
+      if (!ok) return
+    }
+    dirty.current = false
+    apply()
+  }
   const selectCls = 'h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
 
   return (
@@ -49,19 +72,19 @@ export default function Templates() {
         <div className="flex flex-col gap-4 border-b border-border px-5 py-4 sm:flex-row">
           <div className="flex-1 space-y-1">
             <label htmlFor="template-event" className="text-sm font-medium text-foreground">Aviso</label>
-            <select id="template-event" value={event} onChange={(e) => setEvent(e.target.value)} className={selectCls}>
+            <select id="template-event" value={event} onChange={(e) => { const v = e.target.value; void change(() => setEvent(v)) }} className={selectCls}>
               {EVENTS.map((e) => <option key={e} value={e}>{EVENT_LABEL[e]}</option>)}
             </select>
           </div>
           <div className="space-y-1 sm:w-44">
             <label htmlFor="template-channel" className="text-sm font-medium text-foreground">Canal</label>
-            <select id="template-channel" value={channel} onChange={(e) => setChannel(e.target.value)} className={selectCls}>
+            <select id="template-channel" value={channel} onChange={(e) => { const v = e.target.value; void change(() => setChannel(v)) }} className={selectCls}>
               {CHANNELS.map((c) => <option key={c} value={c}>{CHANNEL_LABEL[c]}</option>)}
             </select>
           </div>
         </div>
         <div className="px-5 py-5">
-          <TemplateEditor key={`${event}-${channel}`} event={event} channel={channel} />
+          <TemplateEditor key={`${event}-${channel}`} event={event} channel={channel} onDirtyChange={onDirtyChange} />
         </div>
       </div>
     </div>
