@@ -7,11 +7,21 @@ export async function assertDepartmentBelongsToOrg(departmentId: string, organiz
   if (!department) throw new AppError(404, 'Departamento não encontrado')
 }
 
+// With how many active people work in each department and how many active clients it serves
 export async function listDepartments(organizationId: string) {
-  return prisma.department.findMany({
+  const departments = await prisma.department.findMany({
     where: { organizationId },
     orderBy: { name: 'asc' },
+    include: {
+      _count: {
+        select: {
+          members: { where: { user: { isActive: true } } },
+          clientAssignments: { where: { client: { isActive: true } } },
+        },
+      },
+    },
   })
+  return departments.map(({ _count, ...d }) => ({ ...d, peopleCount: _count.members, clientsCount: _count.clientAssignments }))
 }
 
 export async function createDepartment(organizationId: string, data: CreateDepartmentInput) {

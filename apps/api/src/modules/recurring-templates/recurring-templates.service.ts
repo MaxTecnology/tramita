@@ -51,11 +51,15 @@ function assertDayOfPeriodValid(periodicity: string, dueDayOfPeriod: number, gen
 }
 
 export async function listTemplates(organizationId: string) {
-  return prisma.recurringTaskTemplate.findMany({
+  const templates = await prisma.recurringTaskTemplate.findMany({
     where: { organizationId },
-    include: { department: { select: { id: true, name: true } }, documentRequests: true, documentDeliveries: true, dueRules: DUE_RULES_INCLUDE },
+    include: {
+      department: { select: { id: true, name: true } }, documentRequests: true, documentDeliveries: true, dueRules: DUE_RULES_INCLUDE,
+      _count: { select: { assignments: { where: { isActive: true } } } },
+    },
     orderBy: { title: 'asc' },
   })
+  return templates.map(({ _count, ...t }) => ({ ...t, assignmentsCount: _count.assignments }))
 }
 
 export async function getTemplateById(id: string, organizationId: string) {

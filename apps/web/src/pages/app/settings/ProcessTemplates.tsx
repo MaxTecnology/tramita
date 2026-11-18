@@ -1,13 +1,17 @@
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Plus, Pencil, Trash2, ClipboardList, ArrowLeft } from 'lucide-react'
+import { FileStack, Plus } from 'lucide-react'
 import { toast } from 'sonner'
-import type { ProcessTemplate } from '@/types'
+import { api } from '@/lib/api'
+import { mensagemDeErro } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { PageHeader, SETTINGS_BACK } from '@/components/ui/page-header'
+import { EditLink, ListTable, StatusTag } from '@/components/ui/list-table'
+import { ActionMenu } from '@/components/ui/action-menu'
 import { askConfirm } from '@/components/ui/app-dialogs'
+import type { ProcessTemplate } from '@/types'
 
+// Configurações › Modelos de processo
 export default function ProcessTemplates() {
   const qc = useQueryClient()
   const navigate = useNavigate()
@@ -19,71 +23,63 @@ export default function ProcessTemplates() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/process-templates/${id}`),
-    onSuccess: () => {
-      toast.success('Modelo removido')
-      qc.invalidateQueries({ queryKey: ['process-templates'] })
-    },
-    onError: (err: unknown) => {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(message ?? 'Erro ao remover modelo')
-    },
+    onSuccess: () => { toast.success('Modelo de processo excluído'); qc.invalidateQueries({ queryKey: ['process-templates'] }) },
+    onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível excluir o modelo')),
   })
 
-  if (isLoading) return <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
+  async function remove(t: ProcessTemplate) {
+    const ok = await askConfirm({ title: `Excluir o modelo "${t.name}"?`, description: 'Processos já abertos com ele continuam.', confirmLabel: 'Excluir', danger: true })
+    if (ok) deleteMutation.mutate(t.id)
+  }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div>
-        <Link to="/app/settings" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2">
-          <ArrowLeft size={12} /> Configurações
-        </Link>
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg md:text-xl font-bold text-foreground">Modelos de Processo</h1>
-          <Button onClick={() => navigate('/app/settings/process-templates/new')} className="gap-2">
-            <Plus size={16} />
-            Novo modelo
-          </Button>
-        </div>
-      </div>
-
-      {templates.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
-          <ClipboardList size={48} className="mb-3 opacity-40" />
-          <p className="text-sm font-medium">Nenhum modelo de processo cadastrado</p>
-          <p className="text-xs mt-1">Crie um modelo pra padronizar as etapas de um processo (ex: Legalização, Fiscal).</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {templates.map((t) => (
-            <Card key={t.id} className="px-4 py-3 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground truncate">{t.name}</span>
-                  {!t.isActive && <span className="text-xs px-1.5 py-0.5 rounded-full bg-neutral-bg text-muted-foreground">Inativo</span>}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {t.columns.length} coluna{t.columns.length !== 1 ? 's' : ''} · {t.items.length} OS
-                  {t.deadlineBusinessDays ? ` · ${t.deadlineBusinessDays} dias úteis` : ''}
-                  {t.clientCanRequest ? ' · cliente pode solicitar' : ''}
-                  {t.description ? ` · ${t.description}` : ''}
-                </p>
-              </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <Link to={`/app/settings/process-templates/${t.id}/edit`} className="p-1.5 rounded-md text-muted-foreground hover:bg-neutral-bg hover:text-foreground" aria-label="Editar">
-                  <Pencil size={14} />
-                </Link>
-                <button
-                  onClick={async () => { if (await askConfirm({ title: `Excluir o modelo "${t.name}"?`, confirmLabel: 'Excluir', danger: true })) deleteMutation.mutate(t.id) }}
-                  className="p-1.5 rounded-md text-muted-foreground hover:bg-danger-bg hover:text-danger-text"
-                  aria-label="Excluir"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+    <div className="p-4 md:p-6 max-w-6xl">
+      <PageHeader
+        back={SETTINGS_BACK}
+        title="Modelos de processo"
+        description="Etapas e OS de cada tipo de processo (abertura de empresa, alteração contratual): o processo aberto já nasce com elas."
+        actions={<Button onClick={() => navigate('/app/settings/process-templates/new')} className="gap-1.5"><Plus size={16} aria-hidden /> Novo modelo</Button>}
+      />
+      <ListTable<ProcessTemplate>
+        label="Modelos de processo"
+        loading={isLoading}
+        rows={templates}
+        rowKey={(t) => t.id}
+        muted={(t) => !t.isActive}
+        columns={[
+          {
+            header: 'Processo', width: 'minmax(0,2fr)',
+            cell: (t) => (
+              <span className="block min-w-0">
+                <span className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium text-foreground">{t.name}</span>
+                  {!t.isActive && <StatusTag>Inativo</StatusTag>}
+                </span>
+                {t.description && <span className="block truncate text-xs text-muted-foreground">{t.description}</span>}
+              </span>
+            ),
+          },
+          {
+            header: 'Estrutura', width: 'minmax(0,1.2fr)',
+            cell: (t) => <span className="text-sm text-foreground">{t.columns.length} {t.columns.length === 1 ? 'etapa' : 'etapas'}, {t.items.length} OS</span>,
+          },
+          { header: 'Prazo interno', width: 'minmax(0,1fr)', cell: (t) => <span className="text-sm text-foreground">{t.deadlineBusinessDays ? `${t.deadlineBusinessDays} dias úteis` : 'Sem prazo interno'}</span> },
+          { header: 'Cliente solicita', width: 'minmax(0,0.9fr)', cell: (t) => <span className="text-sm text-foreground">{t.clientCanRequest ? 'Sim' : 'Não'}</span> },
+        ]}
+        actions={(t) => (
+          <>
+            <EditLink to={`/app/settings/process-templates/${t.id}/edit`} name={t.name} />
+            <ActionMenu label={`Mais ações de ${t.name}`} items={[{ label: 'Excluir', onSelect: () => void remove(t), danger: true }]} />
+          </>
+        )}
+        empty={(
+          <div className="flex flex-col items-center gap-2">
+            <FileStack size={28} aria-hidden className="text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Monte o primeiro tipo de processo com as etapas e as OS que ele sempre tem.</p>
+            <Button size="sm" onClick={() => navigate('/app/settings/process-templates/new')}>Criar o primeiro modelo</Button>
+          </div>
+        )}
+      />
     </div>
   )
 }
