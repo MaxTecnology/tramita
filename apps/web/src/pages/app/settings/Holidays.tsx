@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, CalendarOff, Trash2 } from 'lucide-react'
+import { CalendarOff, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { mensagemDeErro } from '@/lib/utils'
 import { formatDateOnlyUTC } from '@/lib/dates'
@@ -11,6 +10,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { askConfirm } from '@/components/ui/app-dialogs'
+import { PageHeader, SETTINGS_BACK } from '@/components/ui/page-header'
 
 interface HolidayList {
   national: { date: string; name: string }[]
@@ -50,20 +50,18 @@ export default function Holidays() {
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl">
       <div>
-        <Link to="/app/settings" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2">
-          <ArrowLeft size={12} /> Configurações
-        </Link>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg md:text-xl font-bold text-foreground">Feriados</h1>
-            <p className="text-sm text-muted-foreground">Dias que não contam nos prazos em dias úteis (OS, processos e recorrentes).</p>
-          </div>
-          <div className="flex items-center gap-1" role="group" aria-label="Ano">
-            <Button variant="outline" size="sm" onClick={() => setYear(year - 1)} aria-label="Ano anterior">‹</Button>
-            <span className="text-sm font-semibold w-12 text-center">{year}</span>
-            <Button variant="outline" size="sm" onClick={() => setYear(year + 1)} aria-label="Próximo ano">›</Button>
-          </div>
-        </div>
+        <PageHeader
+          back={SETTINGS_BACK}
+          title="Feriados"
+          description="Dias em que o escritório não trabalha: não contam nos prazos em dias úteis de OS, processos e tarefas recorrentes. Os nacionais já vêm cadastrados."
+          actions={(
+            <div className="flex items-center gap-1" role="group" aria-label="Ano">
+              <Button variant="outline" size="sm" onClick={() => setYear(year - 1)} aria-label="Ano anterior">‹</Button>
+              <span className="text-sm font-semibold w-12 text-center">{year}</span>
+              <Button variant="outline" size="sm" onClick={() => setYear(year + 1)} aria-label="Próximo ano">›</Button>
+            </div>
+          )}
+        />
       </div>
 
       <Card className="p-4">

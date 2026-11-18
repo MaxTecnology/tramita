@@ -103,7 +103,7 @@ export default function OrgSubscription() {
       <div className="bg-surface rounded-xl border border-border shadow-sm p-5 mb-4">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Plano atual</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">Plano atual</p>
             <h2 className="text-2xl font-bold text-foreground">{data.plan.name}</h2>
             <p className="text-sm text-muted-foreground mt-1">
               <span className="text-lg font-semibold text-foreground">
@@ -164,7 +164,7 @@ export default function OrgSubscription() {
       {/* Seleção de plano */}
       {showChangePlan && (
         <div className="bg-surface rounded-xl border border-border shadow-sm p-5 mb-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">Selecione o novo plano</p>
+          <p className="text-xs font-medium text-muted-foreground mb-4">Selecione o novo plano</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {plans.map((plan) => {
               const isCurrent = plan.id === data.plan.id
@@ -208,7 +208,7 @@ export default function OrgSubscription() {
       {/* Histórico */}
       <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border bg-background/60">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Histórico</p>
+          <p className="text-xs font-medium text-muted-foreground">Histórico</p>
         </div>
 
         {data.subscriptionHistory.length === 0 ? (
@@ -219,9 +219,9 @@ export default function OrgSubscription() {
         ) : (
           <>
             <div className="hidden sm:flex items-center gap-3 px-5 py-2 bg-background/80 border-b border-border">
-              <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Evento</div>
-              <div className="w-28 text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right">Valor</div>
-              <div className="w-36 text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right">Data</div>
+              <div className="flex-1 text-xs font-medium text-muted-foreground">Evento</div>
+              <div className="w-28 text-xs font-medium text-muted-foreground text-right">Valor</div>
+              <div className="w-36 text-xs font-medium text-muted-foreground text-right">Data</div>
             </div>
             {data.subscriptionHistory.map((h) => (
               <div key={h.id} className="flex items-center gap-3 px-5 py-3 border-b border-border last:border-0 text-sm">

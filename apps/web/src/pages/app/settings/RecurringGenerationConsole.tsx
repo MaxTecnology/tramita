@@ -5,11 +5,12 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, AlertTriangle } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { MonthYearPicker } from '@/components/shared/MonthYearPicker'
 import type { RecurringTaskTemplate, BulkGenerationSummary, FailedGeneration } from '@/types'
 import { useRetryFailedGeneration } from '@/hooks/useRetryFailedGeneration'
+import { PageHeader, SETTINGS_BACK } from '@/components/ui/page-header'
 
 const PERIODICITY_LABEL: Record<RecurringTaskTemplate['periodicity'], string> = {
   WEEKLY: 'Semanal', MONTHLY: 'Mensal', QUARTERLY: 'Trimestral', ANNUAL: 'Anual',
@@ -70,15 +71,11 @@ export default function RecurringGenerationConsole() {
 
   return (
     <div className="p-4 md:p-6 max-w-3xl space-y-4">
-      <div className="flex items-center gap-3">
-        <Link to="/app/settings" aria-label="Voltar" className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft size={18} />
-        </Link>
-        <h1 className="text-lg md:text-xl font-bold text-foreground">Geração manual</h1>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Use quando precisar gerar um mês fora do horário automático: recuperar uma geração que falhou ou adiantar o mês inteiro. Gera as tarefas de todas as recorrências ativas de uma vez.
-      </p>
+      <PageHeader
+        back={SETTINGS_BACK}
+        title="Geração manual"
+        description="Use quando precisar gerar um mês fora do horário automático: recuperar uma geração que falhou ou adiantar o mês inteiro. Gera as tarefas de todas as recorrências ativas de uma vez."
+      />
 
       {Object.keys(failuresByTemplate).length > 0 && (
         <Card className="border-danger-text bg-danger-bg px-4 py-3 space-y-2">
@@ -137,7 +134,7 @@ export default function RecurringGenerationConsole() {
 
       {lastRun && (
         <Card className="px-4 py-3 space-y-2">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Resultado da última execução</Label>
+          <Label className="text-sm font-medium text-foreground">Resultado da última execução</Label>
           {lastRun.map((s) => (
             <div key={s.templateId} className="text-xs bg-neutral-bg rounded px-2 py-1.5">
               <span className="font-medium">{s.templateTitle}</span> — {s.result.generated} geradas, {s.result.alreadyExists} já existiam, {s.result.failed.length} falharam

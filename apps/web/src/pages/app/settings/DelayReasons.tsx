@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn, mensagemDeErro } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -10,6 +9,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { askConfirm } from '@/components/ui/app-dialogs'
 import type { DelayReason } from '@/types'
+import { PageHeader, SETTINGS_BACK } from '@/components/ui/page-header'
 
 // Reasons the office picks when an OS or process finishes after its internal deadline
 export default function DelayReasons() {
@@ -36,11 +36,11 @@ export default function DelayReasons() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-2xl">
-      <div>
-        <Link to="/app/settings" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2"><ArrowLeft size={12} /> Configurações</Link>
-        <h1 className="text-lg md:text-xl font-bold text-foreground">Motivos de atraso</h1>
-        <p className="text-sm text-muted-foreground">Pedidos ao concluir uma OS ou processo depois do prazo interno (já descontada a espera pelo cliente).</p>
-      </div>
+      <PageHeader
+        back={SETTINGS_BACK}
+        title="Motivos de atraso"
+        description="Lista que aparece para a pessoa escolher quando conclui uma OS ou processo depois do prazo interno (o tempo esperando o cliente não conta)."
+      />
 
       <Card className="p-4">
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (name.trim().length >= 2) add.mutate() }}>

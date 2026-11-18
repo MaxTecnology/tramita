@@ -406,7 +406,7 @@ export default function RecurringTemplateForm() {
               <p className="text-xs text-muted-foreground">{departmentName ?? 'Sem departamento'} · {PERIODICITY_LABEL[form.periodicity]} · {PRIORITY_LABEL[form.priority]}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Próximas gerações</p>
+              <p className="text-sm font-medium text-foreground mb-2">Próximas gerações</p>
               {form.dueScope !== 'FEDERAL' && form.dueRules.length > 0 && (
                 <p className="text-xs text-muted-foreground mb-2">
                   Data padrão. {form.dueRules.length} {form.dueScope === 'STATE' ? (form.dueRules.length === 1 ? 'estado vence' : 'estados vencem') : (form.dueRules.length === 1 ? 'cidade vence' : 'cidades vencem')} em outro dia.

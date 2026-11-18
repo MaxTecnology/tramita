@@ -135,7 +135,7 @@ export default function Profile() {
       {/* Dados pessoais */}
       <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border bg-neutral-bg">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Informações pessoais</p>
+          <p className="text-sm font-semibold text-foreground">Informações pessoais</p>
         </div>
         <div className="px-5 py-5 space-y-4">
           {/* Avatar + role */}
@@ -202,7 +202,7 @@ export default function Profile() {
       {/* Alterar senha */}
       <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border bg-neutral-bg">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Alterar senha</p>
+          <p className="text-sm font-semibold text-foreground">Alterar senha</p>
         </div>
         <div className="px-5 py-5 space-y-4">
           <div className="space-y-1">
@@ -257,7 +257,7 @@ export default function Profile() {
       {/* Alertas de prazo */}
       <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border bg-neutral-bg">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Alertas de prazo</p>
+          <p className="text-sm font-semibold text-foreground">Alertas de prazo</p>
         </div>
         <div className="px-5 py-5 space-y-5">
           {(['targetWarning', 'dueCritical'] as const).map((level) => {

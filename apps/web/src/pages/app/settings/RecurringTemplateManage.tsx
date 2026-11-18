@@ -376,7 +376,7 @@ export default function RecurringTemplateManage() {
       </Card>
 
       <Card className="px-4 py-3 space-y-2">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Vincular novo cliente</Label>
+        <Label className="text-sm font-medium text-foreground">Vincular novo cliente</Label>
         <div className="flex flex-col sm:flex-row gap-2">
           <select aria-label="Cliente a vincular" value={clientId} onChange={(e) => setClientId(e.target.value)} className="h-9 flex-1 rounded-md border border-border bg-surface text-foreground px-2 text-sm">
             <option value="">Cliente</option>
@@ -407,7 +407,7 @@ export default function RecurringTemplateManage() {
       </Card>
 
       <Card className="px-4 py-3 space-y-2">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+        <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
           <History size={12} /> Log de geração
         </Label>
         {logs.length === 0 ? (

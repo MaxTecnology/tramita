@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -7,8 +6,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { FileSearch, Search, Send, ArrowLeft, Upload, Volume2, Trash2 } from 'lucide-react'
+import { FileSearch, Search, Send, Upload, Volume2, Trash2 } from 'lucide-react'
 import { WhatsAppTestRow } from '@/components/settings/WhatsAppTestRow'
+import { PageHeader, SETTINGS_BACK } from '@/components/ui/page-header'
 
 interface Config {
   whatsappEnabled?: boolean
@@ -83,20 +83,21 @@ const STATUS_BADGE: Record<string, string> = {
 }
 
 const CHANNEL_LABEL: Record<string, string> = {
-  WHATSAPP: '📱 WhatsApp',
-  EMAIL: '✉️ E-mail',
+  WHATSAPP: 'WhatsApp',
+  EMAIL: 'E-mail',
 }
 
-function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={label}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors',
-        checked ? 'bg-[#185FA5]' : 'bg-neutral-bg',
+        'relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+        checked ? 'bg-accent' : 'bg-muted-foreground/40',
       )}
     >
       <span className={cn(
@@ -119,7 +120,7 @@ function SwitchRow({ label, description, checked, onChange }: {
         <p className="text-sm font-medium text-foreground">{label}</p>
         {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
       </div>
-      <Switch checked={checked} onChange={onChange} />
+      <Switch checked={checked} onChange={onChange} label={label} />
     </div>
   )
 }
@@ -128,8 +129,8 @@ function SwitchRow({ label, description, checked, onChange }: {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
-      <div className="px-5 py-3 border-b border-border bg-neutral-bg">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</p>
+      <div className="px-5 py-3 border-b border-border bg-neutral-bg/60">
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
       </div>
       <div className="px-5 py-4 space-y-4">
         {children}
@@ -227,14 +228,11 @@ export default function Notifications() {
 
   return (
     <div className="p-4 md:p-6 max-w-3xl">
-      {/* Header */}
-      <div className="mb-6">
-        <Link to="/app/settings" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2">
-          <ArrowLeft size={12} /> Configurações
-        </Link>
-        <h1 className="text-lg md:text-xl font-bold text-foreground">Notificações</h1>
-        <p className="text-sm text-muted-foreground mt-1">Configure os canais e eventos de notificação do escritório.</p>
-      </div>
+      <PageHeader
+        back={SETTINGS_BACK}
+        title="Notificações"
+        description="Quais avisos automáticos saem, por qual canal (WhatsApp e e-mail) e o histórico do que foi enviado. O texto de cada aviso fica em Mensagens."
+      />
 
       {/* Abas */}
       <div className="flex border-b border-border mb-6">
@@ -258,7 +256,7 @@ export default function Notifications() {
       {/* Aba: Configurações */}
       {tab === 'config' && (
         <div className="space-y-4">
-          <Section title="Eventos — Tarefas">
+          <Section title="Avisos de tarefas">
             <SwitchRow
               label="Tarefa criada"
               description="Notifica o cliente quando uma nova tarefa é aberta pra ele (inclusive tarefas recorrentes)"
@@ -297,7 +295,7 @@ export default function Notifications() {
             />
           </Section>
 
-          <Section title="Eventos — Solicitações">
+          <Section title="Avisos de solicitações">
             <SwitchRow
               label="Solicitação criada"
               description="Notifica a equipe interna quando um cliente abre uma solicitação"
@@ -336,7 +334,7 @@ export default function Notifications() {
             />
           </Section>
 
-          <Section title="Eventos — Aprovação do cliente">
+          <Section title="Avisos de aprovação do cliente">
             <SwitchRow
               label="Pedido de aprovação"
               description="Avisa o cliente quando o escritório pede a aprovação de um arquivo (ex.: prévia da folha)"
@@ -351,7 +349,7 @@ export default function Notifications() {
             />
           </Section>
 
-          <Section title="Eventos — Protocolos">
+          <Section title="Avisos de protocolos">
             <SwitchRow
               label="Protocolo criado"
               description="Notifica o cliente quando um protocolo formal é criado"
@@ -360,7 +358,7 @@ export default function Notifications() {
             />
           </Section>
 
-          <Section title="Eventos — Equipe">
+          <Section title="Avisos para a equipe">
             <SwitchRow
               label="Tarefa assumida por um colega"
               description="Avisa o colaborador quando um colega do departamento assume uma tarefa dele (cobertura de falta)"
@@ -369,7 +367,7 @@ export default function Notifications() {
             />
           </Section>
 
-          <Section title="Eventos — Tarefas recorrentes">
+          <Section title="Avisos de tarefas recorrentes">
             <SwitchRow
               label="Falha na geração de tarefa recorrente"
               description="Notifica os administradores quando o sistema não consegue gerar uma tarefa recorrente automaticamente"
@@ -596,11 +594,11 @@ export default function Notifications() {
             ) : (
               <>
                 <div className="hidden sm:flex items-center gap-3 px-5 py-2 bg-neutral-bg border-b border-border">
-                  <div className="flex-[2] text-xs font-semibold text-muted-foreground uppercase tracking-wide">Evento</div>
-                  <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Canal</div>
-                  <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Destinatário</div>
-                  <div className="w-24 text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right">Status</div>
-                  <div className="w-32 text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right">Data</div>
+                  <div className="flex-[2] text-xs font-medium text-muted-foreground">Evento</div>
+                  <div className="flex-1 text-xs font-medium text-muted-foreground">Canal</div>
+                  <div className="flex-1 text-xs font-medium text-muted-foreground">Destinatário</div>
+                  <div className="w-24 text-xs font-medium text-muted-foreground text-right">Status</div>
+                  <div className="w-32 text-xs font-medium text-muted-foreground text-right">Data</div>
                 </div>
                 {filteredLogs.map((log) => (
                   <div key={log.id} className="flex flex-wrap sm:flex-nowrap items-center gap-3 px-5 py-3 border-b border-border last:border-0 text-sm">
