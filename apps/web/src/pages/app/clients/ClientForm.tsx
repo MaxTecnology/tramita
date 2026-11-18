@@ -143,7 +143,7 @@ export function ClientForm({ initial, submitLabel, isSaving, onSubmit, onCancel 
         <Button
           onClick={() => onSubmit(form)}
           disabled={!status.canSave || isSaving}
-          className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+          className="bg-accent hover:bg-accent-hover text-accent-foreground"
         >
           {isSaving ? 'Salvando...' : submitLabel}
         </Button>
@@ -162,7 +162,7 @@ function TypeToggle({ value, onChange }: { value: ClientType; onChange: (v: Clie
           onClick={() => onChange(t)}
           className={cn(
             'px-4 py-1.5 text-sm font-medium transition-colors',
-            value === t ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
+            value === t ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
           )}
         >
           {t === 'PJ' ? 'Pessoa Jurídica' : 'Pessoa Física'}
@@ -459,7 +459,7 @@ function PortalAccessTab({
         <div className="flex rounded-md border border-border overflow-hidden w-fit">
           {(['create', 'search'] as const).map((m) => (
             <button key={m} type="button" onClick={() => setMode(m)}
-              className={cn('px-3 py-1.5 text-sm font-medium', mode === m ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}>
+              className={cn('px-3 py-1.5 text-sm font-medium', mode === m ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground')}>
               {m === 'create' ? 'Criar novo' : 'Buscar existente'}
             </button>
           ))}
@@ -510,7 +510,7 @@ function PortalAccessTab({
                 {served.map((d) => (
                   <button key={d.id} type="button" onClick={() => toggleAccess(i, d.id)}
                     className={cn('text-xs px-2 py-1 rounded-full border',
-                      u.departmentIds.includes(d.id) ? 'bg-[#185FA5] text-white border-[#185FA5]' : 'bg-surface text-muted-foreground border-border')}>
+                      u.departmentIds.includes(d.id) ? 'bg-accent text-accent-foreground border-accent' : 'bg-surface text-muted-foreground border-border')}>
                     {d.name}
                   </button>
                 ))}

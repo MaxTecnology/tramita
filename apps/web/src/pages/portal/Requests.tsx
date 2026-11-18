@@ -122,7 +122,7 @@ const EMPTY = { title: '', description: '', departmentId: '', service: '', compe
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg md:text-xl font-bold text-foreground">Minhas Solicitações</h1>
-        <Button onClick={() => setOpen(true)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white gap-2">
+        <Button onClick={() => setOpen(true)} className="bg-accent hover:bg-accent-hover text-accent-foreground gap-2">
           <Plus size={16} />
           Nova solicitação
         </Button>
@@ -173,7 +173,7 @@ const EMPTY = { title: '', description: '', departmentId: '', service: '', compe
                   {r.boardId && r.status !== 'CANCELLED' && (
                     <Link
                       to={`/portal/board/${r.boardId}`}
-                      className="text-xs text-[#185FA5] hover:underline inline-flex items-center gap-1"
+                      className="text-xs text-accent hover:underline inline-flex items-center gap-1"
                     >
                       <ExternalLink size={12} />
                       Ver processo
@@ -286,7 +286,7 @@ const EMPTY = { title: '', description: '', departmentId: '', service: '', compe
             {createMutation.isError && <p className="text-sm text-danger-text">Erro ao enviar. Tente novamente.</p>}
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={createMutation.isPending || !form.title.trim() || (!service && !form.departmentId) || (!!service?.requiresCompetence && !form.competence)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+              <Button type="submit" disabled={createMutation.isPending || !form.title.trim() || (!service && !form.departmentId) || (!!service?.requiresCompetence && !form.competence)} className="bg-accent hover:bg-accent-hover text-accent-foreground">
                 {createMutation.isPending ? 'Enviando...' : 'Enviar'}
               </Button>
             </div>

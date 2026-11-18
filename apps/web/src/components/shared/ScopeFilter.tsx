@@ -93,7 +93,7 @@ export function ScopeFilter({ me, value, onChange }: { me: MyScope; value: Scope
             onClick={() => onChange({ scope: v })}
             className={cn(
               'px-3 py-1.5 text-sm font-medium transition-colors',
-              value.scope === v ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
+              value.scope === v ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
             )}
           >
             {LABEL[v]}

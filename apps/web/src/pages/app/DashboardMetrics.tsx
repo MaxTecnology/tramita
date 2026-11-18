@@ -316,7 +316,7 @@ function ProductivityTab() {
               onClick={() => setPreset(p)}
               className={cn(
                 'px-3 py-2 text-sm font-medium transition-colors',
-                preset === p ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
+                preset === p ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
               )}
             >
               {PRESET_LABEL[p]}
@@ -344,7 +344,7 @@ function ProductivityTab() {
               id="pm-department"
               value={departmentId}
               onChange={(e) => setDepartmentId(e.target.value)}
-              className="flex h-9 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
+              className="flex h-9 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
             >
               <option value="">Todos</option>
               {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -359,7 +359,7 @@ function ProductivityTab() {
               id="pm-person"
               value={userId}
               onChange={(e) => setUserId(e.target.value)}
-              className="flex h-9 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
+              className="flex h-9 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
             >
               <option value="">Todos</option>
               {teamMembers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -373,7 +373,7 @@ function ProductivityTab() {
             id="pm-boardtype"
             value={boardType}
             onChange={(e) => setBoardType(e.target.value as typeof boardType)}
-            className="flex h-9 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
+            className="flex h-9 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="">Todos os tipos</option>
             <option value="PROCESS">Só processos</option>
@@ -391,7 +391,7 @@ function ProductivityTab() {
                 onClick={() => setViewBy(v)}
                 className={cn(
                   'px-3 py-2 text-sm font-medium transition-colors',
-                  viewBy === v ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
+                  viewBy === v ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
                 )}
               >
                 {v === 'person' ? 'Por pessoa' : 'Por departamento'}
@@ -451,7 +451,7 @@ function ProtocolsTab() {
             onClick={() => setStatusFilter(statusFilter === status ? '' : status)}
             className={cn(
               'rounded-xl border p-4 text-left transition-colors',
-              statusFilter === status ? 'border-[#185FA5] bg-[#185FA5]/5' : 'border-border bg-surface',
+              statusFilter === status ? 'border-accent bg-accent/5' : 'border-border bg-surface',
             )}
           >
             <p className="text-2xl font-bold text-foreground">{summary?.[status] ?? 0}</p>
@@ -517,7 +517,7 @@ export default function DashboardMetrics() {
             onClick={() => setTab(t)}
             className={cn(
               'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
-              tab === t ? 'border-[#185FA5] text-[#185FA5]' : 'border-transparent text-muted-foreground hover:text-foreground',
+              tab === t ? 'border-accent text-accent' : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
             {t === 'overview' ? 'Visão geral' : t === 'productivity' ? 'Produtividade' : 'Protocolos'}

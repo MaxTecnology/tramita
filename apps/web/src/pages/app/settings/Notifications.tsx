@@ -244,7 +244,7 @@ export default function Notifications() {
             className={cn(
               'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
               tab === t
-                ? 'border-[#185FA5] text-[#185FA5]'
+                ? 'border-accent text-accent'
                 : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
@@ -535,7 +535,7 @@ export default function Notifications() {
             <Button
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending}
-              className="bg-[#185FA5] hover:bg-[#0C447C] text-white shadow-sm"
+              className="bg-accent hover:bg-accent-hover text-accent-foreground shadow-sm"
             >
               {saveMutation.isPending ? 'Salvando...' : 'Salvar configurações'}
             </Button>
@@ -556,7 +556,7 @@ export default function Notifications() {
                 placeholder="Buscar por evento ou destinatário..."
                 value={logSearch}
                 onChange={(e) => setLogSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-[#185FA5]"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>
             <div className="flex rounded-lg border border-border overflow-hidden">
@@ -572,7 +572,7 @@ export default function Notifications() {
                   onClick={() => setLogStatus(value)}
                   className={cn(
                     'px-3 py-2 text-sm font-medium transition-colors',
-                    logStatus === value ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
+                    logStatus === value ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
                   )}
                 >
                   {label}

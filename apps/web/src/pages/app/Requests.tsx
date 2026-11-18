@@ -188,7 +188,7 @@ export default function Requests() {
             onClick={() => setStatusFilter(s)}
             className={cn(
               'px-3 py-1.5 text-sm font-medium transition-colors',
-              statusFilter === s ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
+              statusFilter === s ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
             )}
           >
             {s ? STATUS_LABEL[s] : 'Todas'}
@@ -280,7 +280,7 @@ export default function Requests() {
                 <div className="flex gap-2 mt-2 items-center flex-wrap">
                   {r.status === 'PENDING' && (
                     <>
-                      <Button size="sm" onClick={() => openApproval(r)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+                      <Button size="sm" onClick={() => openApproval(r)} className="bg-accent hover:bg-accent-hover text-accent-foreground">
                         Aprovar
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setRejecting(r)} className="text-danger-text border-danger-text/30 hover:bg-danger-bg">
@@ -293,7 +293,7 @@ export default function Requests() {
                   )}
                   {r.status === 'NEEDS_INFO' && (
                     <>
-                      <Button size="sm" onClick={() => openApproval(r)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+                      <Button size="sm" onClick={() => openApproval(r)} className="bg-accent hover:bg-accent-hover text-accent-foreground">
                         Aprovar
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setRejecting(r)} className="text-danger-text border-danger-text/30 hover:bg-danger-bg">
@@ -311,7 +311,7 @@ export default function Requests() {
                   {r.boardId && r.status !== 'CANCELLED' && (
                     <Link
                       to={`/app/board/${r.boardId}`}
-                      className="text-xs text-[#185FA5] hover:underline inline-flex items-center gap-1"
+                      className="text-xs text-accent hover:underline inline-flex items-center gap-1"
                     >
                       <ExternalLink size={12} />
                       Abrir processo
@@ -353,7 +353,7 @@ export default function Requests() {
                 type="button"
                 aria-pressed={mode === 'NEW_BOARD'}
                 onClick={() => setMode('NEW_BOARD')}
-                className={cn('px-3 py-1.5 text-sm font-medium', mode === 'NEW_BOARD' ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}
+                className={cn('px-3 py-1.5 text-sm font-medium', mode === 'NEW_BOARD' ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground')}
               >
                 Criar novo processo
               </button>
@@ -361,7 +361,7 @@ export default function Requests() {
                 type="button"
                 aria-pressed={mode === 'EXISTING_BOARD'}
                 onClick={() => setMode('EXISTING_BOARD')}
-                className={cn('px-3 py-1.5 text-sm font-medium', mode === 'EXISTING_BOARD' ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}
+                className={cn('px-3 py-1.5 text-sm font-medium', mode === 'EXISTING_BOARD' ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground')}
               >
                 Anexar a processo existente
               </button>
@@ -369,7 +369,7 @@ export default function Requests() {
                 type="button"
                 aria-pressed={mode === 'OS'}
                 onClick={() => setMode('OS')}
-                className={cn('px-3 py-1.5 text-sm font-medium', mode === 'OS' ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}
+                className={cn('px-3 py-1.5 text-sm font-medium', mode === 'OS' ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground')}
               >
                 Abrir como OS
               </button>
@@ -429,7 +429,7 @@ export default function Requests() {
               <Button
                 onClick={() => approveMutation.mutate()}
                 disabled={approveMutation.isPending || (mode === 'EXISTING_BOARD' && (!boardId || !columnId)) || (mode === 'OS' && !osModelId)}
-                className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+                className="bg-accent hover:bg-accent-hover text-accent-foreground"
               >
                 {approveMutation.isPending ? 'Aprovando...' : 'Aprovar'}
               </Button>
@@ -488,7 +488,7 @@ export default function Requests() {
               <Button
                 onClick={() => needsInfoMutation.mutate()}
                 disabled={needsInfoMutation.isPending || !needsInfoComment.trim()}
-                className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+                className="bg-accent hover:bg-accent-hover text-accent-foreground"
               >
                 {needsInfoMutation.isPending ? 'Enviando...' : 'Enviar pedido'}
               </Button>

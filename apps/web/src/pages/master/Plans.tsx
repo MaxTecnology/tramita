@@ -134,7 +134,7 @@ export default function MasterPlans() {
             <Button
               type="submit"
               disabled={createMutation.isPending}
-              className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+              className="bg-accent hover:bg-accent-hover text-accent-foreground"
             >
               {createMutation.isPending ? 'Criando...' : 'Criar plano'}
             </Button>
@@ -187,7 +187,7 @@ export default function MasterPlans() {
                         <>
                           <Button
                             size="sm"
-                            className="h-7 bg-[#185FA5] hover:bg-[#0C447C] text-white"
+                            className="h-7 bg-accent hover:bg-accent-hover text-accent-foreground"
                             onClick={() => updateMutation.mutate({ id: plan.id, name: editName })}
                           >
                             Salvar

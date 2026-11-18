@@ -124,7 +124,7 @@ export default function MasterOrganizations() {
           Escritórios{' '}
           <span className="text-base font-normal text-muted-foreground">({orgs.length})</span>
         </h1>
-        <Button onClick={() => setShowCreate(true)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+        <Button onClick={() => setShowCreate(true)} className="bg-accent hover:bg-accent-hover text-accent-foreground">
           + Criar organização
         </Button>
       </div>
@@ -222,7 +222,7 @@ export default function MasterOrganizations() {
                   </Button>
                 </div>
                 <div className="flex justify-end pt-2">
-                  <Button onClick={closeCreateDialog} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+                  <Button onClick={closeCreateDialog} className="bg-accent hover:bg-accent-hover text-accent-foreground">
                     Fechar
                   </Button>
                 </div>
@@ -298,7 +298,7 @@ export default function MasterOrganizations() {
                       !createForm.name || !createForm.email || !createForm.planId || !createForm.adminName ||
                       (createForm.createAsaasSubscription && !createForm.cnpj)
                     }
-                    className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+                    className="bg-accent hover:bg-accent-hover text-accent-foreground"
                   >
                     {createOrgMutation.isPending ? 'Criando...' : 'Criar'}
                   </Button>

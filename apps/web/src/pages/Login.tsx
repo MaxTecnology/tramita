@@ -88,7 +88,7 @@ export default function Login() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#185FA5] hover:bg-[#0C447C] text-white"
+              className="w-full bg-accent hover:bg-accent-hover text-accent-foreground"
             >
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>

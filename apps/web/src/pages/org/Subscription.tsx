@@ -155,7 +155,7 @@ export default function OrgSubscription() {
         <Button
           variant="outline"
           onClick={() => setShowChangePlan(!showChangePlan)}
-          className="border-[#185FA5] text-[#185FA5] hover:bg-info-bg"
+          className="border-accent text-accent hover:bg-info-bg"
         >
           {showChangePlan ? 'Cancelar' : 'Trocar plano'}
         </Button>
@@ -173,12 +173,12 @@ export default function OrgSubscription() {
                   key={plan.id}
                   className={cn(
                     'rounded-xl border-2 p-4 flex flex-col transition-colors',
-                    isCurrent ? 'border-[#185FA5] bg-info-bg/60' : 'border-border hover:border-muted-foreground',
+                    isCurrent ? 'border-accent bg-info-bg/60' : 'border-border hover:border-muted-foreground',
                   )}
                 >
                   <div className="flex items-start justify-between mb-1">
                     <p className="font-semibold text-foreground">{plan.name}</p>
-                    {isCurrent && <Check size={16} className="text-[#185FA5] flex-shrink-0" />}
+                    {isCurrent && <Check size={16} className="text-accent flex-shrink-0" />}
                   </div>
                   <p className="text-lg font-bold text-foreground mb-0.5">
                     {formatPrice(plan.priceMonthly)}
@@ -191,7 +191,7 @@ export default function OrgSubscription() {
                       'w-full mt-auto',
                       isCurrent
                         ? 'bg-neutral-bg text-muted-foreground cursor-default hover:bg-neutral-bg'
-                        : 'bg-[#185FA5] hover:bg-[#0C447C] text-white',
+                        : 'bg-accent hover:bg-accent-hover text-accent-foreground',
                     )}
                     onClick={() => !isCurrent && changePlanMutation.mutate(plan.id)}
                     disabled={isCurrent || changePlanMutation.isPending}

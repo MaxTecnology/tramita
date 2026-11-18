@@ -75,7 +75,7 @@ export default function PortalBoard() {
           <div className="flex items-center gap-3 mt-1">
             <div className="flex-1 h-1.5 bg-neutral-bg rounded-full overflow-hidden">
               <div
-                className={cn('h-full rounded-full transition-all', progress >= 80 ? 'bg-success-text' : 'bg-[#185FA5]')}
+                className={cn('h-full rounded-full transition-all', progress >= 80 ? 'bg-success-text' : 'bg-accent')}
                 style={{ width: `${progress}%` }}
               />
             </div>

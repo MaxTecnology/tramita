@@ -148,7 +148,7 @@ export default function Profile() {
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">{profile?.name ?? user?.name}</p>
-              <span className="text-xs bg-blue-500/10 text-[#185FA5] dark:text-blue-300 font-medium px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-blue-500/10 text-accent dark:text-blue-300 font-medium px-2 py-0.5 rounded-full">
                 {ROLE_LABEL[profile?.role ?? ''] ?? profile?.role}
               </span>
             </div>
@@ -191,7 +191,7 @@ export default function Profile() {
             <Button
               onClick={() => profileMutation.mutate()}
               disabled={profileMutation.isPending || !form.name}
-              className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+              className="bg-accent hover:bg-accent-hover text-accent-foreground"
             >
               {profileMutation.isPending ? 'Salvando...' : 'Salvar alterações'}
             </Button>
@@ -246,7 +246,7 @@ export default function Profile() {
             <Button
               onClick={handleChangePw}
               disabled={pwMutation.isPending || !pwForm.currentPassword || !pwForm.newPassword}
-              className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+              className="bg-accent hover:bg-accent-hover text-accent-foreground"
             >
               {pwMutation.isPending ? 'Alterando...' : 'Alterar senha'}
             </Button>
@@ -281,7 +281,7 @@ export default function Profile() {
                   <select
                     value={sound}
                     onChange={(e) => slaPrefMutation.mutate({ [soundKey]: e.target.value })}
-                    className="flex h-9 flex-1 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-[#185FA5] focus:border-transparent transition"
+                    className="flex h-9 flex-1 rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition"
                   >
                     {soundOptions.map((opt) => (
                       <option key={opt} value={opt}>{SOUND_LABEL[opt]}</option>

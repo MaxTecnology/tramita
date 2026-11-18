@@ -157,7 +157,7 @@ export default function Clients() {
         <h1 className="text-lg md:text-xl font-bold text-foreground">Clientes</h1>
         <Button
           onClick={() => { if (!showCreate) setCreateKey((k) => k + 1); setShowCreate(!showCreate) }}
-          className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+          className="bg-accent hover:bg-accent-hover text-accent-foreground"
         >
           {showCreate ? 'Cancelar' : '+ Novo cliente'}
         </Button>
@@ -187,7 +187,7 @@ export default function Clients() {
               onClick={() => setTypeFilter(t)}
               className={cn(
                 'px-3 py-2 text-sm font-medium transition-colors',
-                typeFilter === t ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
+                typeFilter === t ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
               )}
             >
               {t === 'all' ? 'Todos' : t}

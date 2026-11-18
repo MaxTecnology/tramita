@@ -123,7 +123,7 @@ export default function PortalProfile() {
             <Button
               onClick={() => profileMutation.mutate()}
               disabled={profileMutation.isPending || !form.name}
-              className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+              className="bg-accent hover:bg-accent-hover text-accent-foreground"
             >
               {profileMutation.isPending ? 'Salvando...' : 'Salvar alterações'}
             </Button>
@@ -163,7 +163,7 @@ export default function PortalProfile() {
             <Button
               onClick={handleChangePw}
               disabled={pwMutation.isPending || !pwForm.currentPassword || !pwForm.newPassword}
-              className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+              className="bg-accent hover:bg-accent-hover text-accent-foreground"
             >
               {pwMutation.isPending ? 'Alterando...' : 'Alterar senha'}
             </Button>

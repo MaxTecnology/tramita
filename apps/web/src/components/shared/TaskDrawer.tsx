@@ -1070,14 +1070,14 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                     <button
                       type="button"
                       onClick={() => setProtocolMode('attachment')}
-                      className={cn('px-3 py-1.5 text-sm font-medium', protocolMode === 'attachment' ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}
+                      className={cn('px-3 py-1.5 text-sm font-medium', protocolMode === 'attachment' ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground')}
                     >
                       Anexo existente
                     </button>
                     <button
                       type="button"
                       onClick={() => setProtocolMode('text')}
-                      className={cn('px-3 py-1.5 text-sm font-medium', protocolMode === 'text' ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground')}
+                      className={cn('px-3 py-1.5 text-sm font-medium', protocolMode === 'text' ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground')}
                     >
                       Só texto
                     </button>
@@ -1143,7 +1143,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                         (protocolRequiresPayment && !isValidAmount(protocolAmount)) ||
                         (protocolMode === 'attachment' ? !protocolAttachmentId : !protocolContent.trim())
                       }
-                      className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
+                      className="bg-accent hover:bg-accent-hover text-accent-foreground"
                     >
                       {createProtocolMutation.isPending ? 'Criando...' : 'Criar'}
                     </Button>

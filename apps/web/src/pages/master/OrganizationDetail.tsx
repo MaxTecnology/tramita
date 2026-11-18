@@ -128,7 +128,7 @@ export default function MasterOrganizationDetail() {
               </Button>
             </div>
             <div className="flex justify-end pt-2">
-              <Button onClick={() => setResetPassword(null)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
+              <Button onClick={() => setResetPassword(null)} className="bg-accent hover:bg-accent-hover text-accent-foreground">
                 Fechar
               </Button>
             </div>

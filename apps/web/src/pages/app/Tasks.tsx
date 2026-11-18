@@ -685,7 +685,7 @@ export default function Tasks() {
                     onClick={() => setPeriodKind(k)}
                     className={cn(
                       'h-8 px-3 text-sm font-medium transition-colors',
-                      periodKind === k ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
+                      periodKind === k ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
                     )}
                   >
                     {PERIOD_LABEL[k]}

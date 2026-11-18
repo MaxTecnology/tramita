@@ -186,7 +186,7 @@ export default function UserTransfer() {
               Incluir tarefas abertas
             </label>
             <Button
-              className="ml-auto bg-[#185FA5] hover:bg-[#0C447C] text-white"
+              className="ml-auto bg-accent hover:bg-accent-hover text-accent-foreground"
               disabled={!toUserId || selected.size === 0 || transferMutation.isPending}
               onClick={() => transferMutation.mutate()}
             >

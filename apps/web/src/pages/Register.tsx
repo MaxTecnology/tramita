@@ -78,10 +78,10 @@ export default function Register() {
           <h1 className="text-2xl font-bold text-foreground mb-2">Fale com a gente</h1>
           <p className="text-muted-foreground max-w-md">
             O cadastro do escritório é feito pela nossa equipe, que libera o acesso para você. Escreva para{' '}
-            <a href="mailto:contato@autohubs.com.br" className="text-[#185FA5] hover:underline font-medium">contato@autohubs.com.br</a>.
+            <a href="mailto:contato@autohubs.com.br" className="text-accent hover:underline font-medium">contato@autohubs.com.br</a>.
           </p>
           <p className="text-sm text-muted-foreground mt-6">
-            Já tem conta? <Link to="/login" className="text-[#185FA5] hover:underline font-medium">Entrar</Link>
+            Já tem conta? <Link to="/login" className="text-accent hover:underline font-medium">Entrar</Link>
           </p>
         </div>
       </div>
@@ -106,17 +106,17 @@ export default function Register() {
               {plans.map((plan) => (
                 <Card
                   key={plan.id}
-                  className="cursor-pointer border-2 hover:border-[#185FA5] transition-colors"
+                  className="cursor-pointer border-2 hover:border-accent transition-colors"
                   onClick={() => { setSelectedPlan(plan); setStep('form') }}
                 >
                   <CardContent className="pt-6">
                     <h2 className="text-lg font-bold text-foreground mb-1">{plan.name}</h2>
-                    <p className="text-3xl font-bold text-[#185FA5] mb-1">
+                    <p className="text-3xl font-bold text-accent mb-1">
                       {formatPrice(plan.priceMonthly)}
                       <span className="text-sm font-normal text-muted-foreground">/mês</span>
                     </p>
                     <p className="text-sm text-muted-foreground mb-4">Até {plan.maxClients} clientes</p>
-                    <Button className="w-full bg-[#185FA5] hover:bg-[#0C447C] text-white">
+                    <Button className="w-full bg-accent hover:bg-accent-hover text-accent-foreground">
                       Escolher
                     </Button>
                   </CardContent>
@@ -127,7 +127,7 @@ export default function Register() {
 
           <p className="mt-8 text-sm text-muted-foreground">
             Já tem conta?{' '}
-            <Link to="/login" className="text-[#185FA5] hover:underline font-medium">Entrar</Link>
+            <Link to="/login" className="text-accent hover:underline font-medium">Entrar</Link>
           </p>
         </div>
       </div>
@@ -229,7 +229,7 @@ export default function Register() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#185FA5] hover:bg-[#0C447C] text-white"
+              className="w-full bg-accent hover:bg-accent-hover text-accent-foreground"
             >
               {loading ? 'Criando conta...' : 'Criar conta'}
             </Button>
