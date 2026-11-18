@@ -15,8 +15,10 @@ test('cadastra cliente completo pelas três abas', async ({ orgAdminPage: page }
   await page.getByLabel('Razão social *').fill('Cliente Cadastro E2E')
   await page.getByLabel('Código (ERP) *').fill('E2E-201')
   await page.getByLabel('CEP *').fill('57312675')
-  await page.getByLabel('Estado *').fill('AL')
-  await page.getByLabel('Cidade *').fill('Arapiraca')
+  // State and city are lists (IBGE): the city list loads after the state is chosen
+  await page.getByLabel('Estado *').selectOption('AL')
+  await expect(page.getByLabel('Cidade *').locator('option', { hasText: 'Arapiraca' })).toHaveCount(1)
+  await page.getByLabel('Cidade *').selectOption({ label: 'Arapiraca' })
   await page.getByLabel('Bairro *').fill('Centro')
   await page.getByLabel('Logradouro *').fill('Rua do Cadastro')
   await page.getByLabel('Número *').fill('10')
