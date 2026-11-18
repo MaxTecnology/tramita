@@ -110,10 +110,12 @@ export function TemplateEditor({ event, channel }: Props) {
           id="template-body"
           ref={box}
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={(e) => { setBody(e.target.value); setPreview(null) }}
           onSelect={rememberCursor}
           onBlur={rememberCursor}
           rows={8}
+          disabled={!data}
+          placeholder={data ? undefined : 'Carregando a mensagem...'}
           className="resize-y font-mono text-sm"
         />
       </div>
@@ -137,10 +139,10 @@ export function TemplateEditor({ event, channel }: Props) {
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
-        <Button type="button" variant="outline" onClick={() => previewMutation.mutate()} disabled={previewMutation.isPending}>
+        <Button type="button" variant="outline" onClick={() => previewMutation.mutate()} disabled={!data || previewMutation.isPending}>
           {previewMutation.isPending ? 'Gerando prévia...' : 'Ver prévia'}
         </Button>
-        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+        <Button onClick={() => saveMutation.mutate()} disabled={!data || saveMutation.isPending}>
           {saveMutation.isPending ? 'Salvando...' : 'Salvar mensagem'}
         </Button>
       </div>

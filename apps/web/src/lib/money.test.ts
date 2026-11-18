@@ -30,6 +30,8 @@ describe('formatPrice (plan prices come as numbers or decimal strings)', () => {
     expect(formatPrice(197.5)).toBe('R$ 197,50')
     expect(formatPrice('1290.9')).toBe('R$ 1.290,90')
     expect(formatPrice(0)).toBe('R$ 0,00')
+    expect(formatPrice('abc')).toBe('—')
+    expect(formatPrice(Number.NaN)).toBe('—')
   })
 })
 

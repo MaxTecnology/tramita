@@ -29,5 +29,6 @@ export function toInputAmount(amount: string): string {
 
 // Plan prices arrive as numbers (97) or decimal strings ("97.5"): always shown as "R$ 97,00"
 export function formatPrice(value: number | string): string {
-  return formatBRL(Number(value).toFixed(2))
+  const n = Number(value)
+  return Number.isFinite(n) ? formatBRL(n.toFixed(2)) : '—'
 }

@@ -10,7 +10,7 @@ import {
   bulkGenerateAllSchema, bulkGenerateSchema, bulkRegenerateSchema, createAssignmentSchema, createTemplateSchema, updateAssignmentSchema, updateTemplateSchema,
 } from '@/modules/recurring-templates/recurring-templates.schema'
 import { createHolidaySchema, holidayDaysQuerySchema, listHolidaysQuerySchema } from '@/modules/holidays/holidays.schema'
-import { createDepartmentSchema, updateDepartmentSchema } from '@/modules/departments/departments.schema'
+import { createDepartmentSchema, listDepartmentsQuerySchema, updateDepartmentSchema } from '@/modules/departments/departments.schema'
 import { closeApprovalSchema } from '@/modules/approvals/approvals.schema'
 import { addDeliverableSchema, addDocumentItemSchema, reviewDocumentRequirementSchema } from '@/modules/task-documents/task-documents.schema'
 
@@ -98,7 +98,7 @@ export const WORK_DOCS: RouteDocs = {
   'POST /holidays': { summary: 'Cadastrar feriado', body: createHolidaySchema },
   'DELETE /holidays/:id': { summary: 'Remover feriado' },
 
-  'GET /departments': { summary: 'Listar departamentos' },
+  'GET /departments': { summary: 'Listar departamentos', description: 'Com `withCounts=true` (só Admin), cada departamento traz `peopleCount` (pessoas ativas) e `clientsCount` (clientes ativos atendidos).', querystring: listDepartmentsQuerySchema },
   'POST /departments': { summary: 'Criar departamento', body: createDepartmentSchema },
   'PATCH /departments/:id': { summary: 'Alterar departamento', body: updateDepartmentSchema },
   'DELETE /departments/:id': { summary: 'Remover departamento' },

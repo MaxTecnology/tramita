@@ -8,3 +8,9 @@ export const updateDepartmentSchema = createDepartmentSchema.partial()
 
 export type CreateDepartmentInput = z.infer<typeof createDepartmentSchema>
 export type UpdateDepartmentInput = z.infer<typeof updateDepartmentSchema>
+
+// ?withCounts=true: people and served clients of each department (admin screen only)
+export const listDepartmentsQuerySchema = z.object({
+  withCounts: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
+})
+

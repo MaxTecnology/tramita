@@ -11,7 +11,9 @@ const columns = [
 describe('ListTable', () => {
   it('shows a header and one row per item, with its actions', () => {
     render(<ListTable label="Departamentos" columns={columns} rows={rows} rowKey={(r) => r.id} actions={(r) => <button type="button">Editar {r.name}</button>} empty="vazio" />)
-    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Nome', 'Pessoas'])
+    // The visual header is hidden from screen readers (no table semantics); each row is a list item
+    expect(screen.queryAllByRole('columnheader')).toEqual([])
+    expect(screen.getByText('Nome').closest('[aria-hidden="true"]')).not.toBeNull()
     const list = screen.getByRole('list', { name: 'Departamentos' })
     expect(within(list).getAllByRole('listitem')).toHaveLength(2)
     expect(within(list).getByRole('button', { name: 'Editar Pessoal' })).toBeInTheDocument()

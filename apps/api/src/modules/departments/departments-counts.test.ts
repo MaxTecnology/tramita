@@ -25,9 +25,21 @@ describe('contagens nas listas de Configurações', () => {
     await serveClientDepartment((await createTestClient(c.org.id)).id, fiscal.id, c.admin.id)
     await serveClientDepartment((await createTestClient(c.org.id, { isActive: false })).id, fiscal.id, c.admin.id)
 
-    const list = (await app.inject({ method: 'GET', url: '/departments', headers: { authorization: c.auth } })).json() as { id: string; peopleCount: number; clientsCount: number }[]
+    const list = (await app.inject({ method: 'GET', url: '/departments?withCounts=true', headers: { authorization: c.auth } })).json() as { id: string; peopleCount: number; clientsCount: number }[]
     expect(list.find((d) => d.id === fiscal.id)).toMatchObject({ peopleCount: 2, clientsCount: 1 })
     expect(list.find((d) => d.id === empty.id)).toMatchObject({ peopleCount: 0, clientsCount: 0 })
+  })
+
+  it('the counts come only on request and only for the admin (pickers and members get the plain list)', async () => {
+    const c = await setup()
+    await createTestDepartment(c.org.id, { name: 'Fiscal' })
+    const plain = (await app.inject({ method: 'GET', url: '/departments', headers: { authorization: c.auth } })).json() as Record<string, unknown>[]
+    expect(plain[0]).not.toHaveProperty('peopleCount')
+    const member = await createTestUser(c.org.id, { role: 'ORG_MEMBER' })
+    const memberAuth = await getAuthHeader(member.email, 'Test@1234')
+    const asMember = (await app.inject({ method: 'GET', url: '/departments?withCounts=true', headers: { authorization: memberAuth } })).json() as Record<string, unknown>[]
+    expect(asMember[0]).not.toHaveProperty('peopleCount')
+    expect(asMember[0]).not.toHaveProperty('clientsCount')
   })
 
   it('each recurring template says how many clients are linked (active links)', async () => {

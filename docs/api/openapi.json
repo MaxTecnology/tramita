@@ -6456,6 +6456,21 @@
         "tags": [
           "Departamentos"
         ],
+        "description": "Com `withCounts=true` (só Admin), cada departamento traz `peopleCount` (pessoas ativas) e `clientsCount` (clientes ativos atendidos).\n\n**Quem pode:** Admin, Gerente, Membro",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "in": "query",
+            "name": "withCounts",
+            "required": false
+          }
+        ],
         "security": [
           {
             "bearerAuth": []
@@ -6470,8 +6485,7 @@
           "Admin",
           "Gerente",
           "Membro"
-        ],
-        "description": "**Quem pode:** Admin, Gerente, Membro"
+        ]
       },
       "post": {
         "summary": "Criar departamento",

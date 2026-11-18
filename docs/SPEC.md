@@ -388,9 +388,12 @@ Não há rota para criar, editar, reordenar ou remover colunas: elas nascem com 
 
 ---
 
+## Departamentos
+### GET `/departments` — lista os departamentos da org; `?withCounts=true` (só ORG_ADMIN, tela de Configurações) traz `peopleCount` (pessoas ativas) e `clientsCount` (clientes ativos atendidos) — 2026-11-18
+
 ## Tarefas Recorrentes
 
-### GET `/recurring-templates` _(ORG_ADMIN | ORG_MANAGER)_ — lista templates da org, com listas de documento a pedir/entregar
+### GET `/recurring-templates` _(ORG_ADMIN | ORG_MANAGER)_ — lista templates da org, com listas de documento a pedir/entregar; cada um traz `assignmentsCount` (clientes vinculados ativos)
 ### GET `/recurring-templates/:id` _(ORG_ADMIN | ORG_MANAGER)_
 ### POST `/recurring-templates` _(ORG_ADMIN)_
 ```json

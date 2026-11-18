@@ -27,12 +27,13 @@ export function ListTable<T>({ label, columns, rows, rowKey, actions, actionsWid
   const template = [...columns.map((c) => c.width), actions ? actionsWidth : ''].filter(Boolean).join(' ')
   return (
     <div className="rounded-lg border border-border bg-surface">
-      <div role="row" className="hidden md:grid gap-4 border-b border-border px-4 py-2.5 text-xs font-medium text-muted-foreground" style={{ gridTemplateColumns: template }}>
-        {columns.map((c) => <span key={c.header} role="columnheader">{c.header}</span>)}
+      {/* Visual header only: rows are list items and, on phones, label each value themselves */}
+      <div aria-hidden="true" className="hidden md:grid gap-4 border-b border-border px-4 py-2.5 text-xs font-medium text-muted-foreground" style={{ gridTemplateColumns: template }}>
+        {columns.map((c) => <span key={c.header}>{c.header}</span>)}
         {actions && <span aria-hidden />}
       </div>
       {loading ? (
-        <div aria-label={`Carregando ${label.toLowerCase()}`} className="divide-y divide-border">
+        <div role="status" aria-label={`Carregando ${label.toLowerCase()}`} className="divide-y divide-border">
           {[0, 1, 2].map((i) => (
             <div key={i} className="space-y-2 px-4 py-4">
               <div className="h-3 w-48 rounded bg-neutral-bg motion-safe:animate-pulse" />

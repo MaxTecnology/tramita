@@ -61,7 +61,7 @@ export default function Templates() {
           </div>
         </div>
         <div className="px-5 py-5">
-          <TemplateEditor event={event} channel={channel} />
+          <TemplateEditor key={`${event}-${channel}`} event={event} channel={channel} />
         </div>
       </div>
     </div>

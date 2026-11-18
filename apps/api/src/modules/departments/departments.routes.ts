@@ -3,9 +3,10 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
-import { createDepartmentSchema, updateDepartmentSchema } from './departments.schema'
+import { createDepartmentSchema, updateDepartmentSchema, listDepartmentsQuerySchema } from './departments.schema'
 import {
   listDepartments,
+  listDepartmentsWithCounts,
   createDepartment,
   updateDepartment,
   deleteDepartment,
@@ -19,7 +20,11 @@ export async function departmentsRoutes(app: FastifyInstance) {
   app.get('/', {
     preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER', 'ORG_MEMBER')],
   }, async (request, reply) => {
-    return reply.send(await listDepartments(request.user.organizationId!))
+    const q = listDepartmentsQuerySchema.safeParse(request.query)
+    if (!q.success) throw new AppError(400, q.error.errors[0].message)
+    // Counts are for the admin screen: pickers and other roles get the plain list
+    const counts = q.data.withCounts && request.user.role === 'ORG_ADMIN'
+    return reply.send(counts ? await listDepartmentsWithCounts(request.user.organizationId!) : await listDepartments(request.user.organizationId!))
   })
 
   // Nota: `requireRole('ORG_ADMIN')` é passado explicitamente no preHandler de cada rota de

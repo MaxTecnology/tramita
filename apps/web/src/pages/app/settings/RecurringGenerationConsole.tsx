@@ -124,7 +124,7 @@ export default function RecurringGenerationConsole() {
               {t.title} — {PERIODICITY_LABEL[t.periodicity]} · {t.department.name}
             </div>
           ))}
-          {activeTemplates.length === 0 && <p className="text-xs text-muted-foreground">Nenhum template ativo.</p>}
+          {activeTemplates.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma tarefa recorrente ativa.</p>}
         </div>
 
         <Button type="button" onClick={() => runAllMutation.mutate()} disabled={activeTemplates.length === 0 || runAllMutation.isPending}>

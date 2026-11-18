@@ -22,8 +22,8 @@ export default function Departments() {
   const [name, setName] = useState('')
 
   const { data: departments = [], isLoading } = useQuery<Row[]>({
-    queryKey: ['departments'],
-    queryFn: () => api.get('/departments').then((r) => r.data),
+    queryKey: ['departments', 'with-counts'],
+    queryFn: () => api.get('/departments', { params: { withCounts: true } }).then((r) => r.data),
   })
 
   const saveMutation = useMutation({

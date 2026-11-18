@@ -124,8 +124,12 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        // Settings pages share the side menu
-        element: <SettingsLayout />,
+        // Settings pages share the side menu; each page keeps its own role check below
+        element: (
+          <ProtectedRoute allowedRoles={MANAGER_ROLES}>
+            <SettingsLayout />
+          </ProtectedRoute>
+        ),
         children: [
           {
             path: 'settings',

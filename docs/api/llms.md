@@ -1841,7 +1841,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-18T01:29:02.453Z"
+  "dueDate": "2026-11-18T02:12:31.427Z"
 }
 ```
 
@@ -1915,7 +1915,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-18T01:29:02.455Z"
+  "dueDate": "2026-11-18T02:12:31.429Z"
 }
 ```
 
@@ -2005,7 +2005,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-18T01:29:02.458Z",
+  "dueDate": "2026-11-18T02:12:31.431Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2280,14 +2280,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-18T01:29:02.468Z",
+  "dueDate": "2026-11-18T02:12:31.441Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-18T01:29:02.468Z",
-  "competence": "2026-11-18T01:29:02.468Z",
+  "targetDate": "2026-11-18T02:12:31.441Z",
+  "competence": "2026-11-18T02:12:31.441Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -4352,7 +4352,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-18T01:29:02.521Z",
+  "dueDate": "2026-11-18T02:12:31.491Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -4739,6 +4739,8 @@ no additional properties
 - **Path:** `/departments`
 - **Tags:** Departamentos
 
+Com `withCounts=true` (só Admin), cada departamento traz `peopleCount` (pessoas ativas) e `clientsCount` (clientes ativos atendidos).
+
 **Quem pode:** Admin, Gerente, Membro
 
 **Servers:** [Inherited servers](#scalar-context-global-servers)
@@ -4746,6 +4748,10 @@ no additional properties
 #### Authentication
 
 - **bearerAuth**: HTTP bearer (`JWT`)
+
+#### Query parameters
+
+- **`withCounts`**: `string`, possible values: `"true", "false"`
 
 #### Responses
 
@@ -5351,7 +5357,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-18T01:29:02.546Z"
+  "dueDate": "2026-11-18T02:12:31.516Z"
 }
 ```
 
@@ -5408,7 +5414,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-18T01:29:02.548Z",
+  "dueDate": "2026-11-18T02:12:31.517Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -6192,7 +6198,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T01:29:02.565Z",
+  "dueMonth": "2026-11-18T02:12:31.536Z",
   "assignmentIds": [
     ""
   ]
@@ -6244,7 +6250,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T01:29:02.566Z",
+  "dueMonth": "2026-11-18T02:12:31.537Z",
   "assignmentIds": [
     ""
   ]
@@ -6287,7 +6293,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T01:29:02.567Z"
+  "dueMonth": "2026-11-18T02:12:31.538Z"
 }
 ```
 
