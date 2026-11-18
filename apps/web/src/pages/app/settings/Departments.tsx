@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, Building2 } from 'lucide-react'
 import { PageHeader, SETTINGS_BACK } from '@/components/ui/page-header'
-import { ListTable } from '@/components/ui/list-table'
+import { EditButton, ListTable } from '@/components/ui/list-table'
 import { ActionMenu } from '@/components/ui/action-menu'
 import { toast } from 'sonner'
 import type { Department } from '@/types'
@@ -99,7 +99,7 @@ export default function Departments() {
         ]}
         actions={(d) => (
           <>
-            <Button variant="ghost" size="sm" aria-label={`Editar ${d.name}`} onClick={() => openEdit(d)}>Editar</Button>
+            <EditButton onClick={() => openEdit(d)} name={d.name} />
             <ActionMenu label={`Mais ações de ${d.name}`} items={[{ label: 'Excluir', onSelect: () => void remove(d), danger: true }]} />
           </>
         )}

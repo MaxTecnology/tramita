@@ -11,18 +11,20 @@ export interface ListColumn<T> {
 
 // The settings list: a table on wide screens; on phones each row is a card where every column
 // after the first shows its header as a label. The actions sit at the end of the row.
-export function ListTable<T>({ label, columns, rows, rowKey, actions, empty, loading, muted }: {
+export function ListTable<T>({ label, columns, rows, rowKey, actions, actionsWidth = '8rem', empty, loading, muted }: {
   label: string
   columns: ListColumn<T>[]
   rows: T[]
   rowKey: (row: T) => string
   actions?: (row: T) => ReactNode
+  // Fixed width of the actions column: header and rows must share the same tracks to line up
+  actionsWidth?: string
   empty: ReactNode
   loading?: boolean
   // Rows shown dimmed (e.g. inactive)
   muted?: (row: T) => boolean
 }) {
-  const template = [...columns.map((c) => c.width), actions ? 'auto' : ''].filter(Boolean).join(' ')
+  const template = [...columns.map((c) => c.width), actions ? actionsWidth : ''].filter(Boolean).join(' ')
   return (
     <div className="rounded-lg border border-border bg-surface">
       <div role="row" className="hidden md:grid gap-4 border-b border-border px-4 py-2.5 text-xs font-medium text-muted-foreground" style={{ gridTemplateColumns: template }}>
@@ -87,3 +89,18 @@ export function EditLink({ to, name }: { to: string; name: string }) {
 export function StatusTag({ children }: { children: ReactNode }) {
   return <span className="rounded bg-neutral-bg px-1.5 py-0.5 text-xs text-muted-foreground">{children}</span>
 }
+
+// Same look as EditLink, for rows edited in a dialog on the same page
+export function EditButton({ onClick, name }: { onClick: () => void; name: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`Editar ${name}`}
+      className="rounded-md px-2.5 py-1.5 text-sm text-foreground hover:bg-neutral-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+    >
+      Editar
+    </button>
+  )
+}
+

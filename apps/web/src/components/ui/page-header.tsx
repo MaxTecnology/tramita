@@ -22,7 +22,7 @@ export function PageHeader({ title, description, back, actions }: {
         </Link>
       )}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-[240px] flex-1">
           <h1 className="text-lg md:text-xl font-bold text-foreground">{title}</h1>
           {description && <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">{description}</p>}
         </div>

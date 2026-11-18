@@ -46,9 +46,9 @@ export default function DocumentModels() {
         rows={models}
         rowKey={(m) => m.id}
         columns={[
-          { header: 'Modelo', width: 'minmax(0,2.2fr)', cell: (m) => <span className="block truncate text-sm font-medium text-foreground">{m.nome}</span> },
-          { header: 'Obrigação', width: 'minmax(0,1.2fr)', cell: (m) => <span className="text-sm text-foreground">{m.obligationType.name}</span> },
-          { header: 'Versão', width: 'minmax(0,0.6fr)', cell: (m) => <span className="text-sm text-foreground">{m.version}</span> },
+          { header: 'Modelo', width: 'minmax(0,2fr)', cell: (m) => <span className="block truncate text-sm font-medium text-foreground">{m.nome}</span> },
+          { header: 'Obrigação', width: 'minmax(0,1.8fr)', cell: (m) => <span className="text-sm text-foreground">{m.obligationType.name}</span> },
+          { header: 'Versão', width: 'minmax(0,0.5fr)', cell: (m) => <span className="text-sm text-foreground">{m.version}</span> },
           {
             header: 'Origem', width: 'minmax(0,1fr)',
             cell: (m) => m.isGlobal

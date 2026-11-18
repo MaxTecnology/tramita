@@ -89,12 +89,13 @@ export default function RecurringTemplates() {
         rows={shown}
         rowKey={(t) => t.id}
         muted={(t) => !t.isActive}
+        actionsWidth="12rem"
         columns={[
           {
             header: 'Recorrência', width: 'minmax(0,2fr)',
             cell: (t) => (
               <span className="flex items-center gap-2">
-                <span className="truncate text-sm font-medium text-foreground">{t.title}</span>
+                <span className="break-words text-sm font-medium text-foreground md:truncate">{t.title}</span>
                 {!t.isActive && <span className="rounded bg-neutral-bg px-1.5 py-0.5 text-xs text-muted-foreground">Inativa</span>}
               </span>
             ),
