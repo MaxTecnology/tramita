@@ -24,19 +24,23 @@ import { useBoard } from '@/hooks/useBoard'
 import { useBoardStream } from '@/hooks/useBoardStream'
 import { api } from '@/lib/api'
 import { TaskCard } from '@/components/TaskCard'
-import { TaskDrawer } from '@/components/shared/TaskDrawer'
+import { TaskDrawer, PRIORITY_LABEL } from '@/components/shared/TaskDrawer'
+import { Button } from '@/components/ui/button'
+import { SearchField } from '@/components/ui/search-field'
 import { useAuth } from '@/hooks/useAuth'
 import type { Task } from '@/types'
 import { useLinkedItem } from '@/hooks/useLinkedItem'
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { toast } from 'sonner'
 
-function DroppableColumn({ id, children }: { id: string; children: React.ReactNode }) {
-  const { setNodeRef } = useDroppable({ id })
+// The whole column (as tall as the longest one) takes the drop: a card from the bottom of a long
+// column can be dropped on any other column at the same height
+function DroppableColumn({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
   return (
-    <div ref={setNodeRef} className="flex flex-col gap-2 min-h-[4rem] rounded-lg bg-neutral-bg p-2">
+    <section ref={setNodeRef} aria-label={title} className={cn('flex w-[280px] flex-shrink-0 flex-col rounded-lg md:w-64', isOver && 'ring-2 ring-accent')}>
       {children}
-    </div>
+    </section>
   )
 }
 
@@ -146,40 +150,40 @@ export default function Board() {
     moveTask({ taskId, columnId: targetColumn.id, position })
   }
 
-  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando board...</div>
-  if (!board) return <div className="p-8 text-muted-foreground">Board não encontrado.</div>
+  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando processo...</div>
+  if (!board) return <div className="p-8 text-muted-foreground">Processo não encontrado.</div>
+
+  const filterCls = 'h-9 rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 border-b border-border bg-surface flex-shrink-0">
-        <Link to="/app/processes" aria-label="Voltar para Processos" className="text-muted-foreground hover:text-foreground flex-shrink-0">
-          <ArrowLeft size={18} />
+      <div className="flex-shrink-0 border-b border-border bg-surface px-4 pt-4 pb-3 md:px-6">
+        <Link to="/app/processes" className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <ArrowLeft size={12} aria-hidden /> Processos
         </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-base md:text-lg font-semibold text-foreground truncate">{board.title}</h1>
-          <p className="text-xs md:text-sm text-muted-foreground truncate">{board.client.name}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-[240px] flex-1">
+            <h1 className="text-lg font-bold text-foreground md:text-xl">{board.title}</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span>{board.client.name}</span>
+              {board.deadline && board.deadline.state !== 'NONE' && <DeadlineChip deadline={board.deadline} />}
+              {boardDueDate && (
+                <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', boardDueDateOverdue ? 'bg-danger-bg text-danger-text' : 'bg-warning-bg text-warning-text')}>
+                  {boardDueDateOverdue ? 'Venceu em' : 'Vence'} {formatDateOnlyUTC(boardDueDate)}
+                </span>
+              )}
+              {board.type === 'PROCESS' && <ProcessDelayReason boardId={board.id} pending={!!board.delayReasonPending} />}
+            </div>
+          </div>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowStageTimes((v) => !v)} aria-pressed={showStageTimes}>
+              Tempo por etapa
+            </Button>
+            {board.type === 'PROCESS' && (
+              <Button type="button" size="sm" onClick={() => setAddingOS(true)} className="gap-1"><Plus size={14} aria-hidden />Adicionar OS</Button>
+            )}
+          </div>
         </div>
-        {board.deadline && <DeadlineChip deadline={board.deadline} className="flex-shrink-0" />}
-        {board.type === 'PROCESS' && <ProcessDelayReason boardId={board.id} pending={!!board.delayReasonPending} />}
-        <button type="button" onClick={() => setShowStageTimes((v) => !v)} aria-pressed={showStageTimes}
-          className="text-xs font-medium text-accent-hover hover:underline flex-shrink-0">
-          Tempo por etapa
-        </button>
-        {board.type === 'PROCESS' && (
-          <button type="button" onClick={() => setAddingOS(true)} className="text-xs font-medium text-accent-hover hover:underline flex-shrink-0">
-            Adicionar OS
-          </button>
-        )}
-        {boardDueDate && (
-          <span className={cn(
-            'text-xs px-2 py-1 rounded-full font-medium flex-shrink-0',
-            boardDueDateOverdue
-              ? 'bg-danger-bg text-danger-text'
-              : 'bg-warning-bg text-warning-text'
-          )}>
-            {boardDueDateOverdue ? '⚠ ' : ''}{formatDateOnlyUTC(boardDueDate)}
-          </span>
-        )}
       </div>
 
       {board.type === 'PROCESS' && <AddOSDialog open={addingOS} board={board} onClose={() => setAddingOS(false)} />}
@@ -190,74 +194,46 @@ export default function Board() {
         </div>
       )}
 
-      {/* Search bar */}
-      <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-2 border-b border-border bg-surface">
-        <input
-          type="text"
-          placeholder="Buscar tarefas..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-0 h-8 rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-        />
-        <select
-          value={filterPriority}
-          onChange={(e) => setFilterPriority(e.target.value)}
-          className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-        >
-          <option value="">Prioridade</option>
-          <option value="LOW">Baixa</option>
-          <option value="MEDIUM">Média</option>
-          <option value="HIGH">Alta</option>
-          <option value="URGENT">Urgente</option>
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-4 py-2 md:px-6">
+        <SearchField label="Buscar tarefas do processo" placeholder="Buscar tarefas" value={search} onChange={setSearch} className="w-full sm:w-64" />
+        <select aria-label="Filtrar por prioridade" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} className={filterCls}>
+          <option value="">Todas as prioridades</option>
+          {(['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const).map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
         </select>
-        <input
-          type="month"
-          value={filterCompetence}
-          onChange={(e) => setFilterCompetence(e.target.value)}
-          title="Filtrar por competência"
-          className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-        />
+        <input type="month" aria-label="Competência" title="Filtrar por competência" value={filterCompetence} onChange={(e) => setFilterCompetence(e.target.value)} className={filterCls} />
         {hasFilters && (
-          <button
-            type="button"
-            onClick={() => {
-              setSearch('')
-              setFilterPriority('')
-              setFilterCompetence('')
-            }}
-            className="text-xs text-muted-foreground hover:text-foreground underline"
-          >
-            Limpar
+          <button type="button" onClick={() => { setSearch(''); setFilterPriority(''); setFilterCompetence('') }} className="h-9 px-2 text-sm text-muted-foreground hover:text-foreground">
+            Limpar filtros
           </button>
         )}
       </div>
 
-      {/* Search results */}
       {hasFilters && searchResults && (
-        <div className="px-4 md:px-6 py-3 border-b border-border bg-warning-bg">
-          <p className="text-xs text-muted-foreground mb-2">{searchResults.length} resultado(s)</p>
-          <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+        <section aria-label="Resultados da busca" className="border-b border-border bg-neutral-bg/50 px-4 py-3 md:px-6">
+          <p className="mb-2 text-xs text-muted-foreground">{searchResults.length === 1 ? '1 tarefa encontrada' : `${searchResults.length} tarefas encontradas`}</p>
+          <div className="flex max-h-48 flex-col gap-1.5 overflow-y-auto">
             {searchResults.map((task) => (
-              <div
+              <button
                 key={task.id}
+                type="button"
                 onClick={() => setSelectedTaskId(task.id)}
-                className="bg-surface rounded-lg p-2.5 border border-border cursor-pointer hover:shadow-sm text-sm flex items-center justify-between"
+                className="flex items-center justify-between rounded-lg border border-border bg-surface p-2.5 text-left text-sm hover:bg-neutral-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <span className="font-medium text-foreground">{task.title}</span>
-                <span className="text-xs text-muted-foreground ml-2">{task.priority}</span>
-              </div>
+                <span className="ml-2 text-xs text-muted-foreground">{PRIORITY_LABEL[task.priority]}</span>
+              </button>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       <div className="flex-1 overflow-x-auto p-4 md:p-6">
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-3 md:gap-4 h-full">
+          <div className="flex min-h-full items-stretch gap-3 md:gap-4">
             {board.columns.map((column) => (
-              <div key={column.id} className="flex-shrink-0 w-[280px] md:w-64">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-foreground">{column.title}</h3>
+              <DroppableColumn key={column.id} id={column.id} title={column.title}>
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-foreground">{column.title}</h2>
                   <span className="text-xs text-muted-foreground bg-neutral-bg rounded-full px-2 py-0.5">
                     {column.tasks.length}
                   </span>
@@ -267,7 +243,7 @@ export default function Board() {
                   items={column.tasks.map((t) => t.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  <DroppableColumn id={column.id}>
+                  <div className="flex min-h-[4rem] flex-col gap-2 rounded-lg bg-neutral-bg p-2">
                     {column.tasks.map((task) => (
                       <SortableTaskCard
                         key={task.id}
@@ -275,7 +251,7 @@ export default function Board() {
                         onClick={() => setSelectedTaskId(task.id)}
                       />
                     ))}
-                  </DroppableColumn>
+                  </div>
                 </SortableContext>
 
                 {addingToColumn === column.id ? (
@@ -326,7 +302,7 @@ export default function Board() {
                     Adicionar tarefa
                   </button>
                 )}
-              </div>
+              </DroppableColumn>
             ))}
           </div>
 

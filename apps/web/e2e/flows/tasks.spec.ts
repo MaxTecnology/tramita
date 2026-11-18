@@ -4,13 +4,15 @@ import { test, expect } from '../fixtures'
 
 // dnd-kit starts a drag after the pointer moves 8px: press, nudge, then travel to the column
 async function dragTo(page: Page, card: Locator, column: Locator) {
+  // Earlier specs add OS to "Aberto": the card may sit below the fold
+  await card.scrollIntoViewIfNeeded()
   const from = await card.boundingBox()
   const to = await column.boundingBox()
   if (!from || !to) throw new Error('card or column not on screen')
   await page.mouse.move(from.x + 40, from.y + 20)
   await page.mouse.down()
   await page.mouse.move(from.x + 55, from.y + 35, { steps: 5 })
-  await page.mouse.move(to.x + to.width / 2, to.y + 120, { steps: 15 })
+  await page.mouse.move(to.x + to.width / 2, Math.max(to.y + 60, from.y), { steps: 15 })
   await page.mouse.up()
 }
 

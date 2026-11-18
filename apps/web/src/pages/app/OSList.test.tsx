@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
@@ -86,4 +86,19 @@ it('Nova OS offers only active standalone models (process-only ones stay in the 
   expect(options).toEqual(['Selecione', 'Recálculo DAS', 'Certidão'])
   const filter = Array.from((screen.getByLabelText('Filtrar por modelo') as HTMLSelectElement).options).map((o) => o.textContent)
   expect(filter).toContain('Registro na Junta')
+})
+
+it('standard list: OS with its process, client, who handles it, deadline with the target date', async () => {
+  renderPage()
+  expect(screen.getByRole('heading', { name: 'Ordens de Serviço' })).toBeInTheDocument()
+  const late = (await screen.findByRole('button', { name: 'Recálculo DAS — 03/2025' })).closest('[data-list-row]') as HTMLElement
+  expect(within(late).getByText('ACME')).toBeInTheDocument()
+  expect(within(late).getByText('#320')).toBeInTheDocument()
+  expect(within(late).getByText('Bruna')).toBeInTheDocument()
+  expect(within(late).getByText('Fiscal')).toBeInTheDocument()
+  expect(within(late).getByText('atrasada há 2 dias úteis')).toBeInTheDocument()
+  expect(within(late).getByText('Meta 20/11/2026')).toBeInTheDocument()
+  const junta = screen.getByRole('button', { name: 'Registro na Junta' }).closest('[data-list-row]') as HTMLElement
+  expect(within(junta).getByText('Abertura ACME')).toBeInTheDocument()
+  expect(screen.getByLabelText('Buscar ordens de serviço')).toBeInTheDocument()
 })

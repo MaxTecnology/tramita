@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Search, X, FileStack, Plus } from 'lucide-react'
+import { X, FileStack, Plus } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn, mensagemDeErro } from '@/lib/utils'
 import { formatDateOnlyUTC } from '@/lib/dates'
@@ -11,6 +11,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DeadlineChip } from '@/components/shared/DeadlineChip'
+import { PageHeader } from '@/components/ui/page-header'
+import { SearchField } from '@/components/ui/search-field'
+import { ListTable, ROW_OPENER } from '@/components/ui/list-table'
 import type { DeadlineInfo, DeadlineState } from '@/types'
 
 interface OSItem {
@@ -40,7 +43,7 @@ const SITUATIONS: { value: '' | DeadlineState; label: string }[] = [
   { value: 'DONE', label: 'Concluídas' },
 ]
 
-const selectCls = 'h-9 rounded-md border border-border bg-surface text-foreground px-2 text-sm'
+const selectCls = 'h-9 rounded-md border border-border bg-surface text-foreground px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
 
 // Ordens de Serviço: every OS (standalone or inside a process) with the situation of its internal
 // deadline. A row opens the OS where it lives (Tarefas for standalone, the process board otherwise).
@@ -70,20 +73,15 @@ export default function OSList() {
   const hasFilter = !!(search || clientId || osModelId || situation)
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg md:text-xl font-bold text-foreground">Ordens de Serviço</h1>
-          <p className="text-sm text-muted-foreground">Serviços avulsos e etapas de processos, com o prazo de cada um.</p>
-        </div>
-        <Button onClick={() => setCreating(true)} className="gap-2"><Plus size={16} />Nova OS</Button>
-      </div>
+    <div className="p-4 md:p-6">
+      <PageHeader
+        title="Ordens de Serviço"
+        description="Serviços avulsos e etapas de processos, com o prazo interno de cada um."
+        actions={<Button onClick={() => setCreating(true)} className="gap-1.5"><Plus size={16} aria-hidden />Nova OS</Button>}
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input aria-label="Buscar" className="pl-8 w-56" placeholder="OS ou cliente..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SearchField label="Buscar ordens de serviço" placeholder="OS ou cliente" value={search} onChange={setSearch} className="w-full sm:w-64" />
         <select aria-label="Filtrar por cliente" className={selectCls} value={clientId} onChange={(e) => setClientId(e.target.value)}>
           <option value="">Todos os clientes</option>
           {clients.map((c) => <option key={c.id} value={c.id}>{c.codigo ? `${c.codigo} - ${c.name}` : c.name}</option>)}
@@ -93,62 +91,75 @@ export default function OSList() {
           {models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
         {hasFilter && (
-          <button type="button" onClick={() => { setSearch(''); setClientId(''); setOsModelId(''); setSituation('') }} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-            <X size={12} />Limpar
+          <button type="button" onClick={() => { setSearch(''); setClientId(''); setOsModelId(''); setSituation('') }} className="inline-flex h-9 items-center gap-1 px-2 text-sm text-muted-foreground hover:text-foreground">
+            <X size={14} aria-hidden />Limpar filtros
           </button>
         )}
       </div>
 
-      <div role="radiogroup" aria-label="Situação" className="flex flex-wrap gap-1.5">
+      <div role="radiogroup" aria-label="Situação" className="mb-4 flex flex-wrap gap-1.5">
         {SITUATIONS.map((s) => (
           <button key={s.value || 'all'} type="button" role="radio" aria-checked={situation === s.value} onClick={() => setSituation(s.value)}
-            className={cn('rounded-full px-3 py-1 text-xs font-medium border transition-colors',
-              situation === s.value ? 'bg-accent text-accent-foreground border-accent' : 'border-border text-muted-foreground hover:text-foreground')}>
+            className={cn('rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+              situation === s.value ? 'border-accent bg-accent text-accent-foreground' : 'border-border text-muted-foreground hover:text-foreground')}>
             {s.label}
           </button>
         ))}
       </div>
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Carregando ordens de serviço...</p>
-      ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
-          <FileStack size={44} className="mb-3 opacity-40" />
-          <p className="text-sm font-medium">Nenhuma OS {hasFilter ? 'com esses filtros' : 'ainda'}</p>
-          <p className="text-xs mt-1">Abra uma OS pelo botão acima, ou aprove uma solicitação de serviço.</p>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-border bg-surface overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground border-b border-border">
-                <th className="px-3 py-2 font-medium">Cliente</th>
-                <th className="px-3 py-2 font-medium">OS</th>
-                <th className="px-3 py-2 font-medium hidden md:table-cell">Responsável</th>
-                <th className="px-3 py-2 font-medium">Prazo</th>
-                <th className="px-3 py-2 font-medium hidden md:table-cell">Meta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((o) => (
-                <tr key={o.id} onClick={() => navigate(o.link)} className="border-b border-border last:border-0 cursor-pointer hover:bg-neutral-bg">
-                  <td className="px-3 py-2.5 text-foreground whitespace-nowrap">
-                    {o.client.name}{o.client.codigo && <span className="ml-1 text-xs text-muted-foreground">#{o.client.codigo}</span>}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span className="text-foreground">{o.title}</span>
-                    {o.process && <span className="block text-xs text-muted-foreground">{o.process.title}</span>}
-                    {o.delayReasonPending && <span className="block text-xs text-danger-text">Motivo do atraso pendente</span>}
-                  </td>
-                  <td className="px-3 py-2.5 text-muted-foreground hidden md:table-cell">{o.assignee?.name ?? o.department.name}</td>
-                  <td className="px-3 py-2.5"><DeadlineChip deadline={o.deadline} /></td>
-                  <td className="px-3 py-2.5 text-muted-foreground hidden md:table-cell tabular-nums">{o.targetDate ? formatDateOnlyUTC(o.targetDate) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <ListTable<OSItem>
+        label="Ordens de serviço"
+        loading={isLoading}
+        rows={items}
+        rowKey={(o) => o.id}
+        interactive
+        empty={
+          <div className="flex flex-col items-center text-muted-foreground">
+            <FileStack size={40} aria-hidden className="mb-3 opacity-40" />
+            <p className="text-sm font-medium">Nenhuma OS {hasFilter ? 'com esses filtros' : 'ainda'}</p>
+            {!hasFilter && <p className="mt-1 text-xs">Abra uma OS pelo botão "Nova OS", ou aprove uma solicitação de serviço.</p>}
+          </div>
+        }
+        columns={[
+          {
+            header: 'OS', width: 'minmax(0,2fr)',
+            cell: (o) => (
+              <div className="min-w-0">
+                <button type="button" onClick={() => navigate(o.link)} className={cn(ROW_OPENER, 'text-sm')}>{o.title}</button>
+                {o.process && <p className="text-xs text-muted-foreground">{o.process.title}</p>}
+                {o.delayReasonPending && <p className="text-xs font-medium text-danger-text">Motivo do atraso pendente</p>}
+              </div>
+            ),
+          },
+          {
+            header: 'Cliente', width: 'minmax(0,1.3fr)',
+            cell: (o) => (
+              <p className="text-sm text-foreground">
+                <span>{o.client.name}</span>
+                {o.client.codigo && <span className="ml-1 text-xs text-muted-foreground">#{o.client.codigo}</span>}
+              </p>
+            ),
+          },
+          {
+            header: 'Responsável', width: 'minmax(0,1.1fr)',
+            cell: (o) => (
+              <div className="min-w-0 text-sm">
+                <p className={cn('truncate', o.assignee ? 'text-foreground' : 'text-muted-foreground')}>{o.assignee?.name ?? 'Sem responsável'}</p>
+                <p className="truncate text-xs text-muted-foreground">{o.department.name}</p>
+              </div>
+            ),
+          },
+          {
+            header: 'Prazo', width: '11rem',
+            cell: (o) => (
+              <div className="flex flex-col items-start gap-0.5">
+                <DeadlineChip deadline={o.deadline} />
+                {o.targetDate && <span className="text-xs text-muted-foreground">Meta {formatDateOnlyUTC(o.targetDate)}</span>}
+              </div>
+            ),
+          },
+        ]}
+      />
 
       {/* Process-only and inactive models can't be opened alone (the list filter still shows them) */}
       <NewOSDialog open={creating} onClose={() => setCreating(false)} models={models.filter((m) => m.usableStandalone && m.isActive)} clients={clients} />

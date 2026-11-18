@@ -815,7 +815,9 @@ export default function Tasks() {
           <p className="text-sm text-muted-foreground">Carregando tarefas...</p>
         ) : (
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="flex gap-3 overflow-x-auto pb-2 lg:h-full lg:overflow-visible">
+            {/* Columns grow with the longest one: a card at the bottom of a long column can be dropped
+                on any other column at the same height */}
+            <div className="flex min-h-full items-stretch gap-3 overflow-x-auto pb-2 lg:overflow-visible">
               {STATUS_ORDER.map((s) => {
                 const columnTasks = columns.get(s) ?? []
                 return (

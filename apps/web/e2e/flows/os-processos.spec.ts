@@ -10,8 +10,8 @@ const drawer = (page: Page, title: string) => page.locator('aside').filter({ has
 // filtered by this month's target, and a late OS from January is not in it
 async function openTask(page: Page, title: string) {
   await page.goto('/app/os')
-  await page.getByPlaceholder('OS ou cliente...').fill(title)
-  await page.getByRole('row', { name: new RegExp(title) }).first().click()
+  await page.getByLabel('Buscar ordens de serviço').fill(title)
+  await page.getByRole('button', { name: title, exact: true }).first().click()
   await expect(drawer(page, title)).toBeVisible()
 }
 
@@ -24,14 +24,14 @@ test.describe.serial('Ordens de Serviço e processos', () => {
     await page.getByRole('button', { name: 'Abrir OS' }).click()
     await expect(page).toHaveURL(/\/app\/tasks\?task=/)
     await page.goto('/app/os')
-    const row = page.getByRole('row', { name: /Certidão E2E/ }).filter({ hasNotText: 'atrasada' }).first()
+    const row = page.locator('[data-list-row]', { hasText: 'Certidão E2E' }).filter({ hasNotText: 'atrasada' }).first()
     await expect(row).toContainText(/faltam 3 dias úteis/)
   })
 
   test('concluir uma OS atrasada pede o motivo', async ({ orgAdminPage: page }) => {
     await page.goto('/app/os')
     await page.getByRole('radio', { name: 'Atrasadas' }).click()
-    await expect(page.getByRole('row', { name: /OS atrasada E2E/ })).toContainText('atrasada há')
+    await expect(page.locator('[data-list-row]', { hasText: 'OS atrasada E2E' })).toContainText('atrasada há')
     await openTask(page, 'OS atrasada E2E')
     await drawer(page, 'OS atrasada E2E').locator('select').filter({ has: page.locator('option[value="DONE"]') }).selectOption('DONE')
     await page.getByLabel('Motivo', { exact: true }).selectOption({ label: 'Retrabalho interno' })

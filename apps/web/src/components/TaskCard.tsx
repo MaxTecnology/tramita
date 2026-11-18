@@ -50,27 +50,25 @@ export function TaskCard({ task, onClick }: Props) {
       )}
       onClick={onClick}
     >
-      <p className="text-sm font-medium text-foreground mb-2 line-clamp-2">{task.title}</p>
-      <div className="flex items-center gap-2 flex-wrap">
+      <p className="text-sm font-medium text-foreground line-clamp-2">{task.title}</p>
+      <div className="mt-1.5 flex items-center gap-1.5 flex-wrap empty:hidden">
         {task.sourceRequestId && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-highlight-bg text-highlight-text" title="Originado de uma solicitação do cliente">
-            <Inbox size={11} />
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-highlight-bg text-highlight-text" title="Aberta a partir de uma solicitação do cliente">
+            <Inbox size={11} aria-hidden />
             Solicitação
           </span>
         )}
-        <span
-          className={cn(
-            'inline-flex text-xs font-medium px-2 py-0.5 rounded-full',
-            PRIORITY_STYLES[task.priority],
-          )}
-        >
-          {PRIORITY_LABELS[task.priority]}
-        </span>
+        {/* Medium and low are the usual: only high and urgent earn a tag */}
+        {(task.priority === 'HIGH' || task.priority === 'URGENT') && (
+          <span className={cn('inline-flex text-xs font-medium px-2 py-0.5 rounded-full', PRIORITY_STYLES[task.priority])}>
+            {PRIORITY_LABELS[task.priority]}
+          </span>
+        )}
         {effectiveLevel === 'DUE_CRITICAL' && (
-          <span className="text-xs text-danger-text font-medium">⚠ Prazo crítico</span>
+          <span className="inline-flex rounded-full bg-danger-bg px-2 py-0.5 text-xs font-medium text-danger-text">Prazo crítico</span>
         )}
         {effectiveLevel === 'TARGET_WARNING' && (
-          <span className="text-xs text-warning-text font-medium">⏰ Meta próxima</span>
+          <span className="inline-flex rounded-full bg-warning-bg px-2 py-0.5 text-xs font-medium text-warning-text">Meta próxima</span>
         )}
         {task.osModel && task.deadline && task.deadline.state !== 'DONE' && (
           <DeadlineChip deadline={task.deadline} waitingFor={task.waitingFor?.join(', ')} />

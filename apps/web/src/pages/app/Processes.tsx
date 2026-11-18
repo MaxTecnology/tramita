@@ -4,29 +4,25 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { diffDaysDateOnlyUTC, formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
+import { diffDaysDateOnlyUTC, formatDateOnlyUTC } from '@/lib/dates'
 import { Plus, ChevronDown, ChevronRight, AlertTriangle, Clock, ClipboardList, CheckCircle2, Search, X, FileSearch } from 'lucide-react'
 import type { Board } from '@/types'
 import { DeadlineChip } from '@/components/shared/DeadlineChip'
 import { NewProcessDialog } from '@/components/process/NewProcessDialog'
+import { PageHeader } from '@/components/ui/page-header'
+import { SearchField } from '@/components/ui/search-field'
+import { ListTable, ROW_OPENER } from '@/components/ui/list-table'
 
 const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
 
-function getProgress(board: Board): number {
-  const tasks = board.columns
-    .flatMap((c) => c.tasks)
-    .filter((t) => t.status !== 'DISREGARDED')
-  if (tasks.length === 0) return 0
-  const maxPos = board.columns.length - 1
-  if (maxPos <= 0) return 0
-  const sum = tasks.reduce((acc, t) => {
-    const col = board.columns.find((c) => c.id === t.columnId)
-    return acc + (col?.position ?? 0) / maxPos
-  }, 0)
-  return Math.round((sum / tasks.length) * 100)
+// Progress = OS finished (by their status: an OS done in its panel counts even if it stayed in an
+// earlier column); disregarded ones are left out
+function osCount(board: Board): { done: number; total: number } {
+  const tasks = board.columns.flatMap((c) => c.tasks).filter((t) => t.status !== 'DISREGARDED')
+  return { done: tasks.filter((t) => t.status === 'DONE').length, total: tasks.length }
 }
+const isFinished = (board: Board) => { const { done, total } = osCount(board); return total > 0 && done === total }
 
 function getMostUrgentDueDate(board: Board): Date | null {
   const dates = board.columns
@@ -35,6 +31,17 @@ function getMostUrgentDueDate(board: Board): Date | null {
     .map((t) => new Date(t.dueDate!))
     .sort((a, b) => a.getTime() - b.getTime())
   return dates[0] ?? null
+}
+
+// Late: an OS past its due date, or the process past its internal deadline
+function isLate(board: Board, now: Date): boolean {
+  const d = getMostUrgentDueDate(board)
+  return (!!d && diffDaysDateOnlyUTC(d, now) < 0) || board.deadline?.state === 'LATE'
+}
+function isDueSoon(board: Board, now: Date): boolean {
+  const d = getMostUrgentDueDate(board)
+  const diff = d ? diffDaysDateOnlyUTC(d, now) : null
+  return (diff !== null && diff >= 0 && diff <= 7) || board.deadline?.state === 'DUE_SOON'
 }
 
 function getCurrentStage(board: Board): string {
@@ -48,123 +55,92 @@ function getCurrentStage(board: Board): string {
   return active[0]?.title ?? 'Concluído'
 }
 
-function formatDueDate(date: Date | null, now: Date): { label: string; cls: string } {
-  if (!date) return { label: '—', cls: 'text-muted-foreground' }
+function formatDueDate(date: Date | null, now: Date): { label: string; cls: string } | null {
+  if (!date) return null
   const diff = diffDaysDateOnlyUTC(date, now)
-  if (diff < 0) return { label: `Vencido há ${Math.abs(diff)}d`, cls: 'text-danger-text font-medium' }
+  if (diff < 0) return { label: `Vencido há ${Math.abs(diff)} ${Math.abs(diff) === 1 ? 'dia' : 'dias'}`, cls: 'text-danger-text font-medium' }
   if (diff === 0) return { label: 'Vence hoje', cls: 'text-danger-text font-medium' }
-  if (diff <= 7) return { label: `Em ${diff}d`, cls: 'text-warning-text font-medium' }
-  return { label: formatDateOnlyUTC(date), cls: 'text-muted-foreground' }
-}
-
-function getProgressCls(progress: number, isOverdue: boolean): string {
-  if (progress === 100) return 'bg-success-text'
-  if (isOverdue) return 'bg-danger-text'
-  if (progress >= 60) return 'bg-accent'
-  return 'bg-warning-text'
+  if (diff <= 7) return { label: `Vence em ${diff} ${diff === 1 ? 'dia' : 'dias'}`, cls: 'text-warning-text font-medium' }
+  return { label: `Vence ${formatDateOnlyUTC(date)}`, cls: 'text-muted-foreground' }
 }
 
 interface Group {
   label: string
   boards: Board[]
   headerCls: string
-  accentCls: string
   icon: React.ReactNode
   defaultOpen: boolean
 }
 
-function BoardRow({ board, now }: { board: Board; now: Date }) {
-  const progress = getProgress(board)
-  const taskDueDate = getMostUrgentDueDate(board)
-  const effectiveDueDate = taskDueDate ?? (board.dueDate ? new Date(board.dueDate) : null)
-  const { label: dueDateLabel, cls: dueDateCls } = formatDueDate(effectiveDueDate, now)
-  const stage = getCurrentStage(board)
-
+function ProgressCell({ board }: { board: Board }) {
+  const { done, total } = osCount(board)
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
   return (
-    <Link
-      to={`/app/board/${board.id}`}
-      className="block px-4 py-3 hover:bg-neutral-bg transition-colors border-b border-border last:border-0"
-    >
-      {/* Mobile: card layout */}
-      <div className="md:hidden">
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <p className="text-sm font-medium text-foreground flex-1 min-w-0 truncate">{board.title}</p>
-          <span className={cn('text-xs flex-shrink-0', dueDateCls)}>{dueDateLabel}</span>
-        </div>
-        {board.deadline && <DeadlineChip className="mb-1.5" deadline={board.deadline} />}
-        <p className="text-xs text-muted-foreground mb-2">{board.client.name}</p>
-        <div className="flex items-center gap-3">
-          <span className="text-xs bg-neutral-bg text-muted-foreground px-2 py-0.5 rounded-full">{stage}</span>
-          <div className="flex-1 flex items-center gap-2">
-            <div className="flex-1 h-1.5 bg-neutral-bg rounded-full overflow-hidden">
-              <div className="h-full bg-accent rounded-full" style={{ width: `${progress}%` }} />
-            </div>
-            <span className="text-xs text-muted-foreground w-8 text-right">{progress}%</span>
-          </div>
-        </div>
+    <div className="min-w-0">
+      <p className="text-xs text-muted-foreground">{total === 0 ? 'Sem OS' : `${done} de ${total} OS concluídas`}</p>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-bg" aria-hidden>
+        <div className={cn('h-full rounded-full', pct === 100 ? 'bg-success-text' : 'bg-accent')} style={{ width: `${pct}%` }} />
       </div>
-
-      {/* Desktop: table row */}
-      <div className="hidden md:flex items-center gap-3">
-        <div className="flex-[2] min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">{board.title}</p>
-          {board.deadline && <DeadlineChip className="mt-0.5" deadline={board.deadline} />}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-muted-foreground truncate">{board.client.name}</p>
-        </div>
-        <div className="flex-1 min-w-0">
-          <span className="text-xs bg-neutral-bg text-muted-foreground px-2 py-0.5 rounded-full truncate">{stage}</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-muted-foreground truncate">{board.responsibleUser?.name ?? '—'}</p>
-        </div>
-        <div className="flex-1 flex items-center gap-2">
-          <div className="flex-1 h-1.5 bg-neutral-bg rounded-full overflow-hidden">
-            <div className="h-full bg-accent rounded-full" style={{ width: `${progress}%` }} />
-          </div>
-          <span className="text-xs text-muted-foreground w-8 text-right">{progress}%</span>
-        </div>
-        <div className="w-24 text-right">
-          <span className={cn('text-xs', dueDateCls)}>{dueDateLabel}</span>
-        </div>
-      </div>
-    </Link>
+    </div>
   )
 }
 
 function BoardGroup({ group, now }: { group: Group; now: Date }) {
   const [open, setOpen] = useState(group.defaultOpen)
-
+  const id = `process-group-${group.label.replace(/\W+/g, '-').toLowerCase()}`
   return (
-    <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={cn('w-full flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-left', group.headerCls)}
-      >
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        {group.icon}
-        {group.label}
-        <span className="ml-1 font-normal opacity-60">({group.boards.length})</span>
-      </button>
-
+    <section>
+      <h2 className="mb-2">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={id}
+          onClick={() => setOpen(!open)}
+          className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent', group.headerCls)}
+        >
+          {open ? <ChevronDown size={14} aria-hidden /> : <ChevronRight size={14} aria-hidden />}
+          {group.icon}
+          {group.label}
+          <span className="font-normal opacity-70">({group.boards.length})</span>
+        </button>
+      </h2>
       {open && (
-        <>
-          <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-neutral-bg/80 border-b border-border">
-            <div className="flex-[2] text-xs font-semibold text-muted-foreground uppercase tracking-wide">Processo</div>
-            <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cliente</div>
-            <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Etapa</div>
-            <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Responsável</div>
-            <div className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Progresso</div>
-            <div className="w-24 text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right">Prazo</div>
-          </div>
-          {group.boards.map((board) => (
-            <BoardRow key={board.id} board={board} now={now} />
-          ))}
-        </>
+        <div id={id}>
+          <ListTable<Board>
+            label={`Processos: ${group.label}`}
+            rows={group.boards}
+            rowKey={(b) => b.id}
+            interactive
+            empty={null}
+            columns={[
+              {
+                header: 'Processo', width: 'minmax(0,2fr)',
+                cell: (b) => (
+                  <div className="min-w-0">
+                    <Link to={`/app/board/${b.id}`} className={cn(ROW_OPENER, 'block text-sm')}>{b.title}</Link>
+                    {b.deadline && b.deadline.state !== 'NONE' && <DeadlineChip className="mt-1" deadline={b.deadline} />}
+                  </div>
+                ),
+              },
+              { header: 'Cliente', width: 'minmax(0,1.2fr)', cell: (b) => <span className="text-sm text-foreground">{b.client.name}</span> },
+              { header: 'Etapa', width: 'minmax(0,1fr)', cell: (b) => <span className="text-sm text-foreground">{getCurrentStage(b)}</span> },
+              {
+                header: 'Responsável', width: 'minmax(0,1fr)',
+                cell: (b) => <span className={cn('text-sm', b.responsibleUser ? 'text-foreground' : 'text-muted-foreground')}>{b.responsibleUser?.name ?? 'Sem responsável'}</span>,
+              },
+              { header: 'Progresso', width: '10rem', cell: (b) => <ProgressCell board={b} /> },
+              {
+                header: 'Vencimento', width: '9rem',
+                cell: (b) => {
+                  const due = formatDueDate(getMostUrgentDueDate(b) ?? (b.dueDate ? new Date(b.dueDate) : null), now)
+                  return due ? <span className={cn('text-xs', due.cls)}>{due.label}</span> : <span className="text-sm text-muted-foreground">—</span>
+                },
+              },
+            ]}
+          />
+        </div>
       )}
-    </div>
+    </section>
   )
 }
 
@@ -213,12 +189,7 @@ export default function Processes() {
       if (filterClient && b.client.id !== filterClient) return false
       if (filterResponsible && b.responsibleUser?.id !== filterResponsible) return false
       if (filterStage && !b.columns.some((c) => c.title.toLowerCase().includes(filterStage.toLowerCase()))) return false
-      if (showOnlyOverdue) {
-        const hasOverdue = b.columns.some((c) =>
-          c.tasks.some((t) => t.dueDate && isPastDateOnlyUTC(t.dueDate, now) && t.status !== 'DONE' && t.status !== 'DISREGARDED'),
-        )
-        if (!hasOverdue) return false
-      }
+      if (showOnlyOverdue && (isFinished(b) || !isLate(b, now))) return false
       return true
     })
   }, [boards, search, filterClient, filterResponsible, filterStage, showOnlyOverdue, now])
@@ -229,11 +200,11 @@ export default function Processes() {
     // dueDate é um rótulo de dia-calendário, não instante real — `d < now`/`d >= now` compara
     // bruto e classifica "vence hoje" como atrasado horas antes do dia terminar. diffDaysDateOnlyUTC
     // já lê isso corretamente (ver apps/web/src/lib/dates.ts).
-    const overdue = filtered.filter((b) => { const d = getMostUrgentDueDate(b); return d && diffDaysDateOnlyUTC(d, now) < 0 }).length
-    const dueSoon = filtered.filter((b) => { const d = getMostUrgentDueDate(b); const diff = d ? diffDaysDateOnlyUTC(d, now) : null; return diff !== null && diff >= 0 && diff <= 7 }).length
-    const completed = filtered.filter((b) => getProgress(b) === 100).length
-    const rate = filtered.length > 0 ? Math.round((completed / filtered.length) * 100) : 0
-    return { total: filtered.length, overdue, dueSoon, completed, rate }
+    const open = filtered.filter((b) => !isFinished(b))
+    const overdue = open.filter((b) => isLate(b, now)).length
+    const dueSoon = open.filter((b) => !isLate(b, now) && isDueSoon(b, now)).length
+    const completed = filtered.filter(isFinished).length
+    return { total: filtered.length, overdue, dueSoon, completed }
   }, [filtered, now])
 
   const groups = useMemo((): Group[] => {
@@ -249,150 +220,103 @@ export default function Processes() {
             if (!db) return -1
             return da.getTime() - db.getTime()
           }),
-          headerCls: 'bg-neutral-bg text-muted-foreground',
-          accentCls: 'border-l-border',
-          icon: <Search size={14} />,
+          headerCls: 'text-foreground',
+          icon: <Search size={14} aria-hidden />,
           defaultOpen: true,
         },
       ]
     }
 
-    const overdue = filtered.filter((b) => { const d = getMostUrgentDueDate(b); return d && diffDaysDateOnlyUTC(d, now) < 0 })
-    const dueSoon = filtered.filter((b) => { const d = getMostUrgentDueDate(b); const diff = d ? diffDaysDateOnlyUTC(d, now) : null; return diff !== null && diff >= 0 && diff <= 7 })
-    const inProgress = filtered.filter((b) => { const d = getMostUrgentDueDate(b); const p = getProgress(b); const diff = d ? diffDaysDateOnlyUTC(d, now) : null; return p < 100 && (diff === null || diff > 7) })
-    const completed = filtered.filter((b) => getProgress(b) === 100)
+    const open = filtered.filter((b) => !isFinished(b))
+    const overdue = open.filter((b) => isLate(b, now))
+    const dueSoon = open.filter((b) => !isLate(b, now) && isDueSoon(b, now))
+    const inProgress = open.filter((b) => !isLate(b, now) && !isDueSoon(b, now))
+    const completed = filtered.filter(isFinished)
 
     return [
-      { label: 'Atrasados',      boards: overdue,     headerCls: 'bg-danger-bg text-danger-text',     accentCls: 'border-l-danger-text',   icon: <AlertTriangle size={14} />, defaultOpen: true },
-      { label: 'Vence em 7 dias', boards: dueSoon,    headerCls: 'bg-warning-bg text-warning-text', accentCls: 'border-l-warning-text', icon: <Clock size={14} />,         defaultOpen: true },
-      { label: 'Em andamento',    boards: inProgress, headerCls: 'bg-accent/10 text-accent',   accentCls: 'border-l-accent',  icon: <ClipboardList size={14} />, defaultOpen: true },
-      { label: 'Concluídos',      boards: completed,  headerCls: 'bg-success-bg text-success-text', accentCls: 'border-l-success-text', icon: <CheckCircle2 size={14} />,  defaultOpen: false },
+      { label: 'Atrasados', boards: overdue, headerCls: 'text-danger-text', icon: <AlertTriangle size={14} aria-hidden />, defaultOpen: true },
+      { label: 'Vencem em 7 dias', boards: dueSoon, headerCls: 'text-warning-text', icon: <Clock size={14} aria-hidden />, defaultOpen: true },
+      { label: 'Em andamento', boards: inProgress, headerCls: 'text-foreground', icon: <ClipboardList size={14} aria-hidden />, defaultOpen: true },
+      { label: 'Concluídos', boards: completed, headerCls: 'text-success-text', icon: <CheckCircle2 size={14} aria-hidden />, defaultOpen: false },
     ].filter((g) => g.boards.length > 0)
   }, [filtered, hasActiveFilter, now])
 
-  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando processos...</div>
+  const selectCls = 'h-9 rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg md:text-xl font-bold text-foreground">Processos</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Acompanhe o andamento dos processos dos seus clientes.</p>
-        </div>
-        {MANAGER_ROLES.includes(user?.role ?? '') && (
-          <Button
-            onClick={() => setNewProcessOpen(true)}
-            className="bg-accent hover:bg-accent-hover text-accent-foreground gap-2 shadow-sm"
-          >
-            <Plus size={16} />
-            Novo Processo
-          </Button>
+    <div className="p-4 md:p-6">
+      <PageHeader
+        title="Processos"
+        description="Abertura, alteração, encerramento e outros trabalhos em etapas, com as OS de cada um."
+        actions={MANAGER_ROLES.includes(user?.role ?? '') && (
+          <Button onClick={() => setNewProcessOpen(true)} className="gap-1.5"><Plus size={16} aria-hidden />Novo processo</Button>
         )}
-      </div>
+      />
 
-      {/* Card de filtros */}
-      <div className="bg-surface rounded-xl border border-border shadow-sm p-4">
-        <div className="flex flex-wrap gap-2 items-center">
-          <div className="relative w-full sm:w-60">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar processo ou cliente..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 border-border focus:ring-accent"
-            />
-          </div>
-
-          <select
-            value={filterClient}
-            onChange={(e) => setFilterClient(e.target.value)}
-            className="h-9 rounded-lg border border-border bg-surface px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            <option value="">Cliente</option>
-            {uniqueClients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SearchField label="Buscar processos" placeholder="Processo ou cliente" value={search} onChange={setSearch} className="w-full sm:w-64" />
+        <select aria-label="Filtrar por cliente" value={filterClient} onChange={(e) => setFilterClient(e.target.value)} className={selectCls}>
+          <option value="">Todos os clientes</option>
+          {uniqueClients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        {MANAGER_ROLES.includes(user?.role ?? '') && (
+          <select aria-label="Filtrar por responsável" value={filterResponsible} onChange={(e) => setFilterResponsible(e.target.value)} className={selectCls}>
+            <option value="">Todos os responsáveis</option>
+            {uniqueResponsible.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
-
-          {MANAGER_ROLES.includes(user?.role ?? '') && (
-            <select
-              value={filterResponsible}
-              onChange={(e) => setFilterResponsible(e.target.value)}
-              className="h-9 rounded-lg border border-border bg-surface px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
-            >
-              <option value="">Colaborador</option>
-              {uniqueResponsible.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
+        )}
+        <select aria-label="Filtrar por etapa" value={filterStage} onChange={(e) => setFilterStage(e.target.value)} className={selectCls}>
+          <option value="">Todas as etapas</option>
+          {uniqueStages.map((st) => <option key={st} value={st}>{st}</option>)}
+        </select>
+        <button
+          type="button"
+          aria-pressed={showOnlyOverdue}
+          onClick={() => setShowOnlyOverdue(!showOnlyOverdue)}
+          className={cn(
+            'flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+            showOnlyOverdue ? 'border-danger-text bg-danger-bg text-danger-text' : 'border-border bg-surface text-muted-foreground hover:bg-neutral-bg',
           )}
-
-          <select
-            value={filterStage}
-            onChange={(e) => setFilterStage(e.target.value)}
-            className="h-9 rounded-lg border border-border bg-surface px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            <option value="">Etapa</option>
-            {uniqueStages.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-
+        >
+          <AlertTriangle size={14} aria-hidden />
+          Só atrasados
+        </button>
+        {hasActiveFilter && (
           <button
             type="button"
-            onClick={() => setShowOnlyOverdue(!showOnlyOverdue)}
-            className={cn(
-              'h-9 px-3 rounded-lg text-sm font-medium border transition-colors flex items-center gap-1.5',
-              showOnlyOverdue
-                ? 'bg-danger-text text-danger-foreground border-danger-text shadow-sm'
-                : 'bg-surface text-muted-foreground border-border hover:bg-neutral-bg',
-            )}
+            onClick={() => { setSearch(''); setFilterClient(''); setFilterResponsible(''); setFilterStage(''); setShowOnlyOverdue(false) }}
+            className="flex h-9 items-center gap-1 px-2 text-sm text-muted-foreground hover:text-foreground"
           >
-            <AlertTriangle size={13} />
-            Atrasados
+            <X size={14} aria-hidden />
+            Limpar filtros
           </button>
-
-          {hasActiveFilter && (
-            <button
-              type="button"
-              onClick={() => { setSearch(''); setFilterClient(''); setFilterResponsible(''); setFilterStage(''); setShowOnlyOverdue(false) }}
-              className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-            >
-              <X size={13} />
-              Limpar
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Resumo */}
-      {stats.total > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground px-1">
-          <span className="text-foreground font-medium">{stats.total} processo{stats.total !== 1 ? 's' : ''}</span>
-          {stats.overdue > 0 && (
-            <span className="text-danger-text font-medium flex items-center gap-1">
-              <AlertTriangle size={11} /> {stats.overdue} atrasado{stats.overdue !== 1 ? 's' : ''}
-            </span>
-          )}
-          {stats.dueSoon > 0 && (
-            <span className="text-warning-text flex items-center gap-1">
-              <Clock size={11} /> {stats.dueSoon} vence{stats.dueSoon !== 1 ? 'm' : ''} esta semana
-            </span>
-          )}
-          <span className="text-success-text flex items-center gap-1">
-            <CheckCircle2 size={11} /> {stats.rate}% concluídos
-          </span>
-        </div>
-      )}
-
-      {/* Grupos */}
-      <div className="space-y-3">
-        {groups.length === 0 ? (
-          <div className="text-center py-16">
-            <FileSearch size={40} className="mx-auto mb-3 text-muted-foreground" />
-            <p className="text-base font-medium text-muted-foreground mb-1">Nenhum processo encontrado</p>
-            <p className="text-sm text-muted-foreground">Ajuste os filtros ou crie um novo processo</p>
-          </div>
-        ) : (
-          groups.map((group) => <BoardGroup key={group.label} group={group} now={now} />)
         )}
       </div>
+
+      {stats.total > 0 && (
+        <p className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{stats.total} {stats.total === 1 ? 'processo' : 'processos'}</span>
+          {stats.overdue > 0 && <span className="font-medium text-danger-text">{stats.overdue} {stats.overdue === 1 ? 'atrasado' : 'atrasados'}</span>}
+          {stats.dueSoon > 0 && <span className="text-warning-text">{stats.dueSoon} {stats.dueSoon === 1 ? 'vence' : 'vencem'} em 7 dias</span>}
+          <span>{stats.completed} {stats.completed === 1 ? 'concluído' : 'concluídos'}</span>
+        </p>
+      )}
+
+      {isLoading ? (
+        <ListTable<Board> label="Processos" loading rows={[]} rowKey={(b) => b.id} empty={null} columns={[{ header: 'Processo', width: '1fr', cell: () => null }]} />
+      ) : (
+        <div className="space-y-5">
+          {groups.length === 0 ? (
+            <div className="py-16 text-center">
+              <FileSearch size={40} aria-hidden className="mx-auto mb-3 text-muted-foreground" />
+              <p className="mb-1 text-base font-medium text-foreground">{hasActiveFilter ? 'Nenhum processo com esses filtros' : 'Nenhum processo ainda'}</p>
+              <p className="text-sm text-muted-foreground">{hasActiveFilter ? 'Ajuste ou limpe os filtros.' : 'Abra um processo pelo botão "Novo processo".'}</p>
+            </div>
+          ) : (
+            groups.map((group) => <BoardGroup key={group.label} group={group} now={now} />)
+          )}
+        </div>
+      )}
 
       <NewProcessDialog open={newProcessOpen} onClose={() => setNewProcessOpen(false)} />
     </div>
