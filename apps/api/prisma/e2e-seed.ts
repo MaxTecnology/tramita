@@ -199,6 +199,9 @@ async function main() {
   // "Assumir": Ausente E2E has an open task, Cobertura E2E covers the absence
   const ausente = await staff('ausente-e2e@g2a.com.br', 'Ausente E2E')
   await staff('cobertura-e2e@g2a.com.br', 'Cobertura E2E')
+  // Configurações: a manager only sees what a manager can open
+  const manager = await staff('gestor-e2e@g2a.com.br', 'Gestor E2E')
+  await prisma.user.update({ where: { id: manager.id }, data: { role: 'ORG_MANAGER' } })
 
   // Monthly document request (portal "Enviar documentos"): recurring task of the current month
   const now = new Date()
