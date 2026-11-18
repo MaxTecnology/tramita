@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
+import { http, HttpResponse, delay } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -131,5 +131,25 @@ describe('Tarefas — Kanban', () => {
     expect(processName).toHaveClass('truncate')
     expect(processName).toHaveAttribute('title', '0001 - Padaria Pão Quente — Abertura de empresa com um nome bem comprido')
     expect(within(card).queryByText('Média')).not.toBeInTheDocument()
+  })
+})
+
+describe('Tarefas — trocando filtro', () => {
+  it('while the new rows load, the old ones show as loading and cannot be opened', async () => {
+    renderPage()
+    await screen.findByRole('button', { name: 'Registro na Junta' })
+    server.use(http.get(`${API}/tasks`, async () => { await delay(300); return HttpResponse.json({ items: [TASKS[1]], nextCursor: null }) }))
+    await userEvent.type(screen.getByLabelText('Buscar tarefas'), 'DAS')
+    const list = await screen.findByTestId('task-results')
+    await waitFor(() => expect(list).toHaveAttribute('aria-busy', 'true'))
+    expect(list).toHaveAttribute('inert')
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Registro na Junta' })).not.toBeInTheDocument())
+    expect(list).toHaveAttribute('aria-busy', 'false')
+  })
+
+  it('in the list the full process name shows (no cut)', async () => {
+    renderPage()
+    const r = await row('Registro na Junta')
+    expect(within(r).getByText(/Abertura de empresa com um nome bem comprido/)).not.toHaveClass('truncate')
   })
 })

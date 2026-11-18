@@ -65,7 +65,8 @@ export function ListTable<T>({ label, columns, rows, rowKey, actions, actionsWid
                 </div>
               ))}
               {actions && (
-                <div className="col-start-2 row-start-1 flex items-center justify-end gap-1 md:col-start-auto md:row-start-auto">
+                // Above the row opener of an `interactive` list, so its buttons stay clickable
+                <div className="relative z-10 col-start-2 row-start-1 flex items-center justify-end gap-1 md:col-start-auto md:row-start-auto">
                   {actions(row)}
                 </div>
               )}
@@ -77,7 +78,8 @@ export function ListTable<T>({ label, columns, rows, rowKey, actions, actionsWid
   )
 }
 
-// The button that opens the row's item: its click area covers the whole row of an `interactive` list
+// The button that opens the row's item: its click area covers the whole row of an `interactive` list.
+// Anything else clickable in such a row (or with a tooltip) needs `relative z-10` to sit above it.
 export const ROW_OPENER = 'text-left font-medium text-foreground after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:rounded-md focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-accent'
 
 // "Editar" of a row: a named link (the person reads what it does), with the item in its label

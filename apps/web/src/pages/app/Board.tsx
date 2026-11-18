@@ -305,7 +305,7 @@ export default function Board() {
                       <button
                         onClick={() => handleAddTask(column.id)}
                         disabled={!newTaskTitle.trim() || !newTaskDepartmentId || createTaskMutation.isPending}
-                        className="text-xs bg-accent text-white px-3 py-1 rounded hover:bg-accent-hover disabled:opacity-50"
+                        className="text-xs bg-accent text-accent-foreground px-3 py-1 rounded hover:bg-accent-hover disabled:opacity-50"
                       >
                         {createTaskMutation.isPending ? '...' : 'Adicionar'}
                       </button>

@@ -284,7 +284,7 @@ export default function Processes() {
         {MANAGER_ROLES.includes(user?.role ?? '') && (
           <Button
             onClick={() => setNewProcessOpen(true)}
-            className="bg-accent hover:bg-accent-hover text-white gap-2 shadow-sm"
+            className="bg-accent hover:bg-accent-hover text-accent-foreground gap-2 shadow-sm"
           >
             <Plus size={16} />
             Novo Processo

@@ -744,3 +744,17 @@ Achados da revisão destas correções — ✅ resolvidos em 2026-11-16:
   `Segmented` das outras telas).
 - `resetUserPassword` aceita `organizationId` opcional (o painel master reseta sem org); manter só
   enquanto o master precisar.
+
+## Tarefas e gaveta da tarefa — menores da revisão do redesign (encontrado em 2026-11-18)
+
+Ficaram de fora do bloco visual de Tarefas (`feat/tasks-visual`); nenhum perde dado ou quebra fluxo:
+
+- **Gaveta não é um diálogo de verdade** (já era assim): sem `role="dialog"`/`aria-modal`, foco inicial, foco preso e Esc para fechar. O título renomeia com clique num `<h2>`, sem teclado.
+- **Abas da gaveta**: `role="tab"` sem `aria-controls`/`tabpanel` e sem navegação por setas.
+- **Dicas de Prazo/Meta só no `title`** ("Definida pela tarefa recorrente"): não aparecem no toque nem no teclado — mostrar como texto.
+- **Departamento sem opção vazia**: tarefa com `departmentId` nulo mostra o primeiro departamento como se fosse o dela.
+- **Datas e descrição da gaveta não controladas** (`defaultValue`): uma mudança que chega por SSE com a gaveta aberta não aparece até reabrir.
+- **Kanban**: o `DragOverlay` usa o mesmo card com `useDraggable` (deveria ser só visual); o card não abre com Enter. O rollback de uma mudança que falha restaura o snapshot inteiro e pode desfazer outra mudança feita em paralelo.
+- **Etiqueta de filtro** aparece com o nome vazio ("Cliente: ") se a lista de clientes ainda não carregou.
+- **Tarefa desconsiderada** com prazo passado aparece em vermelho na lista e na gaveta (`isOverdue` só exclui Concluída).
+- **Menu do Master** segue com o azul fixo antigo (`#185FA5`/`#0C447C`), fora do tema.

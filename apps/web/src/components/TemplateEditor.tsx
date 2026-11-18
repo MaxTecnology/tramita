@@ -56,19 +56,21 @@ export function TemplateEditor({ event, channel, onDirtyChange }: Props) {
       api.get<TemplateData>(`/notifications/templates/${event}/${channel}`).then((r) => r.data),
   })
 
-  // The saved text and the box change together, in the same render, when a text arrives (first load,
-  // back to default, after saving): an effect would leave one render where they differ and the page
-  // would take a text nobody edited for an unsaved change
+  // `loaded` is the saved text; `body` is the box. When a new saved text arrives (first load, after
+  // saving, another person saved) the box follows it only if it held no edit — an edit is never
+  // overwritten. "Voltar ao texto padrão" asks the box to take the next one (`adoptNext`).
+  // Both change in the same render: an effect would leave one render where they differ.
   const [loaded, setLoaded] = useState<string | undefined>(undefined)
+  const [adoptNext, setAdoptNext] = useState(false)
   if (data?.body !== undefined && data.body !== loaded) {
     setLoaded(data.body)
-    setBody(data.body)
-    setPreview(null)
+    if (loaded === undefined || body === loaded || adoptNext) {
+      setBody(data.body)
+      setPreview(null)
+      setAdoptNext(false)
+    }
   }
   useEffect(() => { cursor.current = null }, [loaded])
-
-  const dirty = loaded !== undefined && body !== loaded
-  useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
   const variables = data?.variables ?? []
   // Fields in the text this notice never fills: they go out empty
@@ -82,23 +84,20 @@ export function TemplateEditor({ event, channel, onDirtyChange }: Props) {
 
   const saveMutation = useMutation({
     mutationFn: (sent: string) => api.put(`/notifications/templates/${event}/${channel}`, { body: sent }).then((r) => r.data),
-    // The sent text counts as saved at once: switching notice right after "Salvar" must not ask to
-    // discard it. A failed save puts the previous text back as the saved one.
-    onMutate: (sent) => {
-      const previous = queryClient.getQueryData<TemplateData>(key)
-      if (previous) queryClient.setQueryData<TemplateData>(key, { ...previous, body: sent, isDefault: false })
-      return { previous }
-    },
     onSuccess: () => { toast.success('Mensagem salva'); queryClient.invalidateQueries({ queryKey: key }) },
-    onError: (err, _sent, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(key, ctx.previous)
-      toast.error(mensagemDeErro(err, 'Não foi possível salvar a mensagem'))
-    },
+    // The box keeps what was typed: the person can try again
+    onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível salvar a mensagem')),
   })
+
+  // What was just sent counts as saved (switching notice right after "Salvar" must not ask to
+  // discard it); a failed save makes it unsaved again
+  const justSaved = (saveMutation.isPending || saveMutation.isSuccess) && body === saveMutation.variables
+  const dirty = loaded !== undefined && body !== loaded && !justSaved
+  useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
   const resetMutation = useMutation({
     mutationFn: () => api.delete(`/notifications/templates/${event}/${channel}`),
-    onSuccess: () => { toast.success('Mensagem voltou ao texto padrão'); queryClient.invalidateQueries({ queryKey: key }) },
+    onSuccess: () => { toast.success('Mensagem voltou ao texto padrão'); setAdoptNext(true); queryClient.invalidateQueries({ queryKey: key }) },
     onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível voltar ao texto padrão')),
   })
 

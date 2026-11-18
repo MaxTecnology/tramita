@@ -39,13 +39,13 @@ export function DeadlineChip({ deadline, waitingFor, className }: { deadline: De
   return <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap', TONE[deadline.state], className)}>{label}</span>
 }
 
-// Marks a task that is an OS (and the process it belongs to) in task lists. A long process name is
-// cut to the space available; the full name shows on hover.
-export function OSTag({ model, process, className }: { model: string; process?: string | null; className?: string }) {
+// Marks a task that is an OS (and the process it belongs to) in task lists. On a card (`truncate`)
+// a long process name is cut to the space available, the full name on hover; in a list row it wraps.
+export function OSTag({ model, process, className, truncate = true }: { model: string; process?: string | null; className?: string; truncate?: boolean }) {
   return (
-    <span className={cn('inline-flex min-w-0 max-w-full items-center gap-1', className)}>
+    <span className={cn('inline-flex min-w-0 max-w-full gap-1', truncate ? 'items-center' : 'items-start', className)}>
       <span title={`Ordem de serviço: ${model}`} className="flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-info-bg text-info-text">OS</span>
-      {process && <span title={process} className="truncate text-[11px] text-muted-foreground">{process}</span>}
+      {process && <span title={truncate ? process : undefined} className={cn('text-[11px] text-muted-foreground', truncate && 'truncate')}>{process}</span>}
     </span>
   )
 }

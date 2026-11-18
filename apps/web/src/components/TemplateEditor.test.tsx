@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
+import { http, HttpResponse, delay } from 'msw'
 import { server } from '@/test/server'
 import { TemplateEditor } from '@/components/TemplateEditor'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -148,4 +148,45 @@ it('loading a text (first time or after going back to the default) is never "uns
   await userEvent.click(screen.getByRole('button', { name: 'Voltar ao texto padrão' }))
   await screen.findByDisplayValue('Padrão')
   expect(onDirtyChange).not.toHaveBeenCalledWith(true)
+})
+
+it('a failed save keeps what was typed, still unsaved', async () => {
+  const onDirtyChange = vi.fn()
+  let putCalls = 0
+  server.use(
+    http.get(URL, () => HttpResponse.json({ body: 'Oi', isDefault: true, variables: VARS })),
+    http.put(URL, async () => { putCalls++; await delay(150); return HttpResponse.json({ message: 'Falhou' }, { status: 422 }) }),
+  )
+  render(<TemplateEditor event="TASK_MOVED" channel="WHATSAPP" onDirtyChange={onDirtyChange} />, { wrapper })
+  const box = await screen.findByDisplayValue('Oi')
+  await userEvent.type(box, ' editado')
+  await userEvent.click(screen.getByRole('button', { name: 'Salvar mensagem' }))
+  await waitFor(() => expect(putCalls).toBe(1))
+  await new Promise((r) => setTimeout(r, 300))
+  expect(box).toHaveValue('Oi editado')
+  expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+})
+
+it('a new version of the text arriving while editing does not overwrite the edit', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  server.use(http.get(URL, () => HttpResponse.json({ body: 'Oi', isDefault: true, variables: VARS })))
+  render(<QueryClientProvider client={client}><TemplateEditor event="TASK_MOVED" channel="WHATSAPP" /></QueryClientProvider>)
+  const box = await screen.findByDisplayValue('Oi')
+  await userEvent.type(box, ' editado')
+  act(() => { client.setQueryData(['template', 'TASK_MOVED', 'WHATSAPP'], { body: 'Texto de outra pessoa', isDefault: false, variables: VARS }) })
+  expect(await screen.findByText('Personalizada pelo escritório')).toBeInTheDocument() // the new version did arrive
+  expect(box).toHaveValue('Oi editado')
+})
+
+it('going back to the default replaces the box, even with an edit in it', async () => {
+  confirmMock.mockReset().mockResolvedValue(true)
+  let custom = true
+  server.use(
+    http.get(URL, () => HttpResponse.json(custom ? { body: 'Do escritório', isDefault: false, variables: VARS } : { body: 'Padrão', isDefault: true, variables: VARS })),
+    http.delete(URL, () => { custom = false; return HttpResponse.json({}) }),
+  )
+  render(<TemplateEditor event="TASK_MOVED" channel="WHATSAPP" />, { wrapper })
+  await userEvent.type(await screen.findByDisplayValue('Do escritório'), ' mexido')
+  await userEvent.click(screen.getByRole('button', { name: 'Voltar ao texto padrão' }))
+  expect(await screen.findByDisplayValue('Padrão')).toBeInTheDocument()
 })

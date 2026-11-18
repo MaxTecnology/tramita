@@ -112,7 +112,7 @@ export function NewProcessDialog({ open, onClose }: { open: boolean; onClose: ()
           {create.isError && <p className="text-sm text-danger-text">{mensagemDeErro(create.error, 'Erro ao criar processo. Tente novamente.')}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={close}>Cancelar</Button>
-            <Button type="submit" disabled={create.isPending || !canCreate} className={cn('bg-accent hover:bg-accent-hover text-white')}>
+            <Button type="submit" disabled={create.isPending || !canCreate} className={cn('bg-accent hover:bg-accent-hover text-accent-foreground')}>
               {create.isPending ? 'Criando...' : 'Criar processo'}
             </Button>
           </div>

@@ -20,6 +20,7 @@ import { TaskDrawer, STATUS_LABEL, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR 
 import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
 import { buildCalendarGrid, getCalendarGridRange } from './tasksCalendar'
 import { periodRange, type PeriodKind } from './tasksPeriod'
+import { changeTaskStatus, waitsForAnotherOS } from './tasksStatusChange'
 import { STATUS_FILTER_OPTIONS, DEFAULT_STATUS_FILTER, statusFilterParams, type StatusFilter } from './tasksStatus'
 import type { Task, User, Department, RecurringTaskTemplate, DeadlineInfo } from '@/types'
 import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
@@ -68,6 +69,8 @@ interface ClientOption {
 }
 
 type ViewMode = 'list' | 'kanban' | 'calendar'
+
+class GaveUp extends Error {}
 
 const STATUS_ORDER: Task['status'][] = ['OPEN', 'STARTED', 'BLOCKED', 'DISREGARDED', 'DONE']
 
@@ -154,7 +157,7 @@ const processOf = (task: TaskListItem) => (task.column.board.type === 'PROCESS' 
 const isOverdueTask = (task: TaskListItem) => task.dueDate !== null && task.status !== 'DONE' && isPastDateOnlyUTC(task.dueDate)
 
 // What a task carries besides its title: OS and process, approval, request, priority
-function TaskTags({ task }: { task: TaskListItem }) {
+function TaskTags({ task, inRow = false }: { task: TaskListItem; inRow?: boolean }) {
   const tags = [
     task.awaitingApproval && <AwaitingApprovalBadge key="approval" />,
     task.sourceRequestId && <RequestTag key="request" />,
@@ -162,7 +165,7 @@ function TaskTags({ task }: { task: TaskListItem }) {
   ]
   return (
     <>
-      {task.osModel && <OSTag className="mt-1 flex" model={task.osModel.name} process={processOf(task)} />}
+      {task.osModel && <OSTag className="mt-1 flex" truncate={!inRow} model={task.osModel.name} process={processOf(task)} />}
       <div className="mt-1 flex flex-wrap gap-1.5 empty:hidden">{tags}</div>
     </>
   )
@@ -462,6 +465,7 @@ export default function Tasks() {
   const {
     data: tasksPages,
     isLoading,
+    isPlaceholderData,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -548,8 +552,10 @@ export default function Tasks() {
   }, [showColleagueFilter, assigneeId])
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ taskId, newStatus }: { taskId: string; newStatus: Task['status'] }) =>
-      api.patch(`/tasks/${taskId}`, { status: newStatus }).then((r) => r.data),
+    mutationFn: async ({ taskId, newStatus }: { taskId: string; newStatus: Task['status'] }) => {
+      // Giving up the delay reason: the card goes back where it was, without an error message
+      if (!(await changeTaskStatus(taskId, newStatus))) throw new GaveUp()
+    },
     // The list is paginated (InfiniteData): the card moves at once, inside its page
     onMutate: async ({ taskId, newStatus }) => {
       await qc.cancelQueries({ queryKey: ['tasks'] })
@@ -565,7 +571,7 @@ export default function Tasks() {
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.snapshot) qc.setQueryData(ctx.key, ctx.snapshot)
-      toast.error(mensagemDeErro(err, 'Não foi possível mudar o status da tarefa'))
+      if (!(err instanceof GaveUp)) toast.error(mensagemDeErro(err, 'Não foi possível mudar o status da tarefa'))
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
   })
@@ -596,6 +602,10 @@ export default function Tasks() {
 
     const task = tasks.find((t) => t.id === taskId)
     if (!task || task.status === newStatus) return
+    if (waitsForAnotherOS(task)) {
+      toast.info(`Esta OS aguarda ${task.waitingFor?.join(', ') || 'outra OS'}: o status muda quando ela for liberada.`)
+      return
+    }
 
     updateStatusMutation.mutate({ taskId, newStatus })
   }
@@ -677,7 +687,7 @@ export default function Tasks() {
             <SlidersHorizontal size={14} aria-hidden />
             {advanced.length > 0 ? `Filtros (${advanced.length})` : 'Filtros'}
           </button>
-          {colleague && colleagueOpenCount > 0 && (
+          {colleague && colleagueOpenCount > 0 && !isPlaceholderData && (
             <button
               type="button"
               disabled={assumeBulkMutation.isPending}
@@ -742,7 +752,14 @@ export default function Tasks() {
         )}
       </div>
 
-      <div className="px-4 pb-6 md:px-6 lg:min-h-0 lg:flex-1 lg:overflow-auto">
+      {/* While another filter loads, the rows on screen are the old ones: shown as loading and
+          out of reach (no opening, dragging or "Carregar mais" on what is about to go) */}
+      <div
+        data-testid="task-results"
+        aria-busy={isPlaceholderData}
+        inert={isPlaceholderData}
+        className={cn('px-4 pb-6 transition-opacity md:px-6 lg:min-h-0 lg:flex-1 lg:overflow-auto', isPlaceholderData && 'opacity-60')}
+      >
         {view === 'calendar' ? (
           isLoading ? <p className="text-sm text-muted-foreground">Carregando tarefas...</p> : (
             <CalendarView
@@ -768,7 +785,7 @@ export default function Tasks() {
                 cell: (t) => (
                   <div className="min-w-0">
                     <button type="button" onClick={() => setSelectedTaskId(t.id)} className={cn(ROW_OPENER, 'text-sm')}>{t.title}</button>
-                    <TaskTags task={t} />
+                    <TaskTags task={t} inRow />
                   </div>
                 ),
               },
@@ -823,7 +840,7 @@ export default function Tasks() {
           </DndContext>
         )}
 
-        {!isLoading && hasNextPage && (
+        {!isLoading && !isPlaceholderData && hasNextPage && (
           <div className="flex justify-center mt-4">
             <button
               type="button"
