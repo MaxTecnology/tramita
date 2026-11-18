@@ -11,7 +11,7 @@ export interface ListColumn<T> {
 
 // The settings list: a table on wide screens; on phones each row is a card where every column
 // after the first shows its header as a label. The actions sit at the end of the row.
-export function ListTable<T>({ label, columns, rows, rowKey, actions, actionsWidth = '8rem', empty, loading, muted }: {
+export function ListTable<T>({ label, columns, rows, rowKey, actions, actionsWidth = '8rem', empty, loading, muted, interactive }: {
   label: string
   columns: ListColumn<T>[]
   rows: T[]
@@ -23,6 +23,8 @@ export function ListTable<T>({ label, columns, rows, rowKey, actions, actionsWid
   loading?: boolean
   // Rows shown dimmed (e.g. inactive)
   muted?: (row: T) => boolean
+  // Rows open something: one cell holds a button stretched over the row (see ROW_OPENER)
+  interactive?: boolean
 }) {
   const template = [...columns.map((c) => c.width), actions ? actionsWidth : ''].filter(Boolean).join(' ')
   return (
@@ -50,15 +52,16 @@ export function ListTable<T>({ label, columns, rows, rowKey, actions, actionsWid
               key={rowKey(row)}
               data-list-row
               className={cn(
-                'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 px-4 py-3.5 md:items-center md:gap-4 md:[grid-template-columns:var(--cols)]',
+                'relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 px-4 py-3.5 md:items-center md:gap-4 md:[grid-template-columns:var(--cols)]',
                 muted?.(row) && 'opacity-60',
+                interactive && 'transition-colors hover:bg-neutral-bg/60',
               )}
               style={{ ['--cols' as string]: template }}
             >
               {columns.map((c, i) => (
-                <div key={c.header} className={cn('min-w-0', i > 0 && 'col-start-1 md:col-start-auto')}>
-                  {i > 0 && <span className="mr-1.5 text-xs text-muted-foreground md:hidden">{c.header}:</span>}
-                  {c.cell(row)}
+                <div key={c.header} className={cn('min-w-0', i > 0 && 'col-start-1 flex items-baseline gap-1.5 md:col-start-auto md:block')}>
+                  {i > 0 && <span className="flex-shrink-0 text-xs text-muted-foreground md:hidden">{c.header}:</span>}
+                  {i > 0 ? <div className="min-w-0">{c.cell(row)}</div> : c.cell(row)}
                 </div>
               ))}
               {actions && (
@@ -73,6 +76,9 @@ export function ListTable<T>({ label, columns, rows, rowKey, actions, actionsWid
     </div>
   )
 }
+
+// The button that opens the row's item: its click area covers the whole row of an `interactive` list
+export const ROW_OPENER = 'text-left font-medium text-foreground after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:rounded-md focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-accent'
 
 // "Editar" of a row: a named link (the person reads what it does), with the item in its label
 export function EditLink({ to, name }: { to: string; name: string }) {

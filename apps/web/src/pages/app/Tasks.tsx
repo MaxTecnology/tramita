@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData, type InfiniteData } from '@tanstack/react-query'
 import {
   DndContext,
   DragEndEvent,
@@ -11,7 +11,7 @@ import {
   useDroppable,
   useDraggable,
 } from '@dnd-kit/core'
-import { List, LayoutGrid, Inbox, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react'
+import { List, LayoutGrid, Inbox, ChevronLeft, ChevronRight, Calendar as CalendarIcon, SlidersHorizontal, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn, mensagemDeErro } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -28,6 +28,9 @@ import { useLinkedItem } from '@/hooks/useLinkedItem'
 import { useBoardStream } from '@/hooks/useBoardStream'
 import { askConfirm } from '@/components/ui/app-dialogs'
 import { DeadlineChip, OSTag } from '@/components/shared/DeadlineChip'
+import { PageHeader } from '@/components/ui/page-header'
+import { SearchField } from '@/components/ui/search-field'
+import { ListTable, ROW_OPENER } from '@/components/ui/list-table'
 
 // GET /tasks retorna uma listagem flat de tarefas cruzando todos os boards da org (inclusive o
 // board de sistema onde moram as recorrentes). O select do backend cobre todos os campos de Task,
@@ -68,27 +71,7 @@ type ViewMode = 'list' | 'kanban' | 'calendar'
 
 const STATUS_ORDER: Task['status'][] = ['OPEN', 'STARTED', 'BLOCKED', 'DISREGARDED', 'DONE']
 
-// Every filter shows its name above it (the placeholder alone did not say what the select was)
-// `group` for a set of buttons: a <label> around several controls would rename the first one
-function FilterField({ label, group = false, children }: { label: string; group?: boolean; children: React.ReactNode }) {
-  if (group) {
-    return (
-      <div role="group" aria-label={label} className="flex flex-col gap-0.5">
-        <span aria-hidden className="text-[11px] font-medium text-muted-foreground">{label}</span>
-        {children}
-      </div>
-    )
-  }
-  return (
-    <label className="flex flex-col gap-0.5">
-      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
-      {children}
-    </label>
-  )
-}
-
-const selectCls = 'h-8 rounded-md border border-border bg-surface px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent'
-
+// The less used filters sit in the "Filtros" panel, each with its name above it
 function FilterSelect({
   label,
   value,
@@ -103,48 +86,101 @@ function FilterSelect({
   children: React.ReactNode
 }) {
   return (
-    <FilterField label={label}>
+    <label className="flex min-w-[11rem] flex-col gap-1">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)} className={selectCls}>
         <option value="">{placeholder}</option>
         {children}
       </select>
-    </FilterField>
+    </label>
   )
 }
 
+const selectCls = 'h-9 rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+
 const PERIOD_LABEL: Record<PeriodKind, string> = { this: 'Este mês', last: 'Mês passado', custom: 'Personalizado' }
 
-function TaskRow({ task, onClick }: { task: TaskListItem; onClick: () => void }) {
-  const isOverdue = task.dueDate !== null && task.status !== 'DONE' && isPastDateOnlyUTC(task.dueDate)
+// Segmented buttons (view, period): the pressed one in the theme colour
+function Segmented<T extends string>({ label, options, value, onChange }: {
+  label: string
+  options: { value: T; label: string; icon?: React.ReactNode }[]
+  value: T
+  onChange: (v: T) => void
+}) {
   return (
-    <tr
-      onClick={onClick}
-      className="border-b border-border last:border-0 cursor-pointer hover:bg-neutral-bg transition-colors"
-    >
-      <td className="px-3 py-2.5 text-sm text-foreground">
-        <span className="font-medium">{task.column.board.client.name}</span>
-        {task.column.board.client.codigo && (
-          <span className="text-muted-foreground text-xs ml-1.5">#{task.column.board.client.codigo}</span>
-        )}
-      </td>
-      <td className="px-3 py-2.5 text-sm text-foreground">
-        {task.title}
-        {task.osModel && <OSTag className="ml-2" model={task.osModel.name} process={task.column.board.type === 'PROCESS' ? task.column.board.title : null} />}
-        {task.deadline && task.osModel && <DeadlineChip className="ml-2" deadline={task.deadline} />}
-        {task.awaitingApproval && <AwaitingApprovalBadge className="ml-2" />}
-      </td>
-      <td className="px-3 py-2.5 text-sm text-muted-foreground">{task.department?.name ?? '—'}</td>
-      <td className="px-3 py-2.5 text-sm text-muted-foreground">{task.assignee?.name ?? '—'}</td>
-      <td className="px-3 py-2.5">
-        <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', STATUS_COLOR[task.status])}>
-          {STATUS_LABEL[task.status]}
-        </span>
-      </td>
-      <td className={cn('px-3 py-2.5 text-sm', isOverdue ? 'text-danger-text font-medium' : 'text-muted-foreground')}>
-        {task.targetDate ? formatDateOnlyUTC(new Date(task.targetDate)) : '—'}
-      </td>
-    </tr>
+    <div role="group" aria-label={label} className="flex overflow-hidden rounded-md border border-border">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          aria-pressed={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            'flex h-9 items-center gap-1.5 px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent',
+            value === o.value ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
+          )}
+        >
+          {o.icon}
+          {o.label}
+        </button>
+      ))}
+    </div>
   )
+}
+
+// Medium and low are the usual: only high and urgent earn a tag
+function PriorityTag({ priority }: { priority: Task['priority'] }) {
+  if (priority !== 'HIGH' && priority !== 'URGENT') return null
+  return (
+    <span className={cn('inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium', PRIORITY_COLOR[priority])}>
+      {PRIORITY_LABEL[priority]}
+    </span>
+  )
+}
+
+function RequestTag() {
+  return (
+    <span title="Aberta a partir de uma solicitação do cliente" className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-highlight-bg px-2 py-0.5 text-[11px] font-medium text-highlight-text">
+      <Inbox size={11} aria-hidden /> Solicitação
+    </span>
+  )
+}
+
+function StatusPill({ status }: { status: Task['status'] }) {
+  return <span className={cn('inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[status])}>{STATUS_LABEL[status]}</span>
+}
+
+const processOf = (task: TaskListItem) => (task.column.board.type === 'PROCESS' ? task.column.board.title ?? null : null)
+const isOverdueTask = (task: TaskListItem) => task.dueDate !== null && task.status !== 'DONE' && isPastDateOnlyUTC(task.dueDate)
+
+// What a task carries besides its title: OS and process, approval, request, priority
+function TaskTags({ task }: { task: TaskListItem }) {
+  const tags = [
+    task.awaitingApproval && <AwaitingApprovalBadge key="approval" />,
+    task.sourceRequestId && <RequestTag key="request" />,
+    <PriorityTag key="priority" priority={task.priority} />,
+  ]
+  return (
+    <>
+      {task.osModel && <OSTag className="mt-1 flex" model={task.osModel.name} process={processOf(task)} />}
+      <div className="mt-1 flex flex-wrap gap-1.5 empty:hidden">{tags}</div>
+    </>
+  )
+}
+
+// Deadline: the OS internal deadline in words, otherwise the target date
+function TaskDeadline({ task }: { task: TaskListItem }) {
+  const meta = task.targetDate ? formatDateOnlyUTC(new Date(task.targetDate)) : null
+  if (task.deadline && task.osModel && task.deadline.state !== 'NONE') {
+    return (
+      <div className="flex flex-col items-start gap-0.5">
+        <DeadlineChip deadline={task.deadline} />
+        {meta && <span className="text-xs text-muted-foreground">Meta {meta}</span>}
+      </div>
+    )
+  }
+  if (!meta) return <span className="text-sm text-muted-foreground">—</span>
+  return <span className={cn('text-sm', isOverdueTask(task) ? 'font-medium text-danger-text' : 'text-foreground')}>{meta}</span>
 }
 
 function DroppableStatusColumn({ id, children }: { id: string; children: React.ReactNode }) {
@@ -167,7 +203,8 @@ function DraggableTaskCard({ task, onClick }: { task: TaskListItem; onClick: () 
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined
-  const isOverdue = task.dueDate !== null && task.status !== 'DONE' && isPastDateOnlyUTC(task.dueDate)
+  const isOverdue = isOverdueTask(task)
+  const hasDeadlineChip = !!(task.deadline && task.osModel && task.deadline.state !== 'NONE')
 
   return (
     <div
@@ -176,38 +213,28 @@ function DraggableTaskCard({ task, onClick }: { task: TaskListItem; onClick: () 
       {...attributes}
       {...listeners}
       onClick={onClick}
+      data-task-card
       className={cn(
-        'bg-surface rounded-lg p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow select-none',
+        'min-w-0 cursor-pointer select-none rounded-lg border bg-surface p-3 shadow-sm transition-shadow hover:shadow-md',
         isOverdue ? 'border-danger-text' : 'border-border',
         isDragging && 'opacity-40',
       )}
     >
-      <p className="text-sm font-medium text-foreground mb-1.5 line-clamp-2">{task.title}</p>
-      <p className="text-xs text-muted-foreground mb-1.5">
+      <p className="line-clamp-2 text-sm font-medium text-foreground">{task.title}</p>
+      <p className="mt-0.5 truncate text-xs text-muted-foreground">
         {task.column.board.client.name}
         {task.column.board.client.codigo && <span className="ml-1">#{task.column.board.client.codigo}</span>}
       </p>
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {task.osModel && <OSTag model={task.osModel.name} process={task.column.board.type === 'PROCESS' ? task.column.board.title : null} />}
-        {task.deadline && task.osModel && <DeadlineChip deadline={task.deadline} />}
-        {task.awaitingApproval && <AwaitingApprovalBadge />}
-        {task.sourceRequestId && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-highlight-bg text-highlight-text" title="Originado de uma solicitação do cliente">
-            <Inbox size={11} />
+      <TaskTags task={task} />
+      {hasDeadlineChip && task.deadline && <DeadlineChip className="mt-1.5" deadline={task.deadline} />}
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span className="truncate">{task.assignee?.name ?? 'Sem responsável'}</span>
+        {task.targetDate && (
+          <span className={cn('flex-shrink-0', isOverdue && 'font-medium text-danger-text')}>
+            Meta {formatDateOnlyUTC(new Date(task.targetDate))}
           </span>
         )}
-        <span className={cn('inline-flex text-xs font-medium px-2 py-0.5 rounded-full', PRIORITY_COLOR[task.priority])}>
-          {PRIORITY_LABEL[task.priority]}
-        </span>
-        {task.department?.name && (
-          <span className="text-xs text-muted-foreground">{task.department.name}</span>
-        )}
       </div>
-      {task.targetDate && (
-        <p className={cn('text-xs mt-1.5', isOverdue ? 'text-danger-text font-medium' : 'text-muted-foreground')}>
-          {isOverdue ? '⚠ ' : ''}Meta: {formatDateOnlyUTC(new Date(task.targetDate))}
-        </p>
-      )}
     </div>
   )
 }
@@ -272,7 +299,7 @@ function CalendarView({
 
       <div className="grid grid-cols-7">
         {WEEKDAY_LABELS.map((w) => (
-          <div key={w} className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-center py-1.5 border-b border-border">
+          <div key={w} className="text-xs font-medium text-muted-foreground text-center py-1.5 border-b border-border">
             {w}
           </div>
         ))}
@@ -377,6 +404,7 @@ export default function Tasks() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [search, setSearch] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   // No modo Calendário, a navegação de mês É o filtro de data — mas calculada aqui, no momento de
   // montar a query, em vez de escrita no estado dateFrom/dateTo compartilhado com os inputs manuais
@@ -455,9 +483,12 @@ export default function Tasks() {
       return api.get('/tasks', { params }).then((r) => r.data)
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    // Changing a filter keeps the current rows until the new ones arrive (no blank list in between)
+    placeholderData: keepPreviousData,
   })
 
   const tasks = useMemo(() => tasksPages?.pages.flatMap((p) => p.items) ?? [], [tasksPages])
+  type TasksData = InfiniteData<{ items: TaskListItem[]; nextCursor: string | null }>
 
   // Cover an absent colleague: take all their open tasks of my departments at once
   const bulkQc = useQueryClient()
@@ -519,19 +550,22 @@ export default function Tasks() {
   const updateStatusMutation = useMutation({
     mutationFn: ({ taskId, newStatus }: { taskId: string; newStatus: Task['status'] }) =>
       api.patch(`/tasks/${taskId}`, { status: newStatus }).then((r) => r.data),
+    // The list is paginated (InfiniteData): the card moves at once, inside its page
     onMutate: async ({ taskId, newStatus }) => {
       await qc.cancelQueries({ queryKey: ['tasks'] })
-      const snapshot = qc.getQueryData<TaskListItem[]>(['tasks', filters])
+      const key = ['tasks', filters]
+      const snapshot = qc.getQueryData<TasksData>(key)
       if (snapshot) {
-        qc.setQueryData<TaskListItem[]>(
-          ['tasks', filters],
-          snapshot.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)),
-        )
+        qc.setQueryData<TasksData>(key, {
+          ...snapshot,
+          pages: snapshot.pages.map((p) => ({ ...p, items: p.items.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)) })),
+        })
       }
-      return { snapshot }
+      return { snapshot, key }
     },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.snapshot) qc.setQueryData(['tasks', filters], ctx.snapshot)
+    onError: (err, _vars, ctx) => {
+      if (ctx?.snapshot) qc.setQueryData(ctx.key, ctx.snapshot)
+      toast.error(mensagemDeErro(err, 'Não foi possível mudar o status da tarefa'))
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
   })
@@ -566,104 +600,45 @@ export default function Tasks() {
     updateStatusMutation.mutate({ taskId, newStatus })
   }
 
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between gap-2 px-4 md:px-6 py-3 md:py-4 border-b border-border bg-surface flex-shrink-0">
-        <h1 className="text-base md:text-lg font-semibold text-foreground">Tarefas</h1>
-        <div className="flex items-center gap-1 rounded-md border border-border p-0.5 bg-neutral-bg">
-          <button
-            type="button"
-            onClick={() => setView('list')}
-            className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors',
-              view === 'list' ? 'bg-surface text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <List size={14} />
-            Lista
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('kanban')}
-            className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors',
-              view === 'kanban' ? 'bg-surface text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <LayoutGrid size={14} />
-            Kanban
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('calendar')}
-            className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors',
-              view === 'calendar' ? 'bg-surface text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <CalendarIcon size={14} />
-            Calendário
-          </button>
-        </div>
-      </div>
+  // The filters behind "Filtros": what is chosen shows as a chip that removes it
+  const clientLabel = (id: string) => { const c = clients.find((x) => x.id === id); return c ? (c.codigo ? `${c.codigo} - ${c.name}` : c.name) : '' }
+  const advanced = [
+    clientId && { key: 'client', label: `Cliente: ${clientLabel(clientId)}`, clear: () => setClientId('') },
+    assigneeId && { key: 'assignee', label: `Colaborador: ${users.find((u) => u.id === assigneeId)?.name ?? ''}`, clear: () => setAssigneeId('') },
+    departmentId && { key: 'department', label: `Departamento: ${departments.find((d) => d.id === departmentId)?.name ?? ''}`, clear: () => setDepartmentId('') },
+    recurringTemplateId && { key: 'type', label: `Tipo: ${recurringTemplates.find((t) => t.id === recurringTemplateId)?.title ?? ''}`, clear: () => setRecurringTemplateId('') },
+  ].filter((f): f is { key: string; label: string; clear: () => void } => !!f)
 
-      {/* Filtros */}
-      <div className="flex flex-wrap items-end gap-3 px-4 md:px-6 py-2 border-b border-border bg-surface">
-        {me && (me.role !== 'ORG_MEMBER' || me.seesDepartmentWork) && (
-          <FilterField label="Mostrar" group>
+  return (
+    // Phones scroll the whole page (filters included); wide screens keep the header still and
+    // scroll only the list or board below it
+    <div className="h-full overflow-auto lg:flex lg:flex-col lg:overflow-hidden">
+      <div className="flex-shrink-0 px-4 pt-4 md:px-6 md:pt-6">
+        <PageHeader
+          title="Tarefas"
+          description="O que a equipe tem a fazer: obrigações recorrentes, ordens de serviço e etapas de processo."
+          actions={
+            <Segmented<ViewMode>
+              label="Visualização"
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'list', label: 'Lista', icon: <List size={14} aria-hidden /> },
+                { value: 'kanban', label: 'Kanban', icon: <LayoutGrid size={14} aria-hidden /> },
+                { value: 'calendar', label: 'Calendário', icon: <CalendarIcon size={14} aria-hidden /> },
+              ]}
+            />
+          }
+        />
+
+        <div className="flex flex-wrap items-center gap-2 pb-3">
+          {me && (me.role !== 'ORG_MEMBER' || me.seesDepartmentWork) && (
             <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />
-          </FilterField>
-        )}
-        <FilterField label="Buscar">
-          <input
-            type="text"
-            placeholder="Título, cliente ou código..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-56 h-8 rounded-md border border-border bg-surface px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-        </FilterField>
-        <FilterSelect label="Cliente" value={clientId} onChange={setClientId} placeholder="Todos">
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>{c.codigo ? `${c.codigo} - ${c.name}` : c.name}</option>
-          ))}
-        </FilterSelect>
-        {showColleagueFilter && (
-          <FilterSelect label="Colaborador" value={assigneeId} onChange={setAssigneeId} placeholder="Todos">
-            {colleagueOptions.map((u) => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-          </FilterSelect>
-        )}
-        {colleague && colleagueOpenCount > 0 && (
-          <button
-            type="button"
-            disabled={assumeBulkMutation.isPending}
-            onClick={async () => {
-              if (await askConfirm({
-                title: `Assumir ${colleagueOpenCount === 1 ? 'a tarefa aberta' : `as ${colleagueOpenCount} tarefas abertas`} de ${colleague.name}?`,
-                description: `${colleague.name} recebe um aviso. A carteira de clientes não muda.`,
-                confirmLabel: 'Assumir',
-              })) assumeBulkMutation.mutate()
-            }}
-            className="self-end h-8 rounded-md border border-warning-text/40 bg-warning-bg px-3 text-sm font-medium text-warning-text hover:opacity-90 disabled:opacity-50"
-          >
-            Assumir todas as abertas de {colleague.name}
-          </button>
-        )}
-        <FilterSelect label="Departamento" value={departmentId} onChange={setDepartmentId} placeholder="Todos">
-          {departmentOptions.map((d) => (
-            <option key={d.id} value={d.id}>{d.name}</option>
-          ))}
-        </FilterSelect>
-        <FilterSelect label="Tipo de tarefa" value={recurringTemplateId} onChange={setRecurringTemplateId} placeholder="Todos">
-          {recurringTemplates.map((t) => (
-            <option key={t.id} value={t.id}>{t.title}</option>
-          ))}
-        </FilterSelect>
-        {view !== 'kanban' && (
-          <FilterField label="Status">
+          )}
+          <SearchField label="Buscar tarefas" placeholder="Título, cliente ou código" value={search} onChange={setSearch} className="w-full sm:w-64" />
+          {view !== 'kanban' && (
             <select
+              aria-label="Status"
               value={status}
               onChange={(e) => setStatus(STATUS_FILTER_OPTIONS.find((o) => o.value === e.target.value)?.value ?? DEFAULT_STATUS_FILTER)}
               className={selectCls}
@@ -672,107 +647,172 @@ export default function Tasks() {
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
-          </FilterField>
-        )}
-        {view !== 'calendar' && (
-          <FilterField label="Período" group>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex rounded-md border border-border overflow-hidden">
-                {(['this', 'last', 'custom'] as const).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => setPeriodKind(k)}
-                    className={cn(
-                      'h-8 px-3 text-sm font-medium transition-colors',
-                      periodKind === k ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
-                    )}
-                  >
-                    {PERIOD_LABEL[k]}
-                  </button>
-                ))}
-              </div>
+          )}
+          {view !== 'calendar' && (
+            <>
+              <Segmented<PeriodKind>
+                label="Período"
+                value={periodKind}
+                onChange={setPeriodKind}
+                options={(['this', 'last', 'custom'] as const).map((k) => ({ value: k, label: PERIOD_LABEL[k] }))}
+              />
               {periodKind === 'custom' && (
                 <>
-                  <input
-                    type="date"
-                    aria-label="De"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
-                  <input
-                    type="date"
-                    aria-label="Até"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    className="h-8 rounded-md border border-border bg-surface px-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
+                  <input type="date" aria-label="De" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={selectCls} />
+                  <input type="date" aria-label="Até" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={selectCls} />
                 </>
               )}
-            </div>
-          </FilterField>
-        )}
-        {hasFilters && (
-          <button type="button" onClick={clearFilters} className="self-end pb-1.5 text-xs text-muted-foreground hover:text-foreground underline">
-            Limpar
+            </>
+          )}
+          <button
+            type="button"
+            aria-expanded={filtersOpen}
+            aria-controls="task-more-filters"
+            onClick={() => setFiltersOpen((o) => !o)}
+            className={cn(
+              'flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+              advanced.length > 0 ? 'border-accent text-foreground' : 'border-border text-muted-foreground hover:bg-neutral-bg',
+            )}
+          >
+            <SlidersHorizontal size={14} aria-hidden />
+            {advanced.length > 0 ? `Filtros (${advanced.length})` : 'Filtros'}
           </button>
+          {colleague && colleagueOpenCount > 0 && (
+            <button
+              type="button"
+              disabled={assumeBulkMutation.isPending}
+              onClick={async () => {
+                if (await askConfirm({
+                  title: `Assumir ${colleagueOpenCount === 1 ? 'a tarefa aberta' : `as ${colleagueOpenCount} tarefas abertas`} de ${colleague.name}?`,
+                  description: `${colleague.name} recebe um aviso. A carteira de clientes não muda.`,
+                  confirmLabel: 'Assumir',
+                })) assumeBulkMutation.mutate()
+              }}
+              className="h-9 rounded-md border border-warning-text/40 bg-warning-bg px-3 text-sm font-medium text-warning-text hover:opacity-90 disabled:opacity-50"
+            >
+              Assumir todas as abertas de {colleague.name}
+            </button>
+          )}
+          {hasFilters && (
+            <button type="button" onClick={clearFilters} className="h-9 px-2 text-sm text-muted-foreground hover:text-foreground">
+              Limpar filtros
+            </button>
+          )}
+        </div>
+
+        {filtersOpen ? (
+          <div id="task-more-filters" className="mb-3 flex flex-wrap gap-3 rounded-lg border border-border bg-surface p-3">
+            <FilterSelect label="Cliente" value={clientId} onChange={setClientId} placeholder="Todos">
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>{c.codigo ? `${c.codigo} - ${c.name}` : c.name}</option>
+              ))}
+            </FilterSelect>
+            {showColleagueFilter && (
+              <FilterSelect label="Colaborador" value={assigneeId} onChange={setAssigneeId} placeholder="Todos">
+                {colleagueOptions.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </FilterSelect>
+            )}
+            <FilterSelect label="Departamento" value={departmentId} onChange={setDepartmentId} placeholder="Todos">
+              {departmentOptions.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </FilterSelect>
+            <FilterSelect label="Tipo de tarefa" value={recurringTemplateId} onChange={setRecurringTemplateId} placeholder="Todos">
+              {recurringTemplates.map((t) => (
+                <option key={t.id} value={t.id}>{t.title}</option>
+              ))}
+            </FilterSelect>
+          </div>
+        ) : advanced.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {advanced.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={f.clear}
+                aria-label={`Tirar filtro ${f.label}`}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-foreground hover:bg-neutral-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                {f.label} <X size={12} aria-hidden />
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
-      <div className="flex-1 overflow-auto p-4 md:p-6">
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Carregando tarefas...</p>
-        ) : view === 'calendar' ? (
-          <CalendarView
-            tasks={tasks}
-            month={calendarMonth}
-            onPrevMonth={() => setCalendarMonth((m) => new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() - 1, 1)))}
-            onNextMonth={() => setCalendarMonth((m) => new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1)))}
-            onToday={() => setCalendarMonth(startOfCurrentMonthUTC())}
-            onTaskClick={(taskId) => setSelectedTaskId(taskId)}
-          />
-        ) : tasks.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhuma tarefa encontrada.</p>
+      <div className="px-4 pb-6 md:px-6 lg:min-h-0 lg:flex-1 lg:overflow-auto">
+        {view === 'calendar' ? (
+          isLoading ? <p className="text-sm text-muted-foreground">Carregando tarefas...</p> : (
+            <CalendarView
+              tasks={tasks}
+              month={calendarMonth}
+              onPrevMonth={() => setCalendarMonth((m) => new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() - 1, 1)))}
+              onNextMonth={() => setCalendarMonth((m) => new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1)))}
+              onToday={() => setCalendarMonth(startOfCurrentMonthUTC())}
+              onTaskClick={(taskId) => setSelectedTaskId(taskId)}
+            />
+          )
         ) : view === 'list' ? (
-          <div className="bg-surface border border-border rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-neutral-bg">
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cliente</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tarefa</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Departamento</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Responsável</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Meta</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onClick={() => setSelectedTaskId(task.id)} />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ListTable<TaskListItem>
+            label="Tarefas"
+            loading={isLoading}
+            rows={tasks}
+            rowKey={(t) => t.id}
+            interactive
+            empty={<p className="text-sm text-muted-foreground">{hasFilters ? 'Nenhuma tarefa com esses filtros.' : 'Nenhuma tarefa neste período.'}</p>}
+            columns={[
+              {
+                header: 'Tarefa', width: 'minmax(0,2.2fr)',
+                cell: (t) => (
+                  <div className="min-w-0">
+                    <button type="button" onClick={() => setSelectedTaskId(t.id)} className={cn(ROW_OPENER, 'text-sm')}>{t.title}</button>
+                    <TaskTags task={t} />
+                  </div>
+                ),
+              },
+              {
+                header: 'Cliente', width: 'minmax(0,1.4fr)',
+                cell: (t) => (
+                  <p className="text-sm text-foreground">
+                    <span>{t.column.board.client.name}</span>
+                    {t.column.board.client.codigo && <span className="ml-1 text-xs text-muted-foreground">#{t.column.board.client.codigo}</span>}
+                  </p>
+                ),
+              },
+              {
+                header: 'Responsável', width: 'minmax(0,1.2fr)',
+                cell: (t) => (
+                  <div className="min-w-0 text-sm">
+                    <p className={cn('truncate', t.assignee ? 'text-foreground' : 'text-muted-foreground')}>{t.assignee?.name ?? 'Sem responsável'}</p>
+                    {t.department && <p className="truncate text-xs text-muted-foreground">{t.department.name}</p>}
+                  </div>
+                ),
+              },
+              { header: 'Status', width: '9rem', cell: (t) => <StatusPill status={t.status} /> },
+              { header: 'Prazo', width: '10rem', cell: (t) => <TaskDeadline task={t} /> },
+            ]}
+          />
+        ) : isLoading ? (
+          <p className="text-sm text-muted-foreground">Carregando tarefas...</p>
         ) : (
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="flex gap-3 md:gap-4 h-full">
+            <div className="flex gap-3 overflow-x-auto pb-2 lg:h-full lg:overflow-visible">
               {STATUS_ORDER.map((s) => {
                 const columnTasks = columns.get(s) ?? []
                 return (
-                  <div key={s} className="flex-shrink-0 w-[280px] md:w-64 flex flex-col">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-foreground">{STATUS_LABEL[s]}</h3>
-                      <span className="text-xs text-muted-foreground bg-neutral-bg rounded-full px-2 py-0.5">
-                        {columnTasks.length}
-                      </span>
+                  <section key={s} aria-label={STATUS_LABEL[s]} className="flex w-[260px] flex-shrink-0 flex-col lg:w-auto lg:min-w-[13rem] lg:flex-1 lg:flex-shrink">
+                    <div className="mb-2 flex items-center justify-between">
+                      <h2 className="text-sm font-semibold text-foreground">{STATUS_LABEL[s]}</h2>
+                      <span className="rounded-full bg-neutral-bg px-2 py-0.5 text-xs text-muted-foreground">{columnTasks.length}</span>
                     </div>
                     <DroppableStatusColumn id={s}>
                       {columnTasks.map((task) => (
                         <DraggableTaskCard key={task.id} task={task} onClick={() => setSelectedTaskId(task.id)} />
                       ))}
                     </DroppableStatusColumn>
-                  </div>
+                  </section>
                 )
               })}
             </div>
