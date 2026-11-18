@@ -61,7 +61,6 @@ describe('createUser', () => {
     const result = await createUser(org.id, {
       name: 'Novo Membro',
       email: `novo-${Date.now()}@test.com`,
-      password: 'Senha@1234',
       role: 'ORG_MEMBER',
       departmentIds: [fiscal.id],
     })
@@ -69,7 +68,7 @@ describe('createUser', () => {
     expect(result.role).toBe('ORG_MEMBER')
     const stored = await prisma.user.findUnique({ where: { id: result.id } })
     expect(stored?.organizationId).toBe(org.id)
-    expect(stored?.passwordHash).not.toBe('Senha@1234')
+    expect(stored?.passwordHash).not.toBe(result.temporaryPassword)
   })
 
   it('throws 409 when email is already registered', async () => {
@@ -79,7 +78,7 @@ describe('createUser', () => {
     await createTestUser(org.id, { email })
 
     await expect(
-      createUser(org.id, { name: 'Outro', email, password: 'Senha@1234', role: 'ORG_MEMBER' }),
+      createUser(org.id, { name: 'Outro', email, role: 'ORG_MEMBER' }),
     ).rejects.toMatchObject({ statusCode: 409 })
   })
 })

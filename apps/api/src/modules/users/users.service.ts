@@ -25,9 +25,9 @@ async function assertDepartmentsOfOrg(db: Prisma.TransactionClient | typeof pris
   return unique
 }
 
-export async function listUsers(organizationId: string) {
+export async function listUsers(organizationId: string, status: 'active' | 'inactive' = 'active') {
   const users = await prisma.user.findMany({
-    where: { organizationId, isActive: true },
+    where: { organizationId, isActive: status === 'active' },
     select: SELECT,
     orderBy: { createdAt: 'asc' },
   })
@@ -57,11 +57,13 @@ export async function createUser(organizationId: string, data: CreateUserBody) {
   if (!data.departmentIds?.length) throw new AppError(400, 'Selecione pelo menos um departamento')
   const departmentIds = await assertDepartmentsOfOrg(prisma, organizationId, data.departmentIds)
 
-  return present(await prisma.user.create({
+  // Shown once in the answer, never stored in clear nor listed again
+  const temporaryPassword = generateRandomPassword()
+  const created = present(await prisma.user.create({
     data: {
       name: data.name,
       email: data.email,
-      passwordHash: await hashPassword(data.password),
+      passwordHash: await hashPassword(temporaryPassword),
       role: data.role,
       phone: data.phone,
       seesDepartmentWork: data.seesDepartmentWork ?? true,
@@ -70,6 +72,15 @@ export async function createUser(organizationId: string, data: CreateUserBody) {
     },
     select: SELECT,
   }))
+  return { ...created, temporaryPassword }
+}
+
+// Brings back a deactivated team member, with the departments they had
+export async function reactivateUser(id: string, organizationId: string) {
+  const user = await prisma.user.findFirst({ where: { id, organizationId, role: { in: ['ORG_MANAGER', 'ORG_MEMBER'] } } })
+  if (!user) throw new AppError(404, 'Usuário não encontrado')
+  if (user.isActive) throw new AppError(409, 'Usuário já está ativo')
+  return present(await prisma.user.update({ where: { id }, data: { isActive: true }, select: SELECT }))
 }
 
 export async function updateUser(id: string, organizationId: string, data: UpdateUserBody) {

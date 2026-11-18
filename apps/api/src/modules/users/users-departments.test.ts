@@ -14,7 +14,7 @@ async function setup() {
   return { org, admin, fiscal, folha, auth: await getAuthHeader(admin.email, 'Test@1234') }
 }
 
-const body = (extra: object) => ({ name: 'Bruna', email: `bruna-${Math.random()}@x.com`, password: 'Senha@123', role: 'ORG_MEMBER', ...extra })
+const body = (extra: object) => ({ name: 'Bruna', email: `bruna-${Math.random()}@x.com`, role: 'ORG_MEMBER', ...extra })
 
 describe('departamentos no cadastro de usuários', () => {
   it('creating a member requires at least one department', async () => {

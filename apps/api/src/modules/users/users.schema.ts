@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const createUserSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
-  password: z.string().min(8),
+  // No password: the server generates a temporary one and shows it once (like the reset)
   role: z.enum(['ORG_MANAGER', 'ORG_MEMBER']),
   phone: z.string().optional(),
   // Required for managers and members (checked with a pt-BR message below the schema)
@@ -20,6 +20,10 @@ export const updateUserSchema = z.object({
   seesDepartmentWork: z.boolean().optional(),
 })
 
+export const listUsersQuerySchema = z.object({
+  status: z.enum(['active', 'inactive'], { errorMap: () => ({ message: 'Situação inválida' }) }).default('active'),
+})
+
 export const userOptionsQuerySchema = z.object({
   departmentId: z.string().cuid('Departamento inválido').optional(),
 })
@@ -31,4 +35,5 @@ export const updateMyProfileSchema = z.object({
 
 export type CreateUserBody = z.infer<typeof createUserSchema>
 export type UpdateUserBody = z.infer<typeof updateUserSchema>
+export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>
 export type UpdateMyProfileBody = z.infer<typeof updateMyProfileSchema>

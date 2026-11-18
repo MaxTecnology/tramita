@@ -3,8 +3,8 @@ import { verifyJWT } from '@/middlewares/verifyJWT'
 import { requireRole } from '@/middlewares/requireRole'
 import { checkSubscription } from '@/middlewares/checkSubscription'
 import { AppError } from '@/errors/AppError'
-import { createUserSchema, updateUserSchema, updateMyProfileSchema, userOptionsQuerySchema } from './users.schema'
-import { listUsers, listUserOptions, createUser, updateUser, deleteUser, resetUserPassword, getMyProfile, updateMyProfile } from './users.service'
+import { createUserSchema, updateUserSchema, updateMyProfileSchema, userOptionsQuerySchema, listUsersQuerySchema } from './users.schema'
+import { listUsers, listUserOptions, createUser, updateUser, deleteUser, reactivateUser, resetUserPassword, getMyProfile, updateMyProfile } from './users.service'
 import { getPortfolio, transferResponsibilities } from './responsibility-transfer.service'
 import { portfolioQuerySchema, transferSchema } from './responsibility-transfer.schema'
 
@@ -41,8 +41,16 @@ export async function usersRoutes(app: FastifyInstance) {
     return reply.send(await listUserOptions(request.user.organizationId!, result.data.departmentId))
   })
 
+  // ?status=inactive lists the deactivated people (to reactivate them)
   app.get('/', { preHandler: adminOnly }, async (request, reply) => {
-    return reply.send(await listUsers(request.user.organizationId!))
+    const result = listUsersQuerySchema.safeParse(request.query)
+    if (!result.success) throw new AppError(400, result.error.errors[0].message)
+    return reply.send(await listUsers(request.user.organizationId!, result.data.status))
+  })
+
+  app.post('/:id/reactivate', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    return reply.send(await reactivateUser(id, request.user.organizationId!))
   })
 
   app.post('/', { preHandler: [...adminOnly, checkSubscription] }, async (request, reply) => {

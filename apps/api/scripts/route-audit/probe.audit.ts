@@ -8,7 +8,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { buildApp } from '../../src/server'
 import * as queue from '../../src/lib/queue'
-import * as cnpjws from '../../src/lib/cnpjws'
+import * as cnpjws from '../../src/lib/cnpj-lookup'
 import {
   createTestPlan, createTestOrg, createTestUser, createTestClientUser, createMasterUser, getAuthHeader,
 } from '../../src/test/helpers'

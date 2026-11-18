@@ -36,6 +36,7 @@ API do Tramita (AutoHubs): processos, ordens de serviço, tarefas e portal do cl
 - [GET /users/options](#scalar-operation-get-usersoptions)
 - [GET /users](#scalar-operation-get-users)
 - [POST /users](#scalar-operation-post-users)
+- [POST /users/{id}/reactivate](#scalar-operation-post-usersidreactivate)
 - [PATCH /users/{id}](#scalar-operation-patch-usersid)
 - [DELETE /users/{id}](#scalar-operation-delete-usersid)
 - [POST /users/{id}/reset-password](#scalar-operation-post-usersidreset-password)
@@ -1086,6 +1087,8 @@ Nome e departamentos de cada pessoa ativa da equipe.
 - **Path:** `/users`
 - **Tags:** Usuários
 
+Ativos por padrão; `status=inactive` lista os desativados (para reativar).
+
 **Quem pode:** Admin
 
 **Servers:** [Inherited servers](#scalar-context-global-servers)
@@ -1093,6 +1096,10 @@ Nome e departamentos de cada pessoa ativa da equipe.
 #### Authentication
 
 - **bearerAuth**: HTTP bearer (`JWT`)
+
+#### Query parameters
+
+- **`status`**: `string`, possible values: `"active", "inactive"`, default: `"active"`
 
 #### Responses
 
@@ -1105,6 +1112,8 @@ Nome e departamentos de cada pessoa ativa da equipe.
 - **Method:** `POST`
 - **Path:** `/users`
 - **Tags:** Usuários
+
+A senha é gerada pelo servidor e volta uma única vez em `temporaryPassword`.
 
 **Quem pode:** Admin
 
@@ -1124,7 +1133,6 @@ no additional properties
 
 - **`email` (required)**: `string`, format: `email`
 - **`name` (required)**: `string`, minLength: `2`
-- **`password` (required)**: `string`, minLength: `8`
 - **`role` (required)**: `string`, possible values: `"ORG_MANAGER", "ORG_MEMBER"`
 - **`departmentIds`**: `array`
 
@@ -1142,7 +1150,6 @@ no additional properties
 {
   "name": "",
   "email": "hello@example.com",
-  "password": "",
   "role": "ORG_MANAGER",
   "phone": "",
   "departmentIds": [
@@ -1151,6 +1158,32 @@ no additional properties
   "seesDepartmentWork": true
 }
 ```
+
+#### Responses
+
+##### 200 Default Response
+
+<a id="scalar-operation-post-usersidreactivate"></a>
+
+### Reativar pessoa desativada
+
+- **Method:** `POST`
+- **Path:** `/users/{id}/reactivate`
+- **Tags:** Usuários
+
+Volta com os mesmos departamentos. 409 se já estiver ativa.
+
+**Quem pode:** Admin
+
+**Servers:** [Inherited servers](#scalar-context-global-servers)
+
+#### Authentication
+
+- **bearerAuth**: HTTP bearer (`JWT`)
+
+#### Path parameters
+
+- **`id` (required)**: `string`
 
 #### Responses
 
@@ -1808,7 +1841,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-18T00:55:48.197Z"
+  "dueDate": "2026-11-18T01:11:35.987Z"
 }
 ```
 
@@ -1882,7 +1915,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-18T00:55:48.200Z"
+  "dueDate": "2026-11-18T01:11:35.989Z"
 }
 ```
 
@@ -1972,7 +2005,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-18T00:55:48.202Z",
+  "dueDate": "2026-11-18T01:11:35.991Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2247,14 +2280,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-18T00:55:48.211Z",
+  "dueDate": "2026-11-18T01:11:36.001Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-18T00:55:48.211Z",
-  "competence": "2026-11-18T00:55:48.211Z",
+  "targetDate": "2026-11-18T01:11:36.001Z",
+  "competence": "2026-11-18T01:11:36.001Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -4319,7 +4352,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-18T00:55:48.260Z",
+  "dueDate": "2026-11-18T01:11:36.056Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -5318,7 +5351,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-18T00:55:48.287Z"
+  "dueDate": "2026-11-18T01:11:36.082Z"
 }
 ```
 
@@ -5375,7 +5408,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-18T00:55:48.288Z",
+  "dueDate": "2026-11-18T01:11:36.083Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -6159,7 +6192,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T00:55:48.311Z",
+  "dueMonth": "2026-11-18T01:11:36.101Z",
   "assignmentIds": [
     ""
   ]
@@ -6211,7 +6244,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T00:55:48.311Z",
+  "dueMonth": "2026-11-18T01:11:36.102Z",
   "assignmentIds": [
     ""
   ]
@@ -6254,7 +6287,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T00:55:48.312Z"
+  "dueMonth": "2026-11-18T01:11:36.103Z"
 }
 ```
 

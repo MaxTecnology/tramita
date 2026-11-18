@@ -2,7 +2,7 @@ import type { RouteDocs } from '@/api-docs/types'
 import { changePasswordSchema, loginBodySchema, logoutBodySchema, refreshBodySchema, updateProfileSchema } from '@/modules/auth/auth.schema'
 import { changePlanSchema, createOrgByMasterSchema, registerOrgSchema, updateOrgSchema } from '@/modules/organizations/organizations.schema'
 import { createPlanSchema, updatePlanSchema } from '@/modules/plans/plans.schema'
-import { createUserSchema, updateMyProfileSchema, updateUserSchema, userOptionsQuerySchema } from '@/modules/users/users.schema'
+import { createUserSchema, listUsersQuerySchema, updateMyProfileSchema, updateUserSchema, userOptionsQuerySchema } from '@/modules/users/users.schema'
 import { portfolioQuerySchema, transferSchema } from '@/modules/users/responsibility-transfer.schema'
 import { createClientUserSchema, updateClientUserSchema } from '@/modules/client-users/client-users.schema'
 import { updateSlaPreferenceSchema } from '@/modules/sla/sla.schema'
@@ -38,8 +38,9 @@ export const ACCESS_DOCS: RouteDocs = {
   'GET /users/me': { summary: 'Meu usuário', description: 'Papel, departamentos e o que posso ver. Serve a equipe e o cliente do portal.' },
   'PATCH /users/me': { summary: 'Atualizar meu usuário', body: updateMyProfileSchema },
   'GET /users/options': { summary: 'Pessoas para escolher como responsável', description: 'Nome e departamentos de cada pessoa ativa da equipe.', querystring: userOptionsQuerySchema },
-  'GET /users': { summary: 'Listar a equipe' },
-  'POST /users': { summary: 'Cadastrar pessoa da equipe', body: createUserSchema },
+  'GET /users': { summary: 'Listar a equipe', description: 'Ativos por padrão; `status=inactive` lista os desativados (para reativar).', querystring: listUsersQuerySchema },
+  'POST /users': { summary: 'Cadastrar pessoa da equipe', description: 'A senha é gerada pelo servidor e volta uma única vez em `temporaryPassword`.', body: createUserSchema },
+  'POST /users/:id/reactivate': { summary: 'Reativar pessoa desativada', description: 'Volta com os mesmos departamentos. 409 se já estiver ativa.' },
   'PATCH /users/:id': { summary: 'Alterar pessoa da equipe', description: 'Mudar papel ou desativar encerra as sessões dela.', body: updateUserSchema },
   'DELETE /users/:id': { summary: 'Remover pessoa da equipe' },
   'POST /users/:id/reset-password': { summary: 'Gerar senha provisória' },

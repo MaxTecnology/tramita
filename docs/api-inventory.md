@@ -6,10 +6,10 @@
 
 ## Resumo
 
-- Rotas: **210**
+- Rotas: **211**
 - Públicas (sem login): **6** — `POST /auth/login`, `POST /auth/logout`, `POST /auth/refresh`, `GET /organizations/plans`, `POST /organizations/register`, `GET /organizations/signup-status`
 - Sem uso no web nem chamador externo conhecido: **3**
-- Sem teste de rota: **57**
+- Sem teste de rota: **53**
 - Cliente (portal) passa fora de /portal: **13** (rotas compartilhadas — o escopo dentro delas é revisado na auditoria de segurança)
 
 ## Sem uso
@@ -17,8 +17,8 @@
 | Método | Rota | Quem passa | Teste de rota |
 |---|---|---|---|
 | GET | `/document-reader/metricas` | Admin, Gerente, Membro | sim |
-| GET | `/municipalities` | Admin, Gerente, Membro | não |
 | GET | `/portal/requests/:id` | Cliente | sim |
+| POST | `/users/:id/reactivate` | Admin | sim |
 
 ## Cliente fora de /portal
 
@@ -88,10 +88,10 @@
 | GET | `/clients` | Admin, Gerente, Membro | web | sim |
 | POST | `/clients` | Admin, Gerente | web | sim |
 | DELETE | `/clients/:id` | Admin, Gerente | web | **não** |
-| PATCH | `/clients/:id` | Admin, Gerente | web | **não** |
+| PATCH | `/clients/:id` | Admin, Gerente | web | sim |
 | GET | `/clients/:id/assignments` | Admin, Gerente, Membro | web | **não** |
 | GET | `/clients/:id/users` | Admin, Gerente | web | sim |
-| GET | `/clients/lookup-cnpj/:cnpj` | Admin, Gerente | web | **não** |
+| GET | `/clients/lookup-cnpj/:cnpj` | Admin, Gerente | web | sim |
 | GET | `/clients/search-users` | Admin, Gerente | web | **não** |
 
 ### /columns
@@ -184,7 +184,7 @@
 
 | Método | Rota | Quem passa | Usada por | Teste de rota |
 |---|---|---|---|---|
-| GET | `/municipalities` | Admin, Gerente, Membro | — | **não** |
+| GET | `/municipalities` | Admin, Gerente, Membro | web | **não** |
 
 ### /notifications
 
@@ -301,8 +301,8 @@
 | POST | `/recurring-templates` | Admin | web | sim |
 | DELETE | `/recurring-templates/:id` | Admin | web | **não** |
 | GET | `/recurring-templates/:id` | Admin, Gerente | web | sim |
-| PATCH | `/recurring-templates/:id` | Admin | web | **não** |
-| GET | `/recurring-templates/:id/assignments` | Admin, Gerente | web | **não** |
+| PATCH | `/recurring-templates/:id` | Admin | web | sim |
+| GET | `/recurring-templates/:id/assignments` | Admin, Gerente | web | sim |
 | POST | `/recurring-templates/:id/assignments` | Admin | web | **não** |
 | DELETE | `/recurring-templates/:id/assignments/:assignmentId` | Admin | web | **não** |
 | PATCH | `/recurring-templates/:id/assignments/:assignmentId` | Admin | web (indireto) | **não** |
@@ -388,6 +388,7 @@
 | DELETE | `/users/:id` | Admin | web | **não** |
 | PATCH | `/users/:id` | Admin | web | sim |
 | GET | `/users/:id/portfolio` | Admin | web | sim |
+| POST | `/users/:id/reactivate` | Admin | — | sim |
 | POST | `/users/:id/reset-password` | Admin | web | sim |
 | POST | `/users/:id/transfer` | Admin | web | sim |
 | GET | `/users/me` | Admin, Gerente, Membro, Cliente, Master | web | sim |
