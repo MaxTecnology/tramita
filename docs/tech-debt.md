@@ -733,3 +733,14 @@ Achados da revisão destas correções — ✅ resolvidos em 2026-11-16:
   falha para eles até a edição do cadastro.
 
 - **Troca de departamento da recorrência fora do lock** (pré-existente, 2026-11-18): `updateTemplate` confere clientes não atendidos pelo novo departamento antes de travar a linha; dois PATCH/`createAssignment` simultâneos podem passar. Mover para dentro do `FOR NO KEY UPDATE` se aparecer.
+
+## Tela de usuários — menores adiados (2026-11-18)
+
+- Reativar não revalida departamentos: se todos os departamentos da pessoa foram removidos, ela volta
+  sem departamento (a lista mostra o selo "Sem departamento"; editar exige escolher um).
+- `createUserSchema`/`updateUserSchema` sem `.max()` em nome, e-mail e telefone; e-mail não é
+  normalizado para minúsculas.
+- Filtro "Ativos/Desativados" usa botões com `role="radio"` sem navegação por setas (mesmo padrão do
+  `Segmented` das outras telas).
+- `resetUserPassword` aceita `organizationId` opcional (o painel master reseta sem org); manter só
+  enquanto o master precisar.

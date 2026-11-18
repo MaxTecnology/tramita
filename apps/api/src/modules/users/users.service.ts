@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/errors/AppError'
 import { hashPassword, generateRandomPassword, revokeSessions } from '@/modules/auth/auth.service'
@@ -51,6 +51,13 @@ export async function listUserOptions(
   return users.map(({ departments, ...u }) => ({ ...u, departmentIds: departments.map((d) => d.departmentId) }))
 }
 
+// The e-mail is unique: a check before writing still races with another request, so the unique
+// index has the last word and its error becomes the same 409
+function rethrowEmailTaken(err: unknown): never {
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') throw new AppError(409, 'E-mail já cadastrado')
+  throw err
+}
+
 export async function createUser(organizationId: string, data: CreateUserBody) {
   const existing = await prisma.user.findUnique({ where: { email: data.email } })
   if (existing) throw new AppError(409, 'E-mail já cadastrado')
@@ -71,7 +78,7 @@ export async function createUser(organizationId: string, data: CreateUserBody) {
       departments: { create: departmentIds.map((departmentId) => ({ departmentId })) },
     },
     select: SELECT,
-  }))
+  }).catch(rethrowEmailTaken))
   return { ...created, temporaryPassword }
 }
 
@@ -107,7 +114,7 @@ export async function updateUser(id: string, organizationId: string, data: Updat
       await tx.userDepartment.createMany({ data: next.map((departmentId) => ({ userId: id, departmentId })), skipDuplicates: true })
     }
     return tx.user.update({ where: { id }, data: fields, select: SELECT })
-  }))
+  }).catch(rethrowEmailTaken))
   // A new role takes effect now: the sessions issued with the old one end
   if (fields.role && fields.role !== user.role) await revokeSessions(id)
   return updated

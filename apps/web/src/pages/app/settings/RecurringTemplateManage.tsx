@@ -74,6 +74,18 @@ function isInListedPlaces(template: RecurringTaskTemplate, client: Located): boo
   return template.dueRules.some((r) => (template.dueScope === 'STATE' ? r.uf === client.estado : r.ibgeCityCode === client.ibgeCityCode))
 }
 
+const WEEKDAY_SHORT: Record<number, string> = { 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado', 7: 'Domingo' }
+
+// The due day this client gets: the rule of its state/city, or the template default. Null for a
+// federal template, and for a client outside "only listed places" (no task at all).
+function dueDayLabel(template: RecurringTaskTemplate, client: Located): string | null {
+  if (template.dueScope === 'FEDERAL') return null
+  const rule = template.dueRules.find((r) => (template.dueScope === 'STATE' ? r.uf === client.estado : r.ibgeCityCode === client.ibgeCityCode))
+  const day = (d: number) => (template.periodicity === 'WEEKLY' ? WEEKDAY_SHORT[d] ?? `Dia ${d}` : `Dia ${d}`)
+  if (rule) return `${day(rule.dueDayOfPeriod)} (exceção ${template.dueScope === 'STATE' ? rule.uf : client.cidade ?? ''})`
+  return template.onlyListedLocations ? null : `${day(template.dueDayOfPeriod)} (padrão)`
+}
+
 function placeLabel(client: Located): string {
   return client.cidade && client.estado ? `${client.cidade} (${client.estado})` : 'Sem estado/cidade'
 }
@@ -336,6 +348,10 @@ export default function RecurringTemplateManage() {
                     <span className="truncate">{a.client.codigo ? `${a.client.codigo} - ${a.client.name}` : a.client.name}</span>
                     {template.dueScope !== 'FEDERAL' && <span className="text-xs text-muted-foreground flex-shrink-0">{placeLabel(a.client)}</span>}
                   </label>
+                  {(() => {
+                    const due = dueDayLabel(template, a.client)
+                    return due ? <span className="text-xs px-1.5 py-0.5 rounded flex-shrink-0 mr-2 border border-border text-foreground">{due}</span> : null
+                  })()}
                   {!isInListedPlaces(template, a.client) && (
                     <span className="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 mr-2 bg-warning-bg text-warning-text">Fora dos locais</span>
                   )}

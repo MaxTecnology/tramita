@@ -6,9 +6,9 @@ import { test, expect } from '../fixtures'
 test('transfere a carteira em dois lotes e desativa o colaborador', async ({ orgAdminPage: page }) => {
   await page.goto('/app/users')
   // innermost element holding both the e-mail and the actions of that user
-  const card = page.locator('div', { has: page.getByText('saida-e2e@g2a.com.br') })
-    .filter({ has: page.getByRole('button', { name: 'Transferir' }) }).last()
-  await card.getByRole('button', { name: 'Transferir' }).click()
+  const row = page.locator('[data-user-row]', { has: page.getByText('saida-e2e@g2a.com.br') })
+  await row.getByRole('button', { name: /^Mais ações de / }).click()
+  await page.getByRole('menuitem', { name: 'Transferir responsabilidades' }).click()
   await expect(page).toHaveURL(/\/app\/users\/[^/]+\/transfer/, { timeout: 10_000 })
 
   const destination = page.getByLabel('Colaborador de destino')

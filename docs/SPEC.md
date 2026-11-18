@@ -192,11 +192,13 @@ Cadastro de novo escritório (público — sem autenticação). Só com `PUBLIC_
 
 ## Usuários Internos
 
-### GET `/users` _(ORG_ADMIN)_ — lista usuários da org
+### GET `/users` _(ORG_ADMIN)_ — lista usuários da org (ativos); `?status=inactive` lista os desativados
 ### POST `/users` _(ORG_ADMIN)_
 ```json
-{ "name": "string", "email": "string", "password": "string", "role": "ORG_MANAGER|ORG_MEMBER", "phone": "string?" }
+{ "name": "string", "email": "string", "role": "ORG_MANAGER|ORG_MEMBER", "phone": "string?", "departmentIds": ["string"], "seesDepartmentWork": true }
 ```
+→ Sem senha no corpo (2026-11-18): o servidor gera a senha temporária e devolve `temporaryPassword` só nesta resposta (mesmo modelo da redefinição); senha enviada é ignorada
+### POST `/users/:id/reactivate` _(ORG_ADMIN)_ — reativa Gerente/Colaborador desativado da própria org, com os departamentos que tinha; 409 `'Usuário já está ativo'`
 ### PATCH `/users/:id` _(ORG_ADMIN)_
 ### DELETE `/users/:id` _(ORG_ADMIN)_ — soft delete
 ### POST `/users/:id/reset-password` _(ORG_ADMIN)_ — redefine a senha de `ORG_MANAGER`/`ORG_MEMBER` da própria org

@@ -79,4 +79,13 @@ describe('vínculos de recorrência com vencimento por localidade', () => {
     expect(screen.getByText('Este cliente está fora dos locais da recorrência: a tarefa dele não será gerada.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Vincular cliente' })).toBeEnabled()
   })
+
+  it('each client shows the due day it will get: its place rule or the default', async () => {
+    renderManage(false)
+    const padaria = (await screen.findByText('Aracaju (SE)')).closest('div') as HTMLElement
+    expect(within(padaria.parentElement as HTMLElement).getByText('Dia 15 (exceção SE)')).toBeInTheDocument()
+    const mercado = screen.getByText('Maceió (AL)').closest('div') as HTMLElement
+    expect(within(mercado.parentElement as HTMLElement).getByText('Dia 20 (padrão)')).toBeInTheDocument()
+  })
 })
+

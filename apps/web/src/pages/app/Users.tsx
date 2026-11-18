@@ -1,102 +1,60 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Eye, Plus, Search, UserRound } from 'lucide-react'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { cn, mensagemDeErro } from '@/lib/utils'
-import type { User, OrgRole } from '@/types'
-import { toast } from 'sonner'
+import { ActionMenu } from '@/components/ui/action-menu'
 import { askConfirm } from '@/components/ui/app-dialogs'
+import { cn, mensagemDeErro } from '@/lib/utils'
+import type { User } from '@/types'
+import { UserFormPanel, EMPTY_USER_FORM, type UserFormValues } from './users/UserFormPanel'
 
-type EditableRole = Exclude<OrgRole, 'ORG_ADMIN'>
+type Status = 'active' | 'inactive'
+type RoleFilter = 'all' | 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'
 
-type DepartmentAccess = { departmentIds: string[]; seesDepartmentWork: boolean }
-
-type CreateForm = {
-  name: string; email: string; password: string; role: EditableRole; phone: string
-} & DepartmentAccess
-
-type EditForm = {
-  name: string; email: string; role: EditableRole; phone: string
-} & DepartmentAccess
-
-const EMPTY_CREATE: CreateForm = {
-  name: '', email: '', password: '', role: 'ORG_MEMBER', phone: '', departmentIds: [], seesDepartmentWork: true,
-}
-
-// Departments the staff member belongs to (defines what they see) and, for collaborators, whether
-// they see the work of department colleagues (cover an absence, "Assumir").
-function DepartmentAccessFields({ idPrefix, role, departments, value, onChange }: {
-  idPrefix: string
-  role: EditableRole
-  departments: { id: string; name: string }[]
-  value: DepartmentAccess
-  onChange: (v: DepartmentAccess) => void
-}) {
-  const toggle = (id: string) => onChange({
-    ...value,
-    departmentIds: value.departmentIds.includes(id) ? value.departmentIds.filter((d) => d !== id) : [...value.departmentIds, id],
-  })
-  return (
-    <div className="space-y-2 sm:col-span-2">
-      <Label>Departamentos *</Label>
-      <div className="flex flex-wrap gap-x-4 gap-y-1">
-        {departments.map((d) => (
-          <label key={d.id} className="flex items-center gap-1.5 text-sm text-foreground">
-            <input type="checkbox" checked={value.departmentIds.includes(d.id)} onChange={() => toggle(d.id)} />
-            {d.name}
-          </label>
-        ))}
-      </div>
-      {value.departmentIds.length === 0 && <p className="text-xs text-danger-text">Selecione pelo menos um departamento</p>}
-      {role === 'ORG_MEMBER' && (
-        <label htmlFor={`${idPrefix}-sees`} className="flex items-start gap-2 text-sm text-foreground pt-1">
-          <input id={`${idPrefix}-sees`} type="checkbox" className="mt-0.5" checked={value.seesDepartmentWork} onChange={(e) => onChange({ ...value, seesDepartmentWork: e.target.checked })} />
-          <span>
-            Pode ver o trabalho dos colegas do departamento
-            <span className="block text-xs text-muted-foreground">Permite cobrir a falta de um colega e assumir as tarefas dele.</span>
-          </span>
-        </label>
-      )}
-    </div>
-  )
-}
-
-const ROLE_LABEL: Record<string, string> = {
-  ORG_ADMIN: 'Admin',
-  ORG_MANAGER: 'Gerente',
-  ORG_MEMBER: 'Colaborador',
-}
-
+const ROLE_LABEL: Record<string, string> = { ORG_ADMIN: 'Admin', ORG_MANAGER: 'Gerente', ORG_MEMBER: 'Colaborador' }
+// Admin carries the strongest mark; the avatar repeats the profile color
 const ROLE_BADGE: Record<string, string> = {
-  ORG_ADMIN: 'bg-neutral-bg text-muted-foreground',
+  ORG_ADMIN: 'bg-highlight-bg text-highlight-text',
   ORG_MANAGER: 'bg-info-bg text-info-text',
-  ORG_MEMBER: 'bg-success-bg text-success-text',
+  ORG_MEMBER: 'bg-neutral-bg text-neutral-text',
+}
+
+const selectCls = 'h-9 rounded-md border border-border bg-surface px-2.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
+}
+
+function toForm(user: User): UserFormValues {
+  return {
+    name: user.name,
+    email: user.email,
+    phone: user.phone ?? '',
+    role: user.role === 'ORG_MANAGER' ? 'ORG_MANAGER' : 'ORG_MEMBER',
+    departmentIds: (user.departments ?? []).map((d) => d.id),
+    seesDepartmentWork: user.seesDepartmentWork ?? true,
+  }
 }
 
 export default function Users() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
-  const [showCreate, setShowCreate] = useState(false)
-  const [createForm, setCreateForm] = useState<CreateForm>(EMPTY_CREATE)
-
-  const [editingUser, setEditingUser] = useState<User | null>(null)
-  const [editForm, setEditForm] = useState<EditForm>({
-    name: '', email: '', role: 'ORG_MEMBER', phone: '', departmentIds: [], seesDepartmentWork: true,
-  })
-
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-
+  const [status, setStatus] = useState<Status>('active')
   const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState<'all' | EditableRole>('all')
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all')
+  const [departmentFilter, setDepartmentFilter] = useState('all')
+  const [panel, setPanel] = useState<{ mode: 'create' } | { mode: 'edit'; user: User } | null>(null)
+  const [password, setPassword] = useState<{ title: string; who: string; value: string } | null>(null)
 
   const { data: users = [], isLoading } = useQuery<User[]>({
-    queryKey: ['users'],
-    queryFn: () => api.get('/users').then((r) => r.data),
+    queryKey: ['users', status],
+    queryFn: () => api.get('/users', { params: status === 'inactive' ? { status } : {} }).then((r) => r.data),
   })
   const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['departments'],
@@ -105,343 +63,312 @@ export default function Users() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
-    return users.filter((u) => {
-      const matchRole = roleFilter === 'all' || u.role === roleFilter
-      const matchSearch =
-        !q ||
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q)
-      return matchRole && matchSearch
-    })
-  }, [users, search, roleFilter])
+    return users.filter((u) =>
+      (roleFilter === 'all' || u.role === roleFilter) &&
+      (departmentFilter === 'all' || u.role === 'ORG_ADMIN' || (u.departments ?? []).some((d) => d.id === departmentFilter)) &&
+      (!q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)))
+  }, [users, search, roleFilter, departmentFilter])
+  const filtering = !!search.trim() || roleFilter !== 'all' || departmentFilter !== 'all'
 
-  const createMutation = useMutation({
-    mutationFn: () =>
-      api.post('/users', {
-        name: createForm.name,
-        email: createForm.email,
-        password: createForm.password,
-        role: createForm.role,
-        phone: createForm.phone || undefined,
-        departmentIds: createForm.departmentIds,
-        seesDepartmentWork: createForm.seesDepartmentWork,
-      }).then((r) => r.data),
-    onSuccess: () => {
-      toast.success('Usuário cadastrado com sucesso')
-      queryClient.invalidateQueries({ queryKey: ['users'] })
-      setShowCreate(false)
-      setCreateForm(EMPTY_CREATE)
-      setSearch('')
-      setRoleFilter('all')
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['users'] })
+
+  // Create or edit travels with the call: the answer is handled the same even if the page changed
+  const saveMutation = useMutation({
+    mutationFn: ({ target, values }: { target: { mode: 'create' } | { mode: 'edit'; id: string }; values: UserFormValues }) => {
+      const body = { ...values, phone: values.phone.trim() || (target.mode === 'edit' ? null : undefined) }
+      return target.mode === 'edit'
+        ? api.patch(`/users/${target.id}`, body).then((r) => r.data as User & { temporaryPassword?: string })
+        : api.post('/users', body).then((r) => r.data as User & { temporaryPassword?: string })
     },
-    onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao cadastrar usuário')),
+    onSuccess: (data, { target }) => {
+      refresh()
+      if (target.mode === 'create' && data.temporaryPassword) {
+        setPassword({ title: 'Usuário cadastrado', who: data.name, value: data.temporaryPassword })
+      } else {
+        toast.success('Alterações salvas')
+      }
+      setPanel(null)
+    },
+    onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível salvar. Confira os dados e tente de novo.')),
   })
 
-  const updateMutation = useMutation({
-    mutationFn: (data: EditForm & { id: string }) =>
-      api.patch(`/users/${data.id}`, {
-        name: data.name,
-        email: data.email,
-        role: data.role,
-        phone: data.phone || null,
-        departmentIds: data.departmentIds,
-        seesDepartmentWork: data.seesDepartmentWork,
-      }).then((r) => r.data),
-    onSuccess: () => {
-      toast.success('Usuário atualizado')
-      queryClient.invalidateQueries({ queryKey: ['users'] })
-      setEditingUser(null)
-    },
-    onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao salvar alterações')),
+  const resetMutation = useMutation({
+    mutationFn: (user: User) => api.post(`/users/${user.id}/reset-password`).then((r) => ({ user, ...(r.data as { temporaryPassword: string }) })),
+    onSuccess: ({ user, temporaryPassword }) => setPassword({ title: 'Senha redefinida', who: user.name, value: temporaryPassword }),
+    onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível redefinir a senha')),
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/users/${id}`),
-    onSuccess: () => {
-      toast.success('Usuário desativado')
-      queryClient.invalidateQueries({ queryKey: ['users'] })
-      setDeletingId(null)
-    },
-    onError: (err, id) => {
-      setDeletingId(null)
-      // 409 = ainda é responsável por cliente/departamento: oferece a tela de transferência.
-      const status = (err as { response?: { status?: number } })?.response?.status
-      toast.error(mensagemDeErro(err, 'Erro ao desativar usuário'), status === 409
-        ? { action: { label: 'Transferir responsabilidades', onClick: () => navigate(`/app/users/${id}/transfer`) } }
+  const deactivateMutation = useMutation({
+    mutationFn: (user: User) => api.delete(`/users/${user.id}`),
+    onSuccess: () => { toast.success('Usuário desativado'); refresh() },
+    onError: (err, user) => {
+      // 409 = still responsible for clients: offer the transfer screen
+      const responsible = (err as { response?: { status?: number } })?.response?.status === 409
+      toast.error(mensagemDeErro(err, 'Não foi possível desativar'), responsible
+        ? { action: { label: 'Transferir responsabilidades', onClick: () => navigate(`/app/users/${user.id}/transfer`) } }
         : undefined)
     },
   })
 
-  const [resetPassword, setResetPassword] = useState<string | null>(null)
-
-  const resetMutation = useMutation({
-    mutationFn: (userId: string) =>
-      api.post(`/users/${userId}/reset-password`).then((r) => r.data as { temporaryPassword: string }),
-    onSuccess: (data) => setResetPassword(data.temporaryPassword),
-    onError: () => toast.error('Erro ao redefinir senha'),
+  const reactivateMutation = useMutation({
+    mutationFn: (user: User) => api.post(`/users/${user.id}/reactivate`),
+    onSuccess: () => { toast.success('Usuário reativado'); refresh() },
+    onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível reativar')),
   })
 
-  function openEdit(user: User) {
-    setEditingUser(user)
-    setEditForm({
-      name: user.name,
-      email: user.email,
-      role: user.role === 'ORG_MANAGER' ? 'ORG_MANAGER' : 'ORG_MEMBER',
-      phone: user.phone ?? '',
-      departmentIds: (user.departments ?? []).map((d) => d.id),
-      seesDepartmentWork: user.seesDepartmentWork ?? true,
+  async function resetPassword(user: User) {
+    const ok = await askConfirm({
+      title: `Redefinir a senha de ${user.name}?`,
+      description: 'A senha atual deixa de funcionar e a pessoa sai de todas as sessões. Você recebe uma senha temporária para repassar.',
+      confirmLabel: 'Redefinir senha',
     })
+    if (ok) resetMutation.mutate(user)
   }
 
-  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando...</div>
+  function closePassword() {
+    setPassword(null)
+    // The password also lives in the mutations' last answer: drop it
+    saveMutation.reset()
+    resetMutation.reset()
+  }
+
+  async function copyPassword(value: string) {
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success('Senha copiada')
+    } catch {
+      toast.error('Não foi possível copiar. Selecione a senha e copie manualmente.')
+    }
+  }
+
+  async function deactivate(user: User) {
+    const ok = await askConfirm({
+      title: `Desativar ${user.name}?`,
+      description: 'A pessoa perde o acesso ao Tramita. O histórico continua registrado e dá para reativar depois.',
+      confirmLabel: 'Desativar',
+      danger: true,
+    })
+    if (ok) deactivateMutation.mutate(user)
+  }
+
+  function clearFilters() {
+    setSearch('')
+    setRoleFilter('all')
+    setDepartmentFilter('all')
+  }
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-lg md:text-xl font-bold text-foreground">Usuários</h1>
-        <Button
-          onClick={() => { if (showCreate) setCreateForm(EMPTY_CREATE); setShowCreate(!showCreate) }}
-          className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
-        >
-          {showCreate ? 'Cancelar' : '+ Novo usuário'}
+    <div className="p-4 md:p-6 max-w-6xl">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg md:text-xl font-bold text-foreground">Usuários</h1>
+          <p className="text-sm text-muted-foreground">A equipe do escritório e o que cada pessoa acessa.</p>
+        </div>
+        <Button onClick={() => setPanel({ mode: 'create' })} className="gap-1.5">
+          <Plus size={16} aria-hidden /> Novo usuário
         </Button>
       </div>
 
-      {/* Formulário de criação */}
-      {showCreate && (
-        <div className="bg-surface rounded-lg border border-border p-4 mb-6 space-y-3">
-          <h2 className="text-sm font-semibold text-foreground">Novo usuário</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="c-name">Nome *</Label>
-              <Input id="c-name" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="c-email">E-mail *</Label>
-              <Input id="c-email" type="email" value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="c-password">Senha *</Label>
-              <Input id="c-password" type="password" value={createForm.password} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="c-role">Perfil</Label>
-              <select
-                id="c-role"
-                value={createForm.role}
-                onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as EditableRole })}
-                className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                <option value="ORG_MEMBER">Colaborador</option>
-                <option value="ORG_MANAGER">Gerente</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="c-phone">Telefone</Label>
-              <Input id="c-phone" value={createForm.phone} onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} placeholder="(82) 99999-9999" />
-            </div>
-            <DepartmentAccessFields
-              idPrefix="c" role={createForm.role} departments={departments}
-              value={createForm} onChange={(v) => setCreateForm({ ...createForm, ...v })}
-            />
-          </div>
-          {createMutation.isError && (
-            <p className="text-sm text-danger-text">Erro ao cadastrar. Verifique os dados.</p>
-          )}
-          <div className="flex gap-2 pt-1">
-            <Button
-              onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending || !createForm.name || !createForm.email || !createForm.password || createForm.departmentIds.length === 0}
-              className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
-            >
-              {createMutation.isPending ? 'Cadastrando...' : 'Cadastrar'}
-            </Button>
-            <Button variant="outline" onClick={() => { setShowCreate(false); setCreateForm(EMPTY_CREATE) }}>Cancelar</Button>
-          </div>
-        </div>
-      )}
-
-      {/* Barra de filtros */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-auto sm:min-w-[220px] sm:flex-1">
+          <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
-            aria-label="Buscar usuários"
-            type="text"
-            placeholder="Buscar por nome ou e-mail..."
+            aria-label="Buscar pessoas"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-md bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+            placeholder="Buscar por nome ou e-mail"
+            className="h-9 w-full rounded-md border border-border bg-surface pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           />
         </div>
-
-        <div className="flex rounded-md border border-border overflow-hidden">
-          {(['all', 'ORG_MANAGER', 'ORG_MEMBER'] as const satisfies readonly ('all' | EditableRole)[]).map((r) => (
+        <label className="sr-only" htmlFor="users-role">Perfil</label>
+        <select id="users-role" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as RoleFilter)} className={cn(selectCls, 'min-w-[150px] flex-1 sm:flex-none')}>
+          <option value="all">Todos os perfis</option>
+          <option value="ORG_ADMIN">Admin</option>
+          <option value="ORG_MANAGER">Gerente</option>
+          <option value="ORG_MEMBER">Colaborador</option>
+        </select>
+        <label className="sr-only" htmlFor="users-department">Departamento</label>
+        <select id="users-department" value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className={cn(selectCls, 'min-w-[150px] flex-1 sm:flex-none')}>
+          <option value="all">Todos os departamentos</option>
+          {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+        <div role="radiogroup" aria-label="Situação" className="inline-flex rounded-md border border-border bg-surface p-0.5">
+          {(['active', 'inactive'] as const).map((s) => (
             <button
-              key={r}
+              key={s}
               type="button"
-              onClick={() => setRoleFilter(r)}
+              role="radio"
+              aria-checked={status === s}
+              onClick={() => setStatus(s)}
               className={cn(
-                'px-3 py-2 text-sm font-medium transition-colors',
-                roleFilter === r ? 'bg-[#185FA5] text-white' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
+                'rounded px-3 py-1.5 text-sm transition-colors',
+                status === s ? 'bg-accent font-medium text-accent-foreground' : 'text-muted-foreground hover:bg-neutral-bg hover:text-foreground',
               )}
             >
-              {r === 'all' ? 'Todos' : r === 'ORG_MANAGER' ? 'Gerente' : 'Colaborador'}
+              {s === 'active' ? 'Ativos' : 'Desativados'}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Contador */}
-      {users.length > 0 && (
-        <p className="text-xs text-muted-foreground mb-3">
-          {filtered.length === users.length
-            ? `${users.length} usuário${users.length !== 1 ? 's' : ''}`
-            : `Exibindo ${filtered.length} de ${users.length}`}
+      <div className="overflow-visible rounded-lg border border-border bg-surface">
+        <div className="hidden md:grid grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,2.4fr)_auto] gap-4 border-b border-border px-4 py-2.5 text-xs font-medium text-muted-foreground">
+          <span>Pessoa</span>
+          <span>Perfil</span>
+          <span>Acesso</span>
+          <span className="w-[104px]" aria-hidden />
+        </div>
+
+        {isLoading ? (
+          <div aria-label="Carregando usuários" className="divide-y divide-border">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-4">
+                <div className="h-9 w-9 rounded-full bg-neutral-bg motion-safe:animate-pulse" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-40 rounded bg-neutral-bg motion-safe:animate-pulse" />
+                  <div className="h-3 w-56 rounded bg-neutral-bg motion-safe:animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 px-4 py-14 text-center">
+            <UserRound size={28} aria-hidden className="text-muted-foreground" />
+            {filtering ? (
+              <>
+                <p className="text-sm text-muted-foreground">Ninguém encontrado com esses filtros.</p>
+                <Button variant="outline" size="sm" onClick={clearFilters}>Limpar filtros</Button>
+              </>
+            ) : status === 'inactive' ? (
+              <p className="text-sm text-muted-foreground">Nenhuma pessoa desativada.</p>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">Cadastre quem trabalha no escritório para distribuir as tarefas.</p>
+                <Button size="sm" onClick={() => setPanel({ mode: 'create' })}>Cadastrar a primeira pessoa</Button>
+              </>
+            )}
+          </div>
+        ) : (
+          <ul className="divide-y divide-border">
+            {filtered.map((user) => {
+              const isAdmin = user.role === 'ORG_ADMIN'
+              const userDepartments = user.departments ?? []
+              return (
+                <li
+                  key={user.id}
+                  data-user-row
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-4 py-3.5 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,2.4fr)_auto] md:items-center md:gap-4"
+                >
+                  {/* Person */}
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span aria-hidden className={cn('flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold', ROLE_BADGE[user.role])}>
+                      {initials(user.name)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className={cn('truncate text-sm font-medium', status === 'inactive' ? 'text-muted-foreground' : 'text-foreground')}>{user.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                      {user.phone && <p className="truncate text-xs text-muted-foreground">{user.phone}</p>}
+                    </div>
+                  </div>
+
+                  {/* Actions (top right on phones, last column on desktop) */}
+                  <div className="row-span-3 flex items-center justify-end gap-1 md:order-last md:row-span-1 md:w-[104px]">
+                    {status === 'inactive' ? (
+                      <Button variant="outline" size="sm" aria-label={`Reativar ${user.name}`} disabled={reactivateMutation.isPending} onClick={() => reactivateMutation.mutate(user)}>
+                        Reativar
+                      </Button>
+                    ) : (
+                      <>
+                        {!isAdmin && (
+                          <Button variant="ghost" size="sm" aria-label={`Editar ${user.name}`} onClick={() => setPanel({ mode: 'edit', user })}>
+                            Editar
+                          </Button>
+                        )}
+                        <ActionMenu
+                          label={`Mais ações de ${user.name}`}
+                          items={isAdmin
+                            ? [{ label: 'Transferir responsabilidades', onSelect: () => navigate(`/app/users/${user.id}/transfer`) }]
+                            : [
+                              { label: 'Redefinir senha', onSelect: () => void resetPassword(user), disabled: resetMutation.isPending },
+                              { label: 'Transferir responsabilidades', onSelect: () => navigate(`/app/users/${user.id}/transfer`) },
+                              { label: 'Desativar', onSelect: () => void deactivate(user), danger: true, separated: true },
+                            ]}
+                        />
+                      </>
+                    )}
+                  </div>
+
+                  {/* Profile */}
+                  <div className="pl-12 md:pl-0">
+                    <span className={cn('inline-flex rounded px-2 py-0.5 text-xs font-medium', ROLE_BADGE[user.role])}>
+                      {ROLE_LABEL[user.role] ?? user.role}
+                    </span>
+                  </div>
+
+                  {/* Access: what the person sees */}
+                  <div className="min-w-0 pl-12 md:pl-0">
+                    {isAdmin ? (
+                      <span className="text-sm text-muted-foreground">Todos os departamentos</span>
+                    ) : userDepartments.length === 0 ? (
+                      <span className="inline-flex rounded bg-danger-bg px-2 py-0.5 text-xs text-danger-text">Sem departamento</span>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {userDepartments.map((d) => (
+                          <span key={d.id} className="rounded border border-border px-2 py-0.5 text-xs text-foreground">{d.name}</span>
+                        ))}
+                        {user.role === 'ORG_MEMBER' && user.seesDepartmentWork && (
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <Eye size={12} aria-hidden />
+                            Vê o trabalho da equipe
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+      {!isLoading && users.length > 0 && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {filtered.length === users.length ? `${users.length} ${users.length === 1 ? 'pessoa' : 'pessoas'}` : `${filtered.length} de ${users.length} pessoas`}
         </p>
       )}
 
-      {/* Lista */}
-      <div className="space-y-2">
-        {filtered.length === 0 && (
-          <p className="text-center text-muted-foreground py-12">
-            {users.length === 0 ? 'Nenhum usuário cadastrado.' : 'Nenhum usuário encontrado para este filtro.'}
-          </p>
-        )}
-        {filtered.map((user) => (
-          <div key={user.id} className="bg-surface rounded-lg border border-border px-4 py-3 flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
-                <span className={cn('text-xs px-1.5 py-0.5 rounded flex-shrink-0', ROLE_BADGE[user.role] ?? 'bg-neutral-bg text-muted-foreground')}>
-                  {ROLE_LABEL[user.role] ?? user.role}
-                </span>
-                {user.role !== 'ORG_ADMIN' && (user.departments ?? []).length === 0 && (
-                  <span className="text-xs px-1.5 py-0.5 rounded flex-shrink-0 bg-danger-bg text-danger-text">Sem departamento</span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground truncate">
-                {user.email}{user.phone ? ` · ${user.phone}` : ''}
-                {(user.departments ?? []).length > 0 && ` · ${(user.departments ?? []).map((d) => d.name).join(', ')}`}
-              </p>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {/* Transferir vale pra todos (inclusive admin, que pode redistribuir a própria carteira);
-                  editar/redefinir/desativar continuam só pra não-admin. */}
-              <Button variant="ghost" size="sm" onClick={() => navigate(`/app/users/${user.id}/transfer`)} className="text-muted-foreground hover:text-foreground">
-                Transferir
-              </Button>
-              {user.role !== 'ORG_ADMIN' && (
-              <>
-                <Button variant="ghost" size="sm" onClick={() => openEdit(user)} className="text-muted-foreground hover:text-foreground">
-                  Editar
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={resetMutation.isPending}
-                  onClick={() => resetMutation.mutate(user.id)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  Redefinir senha
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={async () => {
-                    if (!(await askConfirm({ title: `Desativar o usuário "${user.name}"?`, description: 'A pessoa perde o acesso ao Tramita. O histórico dela continua registrado.', confirmLabel: 'Desativar', danger: true }))) return
-                    setDeletingId(user.id)
-                    deleteMutation.mutate(user.id)
-                  }}
-                  disabled={deleteMutation.isPending && deletingId === user.id}
-                  className="text-danger-text hover:text-danger-hover hover:bg-danger-bg"
-                >
-                  {deleteMutation.isPending && deletingId === user.id ? 'Desativando...' : 'Desativar'}
-                </Button>
-              </>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      <UserFormPanel
+        key={panel ? (panel.mode === 'edit' ? `edit-${panel.user.id}` : 'create') : 'closed'}
+        open={!!panel}
+        mode={panel?.mode ?? 'create'}
+        initial={panel?.mode === 'edit' ? toForm(panel.user) : EMPTY_USER_FORM}
+        departments={departments}
+        saving={saveMutation.isPending}
+        onClose={() => setPanel(null)}
+        onSubmit={(values) => saveMutation.mutate({ target: panel?.mode === 'edit' ? { mode: 'edit', id: panel.user.id } : { mode: 'create' }, values })}
+      />
 
-      {/* Modal de edição */}
-      <Dialog open={!!editingUser} onOpenChange={(open) => { if (!open) setEditingUser(null) }}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <Dialog open={!!password} onOpenChange={(open) => { if (!open) closePassword() }}>
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
           <DialogHeader>
-            <DialogTitle>Editar usuário</DialogTitle>
+            <DialogTitle>{password?.title}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 mt-2">
-            <div className="space-y-1">
-              <Label htmlFor="e-name">Nome *</Label>
-              <Input id="e-name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="e-email">E-mail *</Label>
-              <Input id="e-email" type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="e-role">Perfil</Label>
-              <select
-                id="e-role"
-                value={editForm.role}
-                onChange={(e) => setEditForm({ ...editForm, role: e.target.value as EditableRole })}
-                className="flex h-9 w-full rounded-md border border-border bg-surface text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                <option value="ORG_MEMBER">Colaborador</option>
-                <option value="ORG_MANAGER">Gerente</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="e-phone">Telefone</Label>
-              <Input id="e-phone" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="(82) 99999-9999" />
-            </div>
-            <DepartmentAccessFields
-              idPrefix="e" role={editForm.role} departments={departments}
-              value={editForm} onChange={(v) => setEditForm({ ...editForm, ...v })}
-            />
-            {updateMutation.isError && (
-              <p className="text-sm text-danger-text">Erro ao salvar. Tente novamente.</p>
-            )}
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setEditingUser(null)}>Cancelar</Button>
-              <Button
-                onClick={() => { if (editingUser) updateMutation.mutate({ ...editForm, id: editingUser.id }) }}
-                disabled={updateMutation.isPending || !editForm.name || !editForm.email || editForm.departmentIds.length === 0}
-                className="bg-[#185FA5] hover:bg-[#0C447C] text-white"
-              >
-                {updateMutation.isPending ? 'Salvando...' : 'Salvar'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!resetPassword} onOpenChange={(open) => { if (!open) setResetPassword(null) }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Senha redefinida</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 mt-2">
+          <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Nova senha temporária — repasse para o usuário agora, ela não será mostrada novamente:
+              Senha temporária de {password?.who}. Repasse agora: ela não aparece de novo. A pessoa pode trocá-la em Meu Perfil.
             </p>
             <div className="flex items-center gap-2">
-              <code className="flex-1 bg-neutral-bg text-foreground rounded px-3 py-2 text-sm font-mono">{resetPassword}</code>
+              <code className="flex-1 rounded bg-neutral-bg px-3 py-2 font-mono text-sm text-foreground">{password?.value}</code>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => { navigator.clipboard.writeText(resetPassword!); toast.success('Copiado') }}
+                onClick={() => { if (password) void copyPassword(password.value) }}
               >
                 Copiar
               </Button>
             </div>
-            <div className="flex justify-end pt-2">
-              <Button onClick={() => setResetPassword(null)} className="bg-[#185FA5] hover:bg-[#0C447C] text-white">
-                Fechar
-              </Button>
+            <div className="flex justify-end pt-1">
+              <Button onClick={closePassword}>Concluir</Button>
             </div>
           </div>
         </DialogContent>

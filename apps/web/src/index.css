@@ -66,3 +66,9 @@ body {
   color: var(--color-foreground);
   font-family: var(--font-sans);
 }
+
+/* Side panel (forms over the page): slides in from the right */
+@keyframes panel-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

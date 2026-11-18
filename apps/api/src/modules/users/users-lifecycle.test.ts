@@ -80,3 +80,22 @@ describe('desativados e reativação', () => {
     expect((await app.inject({ method: 'GET', url: '/users?status=inactive', headers: as(managerAuth) })).statusCode).toBe(403)
   })
 })
+
+describe('e-mail repetido', () => {
+  it('changing an e-mail to one already in use is a 409, not a server error', async () => {
+    const c = await setup()
+    const first = (await create(c)).json() as { email: string }
+    const second = (await create(c)).json() as { id: string }
+    const res = await app.inject({ method: 'PATCH', url: `/users/${second.id}`, headers: as(c.auth), payload: { email: first.email } })
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toEqual({ message: 'E-mail já cadastrado' })
+  })
+
+  it('two sign-ups with the same e-mail at the same time: one is created, the other gets 409', async () => {
+    const c = await setup()
+    const email = `same-${Math.random()}@x.com`
+    const results = await Promise.all([create(c, { email }), create(c, { email })])
+    expect(results.map((r) => r.statusCode).sort()).toEqual([201, 409])
+  })
+})
+
