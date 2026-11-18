@@ -91,14 +91,14 @@ it('Nova OS offers only active standalone models (process-only ones stay in the 
 it('standard list: OS with its process, client, who handles it, deadline with the target date', async () => {
   renderPage()
   expect(screen.getByRole('heading', { name: 'Ordens de Serviço' })).toBeInTheDocument()
-  const late = (await screen.findByRole('button', { name: 'Recálculo DAS — 03/2025' })).closest('[data-list-row]') as HTMLElement
+  const late = (await screen.findByRole('link', { name: 'Recálculo DAS — 03/2025' })).closest('[data-list-row]') as HTMLElement
   expect(within(late).getByText('ACME')).toBeInTheDocument()
   expect(within(late).getByText('#320')).toBeInTheDocument()
   expect(within(late).getByText('Bruna')).toBeInTheDocument()
   expect(within(late).getByText('Fiscal')).toBeInTheDocument()
   expect(within(late).getByText('atrasada há 2 dias úteis')).toBeInTheDocument()
   expect(within(late).getByText('Meta 20/11/2026')).toBeInTheDocument()
-  const junta = screen.getByRole('button', { name: 'Registro na Junta' }).closest('[data-list-row]') as HTMLElement
+  const junta = screen.getByRole('link', { name: 'Registro na Junta' }).closest('[data-list-row]') as HTMLElement
   expect(within(junta).getByText('Abertura ACME')).toBeInTheDocument()
   expect(screen.getByLabelText('Buscar ordens de serviço')).toBeInTheDocument()
 })

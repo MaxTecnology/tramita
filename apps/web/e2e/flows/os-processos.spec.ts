@@ -11,7 +11,7 @@ const drawer = (page: Page, title: string) => page.locator('aside').filter({ has
 async function openTask(page: Page, title: string) {
   await page.goto('/app/os')
   await page.getByLabel('Buscar ordens de serviço').fill(title)
-  await page.getByRole('button', { name: title, exact: true }).first().click()
+  await page.getByRole('link', { name: title, exact: true }).first().click()
   await expect(drawer(page, title)).toBeVisible()
 }
 

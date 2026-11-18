@@ -83,3 +83,53 @@ describe('Processos', () => {
     expect(await screen.findByText('quadro do processo')).toBeInTheDocument()
   })
 })
+
+describe('Processos — regras de prazo e etapa', () => {
+  const extra = [
+    {
+      id: 'p3', title: 'Encerramento GAMA', dueDate: '2020-01-10T00:00:00.000Z', client: { id: 'c3', name: 'GAMA' }, responsibleUser: null,
+      deadline: { state: 'NONE', officeBusinessDays: 0, clientBusinessDays: 0 },
+      columns: cols([{ status: 'OPEN', col: 1 }]),
+    },
+    {
+      id: 'p4', title: 'Baixa DELTA', dueDate: '2020-01-10T00:00:00.000Z', client: { id: 'c4', name: 'DELTA' }, responsibleUser: null,
+      deadline: { state: 'DONE', officeBusinessDays: 3, clientBusinessDays: 0 },
+      columns: cols([{ status: 'DONE', col: 2 }]),
+    },
+    {
+      id: 'p5', title: 'Cancelado EPSILON', dueDate: null, client: { id: 'c5', name: 'EPSILON' }, responsibleUser: null,
+      deadline: { state: 'NONE', officeBusinessDays: 0, clientBusinessDays: 0 },
+      columns: cols([{ status: 'DISREGARDED', col: 0 }]),
+    },
+  ]
+  beforeEach(() => { server.use(http.get(`${API}/boards`, () => HttpResponse.json([...BOARDS, ...extra]))) })
+
+  it('a process past its own due date is in Atrasados, as its row says', async () => {
+    renderPage()
+    const late = (await screen.findByRole('button', { name: /Atrasados/ })).closest('section') as HTMLElement
+    expect(await within(late).findByRole('link', { name: 'Encerramento GAMA' })).toBeInTheDocument()
+    expect(within(late).getByText(/Vencido há/)).toBeInTheDocument()
+  })
+
+  it('a finished process shows no due date warning', async () => {
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: /Concluídos/ }))
+    const r = await row('Baixa DELTA')
+    expect(within(r).queryByText(/Vencido/)).not.toBeInTheDocument()
+  })
+
+  it('a process with every OS dispensed says so and has no stage', async () => {
+    renderPage()
+    const r = await row('Cancelado EPSILON')
+    expect(within(r).getByText('Sem OS ativas')).toBeInTheDocument()
+    expect(within(r).queryByText('Concluído')).not.toBeInTheDocument()
+  })
+
+  it('the stage filter keeps only processes currently in that stage', async () => {
+    renderPage()
+    await screen.findByRole('link', { name: 'Abertura ACME' })
+    await userEvent.selectOptions(screen.getByLabelText('Filtrar por etapa'), 'Em andamento')
+    expect(await screen.findByRole('link', { name: 'Encerramento GAMA' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Abertura ACME' })).not.toBeInTheDocument()
+  })
+})

@@ -18,28 +18,32 @@ const MANAGER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
 
 // Progress = OS finished (by their status: an OS done in its panel counts even if it stayed in an
 // earlier column); disregarded ones are left out
-function osCount(board: Board): { done: number; total: number } {
-  const tasks = board.columns.flatMap((c) => c.tasks).filter((t) => t.status !== 'DISREGARDED')
-  return { done: tasks.filter((t) => t.status === 'DONE').length, total: tasks.length }
+function osCount(board: Board): { done: number; total: number; dispensed: number } {
+  const all = board.columns.flatMap((c) => c.tasks)
+  const tasks = all.filter((t) => t.status !== 'DISREGARDED')
+  return { done: tasks.filter((t) => t.status === 'DONE').length, total: tasks.length, dispensed: all.length - tasks.length }
 }
 const isFinished = (board: Board) => { const { done, total } = osCount(board); return total > 0 && done === total }
 
-function getMostUrgentDueDate(board: Board): Date | null {
+// The date the process must meet: the nearest due date of an open OS, otherwise the process's own.
+// A finished process has none left to meet.
+function dueDateOf(board: Board): Date | null {
+  if (isFinished(board)) return null
   const dates = board.columns
     .flatMap((c) => c.tasks)
     .filter((t) => t.dueDate && t.status !== 'DONE' && t.status !== 'DISREGARDED')
     .map((t) => new Date(t.dueDate!))
     .sort((a, b) => a.getTime() - b.getTime())
-  return dates[0] ?? null
+  return dates[0] ?? (board.dueDate ? new Date(board.dueDate) : null)
 }
 
-// Late: an OS past its due date, or the process past its internal deadline
+// Late: past its due date, or past the process internal deadline
 function isLate(board: Board, now: Date): boolean {
-  const d = getMostUrgentDueDate(board)
+  const d = dueDateOf(board)
   return (!!d && diffDaysDateOnlyUTC(d, now) < 0) || board.deadline?.state === 'LATE'
 }
 function isDueSoon(board: Board, now: Date): boolean {
-  const d = getMostUrgentDueDate(board)
+  const d = dueDateOf(board)
   const diff = d ? diffDaysDateOnlyUTC(d, now) : null
   return (diff !== null && diff >= 0 && diff <= 7) || board.deadline?.state === 'DUE_SOON'
 }
@@ -52,7 +56,7 @@ function getCurrentStage(board: Board): string {
     count: col.tasks.filter((t) => t.status !== 'DONE' && t.status !== 'DISREGARDED').length,
   }))
   const active = counts.filter((c) => c.count > 0).sort((a, b) => b.count - a.count)
-  return active[0]?.title ?? 'Concluído'
+  return active[0]?.title ?? (isFinished(board) ? 'Concluído' : '—')
 }
 
 function formatDueDate(date: Date | null, now: Date): { label: string; cls: string } | null {
@@ -73,11 +77,11 @@ interface Group {
 }
 
 function ProgressCell({ board }: { board: Board }) {
-  const { done, total } = osCount(board)
+  const { done, total, dispensed } = osCount(board)
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
   return (
     <div className="min-w-0">
-      <p className="text-xs text-muted-foreground">{total === 0 ? 'Sem OS' : `${done} de ${total} OS concluídas`}</p>
+      <p className="text-xs text-muted-foreground">{total === 0 ? (dispensed > 0 ? 'Sem OS ativas' : 'Sem OS') : `${done} de ${total} OS concluídas`}</p>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-bg" aria-hidden>
         <div className={cn('h-full rounded-full', pct === 100 ? 'bg-success-text' : 'bg-accent')} style={{ width: `${pct}%` }} />
       </div>
@@ -94,7 +98,7 @@ function BoardGroup({ group, now }: { group: Group; now: Date }) {
         <button
           type="button"
           aria-expanded={open}
-          aria-controls={id}
+          aria-controls={open ? id : undefined}
           onClick={() => setOpen(!open)}
           className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent', group.headerCls)}
         >
@@ -132,7 +136,7 @@ function BoardGroup({ group, now }: { group: Group; now: Date }) {
               {
                 header: 'Vencimento', width: '9rem',
                 cell: (b) => {
-                  const due = formatDueDate(getMostUrgentDueDate(b) ?? (b.dueDate ? new Date(b.dueDate) : null), now)
+                  const due = formatDueDate(dueDateOf(b), now)
                   return due ? <span className={cn('text-xs', due.cls)}>{due.label}</span> : <span className="text-sm text-muted-foreground">—</span>
                 },
               },
@@ -176,7 +180,7 @@ export default function Processes() {
     [boards],
   )
   const uniqueStages = useMemo(
-    () => [...new Set(boards.flatMap((b) => b.columns.map((c) => c.title)))].sort(),
+    () => [...new Set(boards.map(getCurrentStage))].filter((st) => st !== '—').sort(),
     [boards],
   )
 
@@ -188,7 +192,7 @@ export default function Processes() {
       }
       if (filterClient && b.client.id !== filterClient) return false
       if (filterResponsible && b.responsibleUser?.id !== filterResponsible) return false
-      if (filterStage && !b.columns.some((c) => c.title.toLowerCase().includes(filterStage.toLowerCase()))) return false
+      if (filterStage && getCurrentStage(b) !== filterStage) return false
       if (showOnlyOverdue && (isFinished(b) || !isLate(b, now))) return false
       return true
     })
@@ -213,8 +217,8 @@ export default function Processes() {
         {
           label: 'Resultados',
           boards: [...filtered].sort((a, b) => {
-            const da = getMostUrgentDueDate(a)
-            const db = getMostUrgentDueDate(b)
+            const da = dueDateOf(a)
+            const db = dueDateOf(b)
             if (!da && !db) return 0
             if (!da) return 1
             if (!db) return -1

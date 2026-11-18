@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { X, FileStack, Plus } from 'lucide-react'
@@ -48,7 +48,6 @@ const selectCls = 'h-9 rounded-md border border-border bg-surface text-foregroun
 // Ordens de Serviço: every OS (standalone or inside a process) with the situation of its internal
 // deadline. A row opens the OS where it lives (Tarefas for standalone, the process board otherwise).
 export default function OSList() {
-  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [clientId, setClientId] = useState('')
   const [osModelId, setOsModelId] = useState('')
@@ -125,7 +124,7 @@ export default function OSList() {
             header: 'OS', width: 'minmax(0,2fr)',
             cell: (o) => (
               <div className="min-w-0">
-                <button type="button" onClick={() => navigate(o.link)} className={cn(ROW_OPENER, 'text-sm')}>{o.title}</button>
+                <Link to={o.link} className={cn(ROW_OPENER, 'block text-sm')}>{o.title}</Link>
                 {o.process && <p className="text-xs text-muted-foreground">{o.process.title}</p>}
                 {o.delayReasonPending && <p className="text-xs font-medium text-danger-text">Motivo do atraso pendente</p>}
               </div>

@@ -758,3 +758,14 @@ Ficaram de fora do bloco visual de Tarefas (`feat/tasks-visual`); nenhum perde d
 - **Etiqueta de filtro** aparece com o nome vazio ("Cliente: ") se a lista de clientes ainda não carregou.
 - **Tarefa desconsiderada** com prazo passado aparece em vermelho na lista e na gaveta (`isOverdue` só exclui Concluída).
 - **Menu do Master** segue com o azul fixo antigo (`#185FA5`/`#0C447C`), fora do tema.
+
+## OS, Processos e quadro do processo — pendências da revisão (encontrado em 2026-11-18)
+
+Já eram assim antes do redesign (`feat/os-processes-visual`); ficaram de fora:
+
+- **Quadro do processo não reordena dentro da coluna**: o card usa `useSortable`, anima para a nova posição e volta (o `handleDragEnd` ignora a mesma coluna e sempre anexa ao fim nas outras). Ou implementar a ordem (`arrayMove` + posição do `over`) ou trocar por `useDraggable`.
+- **Cartões do Kanban (Tarefas e quadro) sem teclado**: o wrapper do dnd-kit tem `role="button"`, mas Enter/Espaço não abrem a tarefa e não há `KeyboardSensor` para mover sem mouse.
+- **Destaque da coluna de destino** ao arrastar foi retirado do quadro (só acendia sobre área vazia; sobre cards o `over` é o card). Para voltar: `pointerWithin` ou subir o `over` com `onDragOver`.
+- **Processos**: `now` fixo na abertura da tela (aba aberta de um dia para o outro não reclassifica); com filtro ativo os grupos viram uma lista só e a ordenação não põe primeiro os atrasados só pelo prazo interno; com "Só atrasados" o resumo ainda mostra "0 concluídos".
+- **ListTable**: no computador, o leitor de tela lê os valores sem o nome da coluna (cabeçalho visual é `aria-hidden`; o rótulo da linha só aparece no celular) — usar `md:sr-only` no rótulo.
+- **Quadro**: "Adicionar tarefa" tem o mesmo nome em todas as colunas; o campo de nome da nova tarefa não tem rótulo; resultados da busca não mostram coluna nem status.

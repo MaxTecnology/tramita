@@ -36,9 +36,9 @@ import { toast } from 'sonner'
 // The whole column (as tall as the longest one) takes the drop: a card from the bottom of a long
 // column can be dropped on any other column at the same height
 function DroppableColumn({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id })
+  const { setNodeRef } = useDroppable({ id })
   return (
-    <section ref={setNodeRef} aria-label={title} className={cn('flex w-[280px] flex-shrink-0 flex-col rounded-lg md:w-64', isOver && 'ring-2 ring-accent')}>
+    <section ref={setNodeRef} aria-label={title} className="flex w-[280px] flex-shrink-0 flex-col md:w-64">
       {children}
     </section>
   )
