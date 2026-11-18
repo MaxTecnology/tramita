@@ -8,23 +8,23 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   DragStartEvent,
   DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
   useDroppable,
 } from '@dnd-kit/core'
-import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableContext, useSortable, verticalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { cn, mensagemDeErro } from '@/lib/utils'
 import { useServedDepartments } from '@/hooks/useServedDepartments'
 import { useBoard } from '@/hooks/useBoard'
+import { dropTarget } from '@/hooks/boardOrder'
+import { useBoardSensors, DND_INSTRUCTIONS, dndAnnouncements } from '@/lib/dnd'
 import { useBoardStream } from '@/hooks/useBoardStream'
 import { api } from '@/lib/api'
 import { TaskCard } from '@/components/TaskCard'
-import { TaskDrawer, PRIORITY_LABEL } from '@/components/shared/TaskDrawer'
+import { TaskDrawer, PRIORITY_LABEL, STATUS_LABEL } from '@/components/shared/TaskDrawer'
 import { Button } from '@/components/ui/button'
 import { SearchField } from '@/components/ui/search-field'
 import { useAuth } from '@/hooks/useAuth'
@@ -35,10 +35,10 @@ import { toast } from 'sonner'
 
 // The whole column (as tall as the longest one) takes the drop: a card from the bottom of a long
 // column can be dropped on any other column at the same height
-function DroppableColumn({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+function DroppableColumn({ id, title, highlighted, children }: { id: string; title: string; highlighted: boolean; children: React.ReactNode }) {
   const { setNodeRef } = useDroppable({ id })
   return (
-    <section ref={setNodeRef} aria-label={title} className="flex w-[280px] flex-shrink-0 flex-col md:w-64">
+    <section ref={setNodeRef} aria-label={title} className={cn('flex w-[280px] flex-shrink-0 flex-col rounded-lg', highlighted && 'ring-2 ring-accent ring-offset-2 ring-offset-background', 'md:w-64')}>
       {children}
     </section>
   )
@@ -53,7 +53,18 @@ function SortableTaskCard({ task, onClick }: { task: Task; onClick: () => void }
     opacity: isDragging ? 0.4 : 1,
   }
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      data-board-card
+      className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !isDragging) { e.preventDefault(); onClick(); return }
+        listeners?.onKeyDown?.(e)
+      }}
+    >
       <TaskCard task={task} onClick={onClick} />
     </div>
   )
@@ -123,7 +134,9 @@ export default function Board() {
     enabled: !!boardId && hasFilters,
   })
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const [dropColumnId, setDropColumnId] = useState<string | null>(null)
+  const sensors = useBoardSensors(sortableKeyboardCoordinates)
+  const dndName = (id: string | number) => board?.columns.find((c) => c.id === id)?.title ?? board?.columns.flatMap((c) => c.tasks).find((t) => t.id === id)?.title ?? String(id)
 
   function handleDragStart(event: DragStartEvent) {
     const allTasks = board?.columns.flatMap((c) => c.tasks) ?? []
@@ -131,23 +144,21 @@ export default function Board() {
     if (task) setActiveTask(task)
   }
 
+  // The column that will take the card (over a card or its empty part), never the one it came from
+  function handleDragOver(event: DragOverEvent) {
+    const target = board && event.over ? dropTarget(board, event.active.id as string, event.over.id as string) : null
+    const from = board?.columns.find((c) => c.tasks.some((t) => t.id === event.active.id))
+    setDropColumnId(target && target.columnId !== from?.id ? target.columnId : null)
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     setActiveTask(null)
+    setDropColumnId(null)
     if (!over || !board) return
 
-    const taskId = active.id as string
-    const targetColumn =
-      board.columns.find((col) => col.id === over.id) ??
-      board.columns.find((col) => col.tasks.some((t) => t.id === over.id))
-
-    if (!targetColumn) return
-
-    const currentColumn = board.columns.find((col) => col.tasks.some((t) => t.id === taskId))
-    if (currentColumn?.id === targetColumn.id) return
-
-    const position = targetColumn.tasks.length
-    moveTask({ taskId, columnId: targetColumn.id, position })
+    const target = dropTarget(board, active.id as string, over.id as string)
+    if (target) moveTask({ taskId: active.id as string, ...target })
   }
 
   if (isLoading) return <div className="p-8 text-muted-foreground">Carregando processo...</div>
@@ -220,7 +231,9 @@ export default function Board() {
                 className="flex items-center justify-between rounded-lg border border-border bg-surface p-2.5 text-left text-sm hover:bg-neutral-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <span className="font-medium text-foreground">{task.title}</span>
-                <span className="ml-2 text-xs text-muted-foreground">{PRIORITY_LABEL[task.priority]}</span>
+                <span className="ml-2 text-right text-xs text-muted-foreground">
+                  {board.columns.find((c) => c.id === task.columnId)?.title ?? ''} · {STATUS_LABEL[task.status]} · {PRIORITY_LABEL[task.priority]}
+                </span>
               </button>
             ))}
           </div>
@@ -228,10 +241,10 @@ export default function Board() {
       )}
 
       <div className="flex-1 overflow-x-auto p-4 md:p-6">
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd} onDragCancel={() => { setActiveTask(null); setDropColumnId(null) }} accessibility={{ screenReaderInstructions: DND_INSTRUCTIONS, announcements: dndAnnouncements(dndName) }}>
           <div className="flex min-h-full items-stretch gap-3 md:gap-4">
             {board.columns.map((column) => (
-              <DroppableColumn key={column.id} id={column.id} title={column.title}>
+              <DroppableColumn key={column.id} id={column.id} title={column.title} highlighted={dropColumnId === column.id}>
                 <div className="mb-2 flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-foreground">{column.title}</h2>
                   <span className="text-xs text-muted-foreground bg-neutral-bg rounded-full px-2 py-0.5">
@@ -258,6 +271,7 @@ export default function Board() {
                   <div className="mt-2 p-1">
                     <input
                       autoFocus
+                      aria-label="Nome da tarefa"
                       value={newTaskTitle}
                       onChange={(e) => setNewTaskTitle(e.target.value)}
                       onKeyDown={(e) => {
@@ -268,6 +282,7 @@ export default function Board() {
                       className="w-full text-sm rounded-md border border-border bg-surface px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                     <select
+                      aria-label="Departamento da tarefa"
                       value={newTaskDepartmentId}
                       onChange={(e) => setNewTaskDepartmentId(e.target.value)}
                       className="w-full mt-1.5 text-xs rounded-md border border-border bg-surface px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent"
@@ -279,6 +294,7 @@ export default function Board() {
                     </select>
                     <div className="flex gap-2 mt-1.5">
                       <button
+                        type="button"
                         onClick={() => handleAddTask(column.id)}
                         disabled={!newTaskTitle.trim() || !newTaskDepartmentId || createTaskMutation.isPending}
                         className="text-xs bg-accent text-accent-foreground px-3 py-1 rounded hover:bg-accent-hover disabled:opacity-50"
@@ -286,6 +302,7 @@ export default function Board() {
                         {createTaskMutation.isPending ? '...' : 'Adicionar'}
                       </button>
                       <button
+                        type="button"
                         onClick={() => { setAddingToColumn(null); setNewTaskTitle(''); setNewTaskDepartmentId('') }}
                         className="text-xs text-muted-foreground hover:text-foreground"
                       >
@@ -295,10 +312,12 @@ export default function Board() {
                   </div>
                 ) : (
                   <button
+                    type="button"
+                    aria-label={`Adicionar tarefa em ${column.title}`}
                     onClick={() => { setAddingToColumn(column.id); setNewTaskTitle(''); setNewTaskDepartmentId('') }}
                     className="mt-2 w-full text-left text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-neutral-bg flex items-center gap-1"
                   >
-                    <Plus size={12} />
+                    <Plus size={12} aria-hidden />
                     Adicionar tarefa
                   </button>
                 )}

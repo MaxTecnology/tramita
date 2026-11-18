@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -163,7 +163,12 @@ export default function Processes() {
     queryFn: () => api.get('/boards').then((r) => r.data),
   })
 
-  const now = useMemo(() => new Date(), [])
+  // Re-read every minute: a tab left open from one day to the next reclassifies late / due soon
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(t)
+  }, [])
 
   const uniqueClients = useMemo(
     () => [...new Map(boards.map((b) => [b.client.id, b.client])).values()],
@@ -216,7 +221,11 @@ export default function Processes() {
       return [
         {
           label: 'Resultados',
+          // Late first, then by the nearest due date
           boards: [...filtered].sort((a, b) => {
+            const la = isLate(a, now) ? 0 : 1
+            const lb = isLate(b, now) ? 0 : 1
+            if (la !== lb) return la - lb
             const da = dueDateOf(a)
             const db = dueDateOf(b)
             if (!da && !db) return 0
@@ -302,7 +311,7 @@ export default function Processes() {
           <span className="font-medium text-foreground">{stats.total} {stats.total === 1 ? 'processo' : 'processos'}</span>
           {stats.overdue > 0 && <span className="font-medium text-danger-text">{stats.overdue} {stats.overdue === 1 ? 'atrasado' : 'atrasados'}</span>}
           {stats.dueSoon > 0 && <span className="text-warning-text">{stats.dueSoon} {stats.dueSoon === 1 ? 'vence' : 'vencem'} em 7 dias</span>}
-          <span>{stats.completed} {stats.completed === 1 ? 'concluído' : 'concluídos'}</span>
+          {!showOnlyOverdue && <span>{stats.completed} {stats.completed === 1 ? 'concluído' : 'concluídos'}</span>}
         </p>
       )}
 

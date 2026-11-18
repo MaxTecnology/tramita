@@ -5,9 +5,6 @@ import {
   DragEndEvent,
   DragStartEvent,
   DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
   useDroppable,
   useDraggable,
 } from '@dnd-kit/core'
@@ -23,6 +20,7 @@ import { periodRange, type PeriodKind } from './tasksPeriod'
 import { changeTaskStatus, waitsForAnotherOS } from './tasksStatusChange'
 import { STATUS_FILTER_OPTIONS, DEFAULT_STATUS_FILTER, statusFilterParams, type StatusFilter } from './tasksStatus'
 import type { Task, User, Department, RecurringTaskTemplate, DeadlineInfo } from '@/types'
+import { useBoardSensors, DND_INSTRUCTIONS, dndAnnouncements } from '@/lib/dnd'
 import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
 import { useMyScope } from '@/hooks/useMyScope'
 import { useLinkedItem } from '@/hooks/useLinkedItem'
@@ -215,10 +213,14 @@ function DraggableTaskCard({ task, onClick }: { task: TaskListItem; onClick: () 
       style={style}
       {...attributes}
       {...listeners}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !isDragging) { e.preventDefault(); onClick(); return }
+        listeners?.onKeyDown?.(e)
+      }}
       onClick={onClick}
       data-task-card
       className={cn(
-        'min-w-0 cursor-pointer select-none rounded-lg border bg-surface p-3 shadow-sm transition-shadow hover:shadow-md',
+        'min-w-0 cursor-pointer select-none rounded-lg border bg-surface p-3 shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
         isOverdue ? 'border-danger-text' : 'border-border',
         isDragging && 'opacity-40',
       )}
@@ -584,7 +586,8 @@ export default function Tasks() {
     return grouped
   }, [tasks])
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const sensors = useBoardSensors()
+  const dndName = (id: string | number) => STATUS_LABEL[id as Task['status']] ?? tasks.find((t) => t.id === id)?.title ?? String(id)
 
   function handleDragStart(event: DragStartEvent) {
     const task = tasks.find((t) => t.id === event.active.id)
@@ -814,7 +817,7 @@ export default function Tasks() {
         ) : isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando tarefas...</p>
         ) : (
-          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} accessibility={{ screenReaderInstructions: DND_INSTRUCTIONS, announcements: dndAnnouncements(dndName) }}>
             {/* Columns grow with the longest one: a card at the bottom of a long column can be dropped
                 on any other column at the same height */}
             <div className="flex min-h-full items-stretch gap-3 overflow-x-auto pb-2 lg:overflow-visible">

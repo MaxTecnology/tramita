@@ -343,7 +343,9 @@ Não há rota para criar, editar, reordenar ou remover colunas: elas nascem com 
 ```json
 { "columnId": "string", "position": 0 }
 ```
-→ Dispara `TASK_MOVED` (com canais `WHATSAPP`+`EMAIL` forçados se `Column.notifyClient: true`, independente do toggle global da org). Se `Column.statusEffect: DONE` → também aplica o status na tarefa e dispara `TASK_COMPLETED`
+→ `position` é o índice na coluna de destino (além do fim = último); a coluna é renumerada 0..n e a de origem é compactada.
+→ **Mesma coluna:** só reordena — sem histórico, sem mudança de status e sem aviso ao cliente (publica `task:moved` no SSE do quadro).
+→ Entre colunas: dispara `TASK_MOVED` (com canais `WHATSAPP`+`EMAIL` forçados se `Column.notifyClient: true`, independente do toggle global da org). Se `Column.statusEffect: DONE` → também aplica o status na tarefa e dispara `TASK_COMPLETED`
 → Status possíveis (`TaskStatus`): `OPEN` (padrão) | `STARTED` (em andamento, atribuído por coluna com `statusEffect: STARTED`) | `BLOCKED` (impedimento, geralmente por checklist de documento pendente/rejeitado) | `DISREGARDED` (desconsiderada) | `DONE` (concluída)
 
 **Responsável:** `assigneeId` (tarefa/OS) e `responsibleUserId` (processo) precisam ser de usuário ativo da equipe do mesmo escritório — outro escritório ou desativado → 404 `'Usuário não encontrado'` (nada é atribuído nem notificado).

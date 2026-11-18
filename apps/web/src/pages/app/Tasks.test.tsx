@@ -153,3 +153,12 @@ describe('Tarefas — trocando filtro', () => {
     expect(within(r).getByText(/Abertura de empresa com um nome bem comprido/)).not.toHaveClass('truncate')
   })
 })
+
+it('Kanban: a card opens with Enter (keyboard)', async () => {
+  renderPage()
+  await userEvent.click(screen.getByRole('button', { name: 'Kanban' }))
+  const card = (await screen.findByText('Registro na Junta', { selector: '[data-task-card] *' })).closest('[data-task-card]') as HTMLElement
+  card.focus()
+  await userEvent.keyboard('{Enter}')
+  expect(await screen.findByRole('dialog', { name: 'Tarefa Registro na Junta' })).toBeInTheDocument()
+})

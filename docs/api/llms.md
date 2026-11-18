@@ -1841,7 +1841,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-18T11:18:08.674Z"
+  "dueDate": "2026-11-18T17:39:50.579Z"
 }
 ```
 
@@ -1915,7 +1915,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-18T11:18:08.676Z"
+  "dueDate": "2026-11-18T17:39:50.582Z"
 }
 ```
 
@@ -2005,7 +2005,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-18T11:18:08.679Z",
+  "dueDate": "2026-11-18T17:39:50.585Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2145,13 +2145,13 @@ no additional properties
 
 <a id="scalar-operation-patch-tasksidmove"></a>
 
-### Mover tarefa de coluna
+### Mover ou reordenar tarefa no quadro
 
 - **Method:** `PATCH`
 - **Path:** `/tasks/{id}/move`
 - **Tags:** Tarefas
 
-Dispara a notificação de etapa para o cliente quando a tarefa é visível a ele.
+`position` é o índice na coluna de destino. Na mesma coluna só reordena (sem histórico nem aviso); entre colunas dispara a notificação de etapa para o cliente quando a tarefa é visível a ele.
 
 **Quem pode:** Admin, Gerente, Membro
 
@@ -2280,14 +2280,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-18T11:18:08.689Z",
+  "dueDate": "2026-11-18T17:39:50.596Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-18T11:18:08.690Z",
-  "competence": "2026-11-18T11:18:08.690Z",
+  "targetDate": "2026-11-18T17:39:50.596Z",
+  "competence": "2026-11-18T17:39:50.596Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -4352,7 +4352,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-18T11:18:08.752Z",
+  "dueDate": "2026-11-18T17:39:50.653Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -5357,7 +5357,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-18T11:18:08.782Z"
+  "dueDate": "2026-11-18T17:39:50.685Z"
 }
 ```
 
@@ -5414,7 +5414,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-18T11:18:08.783Z",
+  "dueDate": "2026-11-18T17:39:50.687Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -6198,7 +6198,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T11:18:08.804Z",
+  "dueMonth": "2026-11-18T17:39:50.707Z",
   "assignmentIds": [
     ""
   ]
@@ -6250,7 +6250,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T11:18:08.806Z",
+  "dueMonth": "2026-11-18T17:39:50.708Z",
   "assignmentIds": [
     ""
   ]
@@ -6293,7 +6293,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T11:18:08.807Z"
+  "dueMonth": "2026-11-18T17:39:50.709Z"
 }
 ```
 

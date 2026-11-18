@@ -4,6 +4,7 @@ import type { Board } from '@/types'
 import { toast } from 'sonner'
 import { mensagemDeErro } from '@/lib/utils'
 import { withDelayReason } from '@/components/shared/task-documents/delayReason'
+import { placeTask } from './boardOrder'
 
 class MoveCancelled extends Error {}
 
@@ -34,26 +35,7 @@ export function useBoard(boardId: string) {
       await queryClient.cancelQueries({ queryKey: ['board', boardId] })
       const snapshot = queryClient.getQueryData<Board>(['board', boardId])
 
-      if (snapshot) {
-        const allTasks = snapshot.columns.flatMap((c) => c.tasks)
-        const movingTask = allTasks.find((t) => t.id === taskId)
-
-        if (movingTask) {
-          queryClient.setQueryData<Board>(['board', boardId], {
-            ...snapshot,
-            columns: snapshot.columns.map((col) => ({
-              ...col,
-              tasks:
-                col.id === columnId
-                  ? [
-                      ...col.tasks.filter((t) => t.id !== taskId),
-                      { ...movingTask, columnId, position },
-                    ]
-                  : col.tasks.filter((t) => t.id !== taskId),
-            })),
-          })
-        }
-      }
+      if (snapshot) queryClient.setQueryData<Board>(['board', boardId], placeTask(snapshot, taskId, columnId, position))
 
       return { snapshot }
     },

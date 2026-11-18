@@ -29,7 +29,7 @@ export const WORK_DOCS: RouteDocs = {
   'GET /tasks': { summary: 'Listar tarefas', description: 'Minhas tarefas, do departamento ou do escritório, conforme o papel e os filtros.', querystring: listTasksQuerySchema },
   'POST /tasks/assume-bulk': { summary: 'Assumir várias tarefas', body: assumeBulkSchema },
   'POST /tasks/:id/assume': { summary: 'Assumir tarefa', description: 'Falha com 409 se outra pessoa assumiu antes (`expectedAssigneeId`).', body: assumeTaskSchema },
-  'PATCH /tasks/:id/move': { summary: 'Mover tarefa de coluna', description: 'Dispara a notificação de etapa para o cliente quando a tarefa é visível a ele.', body: moveTaskSchema },
+  'PATCH /tasks/:id/move': { summary: 'Mover ou reordenar tarefa no quadro', description: '`position` é o índice na coluna de destino. Na mesma coluna só reordena (sem histórico nem aviso); entre colunas dispara a notificação de etapa para o cliente quando a tarefa é visível a ele.', body: moveTaskSchema },
   'PATCH /tasks/:id': { summary: 'Alterar tarefa', description: 'Título, prazo, prioridade, status, responsável (pode ser de outro departamento) e visibilidade para o cliente.', body: updateTaskSchema },
   'GET /tasks/:id/history': { summary: 'Histórico da tarefa' },
   'DELETE /tasks/:id': { summary: 'Excluir tarefa' },

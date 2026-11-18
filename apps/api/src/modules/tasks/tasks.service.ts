@@ -136,6 +136,22 @@ export async function createTask(
   return task
 }
 
+// Puts the task at `index` of the column (past the end = last) and renumbers the column 0..n, so the
+// board order is the one the person dropped. `taskId` null only renumbers (the column it left).
+async function placeInColumn(tx: Prisma.TransactionClient, columnId: string, taskId: string | null, index: number): Promise<void> {
+  const others = await tx.task.findMany({
+    where: { columnId, ...(taskId ? { id: { not: taskId } } : {}) },
+    orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+    select: { id: true, position: true },
+  })
+  const ids = others.map((t) => t.id)
+  if (taskId) ids.splice(Math.min(index, ids.length), 0, taskId)
+  const current = new Map(others.map((t) => [t.id, t.position]))
+  for (const [position, id] of ids.entries()) {
+    if (current.get(id) !== position) await tx.task.update({ where: { id }, data: { position } })
+  }
+}
+
 export async function moveTask(
   taskId: string,
   organizationId: string,
@@ -143,6 +159,15 @@ export async function moveTask(
   actor: Actor,
 ) {
   const task = await verifyTaskBelongsToOrg(taskId, organizationId)
+  // Same column: only the order changes — no status, history nor notice to the client
+  if (task.column.id === data.columnId) {
+    await prisma.$transaction((tx) => placeInColumn(tx, data.columnId, taskId, data.position))
+    await publishBoardEvent(task.column.board.id, {
+      event: 'task:moved',
+      data: { taskId, fromColumn: data.columnId, toColumn: data.columnId, position: data.position },
+    })
+    return prisma.task.findUniqueOrThrow({ where: { id: taskId } })
+  }
   // An OS waiting for another one stays where it was born until released
   await assertReleased(taskId)
   const fromColumn = task.column
@@ -169,10 +194,13 @@ export async function moveTask(
       await assertDepartmentServesClient(tx, task.column.board.clientId, task.departmentId)
     }
     if (nextStatus === 'DONE' && task.status !== 'DONE') await assertNoPendingApproval(tx, taskId)
-    const updated = await tx.task.update({
+    await tx.task.update({
       where: { id: taskId },
-      data: { columnId: data.columnId, position: data.position, status: nextStatus, completedAt },
+      data: { columnId: data.columnId, status: nextStatus, completedAt },
     })
+    await placeInColumn(tx, data.columnId, taskId, data.position)
+    await placeInColumn(tx, fromColumn.id, null, 0)
+    const updated = await tx.task.findUniqueOrThrow({ where: { id: taskId } })
 
     await tx.taskHistory.create({
       data: {

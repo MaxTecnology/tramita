@@ -60,7 +60,8 @@ export function ListTable<T>({ label, columns, rows, rowKey, actions, actionsWid
             >
               {columns.map((c, i) => (
                 <div key={c.header} className={cn('min-w-0', i > 0 && 'col-start-1 flex items-baseline gap-1.5 md:col-start-auto md:block')}>
-                  {i > 0 && <span className="flex-shrink-0 text-xs text-muted-foreground md:hidden">{c.header}:</span>}
+                  {/* On wide screens the visual header names the column; screen readers still get it here */}
+                  {i > 0 && <span className="flex-shrink-0 text-xs text-muted-foreground md:sr-only">{c.header}:</span>}
                   {i > 0 ? <div className="min-w-0 flex-1">{c.cell(row)}</div> : c.cell(row)}
                 </div>
               ))}

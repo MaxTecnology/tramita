@@ -2829,11 +2829,11 @@
     },
     "/tasks/{id}/move": {
       "patch": {
-        "summary": "Mover tarefa de coluna",
+        "summary": "Mover ou reordenar tarefa no quadro",
         "tags": [
           "Tarefas"
         ],
-        "description": "Dispara a notificação de etapa para o cliente quando a tarefa é visível a ele.\n\n**Quem pode:** Admin, Gerente, Membro",
+        "description": "`position` é o índice na coluna de destino. Na mesma coluna só reordena (sem histórico nem aviso); entre colunas dispara a notificação de etapa para o cliente quando a tarefa é visível a ele.\n\n**Quem pode:** Admin, Gerente, Membro",
         "requestBody": {
           "required": true,
           "content": {

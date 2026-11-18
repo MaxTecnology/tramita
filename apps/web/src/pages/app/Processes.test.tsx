@@ -133,3 +133,20 @@ describe('Processos — regras de prazo e etapa', () => {
     expect(screen.queryByRole('link', { name: 'Abertura ACME' })).not.toBeInTheDocument()
   })
 })
+
+describe('Processos — com filtro', () => {
+  it('"Só atrasados" does not count finished ones, and late ones come first in the results', async () => {
+    server.use(http.get(`${API}/boards`, () => HttpResponse.json([
+      ...BOARDS,
+      { id: 'p6', title: 'Atrasado pelo prazo interno', dueDate: null, client: { id: 'c6', name: 'ZETA' }, responsibleUser: null,
+        deadline: { state: 'LATE', businessDaysLate: 2, officeBusinessDays: 9, clientBusinessDays: 0 }, columns: cols([{ status: 'OPEN', col: 0 }]) },
+    ])))
+    renderPage()
+    await screen.findByRole('link', { name: 'Abertura ACME' })
+    await userEvent.type(screen.getByLabelText('Buscar processos'), 'a')
+    const links = (await screen.findAllByRole('link')).map((l) => l.textContent)
+    expect(links[0]).toBe('Atrasado pelo prazo interno')
+    await userEvent.click(screen.getByRole('button', { name: 'Só atrasados' }))
+    expect(screen.queryByText(/concluídos?$/)).not.toBeInTheDocument()
+  })
+})
