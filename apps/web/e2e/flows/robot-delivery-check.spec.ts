@@ -12,8 +12,8 @@ const drawer = (page: Page) => page.locator('aside').filter({ hasText: 'Simples 
 
 async function chooseFile(page: Page, file: string) {
   await page.goto('/app/tasks')
-  await page.getByPlaceholder('Título, cliente ou código...').fill('Simples E2E')
-  await page.getByRole('row', { name: /Simples E2E/ }).click()
+  await page.getByLabel('Buscar tarefas').fill('Simples E2E')
+  await page.getByRole('button', { name: 'Simples E2E', exact: true }).click()
   await drawer(page).getByRole('tab', { name: 'Documentos' }).click()
   const delivery = drawer(page).locator('div').filter({ hasText: /^Guia DAS E2E \(robô\)/ }).first()
   await delivery.locator('input[type=file]').setInputFiles(resolve(FIXTURES, file))

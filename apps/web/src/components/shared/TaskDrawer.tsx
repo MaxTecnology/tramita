@@ -287,7 +287,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
     }
   }
 
-  const [sourceRequestOpen, setSourceRequestOpen] = useState(true)
+  const [sourceRequestOpen, setSourceRequestOpen] = useState(false)
 
   const { data: sourceRequestComments = [] } = useQuery<Comment[]>({
     queryKey: ['request-comments', task.sourceRequestId],
@@ -462,344 +462,311 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
     { id: 'history', label: 'Histórico', icon: <Clock size={14} /> },
   ]
 
+  const toUtcIso = (val: string) => {
+    if (!val) return null
+    const [y, m, d] = val.split('-').map(Number)
+    return new Date(Date.UTC(y, m - 1, d)).toISOString()
+  }
+  const fieldCls = 'h-9 w-full rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+  const fixedByRecurrence = isRecurring ? 'Definida pela tarefa recorrente' : undefined
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-      <aside className="fixed inset-y-0 right-0 z-50 flex flex-col bg-surface shadow-2xl w-full max-w-[560px]">
+      <aside aria-label={`Tarefa ${task.title}`} className="fixed inset-y-0 right-0 z-50 flex flex-col bg-surface shadow-2xl w-full max-w-[560px]">
 
-        {/* Header fixo */}
-        <div className="px-5 pt-5 pb-4 border-b border-border flex-shrink-0">
-          {(canAssume || (isStaff && !canEdit)) && (
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning-text/40 bg-warning-bg px-3 py-2">
-              <div className="text-xs text-warning-text">
-                {!canEdit ? <p>Assuma a tarefa para alterá-la</p> : <p>{task.assigneeId ? 'Esta tarefa está com outro colaborador.' : 'Esta tarefa está sem responsável.'}</p>}
-                {assumeError && <p className="font-medium text-danger-text">{assumeError}</p>}
-              </div>
-              {canAssume && (
-                <Button size="sm" onClick={() => assumeMutation.mutate()} disabled={assumeMutation.isPending}>
-                  {assumeMutation.isPending ? 'Assumindo...' : 'Assumir'}
-                </Button>
-              )}
-            </div>
-          )}
-          {awaitingApproval && (
-            <p className="mb-3 inline-flex rounded-full bg-warning-bg px-2.5 py-0.5 text-xs font-medium text-warning-text">
-              Aguardando aprovação do cliente
-            </p>
-          )}
-          <div className="flex items-start justify-between mb-3">
-            {canEdit && editingTitle ? (
-              <input
-                autoFocus
-                value={titleValue}
-                onChange={(e) => setTitleValue(e.target.value)}
-                onBlur={() => {
-                  setEditingTitle(false)
-                  if (titleValue.trim() && titleValue !== task.title) {
-                    updateMutation.mutate({ title: titleValue.trim() })
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-                  if (e.key === 'Escape') { setTitleValue(task.title); setEditingTitle(false) }
-                }}
-                className="flex-1 text-base font-semibold text-foreground border-b border-accent focus:outline-none bg-transparent mr-4"
-              />
-            ) : (
-              <h2
-                className={cn(
-                  'flex-1 text-base font-semibold text-foreground leading-tight mr-4',
-                  canEdit && 'cursor-pointer hover:text-accent',
-                )}
-                onClick={() => canEdit && setEditingTitle(true)}
-              >
-                {task.title}
-              </h2>
-            )}
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground flex-shrink-0">
-              <X size={20} />
-            </button>
-          </div>
-
-          {/* Badges de metadados */}
-          <div className="flex flex-wrap gap-2 mb-3">
-            {canEdit ? (
-              <select
-                value={task.priority}
-                onChange={(e) => updateMutation.mutate({ priority: e.target.value as Task['priority'] })}
-                className={cn('text-xs font-medium px-2 py-0.5 rounded-full border-0 cursor-pointer', PRIORITY_COLOR[task.priority])}
-              >
-                {(['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as Task['priority'][]).map((p) => (
-                  <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>
-                ))}
-              </select>
-            ) : (
-              <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', PRIORITY_COLOR[task.priority])}>
-                {PRIORITY_LABEL[task.priority]}
-              </span>
-            )}
-
-            {waitingDependency ? (
-              <DeadlineChip deadline={task.deadline ?? { state: 'WAITING_DEPENDENCY', officeBusinessDays: 0, clientBusinessDays: 0 }} waitingFor={task.waitingFor?.join(', ')} />
-            ) : canEdit ? (
-              <select
-                value={task.status}
-                onChange={(e) => updateMutation.mutate({ status: e.target.value as Task['status'] })}
-                className={cn('text-xs font-medium px-2 py-0.5 rounded-full border-0 cursor-pointer', STATUS_COLOR[task.status])}
-              >
-                {(['OPEN', 'STARTED', 'DONE', 'DISREGARDED', 'BLOCKED'] as Task['status'][]).map((s) => (
-                  <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-                ))}
-              </select>
-            ) : (
-              <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', STATUS_COLOR[task.status])}>
-                {statusLabels[task.status]}
-              </span>
-            )}
-
-            {canEdit && (
-              <select
-                value={task.departmentId ?? ''}
-                onChange={(e) => updateMutation.mutate({ departmentId: e.target.value })}
-                className="text-xs font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground cursor-pointer bg-surface"
-              >
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            )}
-
-            {isStaff && (canEdit ? (
-              <label className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span className="sr-only">Responsável</span>
-                <select
-                  aria-label="Responsável"
-                  value={task.assigneeId ?? ''}
-                  onChange={(e) => e.target.value && e.target.value !== task.assigneeId && updateMutation.mutate({ assigneeId: e.target.value })}
-                  className="text-xs font-medium px-2 py-0.5 rounded-full border border-border text-foreground cursor-pointer bg-surface"
-                >
-                  {!task.assigneeId && <option value="">Sem responsável</option>}
-                  <optgroup label="Do departamento">
-                    {sameDepartmentChoices.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </optgroup>
-                  {otherDepartmentChoices.length > 0 && (
-                    <optgroup label="Outros departamentos">
-                      {otherDepartmentChoices.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </optgroup>
-                  )}
-                </select>
-              </label>
-            ) : task.assigneeId && (
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground">
-                {userName(task.assigneeId)}
-              </span>
-            ))}
-
-            {canEditDates ? (
-              <div className="flex flex-col gap-1">
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  Prazo:
-                  <input
-                    type="date"
-                    defaultValue={task.dueDate ? task.dueDate.slice(0, 10) : ''}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      updateMutation.mutate({
-                        dueDate: val
-                          ? (() => {
-                              const [y, m, d] = val.split('-').map(Number)
-                              return new Date(Date.UTC(y, m - 1, d)).toISOString()
-                            })()
-                          : null,
-                      })
-                    }}
-                    className="text-xs border border-border rounded px-2 py-0.5 text-foreground bg-surface focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
-                </label>
-                {/* Aviso quando prazo da tarefa ultrapassa prazo do processo */}
-                {task.dueDate && boardDueDate && new Date(task.dueDate) > new Date(boardDueDate) && (
-                  <p className="text-xs text-warning-text">
-                    ⚠ Prazo além do processo ({formatDateOnlyUTC(boardDueDate)})
-                  </p>
-                )}
-              </div>
-            ) : (
-              task.dueDate && (
-                <span
-                  className={cn('text-xs px-2 py-0.5 rounded-full bg-neutral-bg text-foreground', isOverdue && 'bg-danger-bg text-danger-text font-medium')}
-                  title={isRecurring ? 'Tarefa recorrente — vencimento fixado pelo template' : undefined}
-                >
-                  {isOverdue ? '⚠ ' : ''}Prazo: {formatDateOnlyUTC(task.dueDate)}{isRecurring ? ' 🔒' : ''}
-                </span>
-              )
-            )}
-
-            {canEditDates ? (
-              <label className="flex items-center gap-1.5 text-xs text-muted-foreground" title="Meta interna">
-                Meta:
-                <input
-                  type="date"
-                  defaultValue={task.targetDate ? task.targetDate.slice(0, 10) : ''}
-                  onChange={(e) => {
-                    const val = e.target.value
-                    updateMutation.mutate({
-                      targetDate: val
-                        ? (() => {
-                            const [y, m, d] = val.split('-').map(Number)
-                            return new Date(Date.UTC(y, m - 1, d)).toISOString()
-                          })()
-                        : null,
-                    })
-                  }}
-                  className="text-xs border border-border rounded px-2 py-0.5 text-foreground bg-surface"
-                />
-              </label>
-            ) : (
-              task.targetDate && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-bg text-foreground" title={isRecurring ? 'Tarefa recorrente — meta fixada pelo template' : 'Meta interna'}>
-                  Meta: {formatDateOnlyUTC(task.targetDate)}{isRecurring ? ' 🔒' : ''}
-                </span>
-              )
-            )}
-            {task.osModel && task.deadline && !waitingDependency && (
-              <span className="inline-flex items-center gap-1.5" title="Prazo interno em dias úteis (pausa enquanto aguarda o cliente)">
-                <DeadlineChip deadline={task.deadline} />
-                {(task.deadline.officeBusinessDays > 0 || task.deadline.clientBusinessDays > 0) && (
-                  <span className="text-[11px] text-muted-foreground">
-                    {task.deadline.officeBusinessDays} dias úteis do escritório · {task.deadline.clientBusinessDays} aguardando o cliente
-                  </span>
-                )}
-              </span>
-            )}
-            {waitingDependency && canReleaseEarly && (
-              <button type="button" disabled={releaseMutation.isPending}
-                onClick={async () => {
-                  const reason = await askText({ title: 'Liberar esta OS agora?', description: `Ela aguarda: ${task.waitingFor?.join(', ') || 'outra OS'}. O prazo começa a contar hoje.`, label: 'Por que liberar antes?', confirmLabel: 'Liberar' })
-                  if (reason) releaseMutation.mutate(reason)
-                }}
-                className="text-xs font-medium text-accent-hover hover:underline">
-                Liberar agora
-              </button>
-            )}
-            {task.delayReasonPending && canEdit && (
-              <button type="button" onClick={() => void registerDelayReason(task.id).then((ok) => { if (ok) { queryClient.invalidateQueries({ queryKey: ['tasks'] }); queryClient.invalidateQueries({ queryKey: ['os'] }) } })}
-                className="text-xs font-medium text-danger-text hover:underline">
-                Concluída com atraso — registrar o motivo
-              </button>
-            )}
-            {task.competence && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-bg text-foreground" title="Competência">
-                Competência: {new Date(task.competence).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })}
-              </span>
-            )}
-            {isRecurring && role === 'ORG_ADMIN' && (
-              <button
-                type="button"
-                disabled={regenerateMutation.isPending}
-                onClick={async () => {
-                  if (await askConfirm({
-                    title: 'Gerar a tarefa de novo?',
-                    description: 'Isso apaga essa tarefa e gera uma nova pra mesma competência, usando a configuração atual do template. Só funciona se a tarefa ainda não teve nenhuma movimentação (sem comentário, anexo ou mudança de coluna).',
-                    confirmLabel: 'Gerar de novo',
-                  })) regenerateMutation.mutate()
-                }}
-                className="text-xs px-2 py-0.5 rounded-full border border-accent text-accent hover:bg-accent/10 disabled:opacity-50"
-                title="Apaga e gera de novo com a config atual do template — só funciona se a tarefa não teve movimentação"
-              >
-                {regenerateMutation.isPending ? 'Regenerando...' : 'Regenerar'}
-              </button>
-            )}
-
-            {canEdit && (
-              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={task.visibleToClient}
-                  onChange={(e) => updateMutation.mutate({ visibleToClient: e.target.checked })}
-                />
-                Cliente pode ver
-              </label>
-            )}
-          </div>
-
-          {/* Descrição */}
-          {canEdit ? (
-            <textarea
-              value={descValue}
-              onChange={(e) => setDescValue(e.target.value)}
+        {/* Fixed top: the task title and the way out */}
+        <div className="flex flex-shrink-0 items-start gap-3 border-b border-border px-5 py-4">
+          {canEdit && editingTitle ? (
+            <input
+              autoFocus
+              value={titleValue}
+              onChange={(e) => setTitleValue(e.target.value)}
               onBlur={() => {
-                if (descValue !== (task.description ?? '')) {
-                  updateMutation.mutate({ description: descValue || null })
+                setEditingTitle(false)
+                if (titleValue.trim() && titleValue !== task.title) {
+                  updateMutation.mutate({ title: titleValue.trim() })
                 }
               }}
-              placeholder="Adicionar descrição..."
-              rows={2}
-              className="w-full text-sm text-foreground border border-border bg-surface rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent resize-none placeholder:text-muted-foreground"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                if (e.key === 'Escape') { setTitleValue(task.title); setEditingTitle(false) }
+              }}
+              className="flex-1 text-base font-semibold text-foreground border-b border-accent focus:outline-none bg-transparent"
             />
           ) : (
-            task.description && (
-              <p className="text-sm text-foreground">{task.description}</p>
-            )
-          )}
-        </div>
-
-        {/* Abas em grade fechada: 5 (equipe) = 3 em cima (1/3 cada) + 2 embaixo (1/2 cada), sem célula vazia;
-            4 (cliente) = uma linha */}
-        <div
-          role="tablist"
-          className={cn('grid gap-px bg-border border-b border-border flex-shrink-0', TABS.length > 4 ? 'grid-cols-6' : 'grid-cols-4')}
-        >
-          {TABS.map((t, i) => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                'flex items-center justify-center gap-1.5 px-2 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
-                TABS.length > 4 && (i < 3 ? 'col-span-2' : 'col-span-3'),
-                tab === t.id
-                  ? 'border-accent text-accent bg-neutral-bg'
-                  : 'border-transparent text-muted-foreground bg-surface hover:text-foreground hover:bg-neutral-bg/60',
-              )}
+            <h2
+              className={cn('flex-1 text-base font-semibold leading-tight text-foreground', canEdit && 'cursor-pointer hover:text-accent')}
+              title={canEdit ? 'Clique para renomear' : undefined}
+              onClick={() => canEdit && setEditingTitle(true)}
             >
-              {t.icon}
-              {t.label}
-            </button>
-          ))}
+              {task.title}
+            </h2>
+          )}
+          <button type="button" onClick={onClose} aria-label="Fechar" className="flex-shrink-0 rounded-md p-1 text-muted-foreground hover:bg-neutral-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+            <X size={20} aria-hidden />
+          </button>
         </div>
 
-        {/* Conteúdo da aba */}
-        <div className="flex-1 overflow-y-auto p-5">
+        {/* Everything below scrolls together; the tabs stay at the top while their content scrolls */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-4 px-5 py-4">
+            {(canAssume || (isStaff && !canEdit)) && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning-text/40 bg-warning-bg px-3 py-2">
+                <div className="text-xs text-warning-text">
+                  {!canEdit ? <p>Assuma a tarefa para alterá-la</p> : <p>{task.assigneeId ? 'Esta tarefa está com outro colaborador.' : 'Esta tarefa está sem responsável.'}</p>}
+                  {assumeError && <p className="font-medium text-danger-text">{assumeError}</p>}
+                </div>
+                {canAssume && (
+                  <Button size="sm" onClick={() => assumeMutation.mutate()} disabled={assumeMutation.isPending}>
+                    {assumeMutation.isPending ? 'Assumindo...' : 'Assumir'}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Where the task stands: approval, internal deadline, waiting for another OS */}
+            {(awaitingApproval || (task.osModel && task.deadline) || waitingDependency || (task.delayReasonPending && canEdit)) && (
+              <div className="flex flex-wrap items-center gap-2">
+                {awaitingApproval && (
+                  <span className="inline-flex rounded-full bg-warning-bg px-2.5 py-0.5 text-xs font-medium text-warning-text">Aguardando aprovação do cliente</span>
+                )}
+                {waitingDependency && (
+                  <DeadlineChip deadline={task.deadline ?? { state: 'WAITING_DEPENDENCY', officeBusinessDays: 0, clientBusinessDays: 0 }} waitingFor={task.waitingFor?.join(', ')} />
+                )}
+                {waitingDependency && canReleaseEarly && (
+                  <button type="button" disabled={releaseMutation.isPending}
+                    onClick={async () => {
+                      const reason = await askText({ title: 'Liberar esta OS agora?', description: `Ela aguarda: ${task.waitingFor?.join(', ') || 'outra OS'}. O prazo começa a contar hoje.`, label: 'Por que liberar antes?', confirmLabel: 'Liberar' })
+                      if (reason) releaseMutation.mutate(reason)
+                    }}
+                    className="text-xs font-medium text-accent hover:underline">
+                    Liberar agora
+                  </button>
+                )}
+                {task.osModel && task.deadline && !waitingDependency && (
+                  <span className="inline-flex items-center gap-1.5" title="Prazo interno em dias úteis (pausa enquanto aguarda o cliente)">
+                    <DeadlineChip deadline={task.deadline} />
+                    {(task.deadline.officeBusinessDays > 0 || task.deadline.clientBusinessDays > 0) && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {task.deadline.officeBusinessDays} dias úteis do escritório · {task.deadline.clientBusinessDays} aguardando o cliente
+                      </span>
+                    )}
+                  </span>
+                )}
+                {task.delayReasonPending && canEdit && (
+                  <button type="button" onClick={() => void registerDelayReason(task.id).then((ok) => { if (ok) { queryClient.invalidateQueries({ queryKey: ['tasks'] }); queryClient.invalidateQueries({ queryKey: ['os'] }) } })}
+                    className="text-xs font-medium text-danger-text hover:underline">
+                    Concluída com atraso — registrar o motivo
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* The fields of the task, each with its name */}
+            <ul aria-label="Dados da tarefa" className="grid grid-cols-2 gap-x-4 gap-y-3">
+              {!waitingDependency && (
+                <DrawerField label="Status" htmlFor={canEdit ? 'task-status' : undefined}>
+                  {canEdit ? (
+                    <select id="task-status" value={task.status} onChange={(e) => updateMutation.mutate({ status: e.target.value as Task['status'] })} className={fieldCls}>
+                      {(['OPEN', 'STARTED', 'BLOCKED', 'DONE', 'DISREGARDED'] as Task['status'][]).map((st) => (
+                        <option key={st} value={st}>{STATUS_LABEL[st]}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLOR[task.status])}>{statusLabels[task.status]}</span>
+                  )}
+                </DrawerField>
+              )}
+              {isStaff && (
+                <DrawerField label="Prioridade" htmlFor={canEdit ? 'task-priority' : undefined}>
+                  {canEdit ? (
+                    <select id="task-priority" value={task.priority} onChange={(e) => updateMutation.mutate({ priority: e.target.value as Task['priority'] })} className={fieldCls}>
+                      {(['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as Task['priority'][]).map((pr) => (
+                        <option key={pr} value={pr}>{PRIORITY_LABEL[pr]}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-sm text-foreground">{PRIORITY_LABEL[task.priority]}</span>
+                  )}
+                </DrawerField>
+              )}
+              {isStaff && (
+                <DrawerField label="Departamento" htmlFor={canEdit ? 'task-department' : undefined}>
+                  {canEdit ? (
+                    <select id="task-department" value={task.departmentId ?? ''} onChange={(e) => updateMutation.mutate({ departmentId: e.target.value })} className={fieldCls}>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-sm text-foreground">{departments.find((d) => d.id === task.departmentId)?.name ?? me?.departments.find((d) => d.id === task.departmentId)?.name ?? '—'}</span>
+                  )}
+                </DrawerField>
+              )}
+              {isStaff && (
+                <DrawerField label="Responsável" htmlFor={canEdit ? 'task-assignee' : undefined}>
+                  {canEdit ? (
+                    <select
+                      id="task-assignee"
+                      value={task.assigneeId ?? ''}
+                      onChange={(e) => e.target.value && e.target.value !== task.assigneeId && updateMutation.mutate({ assigneeId: e.target.value })}
+                      className={fieldCls}
+                    >
+                      {!task.assigneeId && <option value="">Sem responsável</option>}
+                      <optgroup label="Do departamento">
+                        {sameDepartmentChoices.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                      </optgroup>
+                      {otherDepartmentChoices.length > 0 && (
+                        <optgroup label="Outros departamentos">
+                          {otherDepartmentChoices.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                        </optgroup>
+                      )}
+                    </select>
+                  ) : (
+                    <span className="text-sm text-foreground">{task.assigneeId ? userName(task.assigneeId) : 'Sem responsável'}</span>
+                  )}
+                </DrawerField>
+              )}
+              {(canEditDates || task.dueDate) && (
+                <DrawerField label="Prazo" htmlFor={canEditDates ? 'task-due' : undefined} hint={fixedByRecurrence}>
+                  {canEditDates ? (
+                    <>
+                      <input id="task-due" type="date" defaultValue={task.dueDate ? task.dueDate.slice(0, 10) : ''} onChange={(e) => updateMutation.mutate({ dueDate: toUtcIso(e.target.value) })} className={fieldCls} />
+                      {task.dueDate && boardDueDate && new Date(task.dueDate) > new Date(boardDueDate) && (
+                        <p className="mt-1 text-xs text-warning-text">Depois do prazo do processo ({formatDateOnlyUTC(boardDueDate)})</p>
+                      )}
+                    </>
+                  ) : task.dueDate && (
+                    <span className={cn('text-sm', isOverdue ? 'font-medium text-danger-text' : 'text-foreground')}>
+                      {formatDateOnlyUTC(task.dueDate)}{isOverdue && ' (vencido)'}
+                    </span>
+                  )}
+                </DrawerField>
+              )}
+              {(canEditDates || task.targetDate) && (
+                <DrawerField label="Meta" htmlFor={canEditDates ? 'task-target' : undefined} hint={fixedByRecurrence ?? 'Meta interna do escritório'}>
+                  {canEditDates ? (
+                    <input id="task-target" type="date" defaultValue={task.targetDate ? task.targetDate.slice(0, 10) : ''} onChange={(e) => updateMutation.mutate({ targetDate: toUtcIso(e.target.value) })} className={fieldCls} />
+                  ) : task.targetDate && (
+                    <span className="text-sm text-foreground">{formatDateOnlyUTC(task.targetDate)}</span>
+                  )}
+                </DrawerField>
+              )}
+              {task.competence && (
+                <DrawerField label="Competência">
+                  <span className="text-sm capitalize text-foreground">
+                    {new Date(task.competence).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })}
+                  </span>
+                </DrawerField>
+              )}
+            </ul>
+
+            {(canEdit || (isRecurring && role === 'ORG_ADMIN')) && (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                {canEdit && (
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                    <input type="checkbox" checked={task.visibleToClient} onChange={(e) => updateMutation.mutate({ visibleToClient: e.target.checked })} className="h-4 w-4 accent-[var(--color-accent)]" />
+                    Cliente pode ver
+                  </label>
+                )}
+                {isRecurring && role === 'ORG_ADMIN' && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={regenerateMutation.isPending}
+                    onClick={async () => {
+                      if (await askConfirm({
+                        title: 'Gerar a tarefa de novo?',
+                        description: 'Isso apaga essa tarefa e gera uma nova pra mesma competência, usando a configuração atual da tarefa recorrente. Só funciona se a tarefa ainda não teve nenhuma movimentação (sem comentário, anexo ou mudança de coluna).',
+                        confirmLabel: 'Gerar de novo',
+                      })) regenerateMutation.mutate()
+                    }}
+                  >
+                    {regenerateMutation.isPending ? 'Gerando de novo...' : 'Gerar de novo'}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {canEdit ? (
+              <div>
+                <label htmlFor="task-description" className="mb-1 block text-xs font-medium text-muted-foreground">Descrição</label>
+                <textarea
+                  id="task-description"
+                  value={descValue}
+                  onChange={(e) => setDescValue(e.target.value)}
+                  onBlur={() => {
+                    if (descValue !== (task.description ?? '')) {
+                      updateMutation.mutate({ description: descValue || null })
+                    }
+                  }}
+                  placeholder="Detalhes, combinados, o que falta..."
+                  rows={2}
+                  className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+            ) : (
+              task.description && <p className="whitespace-pre-wrap text-sm text-foreground">{task.description}</p>
+            )}
+          </div>
+
+          <div role="tablist" aria-label="Seções da tarefa" className="sticky top-0 z-10 flex overflow-x-auto border-b border-border bg-surface px-2 [scrollbar-width:none]">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.id}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-1 whitespace-nowrap border-b-2 px-1.5 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent',
+                  tab === t.id ? 'border-accent text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-5">
 
           {tab === 'comments' && (
-            <div className="space-y-4">
+            <div className="space-y-5">
+              <section aria-labelledby="task-comments-title">
+                <h3 id="task-comments-title" className="mb-2 text-sm font-semibold text-foreground">Comentários da tarefa</h3>
+                <Comments entityType="task" entityId={task.id} currentUserId={currentUserId} role={role} allowInternal={isStaff && task.visibleToClient} />
+              </section>
               {task.sourceRequestId && isOrgRole(role) && (
-                <div className="rounded-lg border border-border">
+                <section className="rounded-lg border border-border">
                   <button
                     type="button"
+                    aria-expanded={sourceRequestOpen}
+                    aria-controls="source-request-conversation"
                     onClick={() => setSourceRequestOpen((v) => !v)}
-                    className="w-full flex items-center justify-between px-3 py-2 text-left"
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
                   >
                     <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                      {sourceRequestOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      Solicitação de origem
-                      {hasUnseenClientReply(sourceRequestComments) && (
-                        <span className="flex items-center gap-1 text-xs font-medium text-warning-text bg-warning-bg rounded-full px-2 py-0.5 ml-1">
-                          <AlertCircle size={12} />
-                          Resposta não vista
-                        </span>
-                      )}
+                      {sourceRequestOpen ? <ChevronDown size={14} aria-hidden /> : <ChevronRight size={14} aria-hidden />}
+                      Conversa da solicitação de origem
                     </span>
+                    {hasUnseenClientReply(sourceRequestComments) && (
+                      <span className="flex items-center gap-1 rounded-full bg-warning-bg px-2 py-0.5 text-xs font-medium text-warning-text">
+                        <AlertCircle size={12} aria-hidden />
+                        Resposta não vista
+                      </span>
+                    )}
                   </button>
                   {sourceRequestOpen && (
-                    <div className="px-3 pb-3">
+                    <div id="source-request-conversation" className="border-t border-border px-3 pb-3 pt-2">
+                      <p className="mb-2 text-xs text-muted-foreground">O que o cliente escreveu ao pedir este serviço. Responder aqui fala na solicitação, não na tarefa.</p>
                       <Comments entityType="request" entityId={task.sourceRequestId} currentUserId={currentUserId} role={role} />
                     </div>
                   )}
-                </div>
+                </section>
               )}
-              <Comments entityType="task" entityId={task.id} currentUserId={currentUserId} role={role} allowInternal={isStaff && task.visibleToClient} />
             </div>
           )}
 
@@ -1175,9 +1142,22 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
             </div>
           )}
 
+          </div>
         </div>
       </aside>
     </>
+  )
+}
+
+// One field of the task in the drawer: its name above, the control or the value below
+function DrawerField({ label, htmlFor, hint, children }: { label: string; htmlFor?: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <li className="min-w-0">
+      {htmlFor
+        ? <label htmlFor={htmlFor} title={hint} className="mb-1 block text-xs font-medium text-muted-foreground">{label}</label>
+        : <span title={hint} className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>}
+      {children}
+    </li>
   )
 }
 

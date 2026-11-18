@@ -16,8 +16,8 @@ const statusSelect = (page: Page, title: string) => drawer(page, title).locator(
 
 async function openTask(page: Page, title: string) {
   await page.goto('/app/tasks')
-  await page.getByPlaceholder('Título, cliente ou código...').fill(title)
-  await page.getByRole('row', { name: new RegExp(title) }).click()
+  await page.getByLabel('Buscar tarefas').fill(title)
+  await page.getByRole('button', { name: title, exact: true }).click()
   await expect(drawer(page, title)).toBeVisible()
 }
 
