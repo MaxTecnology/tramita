@@ -2,15 +2,18 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Pencil, Trash2, Building2, ArrowLeft } from 'lucide-react'
+import { Plus, Building2 } from 'lucide-react'
+import { PageHeader, SETTINGS_BACK } from '@/components/ui/page-header'
+import { ListTable } from '@/components/ui/list-table'
+import { ActionMenu } from '@/components/ui/action-menu'
 import { toast } from 'sonner'
-import { Link } from 'react-router-dom'
 import type { Department } from '@/types'
 import { askConfirm } from '@/components/ui/app-dialogs'
+
+type Row = Department & { peopleCount?: number; clientsCount?: number }
 
 export default function Departments() {
   const qc = useQueryClient()
@@ -18,7 +21,7 @@ export default function Departments() {
   const [editing, setEditing] = useState<Department | null>(null)
   const [name, setName] = useState('')
 
-  const { data: departments = [], isLoading } = useQuery<Department[]>({
+  const { data: departments = [], isLoading } = useQuery<Row[]>({
     queryKey: ['departments'],
     queryFn: () => api.get('/departments').then((r) => r.data),
   })
@@ -69,54 +72,45 @@ export default function Departments() {
     setName('')
   }
 
-  if (isLoading) return <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
+  async function remove(d: Row) {
+    const ok = await askConfirm({ title: `Excluir o departamento "${d.name}"?`, description: 'Só é possível excluir um departamento sem clientes, tarefas e solicitações ligados a ele.', confirmLabel: 'Excluir', danger: true })
+    if (ok) deleteMutation.mutate(d.id)
+  }
+
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div>
-        <Link to="/app/settings" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2">
-          <ArrowLeft size={12} /> Configurações
-        </Link>
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg md:text-xl font-bold text-foreground">Departamentos</h1>
-          <Button onClick={openCreate} className="gap-2">
-            <Plus size={16} />
-            Novo departamento
-          </Button>
-        </div>
-      </div>
-
-      {departments.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
-          <Building2 size={48} className="mb-3 opacity-40" />
-          <p className="text-sm font-medium">Nenhum departamento cadastrado</p>
-          <p className="text-xs mt-1">Use o botão acima pra criar o primeiro (ex: Fiscal, Pessoal, Contábil).</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {departments.map((d) => (
-            <Card key={d.id} className="px-4 py-3 flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">{d.name}</span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => openEdit(d)}
-                  className="p-1.5 rounded-md text-muted-foreground hover:bg-neutral-bg hover:text-foreground"
-                  aria-label="Editar"
-                >
-                  <Pencil size={14} />
-                </button>
-                <button
-                  onClick={async () => { if (await askConfirm({ title: `Excluir o departamento "${d.name}"?`, confirmLabel: 'Excluir', danger: true })) deleteMutation.mutate(d.id) }}
-                  className="p-1.5 rounded-md text-muted-foreground hover:bg-danger-bg hover:text-danger-text"
-                  aria-label="Excluir"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+    <div className="p-4 md:p-6 max-w-6xl">
+      <PageHeader
+        back={SETTINGS_BACK}
+        title="Departamentos"
+        description="Áreas do escritório que atendem os clientes. Cada pessoa da equipe enxerga o trabalho dos departamentos dela."
+        actions={<Button onClick={openCreate} className="gap-1.5"><Plus size={16} aria-hidden /> Novo departamento</Button>}
+      />
+      <ListTable<Row>
+        label="Departamentos"
+        loading={isLoading}
+        rows={departments}
+        rowKey={(d) => d.id}
+        columns={[
+          { header: 'Departamento', width: 'minmax(0,2fr)', cell: (d) => <span className="text-sm font-medium text-foreground">{d.name}</span> },
+          { header: 'Equipe', width: 'minmax(0,1fr)', cell: (d) => <span className="text-sm text-foreground">{plural(d.peopleCount ?? 0, 'pessoa', 'pessoas')}</span> },
+          { header: 'Clientes atendidos', width: 'minmax(0,1fr)', cell: (d) => <span className="text-sm text-foreground">{plural(d.clientsCount ?? 0, 'cliente', 'clientes')}</span> },
+        ]}
+        actions={(d) => (
+          <>
+            <Button variant="ghost" size="sm" aria-label={`Editar ${d.name}`} onClick={() => openEdit(d)}>Editar</Button>
+            <ActionMenu label={`Mais ações de ${d.name}`} items={[{ label: 'Excluir', onSelect: () => void remove(d), danger: true }]} />
+          </>
+        )}
+        empty={(
+          <div className="flex flex-col items-center gap-2">
+            <Building2 size={28} aria-hidden className="text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Crie as áreas do escritório, como Fiscal, Pessoal e Contábil.</p>
+            <Button size="sm" onClick={openCreate}>Criar o primeiro departamento</Button>
+          </div>
+        )}
+      />
 
       <Dialog open={open} onOpenChange={(v) => { if (!v) closeDialog() }}>
         <DialogContent className="sm:max-w-sm">

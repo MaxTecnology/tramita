@@ -1,83 +1,114 @@
-import { useNavigate, Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Plus, Pencil, Trash2, UserCog, ArrowLeft } from 'lucide-react'
+import { Plus, UserCog } from 'lucide-react'
 import { toast } from 'sonner'
-import type { ClientUser } from '@/types'
+import { api } from '@/lib/api'
+import { mensagemDeErro } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { PageHeader, SETTINGS_BACK } from '@/components/ui/page-header'
+import { EditLink, ListTable, StatusTag } from '@/components/ui/list-table'
+import { ActionMenu } from '@/components/ui/action-menu'
+import { SearchField } from '@/components/ui/search-field'
 import { askConfirm } from '@/components/ui/app-dialogs'
+import type { ClientUser } from '@/types'
 
+// The accesses of a contact grouped by company: "ACME — Fiscal, Pessoal"
+function byCompany(u: ClientUser): { id: string; name: string; departments: string[] }[] {
+  const map = new Map<string, { id: string; name: string; departments: string[] }>()
+  for (const a of u.accesses) {
+    const entry = map.get(a.client.id) ?? { id: a.client.id, name: a.client.name, departments: [] }
+    entry.departments.push(a.department.name)
+    map.set(a.client.id, entry)
+  }
+  return [...map.values()].sort((x, y) => x.name.localeCompare(y.name, 'pt-BR'))
+}
+
+// Configurações › Acessos ao portal: who, on the client side, follows the processes
 export default function ClientUsers() {
   const qc = useQueryClient()
   const navigate = useNavigate()
+  const [search, setSearch] = useState('')
 
   const { data: clientUsers = [], isLoading } = useQuery<ClientUser[]>({
     queryKey: ['client-users'],
     queryFn: () => api.get('/client-users').then((r) => r.data),
   })
+  const shown = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    if (!q) return clientUsers
+    return clientUsers.filter((u) =>
+      u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.accesses.some((a) => a.client.name.toLowerCase().includes(q)))
+  }, [clientUsers, search])
 
-  const deleteMutation = useMutation({
+  const deactivateMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/client-users/${id}`),
-    onSuccess: () => {
-      toast.success('Usuário desativado')
-      qc.invalidateQueries({ queryKey: ['client-users'] })
-    },
+    onSuccess: () => { toast.success('Acesso desativado'); qc.invalidateQueries({ queryKey: ['client-users'] }) },
+    onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível desativar o acesso')),
   })
 
-  if (isLoading) return <div className="p-6 text-muted-foreground text-sm">Carregando...</div>
+  async function deactivate(u: ClientUser) {
+    const ok = await askConfirm({ title: `Desativar o acesso de ${u.name}?`, description: 'A pessoa deixa de entrar no portal. O histórico continua registrado.', confirmLabel: 'Desativar', danger: true })
+    if (ok) deactivateMutation.mutate(u.id)
+  }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div>
-        <Link to="/app/settings" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2">
-          <ArrowLeft size={12} /> Configurações
-        </Link>
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg md:text-xl font-bold text-foreground">Usuários de Cliente</h1>
-          <Button onClick={() => navigate('/app/settings/client-users/new')} className="gap-2">
-            <Plus size={16} />
-            Novo usuário
-          </Button>
-        </div>
-      </div>
-
-      {clientUsers.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
-          <UserCog size={48} className="mb-3 opacity-40" />
-          <p className="text-sm font-medium">Nenhum usuário de cliente cadastrado</p>
-          <p className="text-xs mt-1">Cadastre quem, do lado do cliente, vai acessar o portal e quais departamentos pode ver.</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {clientUsers.map((u) => (
-            <Card key={u.id} className="px-4 py-3 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground truncate">{u.name}</span>
-                  {!u.isActive && <span className="text-xs px-1.5 py-0.5 rounded-full bg-neutral-bg text-muted-foreground">Inativo</span>}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">{u.email}</p>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  {u.accesses.map((a) => `${a.client.name} (${a.department.name})`).join(', ')}
-                </p>
-              </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <Link to={`/app/settings/client-users/${u.id}/edit`} className="p-1.5 rounded-md text-muted-foreground hover:bg-neutral-bg hover:text-foreground" aria-label="Editar">
-                  <Pencil size={14} />
-                </Link>
-                <button
-                  onClick={async () => { if (await askConfirm({ title: `Desativar "${u.name}"?`, description: 'O acesso ao portal é bloqueado.', confirmLabel: 'Desativar', danger: true })) deleteMutation.mutate(u.id) }}
-                  className="p-1.5 rounded-md text-muted-foreground hover:bg-danger-bg hover:text-danger-text"
-                  aria-label="Excluir"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+    <div className="p-4 md:p-6 max-w-6xl">
+      <PageHeader
+        back={SETTINGS_BACK}
+        title="Acessos ao portal"
+        description="Quem, de cada cliente, entra no portal para acompanhar os processos, enviar documentos e ver guias. O acesso é por empresa e departamento."
+        actions={<Button onClick={() => navigate('/app/settings/client-users/new')} className="gap-1.5"><Plus size={16} aria-hidden /> Novo acesso</Button>}
+      />
+      {clientUsers.length > 0 && <SearchField className="mb-3 max-w-sm" label="Buscar acessos" value={search} onChange={setSearch} placeholder="Buscar por pessoa, e-mail ou empresa" />}
+      <ListTable<ClientUser>
+        label="Acessos ao portal"
+        loading={isLoading}
+        rows={shown}
+        rowKey={(u) => u.id}
+        muted={(u) => !u.isActive}
+        columns={[
+          {
+            header: 'Contato', width: 'minmax(0,1.6fr)',
+            cell: (u) => (
+              <span className="block min-w-0">
+                <span className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium text-foreground">{u.name}</span>
+                  {!u.isActive && <StatusTag>Inativo</StatusTag>}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">{u.email}</span>
+                {u.phone && <span className="block truncate text-xs text-muted-foreground">{u.phone}</span>}
+              </span>
+            ),
+          },
+          {
+            header: 'Empresas e departamentos', width: 'minmax(0,2.4fr)',
+            cell: (u) => (
+              <ul className="space-y-0.5">
+                {byCompany(u).map((c) => (
+                  <li key={c.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                    <span className="font-medium text-foreground">{c.name}</span>
+                    <span className="text-xs text-muted-foreground">{c.departments.join(', ')}</span>
+                  </li>
+                ))}
+              </ul>
+            ),
+          },
+        ]}
+        actions={(u) => (
+          <>
+            <EditLink to={`/app/settings/client-users/${u.id}/edit`} name={u.name} />
+            <ActionMenu label={`Mais ações de ${u.name}`} items={u.isActive ? [{ label: 'Desativar', onSelect: () => void deactivate(u), danger: true }] : []} />
+          </>
+        )}
+        empty={search ? <p className="text-sm text-muted-foreground">Ninguém encontrado com essa busca.</p> : (
+          <div className="flex flex-col items-center gap-2">
+            <UserCog size={28} aria-hidden className="text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Cadastre quem, do lado do cliente, vai acompanhar os processos pelo portal.</p>
+            <Button size="sm" onClick={() => navigate('/app/settings/client-users/new')}>Cadastrar o primeiro acesso</Button>
+          </div>
+        )}
+      />
     </div>
   )
 }

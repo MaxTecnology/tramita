@@ -23,12 +23,12 @@ export default function ProcessTemplates() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/process-templates/${id}`),
-    onSuccess: () => { toast.success('Modelo de processo excluído'); qc.invalidateQueries({ queryKey: ['process-templates'] }) },
-    onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível excluir o modelo')),
+    onSuccess: () => { toast.success('Modelo de processo desativado'); qc.invalidateQueries({ queryKey: ['process-templates'] }) },
+    onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível desativar o modelo')),
   })
 
   async function remove(t: ProcessTemplate) {
-    const ok = await askConfirm({ title: `Excluir o modelo "${t.name}"?`, description: 'Processos já abertos com ele continuam.', confirmLabel: 'Excluir', danger: true })
+    const ok = await askConfirm({ title: `Desativar o modelo "${t.name}"?`, description: 'Ele deixa de aparecer para abrir processos novos. Os processos já abertos continuam.', confirmLabel: 'Desativar', danger: true })
     if (ok) deleteMutation.mutate(t.id)
   }
 
@@ -69,7 +69,7 @@ export default function ProcessTemplates() {
         actions={(t) => (
           <>
             <EditLink to={`/app/settings/process-templates/${t.id}/edit`} name={t.name} />
-            <ActionMenu label={`Mais ações de ${t.name}`} items={[{ label: 'Excluir', onSelect: () => void remove(t), danger: true }]} />
+            <ActionMenu label={`Mais ações de ${t.name}`} items={t.isActive ? [{ label: 'Desativar', onSelect: () => void remove(t), danger: true }] : []} />
           </>
         )}
         empty={(
