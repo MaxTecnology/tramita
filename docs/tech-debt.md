@@ -732,3 +732,4 @@ Achados da revisão destas correções — ✅ resolvidos em 2026-11-16:
 - **Clientes antigos** sem estado/cidade não são migrados (decisão do Max): recorrência estadual/municipal
   falha para eles até a edição do cadastro.
 
+- **Troca de departamento da recorrência fora do lock** (pré-existente, 2026-11-18): `updateTemplate` confere clientes não atendidos pelo novo departamento antes de travar a linha; dois PATCH/`createAssignment` simultâneos podem passar. Mover para dentro do `FOR NO KEY UPDATE` se aparecer.

@@ -88,7 +88,8 @@ type NewTemplate = Omit<CreateTemplateBody, 'dueScope' | 'onlyListedLocations' |
 // Rules must fit the scope (state rules only name a UF, city rules only a city), name each place
 // once, point to an existing city and use a day valid for the periodicity
 async function assertDueRulesValid(
-  scope: DueScope, onlyListedLocations: boolean, rules: RuleShape[], periodicity: string, generationDayOfPeriod: number,
+  scope: DueScope, onlyListedLocations: boolean, rules: RuleShape[], periodicity: string,
+  db: Prisma.TransactionClient = prisma,
 ) {
   if (scope === 'FEDERAL') {
     if (rules.length > 0) throw new AppError(400, 'Recorrência federal não tem exceções por localidade')
@@ -106,7 +107,7 @@ async function assertDueRulesValid(
   const cityNames = new Map<number, string>()
   if (scope === 'CITY') {
     const codes = rules.map((r) => r.ibgeCityCode).filter((c): c is number => c !== undefined)
-    const found = await prisma.municipality.findMany({ where: { ibgeCode: { in: codes } }, select: { ibgeCode: true, name: true, uf: true } })
+    const found = await db.municipality.findMany({ where: { ibgeCode: { in: codes } }, select: { ibgeCode: true, name: true, uf: true } })
     if (found.length !== codes.length) throw new AppError(400, 'Cidade não encontrada')
     for (const c of found) cityNames.set(c.ibgeCode, `${c.name} (${c.uf})`)
   }
@@ -129,7 +130,7 @@ export async function createTemplate(organizationId: string, input: NewTemplate)
   await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
   await assertDeliveryObligations(data.documentDeliveries, organizationId)
   assertDayOfPeriodValid(data.periodicity, data.dueDayOfPeriod, data.generationDayOfPeriod)
-  await assertDueRulesValid(data.dueScope, data.onlyListedLocations, data.dueRules, data.periodicity, data.generationDayOfPeriod)
+  await assertDueRulesValid(data.dueScope, data.onlyListedLocations, data.dueRules, data.periodicity)
 
   const { documentRequests, documentDeliveries, dueRules, ...templateData } = data
 
@@ -166,24 +167,31 @@ export async function updateTemplate(id: string, organizationId: string, data: U
     }
   }
   if (data.documentDeliveries) await assertDeliveryObligations(data.documentDeliveries, organizationId)
-  const periodicity = data.periodicity ?? existing.periodicity
-  const generationDayOfPeriod = data.generationDayOfPeriod ?? existing.generationDayOfPeriod
-  assertDayOfPeriodValid(periodicity, data.dueDayOfPeriod ?? existing.dueDayOfPeriod, generationDayOfPeriod)
-
-  // Changing the scope makes the stored rules meaningless: the new ones come in the same request
-  const dueScope = data.dueScope ?? existing.dueScope
-  if (dueScope !== existing.dueScope && data.dueRules === undefined) throw new AppError(400, 'Envie as exceções da nova abrangência')
-  const rules: RuleShape[] = data.dueRules ?? existing.dueRules.map((r) => ({
-    uf: r.uf ?? undefined, ibgeCityCode: r.ibgeCityCode ?? undefined, dueDayOfPeriod: r.dueDayOfPeriod, dueBusinessDayRoll: r.dueBusinessDayRoll,
-  }))
-  // Going federal drops "only listed places" unless the request insists on it (then it is refused)
-  const onlyListedLocations = data.onlyListedLocations ?? (dueScope === 'FEDERAL' ? false : existing.onlyListedLocations)
-  await assertDueRulesValid(dueScope, onlyListedLocations, rules, periodicity, generationDayOfPeriod)
-
   const { documentRequests, documentDeliveries, dueRules, ...rest } = data
-  const templateData = { ...rest, onlyListedLocations }
 
   return prisma.$transaction(async (tx) => {
+    // Scope, periodicity and rules are checked against the stored row under its lock: two edits at
+    // the same time are applied one after the other, never mixing one's scope with the other's rules
+    // NO KEY UPDATE: serializes the editors without holding up rows that only point to the template
+    await tx.$queryRaw`SELECT id FROM "recurring_task_templates" WHERE id = ${id} FOR NO KEY UPDATE`
+    const current = await tx.recurringTaskTemplate.findUnique({ where: { id }, include: { dueRules: true } })
+    if (!current) throw new AppError(404, 'Template não encontrado')
+
+    const periodicity = data.periodicity ?? current.periodicity
+    const generationDayOfPeriod = data.generationDayOfPeriod ?? current.generationDayOfPeriod
+    assertDayOfPeriodValid(periodicity, data.dueDayOfPeriod ?? current.dueDayOfPeriod, generationDayOfPeriod)
+
+    // Changing the scope makes the stored rules meaningless: the new ones come in the same request
+    const dueScope = data.dueScope ?? current.dueScope
+    if (dueScope !== current.dueScope && dueRules === undefined) throw new AppError(400, 'Envie as exceções da nova abrangência')
+    const rules: RuleShape[] = dueRules ?? current.dueRules.map((r) => ({
+      uf: r.uf ?? undefined, ibgeCityCode: r.ibgeCityCode ?? undefined, dueDayOfPeriod: r.dueDayOfPeriod, dueBusinessDayRoll: r.dueBusinessDayRoll,
+    }))
+    // Going federal drops "only listed places" unless the request insists on it (then it is refused)
+    const onlyListedLocations = data.onlyListedLocations ?? (dueScope === 'FEDERAL' ? false : current.onlyListedLocations)
+    await assertDueRulesValid(dueScope, onlyListedLocations, rules, periodicity, tx)
+    const templateData = { ...rest, onlyListedLocations }
+
     if (documentRequests) {
       await tx.recurringTaskTemplateDocument.deleteMany({ where: { requestTemplateId: id } })
       await tx.recurringTaskTemplateDocument.createMany({
@@ -352,24 +360,23 @@ export async function generateTaskForAssignment(
       where: { clientId_departmentId: { clientId: assignment.clientId, departmentId: template.departmentId } },
       select: { userId: true },
     })
+    // The client, once: its name for the messages and where it is for the due date
+    const client = await prisma.client.findUniqueOrThrow({
+      where: { id: assignment.clientId }, select: { name: true, estado: true, ibgeCityCode: true },
+    })
     if (!served) {
-      const [department, client] = await Promise.all([
-        prisma.department.findUnique({ where: { id: template.departmentId }, select: { name: true } }),
-        prisma.client.findUnique({ where: { id: assignment.clientId }, select: { name: true } }),
-      ])
-      throw new GenerationUserFacingError(departmentNotServedFailureMessage(department?.name ?? '', client?.name ?? ''))
+      const department = await prisma.department.findUnique({ where: { id: template.departmentId }, select: { name: true } })
+      throw new GenerationUserFacingError(departmentNotServedFailureMessage(department?.name ?? '', client.name))
     }
+
+    // The due day of the client's place (state/city rules). Checked before anything is created: a
+    // client the scope cannot place gets nothing, not even its recurring board
+    const placed = resolveDueRule(template, client)
+    if (!placed.ok) throw new GenerationUserFacingError(placed.message)
+    const clientRules: RecurrenceDateRules = { ...rules, dueDayOfPeriod: placed.dueDayOfPeriod, dueBusinessDayRoll: placed.dueBusinessDayRoll }
 
     const systemBoard = await ensureRecurringSystemBoard(assignment.clientId, template.organizationId)
     const columnId = systemBoard.columns[0].id
-
-    // The due day of the client's place (state/city rules); a client the scope cannot place fails here
-    const location = await prisma.client.findUniqueOrThrow({
-      where: { id: assignment.clientId }, select: { name: true, estado: true, ibgeCityCode: true },
-    })
-    const placed = resolveDueRule(template, location)
-    if (!placed.ok) throw new GenerationUserFacingError(placed.message)
-    const clientRules: RecurrenceDateRules = { ...rules, dueDayOfPeriod: placed.dueDayOfPeriod, dueBusinessDayRoll: placed.dueBusinessDayRoll }
 
     // One business-day calendar: national + office holidays (the due date can roll into next year)
     const holidays = await loadHolidaySet(template.organizationId, [dueMonth.getUTCFullYear(), dueMonth.getUTCFullYear() + 1])

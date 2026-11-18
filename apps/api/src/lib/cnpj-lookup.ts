@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { z } from 'zod'
 import { logger } from '@/lib/logger'
+import { redis } from '@/lib/redis'
 
 // Company data by CNPJ for the client form. BrasilAPI first (fast, brings the city's IBGE code);
 // the public CNPJ.ws (3 requests/min per IP, unstable) only when the BrasilAPI is down. HTTP only:
@@ -95,6 +96,27 @@ const isNotFound = (err: unknown) => axios.isAxiosError(err) && err.response?.st
 // What went wrong, for the log (never the CNPJ)
 const reason = (err: unknown) => (axios.isAxiosError(err) ? err.response?.status ?? err.code ?? 'network' : 'invalid payload')
 
+// The CNPJ.ws allows 3 requests a minute per IP (the server's, shared by every office): after a 429
+// it is left alone for a minute instead of being hammered. Redis down → no pause, asked as usual.
+const CNPJ_WS_PAUSE_KEY = 'cnpj-lookup:cnpjws-paused'
+const CNPJ_WS_PAUSE_SECONDS = 60
+
+async function cnpjWsPaused(): Promise<boolean> {
+  try {
+    return (await redis.get(CNPJ_WS_PAUSE_KEY)) !== null
+  } catch {
+    return false
+  }
+}
+
+async function pauseCnpjWs(): Promise<void> {
+  try {
+    await redis.set(CNPJ_WS_PAUSE_KEY, '1', 'EX', CNPJ_WS_PAUSE_SECONDS)
+  } catch {
+    // Without Redis there is no shared pause; the per-person route limit still applies
+  }
+}
+
 export async function lookupCnpj(cnpj: string): Promise<CnpjLookupResult> {
   const digits = cnpj.replace(/\D/g, '')
   let primaryFailure: unknown
@@ -106,11 +128,17 @@ export async function lookupCnpj(cnpj: string): Promise<CnpjLookupResult> {
     if (isNotFound(err)) throw new CnpjNotFoundError()
     primaryFailure = err
   }
+  if (await cnpjWsPaused()) {
+    // Expected while paused (the 429 that started it was already logged as warn)
+    logger.info({ brasilApi: reason(primaryFailure), cnpjWs: 'paused' }, 'Consulta de CNPJ: reserva em pausa')
+    throw new CnpjUnavailableError()
+  }
   try {
     const res = await axios.get<unknown>(`https://publica.cnpj.ws/cnpj/${digits}`, HTTP_OPTIONS)
     return fromCnpjWs(cnpjWsSchema.parse(res.data))
   } catch (err) {
     if (isNotFound(err)) throw new CnpjNotFoundError()
+    if (axios.isAxiosError(err) && err.response?.status === 429) await pauseCnpjWs()
     logger.warn({ brasilApi: reason(primaryFailure), cnpjWs: reason(err) }, 'Consulta de CNPJ indisponível nos dois serviços')
     throw new CnpjUnavailableError()
   }

@@ -209,7 +209,6 @@ model Client {
   // - CHECK clients_document_by_type_check: PJ exige cnpj, PF exige cpf;
   // - índices únicos parciais (só clientes ativos): clients_codigo_active_key,
   //   clients_cnpj_active_key, clients_cpf_active_key — cliente desativado não trava recadastro.
-  @@index([organizationId, estado])
   @@index([ibgeCityCode])
   @@map("clients")
 }

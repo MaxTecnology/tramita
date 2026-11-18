@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import * as queue from '@/lib/queue'
 import { createTestPlan, createTestOrg, createTestDepartment, createTestClient, createTestRecurringAssignment } from '@/test/helpers'
-import { createTemplate, generateTaskForAssignment } from './recurring-templates.service'
+import { createTemplate, generateTaskForAssignment, generateBulkForTemplate } from './recurring-templates.service'
 import type { DueRuleInput } from './recurring-templates.schema'
 
 beforeEach(() => {
@@ -74,6 +74,8 @@ describe('geração com vencimento por localidade', () => {
     const { outcome, client, assignment } = await generateFor(c, { estado: 'SE', ibgeCityCode: null })
     expect(outcome).toEqual({ status: 'FAILED', errorMessage: 'Cliente Padaria sem cidade cadastrada' })
     expect(await prisma.task.count({ where: { recurringTemplateId: c.template.id } })).toBe(0)
+    // A client the scope cannot place gets nothing created, not even its recurring board
+    expect(await prisma.board.count({ where: { clientId: client.id, type: 'RECURRING_SYSTEM' } })).toBe(0)
 
     await prisma.client.update({ where: { id: client.id }, data: { ibgeCityCode: 2800308, cidade: 'Aracaju' } })
     const retry = await generateTaskForAssignment(c.template.id, assignment.id, DEC_2026)
@@ -91,4 +93,60 @@ describe('geração com vencimento por localidade', () => {
     const c = await setup()
     expect(await dueDateOf((await generateFor(c, { estado: null, ibgeCityCode: null })).outcome)).toBe('2026-12-20')
   })
+
+  // One template, several places, generated together (the "Gerar selecionados" path). December 2026:
+  // default day 20 is a Sunday kept as is; the rules fall on weekends on purpose to check each roll.
+  async function bulkDueDates(c: Ctx, clients: { name: string; estado: string; ibgeCityCode: number }[]) {
+    const ids: string[] = []
+    for (const cl of clients) {
+      const created = await createTestClient(c.org.id, cl)
+      ids.push((await createTestRecurringAssignment(c.template.id, c.org.id, { clientId: created.id })).id)
+    }
+    const result = await generateBulkForTemplate(c.template.id, c.org.id, DEC_2026.toISOString(), ids)
+    expect(result).toEqual({ generated: clients.length, alreadyExists: 0, failed: [] })
+    const tasks = await prisma.task.findMany({
+      where: { recurringTemplateId: c.template.id },
+      select: { dueDate: true, column: { select: { board: { select: { client: { select: { name: true } } } } } } },
+    })
+    return Object.fromEntries(tasks.map((t) => [t.column.board.client?.name, t.dueDate?.toISOString().slice(0, 10)]))
+  }
+
+  it('state template with three rules and a client elsewhere: each one gets its own date', async () => {
+    const c = await setup({ dueScope: 'STATE', dueRules: [
+      { uf: 'SE', dueDayOfPeriod: 15, dueBusinessDayRoll: 'NONE' },
+      { uf: 'AL', dueDayOfPeriod: 12, dueBusinessDayRoll: 'FORWARD' },
+      { uf: 'BA', dueDayOfPeriod: 19, dueBusinessDayRoll: 'BACKWARD' },
+    ] })
+    expect(await bulkDueDates(c, [
+      { name: 'Aracaju SE', estado: 'SE', ibgeCityCode: 2800308 },
+      { name: 'Maceió AL', estado: 'AL', ibgeCityCode: 2704302 },
+      { name: 'Salvador BA', estado: 'BA', ibgeCityCode: 2927408 },
+      { name: 'Recife PE', estado: 'PE', ibgeCityCode: 2611606 },
+    ])).toEqual({
+      'Aracaju SE': '2026-12-15', // SE: day 15 (Tuesday)
+      'Maceió AL': '2026-12-14', // AL: day 12 is a Saturday, forward → Monday 14
+      'Salvador BA': '2026-12-18', // BA: day 19 is a Saturday, backward → Friday 18
+      'Recife PE': '2026-12-20', // no rule: the default day 20
+    })
+  })
+
+  it('city template with cities of different states and one without rule', async () => {
+    const c = await setup({ dueScope: 'CITY', dueRules: [
+      { ibgeCityCode: 2800308, dueDayOfPeriod: 10, dueBusinessDayRoll: 'NONE' },
+      { ibgeCityCode: 2704302, dueDayOfPeriod: 5, dueBusinessDayRoll: 'FORWARD' },
+      { ibgeCityCode: 2927408, dueDayOfPeriod: 13, dueBusinessDayRoll: 'BACKWARD' },
+    ] })
+    expect(await bulkDueDates(c, [
+      { name: 'Aracaju', estado: 'SE', ibgeCityCode: 2800308 },
+      { name: 'Maceió', estado: 'AL', ibgeCityCode: 2704302 },
+      { name: 'Salvador', estado: 'BA', ibgeCityCode: 2927408 },
+      { name: 'Feira de Santana', estado: 'BA', ibgeCityCode: 2910800 },
+    ])).toEqual({
+      Aracaju: '2026-12-10', // day 10 (Thursday)
+      Maceió: '2026-12-07', // day 5 is a Saturday, forward → Monday 7
+      Salvador: '2026-12-11', // day 13 is a Sunday, backward → Friday 11
+      'Feira de Santana': '2026-12-20', // same state as Salvador, but no rule for the city: default
+    })
+  })
 })
+

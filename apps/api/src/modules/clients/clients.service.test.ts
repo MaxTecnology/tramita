@@ -393,6 +393,11 @@ describe('lookupClientByCnpj', () => {
     expect(await lookupClientByCnpj('11222333000181')).toMatchObject({ estado: 'SE', cidade: 'CIDADE NOVA', ibgeCityCode: null })
   })
 
+  it('a code missing from the table is retried by name + state', async () => {
+    vi.spyOn(cnpjws, 'lookupCnpj').mockResolvedValue(found({ cidade: 'ARACAJU', ibgeCityCode: 2899999 }))
+    expect(await lookupClientByCnpj('11222333000181')).toMatchObject({ estado: 'SE', cidade: 'Aracaju', ibgeCityCode: 2800308 })
+  })
+
   it('a code of another state than the one informed is not trusted', async () => {
     vi.spyOn(cnpjws, 'lookupCnpj').mockResolvedValue(found({ estado: 'AL', ibgeCityCode: 2800308 }))
     expect(await lookupClientByCnpj('11222333000181')).toMatchObject({ estado: 'AL', ibgeCityCode: null })

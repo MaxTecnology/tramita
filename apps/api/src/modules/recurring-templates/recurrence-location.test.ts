@@ -35,7 +35,8 @@ describe('resolveDueRule', () => {
 
   it('a client without a valid state or city never gets the default date by mistake', () => {
     expect(resolveDueRule(template(), { ...se, estado: null })).toEqual({ ok: false, message: 'Cliente Padaria sem estado cadastrado' })
-    expect(resolveDueRule(template(), { ...se, estado: 'Sergipe' })).toEqual({ ok: false, message: 'Cliente Padaria sem estado cadastrado' })
+    expect(resolveDueRule(template(), { ...se, estado: 'Sergipe' })).toEqual({ ok: false, message: 'Cliente Padaria com estado inválido no cadastro (edite o cliente)' })
+    expect(resolveDueRule(template(), { ...se, estado: 'se' })).toEqual({ ok: false, message: 'Cliente Padaria com estado inválido no cadastro (edite o cliente)' })
     expect(resolveDueRule(template({ dueScope: 'CITY' }), { ...se, ibgeCityCode: null })).toEqual({ ok: false, message: 'Cliente Padaria sem cidade cadastrada' })
   })
 })

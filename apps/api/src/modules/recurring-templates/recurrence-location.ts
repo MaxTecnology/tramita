@@ -23,7 +23,10 @@ export function resolveDueRule(t: DueRuleTemplate, client: ClientLocation): Reso
   const fallback: ResolvedDueRule = { ok: true, dueDayOfPeriod: t.dueDayOfPeriod, dueBusinessDayRoll: t.dueBusinessDayRoll }
   if (t.dueScope === 'FEDERAL') return fallback
 
-  if (t.dueScope === 'STATE' && !isUf(client.estado)) return { ok: false, message: `Cliente ${client.name} sem estado cadastrado` }
+  if (t.dueScope === 'STATE' && !isUf(client.estado)) {
+    // Typed before states were standardized ("Sergipe", "se"): there is a state, just not a valid one
+    return { ok: false, message: client.estado ? `Cliente ${client.name} com estado inválido no cadastro (edite o cliente)` : `Cliente ${client.name} sem estado cadastrado` }
+  }
   if (t.dueScope === 'CITY' && client.ibgeCityCode === null) return { ok: false, message: `Cliente ${client.name} sem cidade cadastrada` }
 
   const rule = t.dueScope === 'STATE'

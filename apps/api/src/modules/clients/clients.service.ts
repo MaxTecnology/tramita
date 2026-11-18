@@ -325,9 +325,9 @@ async function writeLookupCache(key: string, value: CnpjLookupResult | 'NOT_FOUN
 // The city as the form will save it: the IBGE table's name and code, or no code (chosen by hand)
 async function resolveLookupCity(found: CnpjLookupResult): Promise<{ cidade: string | null; ibgeCityCode: number | null }> {
   if (!isUf(found.estado)) return { cidade: found.cidade, ibgeCityCode: null }
-  const city = found.ibgeCityCode !== null
-    ? await findMunicipality(found.ibgeCityCode)
-    : found.cidade ? await findMunicipalityByName(found.cidade, found.estado) : null
+  // By code first; a code the table does not know (or no code, reserve service) → by name + state
+  const byCode = found.ibgeCityCode !== null ? await findMunicipality(found.ibgeCityCode) : null
+  const city = byCode ?? (found.cidade ? await findMunicipalityByName(found.cidade, found.estado) : null)
   if (!city || city.uf !== found.estado) return { cidade: found.cidade, ibgeCityCode: null }
   return { cidade: city.name, ibgeCityCode: city.ibgeCode }
 }

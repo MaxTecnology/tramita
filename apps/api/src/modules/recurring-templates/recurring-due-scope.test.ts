@@ -114,4 +114,19 @@ describe('abrangência do vencimento — validação', () => {
     const res = await app.inject({ method: 'GET', url: `/recurring-templates/${id}/assignments`, headers: { authorization: c.auth } })
     expect(res.json()[0].client).toMatchObject({ estado: 'AL', cidade: 'Maceió', ibgeCityCode: 2704302 })
   })
+
+  it('two edits at the same time never leave rules of another scope behind', async () => {
+    const c = await setup()
+    for (let round = 0; round < 5; round++) {
+      const id = (await create(c, { dueScope: 'STATE', dueRules: [SE] })).json().id as string
+      await Promise.all([
+        patch(c, id, { dueScope: 'CITY', dueRules: [ARACAJU] }),
+        patch(c, id, { dueRules: [AL] }),
+      ])
+      const saved = (await get(c, id)).json() as { dueScope: string; dueRules: { uf: string | null; ibgeCityCode: number | null }[] }
+      const fits = saved.dueRules.every((r) => (saved.dueScope === 'STATE' ? r.uf !== null : r.ibgeCityCode !== null))
+      expect({ round, scope: saved.dueScope, fits }).toEqual({ round, scope: saved.dueScope, fits: true })
+    }
+  })
 })
+

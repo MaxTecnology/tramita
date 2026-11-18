@@ -45,4 +45,10 @@ describe('municípios (IBGE)', () => {
     expect((await findMunicipalityByName('MACEIO', 'AL'))?.ibgeCode).toBe(2704302)
     expect(await findMunicipalityByName('Maceió', 'SE')).toBeNull()
   })
+
+  it('accents, apostrophes and extra spaces in the typed name still match', async () => {
+    expect((await findMunicipalityByName('SAO  CRISTOVAO', 'SE'))?.ibgeCode).toBe(2806701)
+    expect((await findMunicipalityByName("itaporanga d'ajuda", 'SE'))?.ibgeCode).toBe(2803203)
+  })
 })
+
