@@ -67,3 +67,20 @@ it('saying yes discards and opens the other notice; without edits it never asks'
   expect(await screen.findByDisplayValue('Texto da tarefa movida')).toBeInTheDocument()
   expect(confirmMock).not.toHaveBeenCalled()
 })
+
+it('right after saving, switching notice does not ask (the saved text is not "unsaved")', async () => {
+  let body = 'Texto da tarefa movida'
+  server.use(
+    http.get(`${API}/notifications/templates/TASK_MOVED/:channel`, async () => { await delay(400); return HttpResponse.json({ body, isDefault: false, variables: VARS }) }),
+    http.get(`${API}/notifications/templates/TASK_CREATED/:channel`, () => HttpResponse.json({ body: 'Texto da tarefa criada', isDefault: true, variables: VARS })),
+    http.put(`${API}/notifications/templates/:event/:channel`, async ({ request }) => { body = ((await request.json()) as { body: string }).body; return HttpResponse.json({}) }),
+  )
+  confirmMock.mockResolvedValue(false)
+  renderPage()
+  const box = await screen.findByDisplayValue('Texto da tarefa movida')
+  await userEvent.type(box, ' salvo')
+  await userEvent.click(screen.getByRole('button', { name: 'Salvar mensagem' }))
+  await userEvent.selectOptions(screen.getByLabelText('Aviso'), 'TASK_CREATED')
+  expect(confirmMock).not.toHaveBeenCalled()
+  expect(await screen.findByDisplayValue('Texto da tarefa criada')).toBeInTheDocument()
+})

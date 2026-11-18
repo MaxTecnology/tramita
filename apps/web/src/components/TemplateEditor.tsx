@@ -32,6 +32,8 @@ const VAR_LABEL: Record<string, string> = {
 }
 const varLabel = (key: string) => VAR_LABEL[key] ?? `{{${key}}}`
 
+type TemplateData = { body: string; subject?: string; isDefault: boolean; variables: string[] }
+
 interface Props {
   event: string
   channel: string
@@ -51,14 +53,21 @@ export function TemplateEditor({ event, channel, onDirtyChange }: Props) {
   const { data } = useQuery({
     queryKey: key,
     queryFn: () =>
-      api.get<{ body: string; subject?: string; isDefault: boolean; variables: string[] }>(`/notifications/templates/${event}/${channel}`).then((r) => r.data),
+      api.get<TemplateData>(`/notifications/templates/${event}/${channel}`).then((r) => r.data),
   })
 
-  useEffect(() => {
-    if (data?.body !== undefined) { setBody(data.body); setPreview(null); cursor.current = null }
-  }, [data?.body])
+  // The saved text and the box change together, in the same render, when a text arrives (first load,
+  // back to default, after saving): an effect would leave one render where they differ and the page
+  // would take a text nobody edited for an unsaved change
+  const [loaded, setLoaded] = useState<string | undefined>(undefined)
+  if (data?.body !== undefined && data.body !== loaded) {
+    setLoaded(data.body)
+    setBody(data.body)
+    setPreview(null)
+  }
+  useEffect(() => { cursor.current = null }, [loaded])
 
-  const dirty = data !== undefined && body !== data.body
+  const dirty = loaded !== undefined && body !== loaded
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
   const variables = data?.variables ?? []
@@ -72,9 +81,19 @@ export function TemplateEditor({ event, channel, onDirtyChange }: Props) {
   })
 
   const saveMutation = useMutation({
-    mutationFn: () => api.put(`/notifications/templates/${event}/${channel}`, { body }).then((r) => r.data),
+    mutationFn: (sent: string) => api.put(`/notifications/templates/${event}/${channel}`, { body: sent }).then((r) => r.data),
+    // The sent text counts as saved at once: switching notice right after "Salvar" must not ask to
+    // discard it. A failed save puts the previous text back as the saved one.
+    onMutate: (sent) => {
+      const previous = queryClient.getQueryData<TemplateData>(key)
+      if (previous) queryClient.setQueryData<TemplateData>(key, { ...previous, body: sent, isDefault: false })
+      return { previous }
+    },
     onSuccess: () => { toast.success('Mensagem salva'); queryClient.invalidateQueries({ queryKey: key }) },
-    onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível salvar a mensagem')),
+    onError: (err, _sent, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(key, ctx.previous)
+      toast.error(mensagemDeErro(err, 'Não foi possível salvar a mensagem'))
+    },
   })
 
   const resetMutation = useMutation({
@@ -163,7 +182,7 @@ export function TemplateEditor({ event, channel, onDirtyChange }: Props) {
         <Button type="button" variant="outline" onClick={() => previewMutation.mutate()} disabled={!data || previewMutation.isPending}>
           {previewMutation.isPending ? 'Gerando prévia...' : 'Ver prévia'}
         </Button>
-        <Button onClick={() => saveMutation.mutate()} disabled={!data || saveMutation.isPending}>
+        <Button onClick={() => saveMutation.mutate(body)} disabled={!data || saveMutation.isPending}>
           {saveMutation.isPending ? 'Salvando...' : 'Salvar mensagem'}
         </Button>
       </div>

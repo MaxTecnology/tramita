@@ -134,3 +134,18 @@ it('tells the page when the text has unsaved changes', async () => {
   await userEvent.type(box, '{backspace}')
   expect(onDirtyChange).toHaveBeenLastCalledWith(false)
 })
+
+it('loading a text (first time or after going back to the default) is never "unsaved"', async () => {
+  const onDirtyChange = vi.fn()
+  confirmMock.mockReset().mockResolvedValue(true)
+  let custom = true
+  server.use(
+    http.get(URL, () => HttpResponse.json(custom ? { body: 'Do escritório', isDefault: false, variables: VARS } : { body: 'Padrão', isDefault: true, variables: VARS })),
+    http.delete(URL, () => { custom = false; return HttpResponse.json({}) }),
+  )
+  render(<TemplateEditor event="TASK_MOVED" channel="WHATSAPP" onDirtyChange={onDirtyChange} />, { wrapper })
+  await screen.findByDisplayValue('Do escritório')
+  await userEvent.click(screen.getByRole('button', { name: 'Voltar ao texto padrão' }))
+  await screen.findByDisplayValue('Padrão')
+  expect(onDirtyChange).not.toHaveBeenCalledWith(true)
+})
