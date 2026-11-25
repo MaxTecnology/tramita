@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, Paperclip, MessageSquare, Clock, Trash2, FileCheck, Stamp, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react'
+import { X, Pencil, Paperclip, MessageSquare, Clock, Trash2, FileCheck, Stamp, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react'
 import { api } from '@/lib/api'
 import { UPLOAD_ACCEPT } from '@/lib/upload'
 import { cn, mensagemDeErro } from '@/lib/utils'
@@ -147,7 +148,10 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   const [tab, setTab] = useState<Tab>('comments')
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState(task.title)
-  const [descValue, setDescValue] = useState(task.description ?? '')
+  // Follow changes that arrive while the drawer is open (SSE, refetch) unless the person is editing
+  const [descValue, setDescValue] = useSyncedValue(task.description ?? '')
+  const [dueValue, setDueValue] = useSyncedValue(task.dueDate ? task.dueDate.slice(0, 10) : '')
+  const [targetValue, setTargetValue] = useSyncedValue(task.targetDate ? task.targetDate.slice(0, 10) : '')
 
   const isStaff = isOrgRole(role)
   // Same list the Tasks screen uses (id, name, departments): who can receive the task and names in the history
@@ -429,6 +433,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   const isOverdue =
     task.dueDate !== null &&
     task.status !== 'DONE' &&
+    task.status !== 'DISREGARDED' &&
     isPastDateOnlyUTC(task.dueDate)
 
   // Vencimento e meta de uma tarefa recorrente vêm do motor de recorrência (template) — travados
@@ -471,15 +476,19 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
   const fixedByRecurrence = isRecurring ? 'Definida pela tarefa recorrente' : undefined
 
   return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-      <aside aria-label={`Tarefa ${task.title}`} className="fixed inset-y-0 right-0 z-50 flex flex-col bg-surface shadow-2xl w-full max-w-[560px]">
+    // A modal dialog: focus stays inside, Escape and a click outside close it, the title names it
+    <DialogPrimitive.Root open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/30" />
+      <DialogPrimitive.Content asChild aria-describedby={undefined}>
+      <aside className="fixed inset-y-0 right-0 z-50 flex flex-col bg-surface shadow-2xl w-full max-w-[560px] focus:outline-none">
 
         {/* Fixed top: the task title and the way out */}
         <div className="flex flex-shrink-0 items-start gap-3 border-b border-border px-5 py-4">
-          {canEdit && editingTitle ? (
+          {canEdit && editingTitle && (
             <input
               autoFocus
+              aria-label="Título da tarefa"
               value={titleValue}
               onChange={(e) => setTitleValue(e.target.value)}
               onBlur={() => {
@@ -494,14 +503,25 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
               }}
               className="flex-1 text-base font-semibold text-foreground border-b border-accent focus:outline-none bg-transparent"
             />
-          ) : (
+          )}
+          {/* The title names the dialog; while it is being renamed it stays for screen readers only */}
+          <DialogPrimitive.Title asChild>
             <h2
-              className={cn('flex-1 text-base font-semibold leading-tight text-foreground', canEdit && 'cursor-pointer hover:text-accent')}
-              title={canEdit ? 'Clique para renomear' : undefined}
+              className={cn(
+                'flex-1 text-base font-semibold leading-tight text-foreground',
+                canEdit && editingTitle && 'sr-only',
+                canEdit && 'cursor-pointer hover:text-accent',
+              )}
               onClick={() => canEdit && setEditingTitle(true)}
             >
               {task.title}
             </h2>
+          </DialogPrimitive.Title>
+          {canEdit && !editingTitle && (
+            <button type="button" onClick={() => setEditingTitle(true)} aria-label={`Renomear: ${task.title}`} title="Renomear"
+              className="flex-shrink-0 rounded-md p-1 text-muted-foreground hover:bg-neutral-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+              <Pencil size={16} aria-hidden />
+            </button>
           )}
           <button type="button" onClick={onClose} aria-label="Fechar" className="flex-shrink-0 rounded-md p-1 text-muted-foreground hover:bg-neutral-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
             <X size={20} aria-hidden />
@@ -594,7 +614,8 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
               {isStaff && (
                 <DrawerField label="Departamento" htmlFor={canEdit ? 'task-department' : undefined}>
                   {canEdit ? (
-                    <select id="task-department" value={task.departmentId ?? ''} onChange={(e) => updateMutation.mutate({ departmentId: e.target.value })} className={fieldCls}>
+                    <select id="task-department" value={task.departmentId ?? ''} onChange={(e) => e.target.value && updateMutation.mutate({ departmentId: e.target.value })} className={fieldCls}>
+                      {!task.departmentId && <option value="" disabled>Escolha o departamento</option>}
                       {departments.map((d) => (
                         <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
@@ -632,7 +653,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
                 <DrawerField label="Prazo" htmlFor={canEditDates ? 'task-due' : undefined} hint={fixedByRecurrence}>
                   {canEditDates ? (
                     <>
-                      <input id="task-due" type="date" defaultValue={task.dueDate ? task.dueDate.slice(0, 10) : ''} onChange={(e) => updateMutation.mutate({ dueDate: toUtcIso(e.target.value) })} className={fieldCls} />
+                      <input id="task-due" type="date" value={dueValue} onChange={(e) => { setDueValue(e.target.value); updateMutation.mutate({ dueDate: toUtcIso(e.target.value) }) }} className={fieldCls} />
                       {task.dueDate && boardDueDate && new Date(task.dueDate) > new Date(boardDueDate) && (
                         <p className="mt-1 text-xs text-warning-text">Depois do prazo do processo ({formatDateOnlyUTC(boardDueDate)})</p>
                       )}
@@ -647,7 +668,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
               {(canEditDates || task.targetDate) && (
                 <DrawerField label="Meta" htmlFor={canEditDates ? 'task-target' : undefined} hint={fixedByRecurrence ?? 'Meta interna do escritório'}>
                   {canEditDates ? (
-                    <input id="task-target" type="date" defaultValue={task.targetDate ? task.targetDate.slice(0, 10) : ''} onChange={(e) => updateMutation.mutate({ targetDate: toUtcIso(e.target.value) })} className={fieldCls} />
+                    <input id="task-target" type="date" value={targetValue} onChange={(e) => { setTargetValue(e.target.value); updateMutation.mutate({ targetDate: toUtcIso(e.target.value) }) }} className={fieldCls} />
                   ) : task.targetDate && (
                     <span className="text-sm text-foreground">{formatDateOnlyUTC(task.targetDate)}</span>
                   )}
@@ -716,10 +737,24 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
             {TABS.map((t) => (
               <button
                 key={t.id}
+                id={`task-tab-${t.id}`}
                 type="button"
                 role="tab"
                 aria-selected={tab === t.id}
+                aria-controls="task-tabpanel"
+                tabIndex={tab === t.id ? 0 : -1}
                 onClick={() => setTab(t.id)}
+                onKeyDown={(e) => {
+                  // Arrows, Home and End move between tabs (the selected one follows the focus)
+                  const i = TABS.findIndex((x) => x.id === t.id)
+                  const next = e.key === 'ArrowRight' ? (i + 1) % TABS.length
+                    : e.key === 'ArrowLeft' ? (i - 1 + TABS.length) % TABS.length
+                    : e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : -1
+                  if (next === -1) return
+                  e.preventDefault()
+                  setTab(TABS[next].id)
+                  document.getElementById(`task-tab-${TABS[next].id}`)?.focus()
+                }}
                 className={cn(
                   'flex flex-1 items-center justify-center gap-1 whitespace-nowrap border-b-2 px-1.5 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent',
                   tab === t.id ? 'border-accent text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -731,7 +766,7 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
             ))}
           </div>
 
-          <div className="p-5">
+          <div role="tabpanel" id="task-tabpanel" aria-labelledby={`task-tab-${tab}`} className="p-5">
 
           {tab === 'comments' && (
             <div className="space-y-5">
@@ -1145,8 +1180,21 @@ export function TaskDrawer({ task, currentUserId, role, boardDueDate, clientId, 
           </div>
         </div>
       </aside>
-    </>
+      </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
+}
+
+// A field's local value that follows its source when the source changes, unless the person changed it
+function useSyncedValue(source: string): [string, (v: string) => void] {
+  const [value, setValue] = useState(source)
+  const [seen, setSeen] = useState(source)
+  if (source !== seen) {
+    setSeen(source)
+    if (value === seen) setValue(source)
+  }
+  return [value, setValue]
 }
 
 // One field of the task in the drawer: its name above, the control or the value below
@@ -1154,9 +1202,10 @@ function DrawerField({ label, htmlFor, hint, children }: { label: string; htmlFo
   return (
     <li className="min-w-0">
       {htmlFor
-        ? <label htmlFor={htmlFor} title={hint} className="mb-1 block text-xs font-medium text-muted-foreground">{label}</label>
-        : <span title={hint} className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>}
+        ? <label htmlFor={htmlFor} className="mb-1 block text-xs font-medium text-muted-foreground">{label}</label>
+        : <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>}
       {children}
+      {hint && <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>}
     </li>
   )
 }

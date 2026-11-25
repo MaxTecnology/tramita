@@ -152,7 +152,7 @@ function StatusPill({ status }: { status: Task['status'] }) {
 }
 
 const processOf = (task: TaskListItem) => (task.column.board.type === 'PROCESS' ? task.column.board.title ?? null : null)
-const isOverdueTask = (task: TaskListItem) => task.dueDate !== null && task.status !== 'DONE' && isPastDateOnlyUTC(task.dueDate)
+const isOverdueTask = (task: TaskListItem) => task.dueDate !== null && task.status !== 'DONE' && task.status !== 'DISREGARDED' && isPastDateOnlyUTC(task.dueDate)
 
 // What a task carries besides its title: OS and process, approval, request, priority
 function TaskTags({ task, inRow = false }: { task: TaskListItem; inRow?: boolean }) {
@@ -199,32 +199,12 @@ function DroppableStatusColumn({ id, children }: { id: string; children: React.R
   )
 }
 
-function DraggableTaskCard({ task, onClick }: { task: TaskListItem; onClick: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id })
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : undefined
+// What a Kanban card shows (also the picture that follows the pointer while dragging)
+function TaskCardView({ task }: { task: TaskListItem }) {
   const isOverdue = isOverdueTask(task)
   const hasDeadlineChip = !!(task.deadline && task.osModel && task.deadline.state !== 'NONE')
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && !isDragging) { e.preventDefault(); onClick(); return }
-        listeners?.onKeyDown?.(e)
-      }}
-      onClick={onClick}
-      data-task-card
-      className={cn(
-        'min-w-0 cursor-pointer select-none rounded-lg border bg-surface p-3 shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-        isOverdue ? 'border-danger-text' : 'border-border',
-        isDragging && 'opacity-40',
-      )}
-    >
+    <>
       <p className="line-clamp-2 text-sm font-medium text-foreground">{task.title}</p>
       <p className="mt-0.5 truncate text-xs text-muted-foreground">
         {task.column.board.client.name}
@@ -240,6 +220,35 @@ function DraggableTaskCard({ task, onClick }: { task: TaskListItem; onClick: () 
           </span>
         )}
       </div>
+    </>
+  )
+}
+
+const cardCls = (task: TaskListItem) => cn(
+  'min-w-0 cursor-pointer select-none rounded-lg border bg-surface p-3 shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+  isOverdueTask(task) ? 'border-danger-text' : 'border-border',
+)
+
+function DraggableTaskCard({ task, onClick }: { task: TaskListItem; onClick: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id })
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+    : undefined
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !isDragging) { e.preventDefault(); onClick(); return }
+        listeners?.onKeyDown?.(e)
+      }}
+      onClick={onClick}
+      data-task-card
+      className={cn(cardCls(task), isDragging && 'opacity-40')}
+    >
+      <TaskCardView task={task} />
     </div>
   )
 }
@@ -569,10 +578,17 @@ export default function Tasks() {
           pages: snapshot.pages.map((p) => ({ ...p, items: p.items.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)) })),
         })
       }
-      return { snapshot, key }
+      const previous = snapshot?.pages.flatMap((p) => p.items).find((t) => t.id === taskId)?.status
+      return { previous, key }
     },
-    onError: (err, _vars, ctx) => {
-      if (ctx?.snapshot) qc.setQueryData(ctx.key, ctx.snapshot)
+    // Puts back only this card's status: another change made meanwhile is kept
+    onError: (err, { taskId }, ctx) => {
+      if (ctx?.previous) {
+        qc.setQueryData<TasksData>(ctx.key, (data) => data && {
+          ...data,
+          pages: data.pages.map((p) => ({ ...p, items: p.items.map((t) => (t.id === taskId ? { ...t, status: ctx.previous! } : t)) })),
+        })
+      }
       if (!(err instanceof GaveUp)) toast.error(mensagemDeErro(err, 'Não foi possível mudar o status da tarefa'))
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
@@ -614,12 +630,12 @@ export default function Tasks() {
   }
 
   // The filters behind "Filtros": what is chosen shows as a chip that removes it
-  const clientLabel = (id: string) => { const c = clients.find((x) => x.id === id); return c ? (c.codigo ? `${c.codigo} - ${c.name}` : c.name) : '' }
+  const clientLabel = (id: string) => { const c = clients.find((x) => x.id === id); return c ? (c.codigo ? `${c.codigo} - ${c.name}` : c.name) : 'selecionado' }
   const advanced = [
     clientId && { key: 'client', label: `Cliente: ${clientLabel(clientId)}`, clear: () => setClientId('') },
-    assigneeId && { key: 'assignee', label: `Colaborador: ${users.find((u) => u.id === assigneeId)?.name ?? ''}`, clear: () => setAssigneeId('') },
-    departmentId && { key: 'department', label: `Departamento: ${departments.find((d) => d.id === departmentId)?.name ?? ''}`, clear: () => setDepartmentId('') },
-    recurringTemplateId && { key: 'type', label: `Tipo: ${recurringTemplates.find((t) => t.id === recurringTemplateId)?.title ?? ''}`, clear: () => setRecurringTemplateId('') },
+    assigneeId && { key: 'assignee', label: `Colaborador: ${users.find((u) => u.id === assigneeId)?.name ?? 'selecionado'}`, clear: () => setAssigneeId('') },
+    departmentId && { key: 'department', label: `Departamento: ${departments.find((d) => d.id === departmentId)?.name ?? 'selecionado'}`, clear: () => setDepartmentId('') },
+    recurringTemplateId && { key: 'type', label: `Tipo: ${recurringTemplates.find((t) => t.id === recurringTemplateId)?.title ?? 'selecionado'}`, clear: () => setRecurringTemplateId('') },
   ].filter((f): f is { key: string; label: string; clear: () => void } => !!f)
 
   return (
@@ -840,7 +856,7 @@ export default function Tasks() {
             </div>
 
             <DragOverlay>
-              {activeTask ? <DraggableTaskCard task={activeTask} onClick={() => {}} /> : null}
+              {activeTask ? <div className={cn(cardCls(activeTask), 'shadow-lg')}><TaskCardView task={activeTask} /></div> : null}
             </DragOverlay>
           </DndContext>
         )}

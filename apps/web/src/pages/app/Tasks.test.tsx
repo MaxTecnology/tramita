@@ -162,3 +162,10 @@ it('Kanban: a card opens with Enter (keyboard)', async () => {
   await userEvent.keyboard('{Enter}')
   expect(await screen.findByRole('dialog', { name: 'Tarefa Registro na Junta' })).toBeInTheDocument()
 })
+
+it('a disregarded task with an old date is not shown as overdue', async () => {
+  server.use(http.get(`${API}/tasks`, () => HttpResponse.json({ items: [{ ...TASKS[1], id: 't9', title: 'DAS dispensado', status: 'DISREGARDED', dueDate: '2020-01-10T00:00:00.000Z', targetDate: '2020-01-10T00:00:00.000Z' }], nextCursor: null })))
+  renderPage()
+  const r = await row('DAS dispensado')
+  expect(within(r).getByText('10/01/2020')).not.toHaveClass('text-danger-text')
+})

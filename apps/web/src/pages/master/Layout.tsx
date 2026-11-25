@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { LayoutDashboard, Building2, CreditCard, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
 
 export default function MasterLayout() {
   const { user, isAuthenticated, logout } = useAuth()
@@ -24,14 +25,15 @@ export default function MasterLayout() {
 
   return (
     <div className="flex h-screen bg-background">
-      <aside className="w-56 bg-[#0C447C] flex flex-col flex-shrink-0">
+      {/* Same look as the office menu, in the app theme (light and dark) */}
+      <aside className="w-56 flex flex-col flex-shrink-0 bg-surface border-r border-border">
         {/* Logo */}
-        <div className="px-4 py-5 border-b border-[#185FA5]">
+        <div className="px-4 py-5 border-b border-border">
           <div className="flex items-center gap-2.5">
             <HubIcon />
             <div>
-              <p className="text-white font-bold text-sm leading-tight">AutoHubs</p>
-              <p className="text-[#85B7EB] text-xs">Master</p>
+              <p className="text-foreground font-bold text-sm leading-tight">AutoHubs</p>
+              <p className="text-muted-foreground text-xs">Master</p>
             </div>
           </div>
         </div>
@@ -44,14 +46,15 @@ export default function MasterLayout() {
         </nav>
 
         {/* User + logout */}
-        <div className="px-3 py-4 border-t border-[#185FA5] space-y-1">
-          <p className="text-[#B5D4F4] text-xs px-3 mb-2 truncate">{user?.name}</p>
-          <ChangePasswordDialog triggerClassName="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-[#85B7EB] hover:bg-[#185FA5] hover:text-white transition-colors" />
+        <div className="px-3 py-4 border-t border-border space-y-1">
+          <ThemeToggle className="mb-2" />
+          <p className="text-muted-foreground text-xs px-3 mb-2 truncate">{user?.name}</p>
+          <ChangePasswordDialog triggerClassName="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-neutral-bg hover:text-foreground transition-colors" />
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-[#85B7EB] hover:bg-[#185FA5] hover:text-white transition-colors"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-neutral-bg hover:text-foreground transition-colors"
           >
-            <LogOut size={16} />
+            <LogOut size={16} aria-hidden />
             Sair
           </button>
         </div>
@@ -72,8 +75,8 @@ function MasterLink({ to, icon, label }: { to: string; icon: React.ReactNode; la
         cn(
           'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
           isActive
-            ? 'bg-[#185FA5] text-white font-medium'
-            : 'text-[#B5D4F4] hover:bg-[#185FA5] hover:text-white',
+            ? 'bg-neutral-bg text-accent font-medium'
+            : 'text-muted-foreground hover:bg-neutral-bg hover:text-foreground',
         )
       }
     >
@@ -85,14 +88,14 @@ function MasterLink({ to, icon, label }: { to: string; icon: React.ReactNode; la
 
 function HubIcon() {
   return (
-    <svg width="28" height="28" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="36" cy="36" r="10" fill="white" />
-      <circle cx="36" cy="10" r="5" fill="white" opacity="0.8" />
-      <circle cx="60" cy="51" r="5" fill="white" opacity="0.8" />
-      <circle cx="12" cy="51" r="5" fill="white" opacity="0.8" />
-      <line x1="36" y1="26" x2="36" y2="15" stroke="white" strokeWidth="2" opacity="0.6" />
-      <line x1="46" y1="42" x2="55" y2="46" stroke="white" strokeWidth="2" opacity="0.6" />
-      <line x1="26" y1="42" x2="17" y2="46" stroke="white" strokeWidth="2" opacity="0.6" />
+    <svg width="28" height="28" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-brand" aria-hidden>
+      <circle cx="36" cy="36" r="10" fill="currentColor" />
+      <circle cx="36" cy="10" r="5" fill="currentColor" opacity="0.8" />
+      <circle cx="60" cy="51" r="5" fill="currentColor" opacity="0.8" />
+      <circle cx="12" cy="51" r="5" fill="currentColor" opacity="0.8" />
+      <line x1="36" y1="26" x2="36" y2="15" stroke="currentColor" strokeWidth="2" opacity="0.6" />
+      <line x1="46" y1="42" x2="55" y2="46" stroke="currentColor" strokeWidth="2" opacity="0.6" />
+      <line x1="26" y1="42" x2="17" y2="46" stroke="currentColor" strokeWidth="2" opacity="0.6" />
     </svg>
   )
 }

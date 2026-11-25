@@ -29,7 +29,7 @@ export default function MasterDashboard() {
           value={brl(data?.mrr ?? 0)}
           hint={`Asaas ${brl(data?.mrrAsaas ?? 0)} · acerto direto ${brl(data?.mrrManual ?? 0)}`}
           icon={<TrendingUp size={20} />}
-          iconColor="#185FA5"
+          iconColor="#1E3A5F"
         />
         <StatCard
           label="Orgs Ativas"
