@@ -6,9 +6,9 @@
 
 ## Resumo
 
-- Rotas: **211**
+- Rotas: **212**
 - Públicas (sem login): **6** — `POST /auth/login`, `POST /auth/logout`, `POST /auth/refresh`, `GET /organizations/plans`, `POST /organizations/register`, `GET /organizations/signup-status`
-- Sem uso no web nem chamador externo conhecido: **2**
+- Sem uso no web nem chamador externo conhecido: **3**
 - Sem teste de rota: **53**
 - Cliente (portal) passa fora de /portal: **13** (rotas compartilhadas — o escopo dentro delas é revisado na auditoria de segurança)
 
@@ -16,6 +16,7 @@
 
 | Método | Rota | Quem passa | Teste de rota |
 |---|---|---|---|
+| POST | `/clients/:id/reactivate` | Admin, Gerente | sim |
 | GET | `/document-reader/metricas` | Admin, Gerente, Membro | sim |
 | GET | `/portal/requests/:id` | Cliente | sim |
 
@@ -89,6 +90,7 @@
 | DELETE | `/clients/:id` | Admin, Gerente | web | **não** |
 | PATCH | `/clients/:id` | Admin, Gerente | web | sim |
 | GET | `/clients/:id/assignments` | Admin, Gerente, Membro | web | **não** |
+| POST | `/clients/:id/reactivate` | Admin, Gerente | — | sim |
 | GET | `/clients/:id/users` | Admin, Gerente | web | sim |
 | GET | `/clients/lookup-cnpj/:cnpj` | Admin, Gerente | web | sim |
 | GET | `/clients/search-users` | Admin, Gerente | web | **não** |

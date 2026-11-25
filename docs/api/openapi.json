@@ -1988,10 +1988,11 @@
         "description": "**Quem pode:** Admin, Gerente"
       },
       "delete": {
-        "summary": "Remover cliente",
+        "summary": "Desativar cliente",
         "tags": [
           "Clientes"
         ],
+        "description": "Sai das listas e o portal dele é bloqueado; o histórico continua.\n\n**Quem pode:** Admin, Gerente",
         "security": [
           {
             "bearerAuth": []
@@ -2015,8 +2016,40 @@
         "x-roles": [
           "Admin",
           "Gerente"
+        ]
+      }
+    },
+    "/clients/{id}/reactivate": {
+      "post": {
+        "summary": "Reativar cliente",
+        "tags": [
+          "Clientes"
         ],
-        "description": "**Quem pode:** Admin, Gerente"
+        "description": "Volta a ficar ativo. Conta no limite de clientes do plano (422 se atingido).\n\n**Quem pode:** Admin, Gerente",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        },
+        "x-roles": [
+          "Admin",
+          "Gerente"
+        ]
       }
     },
     "/clients/{id}/users": {

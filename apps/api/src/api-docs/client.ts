@@ -18,7 +18,8 @@ export const CLIENT_DOCS: RouteDocs = {
   'GET /clients/search-users': { summary: 'Buscar usuários do portal para vincular ao cliente' },
   'POST /clients': { summary: 'Cadastrar cliente', description: 'Respeita o limite de clientes do plano.', body: clientBodySchema },
   'PATCH /clients/:id': { summary: 'Alterar cliente', body: clientBodySchema },
-  'DELETE /clients/:id': { summary: 'Remover cliente' },
+  'DELETE /clients/:id': { summary: 'Desativar cliente', description: 'Sai das listas e o portal dele é bloqueado; o histórico continua.' },
+  'POST /clients/:id/reactivate': { summary: 'Reativar cliente', description: 'Volta a ficar ativo. Conta no limite de clientes do plano (422 se atingido).' },
   'GET /clients/:id/users': { summary: 'Usuários do portal ligados ao cliente' },
   'GET /clients/:id/assignments': { summary: 'Departamentos que atendem o cliente e seus responsáveis' },
 

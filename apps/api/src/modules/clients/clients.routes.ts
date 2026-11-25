@@ -10,6 +10,7 @@ import {
   createClient,
   updateClient,
   deleteClient,
+  reactivateClient,
   listAssignments,
   lookupClientByCnpj,
   searchClientUsers,
@@ -69,6 +70,13 @@ export async function clientsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
     return reply.send(await deleteClient(id, request.user.organizationId!))
+  })
+
+  app.post('/:id/reactivate', {
+    preHandler: [requireRole('ORG_ADMIN', 'ORG_MANAGER'), checkSubscription, checkPlanLimit],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    return reply.send(await reactivateClient(id, request.user.organizationId!))
   })
 
   app.get('/:id/users', {

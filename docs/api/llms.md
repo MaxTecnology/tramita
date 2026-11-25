@@ -48,6 +48,7 @@ API do Tramita (AutoHubs): processos, ordens de serviço, tarefas e portal do cl
 - [GET /clients/search-users](#scalar-operation-get-clientssearch-users)
 - [DELETE /clients/{id}](#scalar-operation-delete-clientsid)
 - [PATCH /clients/{id}](#scalar-operation-patch-clientsid)
+- [POST /clients/{id}/reactivate](#scalar-operation-post-clientsidreactivate)
 - [GET /clients/{id}/users](#scalar-operation-get-clientsidusers)
 - [GET /clients/{id}/assignments](#scalar-operation-get-clientsidassignments)
 - [GET /boards](#scalar-operation-get-boards)
@@ -1574,11 +1575,13 @@ Preenche razão social e endereço no cadastro, com estado e cidade (código IBG
 
 <a id="scalar-operation-delete-clientsid"></a>
 
-### Remover cliente
+### Desativar cliente
 
 - **Method:** `DELETE`
 - **Path:** `/clients/{id}`
 - **Tags:** Clientes
+
+Sai das listas e o portal dele é bloqueado; o histórico continua.
 
 **Quem pode:** Admin, Gerente
 
@@ -1717,6 +1720,32 @@ no additional properties
 
 ##### 200 Default Response
 
+<a id="scalar-operation-post-clientsidreactivate"></a>
+
+### Reativar cliente
+
+- **Method:** `POST`
+- **Path:** `/clients/{id}/reactivate`
+- **Tags:** Clientes
+
+Volta a ficar ativo. Conta no limite de clientes do plano (422 se atingido).
+
+**Quem pode:** Admin, Gerente
+
+**Servers:** [Inherited servers](#scalar-context-global-servers)
+
+#### Authentication
+
+- **bearerAuth**: HTTP bearer (`JWT`)
+
+#### Path parameters
+
+- **`id` (required)**: `string`
+
+#### Responses
+
+##### 200 Default Response
+
 <a id="scalar-operation-get-clientsidusers"></a>
 
 ### Usuários do portal ligados ao cliente
@@ -1841,7 +1870,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-18T17:39:50.579Z"
+  "dueDate": "2026-11-25T20:21:48.191Z"
 }
 ```
 
@@ -1915,7 +1944,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-18T17:39:50.582Z"
+  "dueDate": "2026-11-25T20:21:48.193Z"
 }
 ```
 
@@ -2005,7 +2034,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-18T17:39:50.585Z",
+  "dueDate": "2026-11-25T20:21:48.196Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2280,14 +2309,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-18T17:39:50.596Z",
+  "dueDate": "2026-11-25T20:21:48.205Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-18T17:39:50.596Z",
-  "competence": "2026-11-18T17:39:50.596Z",
+  "targetDate": "2026-11-25T20:21:48.205Z",
+  "competence": "2026-11-25T20:21:48.206Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -4352,7 +4381,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-18T17:39:50.653Z",
+  "dueDate": "2026-11-25T20:21:48.257Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -5357,7 +5386,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-18T17:39:50.685Z"
+  "dueDate": "2026-11-25T20:21:48.286Z"
 }
 ```
 
@@ -5414,7 +5443,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-18T17:39:50.687Z",
+  "dueDate": "2026-11-25T20:21:48.288Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -6198,7 +6227,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T17:39:50.707Z",
+  "dueMonth": "2026-11-25T20:21:48.309Z",
   "assignmentIds": [
     ""
   ]
@@ -6250,7 +6279,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T17:39:50.708Z",
+  "dueMonth": "2026-11-25T20:21:48.311Z",
   "assignmentIds": [
     ""
   ]
@@ -6293,7 +6322,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-18T17:39:50.709Z"
+  "dueMonth": "2026-11-25T20:21:48.312Z"
 }
 ```
 

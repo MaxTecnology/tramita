@@ -261,6 +261,13 @@ export async function deleteClient(id: string, organizationId: string) {
   return prisma.client.update({ where: { id }, data: { isActive: false }, select: SELECT })
 }
 
+// Back to active (the office's plan limit is checked on the route, as for a new client)
+export async function reactivateClient(id: string, organizationId: string) {
+  const client = await prisma.client.findFirst({ where: { id, organizationId, isActive: false } })
+  if (!client) throw new AppError(404, 'Cliente não encontrado')
+  return prisma.client.update({ where: { id }, data: { isActive: true }, select: SELECT })
+}
+
 export async function lookupClientByCnpj(cnpj: string): Promise<CnpjLookupResult> {
   const digits = cnpj.replace(/\D/g, '')
   if (digits.length !== 14) throw new AppError(400, 'CNPJ inválido')
