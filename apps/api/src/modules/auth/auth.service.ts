@@ -59,8 +59,9 @@ export async function login(email: string, password: string): Promise<LoginRespo
 
 async function tryLogin(email: string, password: string): Promise<LoginResponse> {
   // Try User table first
-  const user = await prisma.user.findUnique({
-    where: { email },
+  // E-mails are stored in lower case; the comparison ignores case for older rows typed otherwise
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email.trim(), mode: 'insensitive' } },
     include: { organization: { select: { name: true } } },
   })
   // A deactivated staff member keeps the row (history, authorship) but never signs in again
@@ -73,7 +74,7 @@ async function tryLogin(email: string, password: string): Promise<LoginResponse>
   // organization (e.g. a bookkeeper working with multiple accounting offices). Try every
   // candidate and return the session for the first whose password matches.
   const clientUserCandidates = await prisma.clientUser.findMany({
-    where: { email, isActive: true },
+    where: { email: { equals: email.trim(), mode: 'insensitive' }, isActive: true },
     include: { organization: { select: { name: true } } },
   })
   // Nobody with this e-mail: still one password check (same time as a real account)

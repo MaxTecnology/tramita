@@ -154,22 +154,6 @@ export async function updateTemplate(id: string, organizationId: string, data: U
   const existing = await getTemplateById(id, organizationId)
 
   if (data.departmentId) await assertDepartmentBelongsToOrg(data.departmentId, organizationId)
-  if (data.departmentId && data.departmentId !== existing.departmentId) {
-    const notServed = await prisma.recurringTaskAssignment.count({
-      where: {
-        templateId: id,
-        isActive: true,
-        client: { isActive: true, clientAssignments: { none: { departmentId: data.departmentId } } },
-      },
-    })
-    if (notServed > 0) {
-      const department = await prisma.department.findUnique({ where: { id: data.departmentId }, select: { name: true } })
-      throw new AppError(
-        409,
-        `Não é possível trocar o departamento: ${notServed} cliente(s) vinculado(s) não são atendidos pelo departamento ${department?.name ?? ''}.`,
-      )
-    }
-  }
   if (data.documentDeliveries) await assertDeliveryObligations(data.documentDeliveries, organizationId)
   const { documentRequests, documentDeliveries, dueRules, ...rest } = data
 
@@ -180,6 +164,24 @@ export async function updateTemplate(id: string, organizationId: string, data: U
     await tx.$queryRaw`SELECT id FROM "recurring_task_templates" WHERE id = ${id} FOR NO KEY UPDATE`
     const current = await tx.recurringTaskTemplate.findUnique({ where: { id }, include: { dueRules: true } })
     if (!current) throw new AppError(404, 'Template não encontrado')
+
+    // Under the same lock as linking a client: the clients linked now are the ones checked
+    if (data.departmentId && data.departmentId !== current.departmentId) {
+      const notServed = await tx.recurringTaskAssignment.count({
+        where: {
+          templateId: id,
+          isActive: true,
+          client: { isActive: true, clientAssignments: { none: { departmentId: data.departmentId } } },
+        },
+      })
+      if (notServed > 0) {
+        const department = await tx.department.findUnique({ where: { id: data.departmentId }, select: { name: true } })
+        throw new AppError(
+          409,
+          `Não é possível trocar o departamento: ${notServed} cliente(s) vinculado(s) não são atendidos pelo departamento ${department?.name ?? ''}.`,
+        )
+      }
+    }
 
     const periodicity = data.periodicity ?? current.periodicity
     const generationDayOfPeriod = data.generationDayOfPeriod ?? current.generationDayOfPeriod
@@ -258,8 +260,12 @@ export async function createAssignment(templateId: string, organizationId: strin
   if (existing) throw new AppError(409, 'Este cliente já está vinculado a este template')
 
   return prisma.$transaction(async (tx) => {
-    await lockClients(tx, [client.id]) // an admin unserving the department meanwhile wins or waits
-    await assertDepartmentServesClient(tx, client.id, template.departmentId)
+    // Template first (a department change meanwhile wins or waits), then the client (an admin
+    // unserving the department meanwhile wins or waits); the department is read again under the lock
+    await tx.$queryRaw`SELECT id FROM "recurring_task_templates" WHERE id = ${templateId} FOR SHARE`
+    await lockClients(tx, [client.id])
+    const { departmentId } = await tx.recurringTaskTemplate.findUniqueOrThrow({ where: { id: templateId }, select: { departmentId: true } })
+    await assertDepartmentServesClient(tx, client.id, departmentId)
     return tx.recurringTaskAssignment.create({ data: { templateId, clientId: data.clientId } })
   })
 }
@@ -289,6 +295,7 @@ export async function updateAssignment(
 
   return prisma.$transaction(async (tx) => {
     if (data.isActive === true && !assignment.isActive) {
+      await tx.$queryRaw`SELECT id FROM "recurring_task_templates" WHERE id = ${templateId} FOR SHARE`
       const template = await tx.recurringTaskTemplate.findUniqueOrThrow({ where: { id: templateId }, select: { departmentId: true } })
       await lockClients(tx, [assignment.clientId])
       await assertDepartmentServesClient(tx, assignment.clientId, template.departmentId)

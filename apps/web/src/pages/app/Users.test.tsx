@@ -152,6 +152,15 @@ describe('tela de usuários', () => {
     await waitFor(() => expect(calls).toContainEqual({ method: 'POST', url: '/users/u9/reactivate' }))
   })
 
+  it('someone reactivated without any department opens to choose one', async () => {
+    server.use(http.post(`${API}/users/:id/reactivate`, () => HttpResponse.json({ id: 'u9', name: 'Davi Antigo', email: 'davi@x.com', role: 'ORG_MEMBER', isActive: true, departments: [] })))
+    renderPage()
+    await screen.findByText('Bruno Lima')
+    await userEvent.click(screen.getByRole('radio', { name: 'Desativados' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Reativar Davi Antigo' }))
+    expect(await screen.findByRole('dialog', { name: 'Editar usuário' })).toBeInTheDocument()
+  })
+
   it('a search with no result says so and offers to clear it', async () => {
     renderPage()
     await screen.findByText('Bruno Lima')

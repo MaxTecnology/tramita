@@ -111,8 +111,19 @@ export default function Users() {
   })
 
   const reactivateMutation = useMutation({
-    mutationFn: (user: User) => api.post(`/users/${user.id}/reactivate`),
-    onSuccess: () => { toast.success('Usuário reativado'); refresh() },
+    mutationFn: (user: User) => api.post<User>(`/users/${user.id}/reactivate`).then((r) => r.data),
+    // Someone whose departments were all removed meanwhile comes back seeing nothing: the edit panel
+    // opens so a department is chosen right away
+    onSuccess: (back) => {
+      refresh()
+      if (back?.role !== 'ORG_ADMIN' && back?.departments && back.departments.length === 0) {
+        toast.warning(`${back.name} foi reativado sem departamento. Escolha ao menos um para voltar a ver o trabalho.`)
+        setStatus('active')
+        setPanel({ mode: 'edit', user: back })
+        return
+      }
+      toast.success('Usuário reativado')
+    },
     onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível reativar')),
   })
 
