@@ -1,0 +1,6 @@
+{
+  // Type-check of the API scripts (docs generator, route audit), which the build config leaves out
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "rootDir": ".", "noEmit": true },
+  "include": ["src/**/*", "scripts/**/*.ts"]
+}

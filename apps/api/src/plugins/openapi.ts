@@ -89,7 +89,12 @@ export default fp(async function openapi(app: FastifyInstance) {
   // Opt-in and never in production: an environment without NODE_ENV (staging, a manual run) does
   // not publish the API map by accident
   if (process.env.API_DOCS_ENABLED === 'true' && process.env.NODE_ENV !== 'production') {
-    const { default: reference } = await import('@scalar/fastify-api-reference')
+    // Dev dependency: an image built for production (installed with --prod) does not have it
+    const reference = await import('@scalar/fastify-api-reference').then((m) => m.default).catch(() => null)
+    if (!reference) {
+      app.log.warn('API_DOCS_ENABLED=true, mas @scalar/fastify-api-reference não está instalado — /reference não foi publicado')
+      return
+    }
     await app.register(async (scope) => {
       // The Scalar page boots from an inline script that helmet's CSP blocks. Only this
       // non-production page turns the CSP off (helmet reads `config.helmet` per route); every API

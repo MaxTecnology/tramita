@@ -864,6 +864,10 @@ model ProtocolEvent {
   detail               String?
   // File replaced by a REPLACED event — kept, never deleted
   previousAttachmentId String?
+  // VIEWED only: the file version seen (protocol.fileUpdatedAt ?? createdAt). A partial unique index
+  // (protocol_events_viewed_once_key, in the migration) keeps one view per person per version.
+  // Prisma does not declare partial indexes: never accept a generated DROP of it
+  viewedVersionAt      DateTime?
 
   protocol Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
 

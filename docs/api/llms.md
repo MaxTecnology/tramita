@@ -37,8 +37,8 @@ API do Tramita (AutoHubs): processos, ordens de serviço, tarefas e portal do cl
 - [GET /users](#scalar-operation-get-users)
 - [POST /users](#scalar-operation-post-users)
 - [POST /users/{id}/reactivate](#scalar-operation-post-usersidreactivate)
-- [PATCH /users/{id}](#scalar-operation-patch-usersid)
 - [DELETE /users/{id}](#scalar-operation-delete-usersid)
+- [PATCH /users/{id}](#scalar-operation-patch-usersid)
 - [POST /users/{id}/reset-password](#scalar-operation-post-usersidreset-password)
 - [GET /users/{id}/portfolio](#scalar-operation-get-usersidportfolio)
 - [POST /users/{id}/transfer](#scalar-operation-post-usersidtransfer)
@@ -1036,8 +1036,8 @@ Papel, departamentos e o que posso ver. Serve a equipe e o cliente do portal.
 
 no additional properties
 
-- **`name`**: `string`, minLength: `2`
-- **`phone`**: `string | null`
+- **`name`**: `string`, minLength: `2`, maxLength: `120`
+- **`phone`**: `string | null`, maxLength: `30`
 
 <a id="scalar-example-12"></a>
 
@@ -1046,7 +1046,7 @@ no additional properties
 ```json
 {
   "name": "",
-  "phone": null
+  "phone": ""
 }
 ```
 
@@ -1132,15 +1132,15 @@ A senha é gerada pelo servidor e volta uma única vez em `temporaryPassword`.
 
 no additional properties
 
-- **`email` (required)**: `string`, format: `email`
-- **`name` (required)**: `string`, minLength: `2`
+- **`email` (required)**: `string`, format: `email`, maxLength: `254`
+- **`name` (required)**: `string`, minLength: `2`, maxLength: `120`
 - **`role` (required)**: `string`, possible values: `"ORG_MANAGER", "ORG_MEMBER"`
 - **`departmentIds`**: `array`
 
   **Items:**
 
   `string`, pattern: `^[cC][^\s-]{8,}$`
-- **`phone`**: `string`
+- **`phone`**: `string`, maxLength: `30`
 - **`seesDepartmentWork`**: `boolean`
 
 <a id="scalar-example-13"></a>
@@ -1173,6 +1173,30 @@ no additional properties
 - **Tags:** Usuários
 
 Volta com os mesmos departamentos. 409 se já estiver ativa.
+
+**Quem pode:** Admin
+
+**Servers:** [Inherited servers](#scalar-context-global-servers)
+
+#### Authentication
+
+- **bearerAuth**: HTTP bearer (`JWT`)
+
+#### Path parameters
+
+- **`id` (required)**: `string`
+
+#### Responses
+
+##### 200 Default Response
+
+<a id="scalar-operation-delete-usersid"></a>
+
+### Remover pessoa da equipe
+
+- **Method:** `DELETE`
+- **Path:** `/users/{id}`
+- **Tags:** Usuários
 
 **Quem pode:** Admin
 
@@ -1225,9 +1249,9 @@ no additional properties
   **Items:**
 
   `string`, pattern: `^[cC][^\s-]{8,}$`
-- **`email`**: `string`, format: `email`
-- **`name`**: `string`, minLength: `2`
-- **`phone`**: `string | null`
+- **`email`**: `string`, format: `email`, maxLength: `254`
+- **`name`**: `string`, minLength: `2`, maxLength: `120`
+- **`phone`**: `string | null`, maxLength: `30`
 - **`role`**: `string`, possible values: `"ORG_MANAGER", "ORG_MEMBER"`
 - **`seesDepartmentWork`**: `boolean`
 
@@ -1240,37 +1264,13 @@ no additional properties
   "name": "",
   "email": "hello@example.com",
   "role": "ORG_MANAGER",
-  "phone": null,
+  "phone": "",
   "departmentIds": [
     ""
   ],
   "seesDepartmentWork": true
 }
 ```
-
-#### Responses
-
-##### 200 Default Response
-
-<a id="scalar-operation-delete-usersid"></a>
-
-### Remover pessoa da equipe
-
-- **Method:** `DELETE`
-- **Path:** `/users/{id}`
-- **Tags:** Usuários
-
-**Quem pode:** Admin
-
-**Servers:** [Inherited servers](#scalar-context-global-servers)
-
-#### Authentication
-
-- **bearerAuth**: HTTP bearer (`JWT`)
-
-#### Path parameters
-
-- **`id` (required)**: `string`
 
 #### Responses
 
@@ -1870,7 +1870,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-25T20:59:58.647Z"
+  "dueDate": "2026-11-25T21:56:54.656Z"
 }
 ```
 
@@ -1944,7 +1944,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-25T20:59:58.651Z"
+  "dueDate": "2026-11-25T21:56:54.658Z"
 }
 ```
 
@@ -2034,7 +2034,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-25T20:59:58.658Z",
+  "dueDate": "2026-11-25T21:56:54.660Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2309,14 +2309,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-25T20:59:58.681Z",
+  "dueDate": "2026-11-25T21:56:54.668Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-25T20:59:58.681Z",
-  "competence": "2026-11-25T20:59:58.681Z",
+  "targetDate": "2026-11-25T21:56:54.669Z",
+  "competence": "2026-11-25T21:56:54.669Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -2837,6 +2837,8 @@ no additional properties
 
 - **`file` (required)**: `string`, format: `binary`
 
+  MP3 ou WAV de até 500 KB.
+
 <a id="scalar-example-31"></a>
 
 **Generated example:**
@@ -2998,6 +3000,8 @@ Só os eventos que fazem sentido para o cliente.
 **Content type:** `multipart/form-data`
 
 - **`file` (required)**: `string`, format: `binary`
+
+  Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão.
 
 <a id="scalar-example-32"></a>
 
@@ -3200,6 +3204,8 @@ no additional properties
 **Content type:** `multipart/form-data`
 
 - **`file` (required)**: `string`, format: `binary`
+
+  Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão.
 
 <a id="scalar-example-34"></a>
 
@@ -3597,6 +3603,8 @@ PDF, imagem e documentos de escritório; o conteúdo precisa bater com a extens�
 
 - **`file` (required)**: `string`, format: `binary`
 
+  Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão.
+
 <a id="scalar-example-36"></a>
 
 **Generated example:**
@@ -3852,6 +3860,8 @@ no additional properties
 
 - **`file` (required)**: `string`, format: `binary`
 
+  Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão.
+
 <a id="scalar-example-40"></a>
 
 **Generated example:**
@@ -3897,6 +3907,8 @@ Lê o arquivo e avisa se não parece ser o documento esperado; não salva nada.
 
 - **`file` (required)**: `string`, format: `binary`
 
+  Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão.
+
 <a id="scalar-example-41"></a>
 
 **Generated example:**
@@ -3939,6 +3951,8 @@ Lê o arquivo e avisa se não parece ser o documento esperado; não salva nada.
 **Content type:** `multipart/form-data`
 
 - **`file` (required)**: `string`, format: `binary`
+
+  Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão.
 
 <a id="scalar-example-42"></a>
 
@@ -4381,7 +4395,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-25T20:59:58.802Z",
+  "dueDate": "2026-11-25T21:56:54.718Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -4563,6 +4577,8 @@ no additional properties
 **Content type:** `multipart/form-data`
 
 - **`file` (required)**: `string`, format: `binary`
+
+  Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão.
 
 <a id="scalar-example-49"></a>
 
@@ -5386,7 +5402,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-25T20:59:58.853Z"
+  "dueDate": "2026-11-25T21:56:54.742Z"
 }
 ```
 
@@ -5443,7 +5459,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-25T20:59:58.855Z",
+  "dueDate": "2026-11-25T21:56:54.743Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -6227,7 +6243,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-25T20:59:58.895Z",
+  "dueMonth": "2026-11-25T21:56:54.760Z",
   "assignmentIds": [
     ""
   ]
@@ -6279,7 +6295,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-25T20:59:58.897Z",
+  "dueMonth": "2026-11-25T21:56:54.761Z",
   "assignmentIds": [
     ""
   ]
@@ -6322,7 +6338,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-25T20:59:58.899Z"
+  "dueMonth": "2026-11-25T21:56:54.762Z"
 }
 ```
 
@@ -6914,6 +6930,8 @@ O robô identifica cliente, obrigação e competência e sugere a tarefa.
 
 - **`file` (required)**: `string`, format: `binary`
 
+  PDF de até 20 MB.
+
 <a id="scalar-example-76"></a>
 
 **Generated example:**
@@ -7482,6 +7500,8 @@ O arquivo a aprovar vai depois dos campos.
 **Content type:** `multipart/form-data`
 
 - **`file` (required)**: `string`, format: `binary`
+
+  Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão.
 - **`message`**: `string`
 
   Mensagem ao cliente (opcional)
@@ -7664,6 +7684,8 @@ no additional properties
 **Content type:** `multipart/form-data`
 
 - **`file` (required)**: `string`, format: `binary`
+
+  PDF de até 20 MB.
 
 <a id="scalar-example-86"></a>
 

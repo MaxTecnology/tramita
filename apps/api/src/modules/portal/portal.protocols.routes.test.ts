@@ -56,6 +56,12 @@ describe('VIEWED uma vez por pessoa e por versão do arquivo', () => {
     expect(await viewedCount(protocol.id)).toBe(2)
   })
 
+  it('opening it several times at once (two tabs) is still one view', async () => {
+    const { protocol, finance } = await viewers()
+    await Promise.all(Array.from({ length: 6 }, () => view(protocol.id, finance)))
+    expect(await viewedCount(protocol.id)).toBe(1)
+  })
+
   it('a replaced file counts as a new view', async () => {
     const { protocol, owner } = await viewers()
     await view(protocol.id, owner)

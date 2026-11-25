@@ -4,6 +4,7 @@ import { discardUploadedAttachment } from './protocol-from-deliverable'
 import { AppError } from '@/errors/AppError'
 import { formatBRL, parseMoney } from '@/lib/money'
 import { uploadFile } from '@/lib/b2'
+import { viewedVersion } from './protocols.service'
 import { getClientAccessScope, canSeeTask } from '@/modules/client-users/client-access'
 import type { UploadPayload } from '@/modules/task-documents/task-documents.service'
 
@@ -67,7 +68,7 @@ export async function markProtocolPaid(
       await tx.protocolEvent.create({ data: { ...base, type: 'PAID', detail: formatBRL(amount) } })
       // Paying implies having seen it — also lifts it out of "vencido sem visualização"
       if (protocol.status === 'SENT' || protocol.status === 'EXPIRED') {
-        await tx.protocolEvent.create({ data: { ...base, type: 'VIEWED' } })
+        await tx.protocolEvent.createMany({ data: [{ ...base, type: 'VIEWED', viewedVersionAt: viewedVersion(protocol) }], skipDuplicates: true })
         await tx.protocol.updateMany({ where: { id: protocol.id, status: { in: ['SENT', 'EXPIRED'] } }, data: { status: 'VIEWED' } })
       }
       return tx.protocol.findUniqueOrThrow({ where: { id: protocol.id } })

@@ -62,6 +62,9 @@ jobs:
       - name: Type-check da API
         run: pnpm --filter api exec tsc --noEmit
 
+      - name: Type-check dos scripts da API (gerador de docs, auditoria de rotas)
+        run: pnpm --filter api exec tsc -p tsconfig.scripts.json
+
       - name: Type-check do frontend
         run: pnpm --filter web exec tsc --noEmit
 
@@ -70,6 +73,14 @@ jobs:
 
       - name: Testes do frontend
         run: pnpm --filter web test
+
+      # The API reference is generated: a route changed without `audit:routes && docs:api` leaves it
+      # stale, and the catalog test does not see the generated files
+      - name: Documentação da API em dia
+        run: |
+          pnpm --filter api audit:routes
+          pnpm --filter api docs:api
+          git diff --exit-code docs/api docs/api-inventory.md || (echo "::error::Documentação da API desatualizada: rode pnpm --filter api audit:routes && pnpm --filter api docs:api e commite docs/" && exit 1)
 
   e2e:
     runs-on: ubuntu-latest

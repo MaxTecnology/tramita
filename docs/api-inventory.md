@@ -9,7 +9,7 @@
 - Rotas: **212**
 - Públicas (sem login): **6** — `POST /auth/login`, `POST /auth/logout`, `POST /auth/refresh`, `GET /organizations/plans`, `POST /organizations/register`, `GET /organizations/signup-status`
 - Sem uso no web nem chamador externo conhecido: **2**
-- Sem teste de rota: **52**
+- Sem teste de rota: **51**
 - Cliente (portal) passa fora de /portal: **13** (rotas compartilhadas — o escopo dentro delas é revisado na auditoria de segurança)
 
 ## Sem uso
@@ -303,7 +303,7 @@
 | GET | `/recurring-templates/:id` | Admin, Gerente | web | sim |
 | PATCH | `/recurring-templates/:id` | Admin | web | sim |
 | GET | `/recurring-templates/:id/assignments` | Admin, Gerente | web | sim |
-| POST | `/recurring-templates/:id/assignments` | Admin | web | **não** |
+| POST | `/recurring-templates/:id/assignments` | Admin | web | sim |
 | DELETE | `/recurring-templates/:id/assignments/:assignmentId` | Admin | web | **não** |
 | PATCH | `/recurring-templates/:id/assignments/:assignmentId` | Admin | web (indireto) | **não** |
 | POST | `/recurring-templates/:id/assignments/bulk-generate` | Admin | web | **não** |

@@ -27,7 +27,6 @@
     "@fastify/rate-limit": "^10.3.0",
     "@fastify/swagger": "^9.9.5",
     "@prisma/client": "^6.9.0",
-    "@scalar/fastify-api-reference": "^1.79.0",
     "axios": "^1.16.1",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.56.0",
@@ -45,6 +44,7 @@
     "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
+    "@scalar/fastify-api-reference": "^1.79.0",
     "@scalar/openapi-to-markdown": "^1.7.7",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.9",

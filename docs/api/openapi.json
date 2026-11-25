@@ -919,12 +919,18 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "minLength": 2
+                    "minLength": 2,
+                    "maxLength": 120
                   },
                   "phone": {
-                    "type": [
-                      "string",
-                      "null"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 30
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   }
                 },
@@ -1039,11 +1045,13 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "minLength": 2
+                    "minLength": 2,
+                    "maxLength": 120
                   },
                   "email": {
                     "type": "string",
-                    "format": "email"
+                    "format": "email",
+                    "maxLength": 254
                   },
                   "role": {
                     "type": "string",
@@ -1053,7 +1061,8 @@
                     ]
                   },
                   "phone": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 30
                   },
                   "departmentIds": {
                     "type": "array",
@@ -1139,11 +1148,13 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "minLength": 2
+                    "minLength": 2,
+                    "maxLength": 120
                   },
                   "email": {
                     "type": "string",
-                    "format": "email"
+                    "format": "email",
+                    "maxLength": 254
                   },
                   "role": {
                     "type": "string",
@@ -1153,9 +1164,14 @@
                     ]
                   },
                   "phone": {
-                    "type": [
-                      "string",
-                      "null"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 30
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "departmentIds": {
@@ -3762,7 +3778,8 @@
                 "properties": {
                   "file": {
                     "type": "string",
-                    "format": "binary"
+                    "format": "binary",
+                    "description": "MP3 ou WAV de até 500 KB."
                   }
                 }
               }
@@ -3979,7 +3996,8 @@
                 "properties": {
                   "file": {
                     "type": "string",
-                    "format": "binary"
+                    "format": "binary",
+                    "description": "Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão."
                   }
                 }
               }
@@ -4232,7 +4250,8 @@
                 "properties": {
                   "file": {
                     "type": "string",
-                    "format": "binary"
+                    "format": "binary",
+                    "description": "Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão."
                   }
                 }
               }
@@ -4794,7 +4813,8 @@
                 "properties": {
                   "file": {
                     "type": "string",
-                    "format": "binary"
+                    "format": "binary",
+                    "description": "Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão."
                   }
                 }
               }
@@ -5138,7 +5158,8 @@
                 "properties": {
                   "file": {
                     "type": "string",
-                    "format": "binary"
+                    "format": "binary",
+                    "description": "Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão."
                   }
                 }
               }
@@ -5200,7 +5221,8 @@
                 "properties": {
                   "file": {
                     "type": "string",
-                    "format": "binary"
+                    "format": "binary",
+                    "description": "Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão."
                   }
                 }
               }
@@ -5260,7 +5282,8 @@
                 "properties": {
                   "file": {
                     "type": "string",
-                    "format": "binary"
+                    "format": "binary",
+                    "description": "Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão."
                   }
                 }
               }
@@ -6185,7 +6208,8 @@
                 "properties": {
                   "file": {
                     "type": "string",
-                    "format": "binary"
+                    "format": "binary",
+                    "description": "Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão."
                   }
                 }
               }
@@ -9747,7 +9771,8 @@
                 "properties": {
                   "file": {
                     "type": "string",
-                    "format": "binary"
+                    "format": "binary",
+                    "description": "PDF de até 20 MB."
                   }
                 }
               }
@@ -10542,7 +10567,8 @@
                   },
                   "file": {
                     "type": "string",
-                    "format": "binary"
+                    "format": "binary",
+                    "description": "Um arquivo de até 20 MB: PDF, imagem (JPG, PNG, GIF, WebP), Word, Excel, TXT, CSV, XML, OFX ou ZIP. O conteúdo precisa bater com a extensão."
                   }
                 }
               }
@@ -10759,7 +10785,8 @@
                 "properties": {
                   "file": {
                     "type": "string",
-                    "format": "binary"
+                    "format": "binary",
+                    "description": "PDF de até 20 MB."
                   }
                 }
               }
