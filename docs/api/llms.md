@@ -1728,7 +1728,7 @@ no additional properties
 - **Path:** `/clients/{id}/reactivate`
 - **Tags:** Clientes
 
-Volta a ficar ativo. Conta no limite de clientes do plano (422 se atingido).
+Volta a ficar ativo e o portal reabre. Conta no limite de clientes do plano (422); responsável de departamento desativado ou código/CPF/CNPJ já em uso → 409.
 
 **Quem pode:** Admin, Gerente
 
@@ -1870,7 +1870,7 @@ no additional properties
   "processTemplateId": "",
   "competence": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-25T20:25:49.792Z"
+  "dueDate": "2026-11-25T20:59:58.647Z"
 }
 ```
 
@@ -1944,7 +1944,7 @@ no additional properties
   "title": "",
   "description": "",
   "responsibleUserId": "",
-  "dueDate": "2026-11-25T20:25:49.794Z"
+  "dueDate": "2026-11-25T20:59:58.651Z"
 }
 ```
 
@@ -2034,7 +2034,7 @@ no additional properties
   "description": "",
   "priority": "MEDIUM",
   "assigneeId": "",
-  "dueDate": "2026-11-25T20:25:49.797Z",
+  "dueDate": "2026-11-25T20:59:58.658Z",
   "tags": [],
   "departmentId": ""
 }
@@ -2309,14 +2309,14 @@ no additional properties
   "priority": "LOW",
   "status": "OPEN",
   "assigneeId": "",
-  "dueDate": "2026-11-25T20:25:49.806Z",
+  "dueDate": "2026-11-25T20:59:58.681Z",
   "tags": [
     ""
   ],
   "departmentId": "",
   "visibleToClient": true,
-  "targetDate": "2026-11-25T20:25:49.806Z",
-  "competence": "2026-11-25T20:25:49.806Z",
+  "targetDate": "2026-11-25T20:59:58.681Z",
+  "competence": "2026-11-25T20:59:58.681Z",
   "delayReasonId": "",
   "delayNote": "",
   "processDelayReasonId": "",
@@ -4381,7 +4381,7 @@ no additional properties
 ```json
 {
   "title": "",
-  "dueDate": "2026-11-25T20:25:49.854Z",
+  "dueDate": "2026-11-25T20:59:58.802Z",
   "attachmentId": "",
   "content": "",
   "requiresPayment": false,
@@ -5386,7 +5386,7 @@ no additional properties
   "clientId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-25T20:25:49.880Z"
+  "dueDate": "2026-11-25T20:59:58.853Z"
 }
 ```
 
@@ -5443,7 +5443,7 @@ no additional properties
   "columnId": "",
   "competence": "",
   "assigneeId": "",
-  "dueDate": "2026-11-25T20:25:49.881Z",
+  "dueDate": "2026-11-25T20:59:58.855Z",
   "dependsOnTaskIds": []
 }
 ```
@@ -6227,7 +6227,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-25T20:25:49.898Z",
+  "dueMonth": "2026-11-25T20:59:58.895Z",
   "assignmentIds": [
     ""
   ]
@@ -6279,7 +6279,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-25T20:25:49.899Z",
+  "dueMonth": "2026-11-25T20:59:58.897Z",
   "assignmentIds": [
     ""
   ]
@@ -6322,7 +6322,7 @@ no additional properties
 
 ```json
 {
-  "dueMonth": "2026-11-25T20:25:49.900Z"
+  "dueMonth": "2026-11-25T20:59:58.899Z"
 }
 ```
 

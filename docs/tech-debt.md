@@ -744,3 +744,13 @@ Achados da revisão destas correções — ✅ resolvidos em 2026-11-16:
   `Segmented` das outras telas).
 - `resetUserPassword` aceita `organizationId` opcional (o painel master reseta sem org); manter só
   enquanto o master precisar.
+
+## Clientes, Solicitações, Guias e Dashboard — menores da revisão (encontrado em 2026-11-25)
+
+- **Limite de clientes do plano com corrida**: `checkPlanLimit` conta e a criação/reativação grava em passos separados; duas operações simultâneas com N-1 ativos passam as duas. Contar e gravar numa transação com trava na organização (vale para `POST /clients` e `POST /clients/:id/reactivate`).
+- **Etiquetas de situação (Solicitações e OS)** usam `role="radio"` sem setas nem `tabIndex` 0/-1 — ou completar o padrão ou trocar por botões com `aria-pressed`.
+- **Abas da Leitura de documentos** sem `tabpanel`/`aria-controls`/setas (mesmo padrão já feito na gaveta da tarefa).
+- **Filtro "Recebidas até"** compara com `T23:59:59` (perde o último segundo do dia); a competência é formatada com `formatDateOnlyUTC(...).slice(3)` em vários lugares — extrair `formatCompetence`.
+- **Guias não pagas**: a primeira opção de "Situação" se chama "Não pagas" (não "Todas"); o filtro de cliente só lista ativos, então guias antigas de cliente desativado não filtram por ele.
+- **Clientes**: `?edit=<id>` de cliente desativado não abre (a lista inicial só traz ativos) e o parâmetro some sem aviso.
+- **Alerta de falhas no Dashboard** é `role="alert"` inteiro: expandir "Mostrar mais" anuncia a lista como alerta — deixar o alerta só no título.

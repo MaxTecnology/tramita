@@ -2025,7 +2025,7 @@
         "tags": [
           "Clientes"
         ],
-        "description": "Volta a ficar ativo. Conta no limite de clientes do plano (422 se atingido).\n\n**Quem pode:** Admin, Gerente",
+        "description": "Volta a ficar ativo e o portal reabre. Conta no limite de clientes do plano (422); responsável de departamento desativado ou código/CPF/CNPJ já em uso → 409.\n\n**Quem pode:** Admin, Gerente",
         "security": [
           {
             "bearerAuth": []

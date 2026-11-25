@@ -64,7 +64,8 @@ async function send(c: Ctx, kind: 'check' | 'upload', deliverableId: string, con
   return { status: res.statusCode, body: JSON.parse(res.body) }
 }
 
-describe('robô confere a entrega manual', () => {
+// The robot reads real PDFs here (3–5 s each): the default 5 s left no margin
+describe('robô confere a entrega manual', { timeout: 20_000 }, () => {
   it('everything matches: no warning, delivered straight away', async () => {
     const c = await setup()
     const doc = await pdf('11.222.333/0001-81', 'agosto/2026')

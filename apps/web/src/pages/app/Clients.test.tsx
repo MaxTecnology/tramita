@@ -90,7 +90,7 @@ describe('Clientes', () => {
     await waitFor(() => expect(calls).toEqual(['delete c1']))
   })
 
-  it('a deactivated client is marked and can be reactivated (no editing)', async () => {
+  it('a deactivated client is marked and can be reactivated', async () => {
     renderPage()
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Mostrar desativados' }))
     const old = await row('Antiga Ltda')
@@ -98,6 +98,21 @@ describe('Clientes', () => {
     await userEvent.click(within(old).getByRole('button', { name: 'Mais ações de Antiga Ltda' }))
     expect(screen.queryByRole('menuitem', { name: 'Desativar' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Reativar' }))
+    expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Reativar o cliente "Antiga Ltda"?', description: expect.stringMatching(/portal.*recorrentes/s) }))
     await waitFor(() => expect(calls).toEqual(['reactivate c3']))
+  })
+
+  it('a deactivated client opens to edit too (to fix it before reactivating)', async () => {
+    renderPage()
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Mostrar desativados' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Antiga Ltda' }))
+    expect(await screen.findByRole('dialog', { name: 'Editar cliente' })).toBeInTheDocument()
+  })
+
+  it('numbers inside a name search do not match documents', async () => {
+    renderPage()
+    await screen.findByRole('button', { name: 'Padaria Pão Quente' })
+    await userEvent.type(screen.getByLabelText('Buscar clientes'), 'João 0001')
+    expect(screen.queryByRole('button', { name: 'Padaria Pão Quente' })).not.toBeInTheDocument()
   })
 })

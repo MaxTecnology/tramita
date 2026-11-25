@@ -82,7 +82,8 @@ export default function Clients() {
   // Name, code, or CPF/CNPJ typed with or without punctuation
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
-    const qDigits = digitsOf(q)
+    // Digits are compared with CPF/CNPJ only when the search looks like a document (no letters)
+    const qDigits = /^[\d.\-/\s]+$/.test(q) ? digitsOf(q) : ''
     return clients.filter((c) => {
       const matchType = typeFilter === 'all' || c.clientType === typeFilter
       const matchSearch =
@@ -126,6 +127,15 @@ export default function Clients() {
     onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao reativar cliente')),
   })
 
+  async function reactivate(client: Client) {
+    if (!(await askConfirm({
+      title: `Reativar o cliente "${client.name}"?`,
+      description: 'O portal dele reabre para os usuários de acesso, e as tarefas recorrentes voltam a ser geradas a partir das próximas competências. Os meses em que ficou desativado não são gerados.',
+      confirmLabel: 'Reativar',
+    }))) return
+    reactivateMutation.mutate(client.id)
+  }
+
   async function deactivate(client: Client) {
     if (!(await askConfirm({ title: `Desativar o cliente "${client.name}"?`, description: 'O cliente sai das listas e o portal dele é bloqueado. O histórico continua registrado, e dá para reativar depois.', confirmLabel: 'Desativar', danger: true }))) return
     setDeletingId(client.id)
@@ -139,7 +149,7 @@ export default function Clients() {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       setDeletingId(null)
     },
-    onError: () => toast.error('Erro ao desativar cliente'),
+    onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao desativar cliente')),
   })
 
   async function openEdit(client: Client) {
@@ -237,9 +247,7 @@ export default function Clients() {
               <div className="min-w-0">
                 <p className="flex min-w-0 items-baseline gap-2">
                   {c.codigo && <span className="flex-shrink-0 text-xs text-muted-foreground">{c.codigo}</span>}
-                  {c.isActive
-                    ? <button type="button" onClick={() => void openEdit(c)} className={cn(ROW_OPENER, 'truncate text-sm')}>{c.name}</button>
-                    : <span className="truncate text-sm font-medium text-foreground">{c.name}</span>}
+                  <button type="button" onClick={() => void openEdit(c)} className={cn(ROW_OPENER, 'truncate text-sm')}>{c.name}</button>
                 </p>
                 {!c.isActive && <span className="mt-1 inline-block"><StatusTag>Desativado</StatusTag></span>}
                 {c.notes && <p className="mt-0.5 truncate text-xs text-muted-foreground" title={c.notes}>{c.notes}</p>}
@@ -269,7 +277,7 @@ export default function Clients() {
             label={`Mais ações de ${c.name}`}
             items={c.isActive
               ? [{ label: 'Desativar', onSelect: () => void deactivate(c), danger: true, disabled: deleteMutation.isPending && deletingId === c.id }]
-              : [{ label: 'Reativar', onSelect: () => reactivateMutation.mutate(c.id), disabled: reactivateMutation.isPending }]}
+              : [{ label: 'Reativar', onSelect: () => void reactivate(c), disabled: reactivateMutation.isPending && reactivateMutation.variables === c.id }]}
           />
         )}
       />

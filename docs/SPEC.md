@@ -232,7 +232,9 @@ Cadastro de novo escritório (público — sem autenticação). Só com `PUBLIC_
 ### PATCH `/clients/:id` — mesmo payload, todos os campos opcionais; `clientUsers` quando enviado substitui os vínculos existentes
 ### DELETE `/clients/:id` — soft delete (não conta no limite ao desativar)
 
-### POST `/clients/:id/reactivate` _(ORG_ADMIN | ORG_MANAGER)_ — volta o cliente desativado a ativo. Passa pelo `checkPlanLimit` como um cadastro novo (422 `'Limite de clientes atingido (máximo: N)'`); cliente ativo ou de outro escritório → 404 `'Cliente não encontrado'`.
+### POST `/clients/:id/reactivate` _(ORG_ADMIN | ORG_MANAGER)_ — volta o cliente desativado a ativo. Passa pelo `checkPlanLimit` como um cadastro novo (422 `'Limite de clientes atingido (máximo: N)'`); cliente ativo ou de outro escritório → 404 `'Cliente não encontrado'`. Departamento com responsável desativado → 409 nomeando o departamento (troque no cadastro e reative); código/CPF/CNPJ tomado por outro cliente ativo → 409 com a mensagem de duplicidade. Cliente desativado pode ser editado (`PATCH /clients/:id`).
+
+**Portal de cliente desativado:** o escopo de acesso (`getClientAccessScope`) só considera clientes ativos — desativar fecha o portal daquele cliente para todos os usuários dele em todos os caminhos; reativar reabre. As recorrências voltam a gerar a partir das próximas competências; as do período desativado não são geradas.
 
 ### GET `/clients/lookup-cnpj/:cnpj` _(ORG_ADMIN | ORG_MANAGER)_ — razão social + endereço, estado (UF) e cidade (`ibgeCityCode`) pra preencher o formulário de cadastro
 → Proxied pelo backend (`src/lib/cnpj-lookup.ts`): **BrasilAPI** primeiro (traz o código IBGE); **CNPJ.ws** (3 req/min por IP, instável) só se a BrasilAPI falhar por 5xx, 429, timeout (8 s) ou resposta inválida. 404 da BrasilAPI = `'CNPJ não encontrado'` sem consultar a reserva

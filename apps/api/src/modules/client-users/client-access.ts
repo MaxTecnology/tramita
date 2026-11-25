@@ -8,7 +8,9 @@ export interface ClientAccessScope {
 
 export async function getClientAccessScope(clientUserId: string): Promise<ClientAccessScope> {
   const accesses = await prisma.clientUserAccess.findMany({
-    where: { clientUserId, clientUser: { isActive: true } },
+    // A deactivated client (or client user) gives no access: the portal closes on deactivation and
+    // opens again on reactivation, through every path that asks for this scope
+    where: { clientUserId, clientUser: { isActive: true }, client: { isActive: true } },
     select: { clientId: true, departmentId: true },
     orderBy: { clientId: 'asc' },
   })

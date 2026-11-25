@@ -9,7 +9,7 @@
 - Rotas: **212**
 - Públicas (sem login): **6** — `POST /auth/login`, `POST /auth/logout`, `POST /auth/refresh`, `GET /organizations/plans`, `POST /organizations/register`, `GET /organizations/signup-status`
 - Sem uso no web nem chamador externo conhecido: **2**
-- Sem teste de rota: **53**
+- Sem teste de rota: **52**
 - Cliente (portal) passa fora de /portal: **13** (rotas compartilhadas — o escopo dentro delas é revisado na auditoria de segurança)
 
 ## Sem uso
@@ -86,7 +86,7 @@
 |---|---|---|---|---|
 | GET | `/clients` | Admin, Gerente, Membro | web | sim |
 | POST | `/clients` | Admin, Gerente | web | sim |
-| DELETE | `/clients/:id` | Admin, Gerente | web | **não** |
+| DELETE | `/clients/:id` | Admin, Gerente | web | sim |
 | PATCH | `/clients/:id` | Admin, Gerente | web | sim |
 | GET | `/clients/:id/assignments` | Admin, Gerente, Membro | web | **não** |
 | POST | `/clients/:id/reactivate` | Admin, Gerente | web | sim |

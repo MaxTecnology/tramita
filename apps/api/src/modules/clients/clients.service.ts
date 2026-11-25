@@ -219,7 +219,8 @@ export async function updateClient(id: string, organizationId: string, data: Cli
   try {
     return await prisma.$transaction(async (tx) => {
       await lockClients(tx, [id]) // serializes with task creation and client-user changes of this client
-      const client = await tx.client.findFirst({ where: { id, organizationId, isActive: true } })
+      // A deactivated client may be edited too (e.g. to swap a deactivated responsible before reactivating)
+      const client = await tx.client.findFirst({ where: { id, organizationId } })
       if (!client) throw new AppError(404, 'Cliente não encontrado')
 
       const departmentNames = await resolveDepartmentNames(tx, organizationId, data)
@@ -261,11 +262,30 @@ export async function deleteClient(id: string, organizationId: string) {
   return prisma.client.update({ where: { id }, data: { isActive: false }, select: SELECT })
 }
 
-// Back to active (the office's plan limit is checked on the route, as for a new client)
+// Back to active (the office's plan limit is checked on the route, as for a new client). Its
+// departments must still have an active responsible, and its code / CPF / CNPJ must not have been
+// taken by another active client meanwhile.
 export async function reactivateClient(id: string, organizationId: string) {
-  const client = await prisma.client.findFirst({ where: { id, organizationId, isActive: false } })
-  if (!client) throw new AppError(404, 'Cliente não encontrado')
-  return prisma.client.update({ where: { id }, data: { isActive: true }, select: SELECT })
+  try {
+    return await prisma.$transaction(async (tx) => {
+      await lockClients(tx, [id]) // serializes with other changes of this client
+      const client = await tx.client.findFirst({ where: { id, organizationId, isActive: false } })
+      if (!client) throw new AppError(404, 'Cliente não encontrado')
+      const orphan = await tx.clientAssignment.findMany({
+        where: { clientId: id, user: { isActive: false } },
+        select: { department: { select: { name: true } } },
+      })
+      if (orphan.length > 0) {
+        const names = orphan.map((a) => a.department.name).join(', ')
+        throw new AppError(409, `O responsável pelo departamento ${names} foi desativado. Troque o responsável no cadastro antes de reativar.`)
+      }
+      return tx.client.update({ where: { id }, data: { isActive: true }, select: SELECT })
+    })
+  } catch (err) {
+    const duplicate = duplicateMessage(err)
+    if (duplicate) throw new AppError(409, duplicate)
+    throw err
+  }
 }
 
 export async function lookupClientByCnpj(cnpj: string): Promise<CnpjLookupResult> {

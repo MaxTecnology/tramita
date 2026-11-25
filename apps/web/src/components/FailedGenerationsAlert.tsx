@@ -66,7 +66,7 @@ export function FailedGenerationsAlert() {
               {isAdmin && (
                 <Link to={`/app/settings/recurring-templates/${f.templateId}/manage`} className="text-accent hover:underline">Abrir tarefa recorrente</Link>
               )}
-              {isAdmin && f.retryable && (
+              {isAdmin && (
                 <Button size="sm" variant="outline" className="h-7 text-xs" disabled={retry.isPending} onClick={() => retry.mutate(f)}>
                   Gerar novamente
                 </Button>
@@ -76,7 +76,7 @@ export function FailedGenerationsAlert() {
         ))}
       </ul>
       {failures.length > 3 && (
-        <button type="button" onClick={() => setShowAll((v) => !v)} className="text-xs font-medium text-danger-text hover:underline">
+        <button type="button" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)} className="text-xs font-medium text-danger-text hover:underline">
           {showAll ? 'Mostrar menos' : `Mostrar mais ${failures.length - 3}`}
         </button>
       )}

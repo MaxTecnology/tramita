@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -68,11 +68,13 @@ export default function Requests() {
   const me = useMyScope()
   const [scopeFilter, setScopeFilter] = useScopeFilter('requests', me)
 
-  const { data: requests = [], isLoading } = useQuery<ClientRequest[]>({
+  const { data: requests = [], isLoading, isPlaceholderData } = useQuery<ClientRequest[]>({
     queryKey: ['requests', statusFilter, scopeFilter],
     queryFn: () => api.get('/requests', {
       params: { ...scopeParams(scopeFilter), ...(statusFilter ? { status: statusFilter } : {}) },
     }).then((r) => r.data),
+    // Another filter keeps the cards until the new ones arrive (shown as loading, out of reach)
+    placeholderData: keepPreviousData,
   })
 
   const filtered = useMemo(() => {
@@ -178,8 +180,6 @@ export default function Requests() {
     },
   })
 
-  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando solicitações...</div>
-
   return (
     <div className="p-4 md:p-6 space-y-4">
       <PageHeader
@@ -196,7 +196,7 @@ export default function Requests() {
         </label>
         <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
           até
-          <input id="req-date-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" />
+          <input id="req-date-to" aria-label="Recebidas até" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" />
         </label>
         {hasActiveFilter && (
           <button
@@ -231,12 +231,15 @@ export default function Requests() {
       {requests.length > 0 && (
         <p className="text-xs text-muted-foreground">
           {filtered.length === requests.length
-            ? `${requests.length} solicitação${requests.length !== 1 ? 'ões' : ''}`
+            ? (requests.length === 1 ? '1 solicitação' : `${requests.length} solicitações`)
             : `Exibindo ${filtered.length} de ${requests.length}`}
         </p>
       )}
 
-      {filtered.length === 0 ? (
+      <div aria-busy={isPlaceholderData} inert={isPlaceholderData} className={cn('transition-opacity', isPlaceholderData && 'opacity-60')}>
+      {isLoading ? (
+        <p role="status" className="py-12 text-center text-sm text-muted-foreground">Carregando solicitações...</p>
+      ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
           <Inbox size={48} className="mb-3 opacity-40" />
           <p className="text-sm font-medium">
@@ -336,6 +339,7 @@ export default function Requests() {
           })}
         </div>
       )}
+      </div>
 
       {/* Modal de aprovação */}
       <Dialog open={!!approving} onOpenChange={(open) => { if (!open) setApproving(null) }}>

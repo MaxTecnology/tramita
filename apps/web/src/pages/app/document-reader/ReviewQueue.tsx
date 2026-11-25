@@ -350,7 +350,7 @@ export default function ReviewQueue() {
               onClick={() => setAba(t)}
               className={cn('px-3 py-2 text-sm font-medium border-b-2 -mb-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent', aba === t ? 'border-accent text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
             >
-              {t === 'fila' ? `Para conferir (${fila.length})` : 'Recusados'}
+              {t === 'fila' ? `Para conferir (${fila.length})` : 'Rejeitados'}
             </button>
           ))}
         </div>

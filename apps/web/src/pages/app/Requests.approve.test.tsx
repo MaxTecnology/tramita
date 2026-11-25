@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
+import { http, HttpResponse, delay } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, expect, it } from 'vitest'
@@ -77,4 +77,19 @@ it('standard header; each request says when it arrived', async () => {
   expect(screen.getByRole('radio', { name: 'Pendentes' })).toHaveAttribute('aria-checked', 'true')
   expect(await screen.findByText(/Recebida em 15\/11\/2026/)).toBeInTheDocument()
   expect(screen.getByLabelText('Buscar solicitações')).toBeInTheDocument()
+})
+
+it('counts in Portuguese and keeps the page while another situation loads', async () => {
+  renderPage({})
+  server.use(http.get(`${API}/requests`, async ({ request: req }) => {
+    const status = new URL(req.url).searchParams.get('status')
+    if (status === 'APPROVED') { await delay(300); return HttpResponse.json([]) }
+    return HttpResponse.json([request({}), request({ id: 'r2', title: 'Outra' })])
+  }))
+  await userEvent.click(await screen.findByRole('radio', { name: 'Todas' }))
+  expect(await screen.findByText('2 solicitações')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('radio', { name: 'Aprovadas' }))
+  expect(screen.getByRole('heading', { name: 'Solicitações' })).toBeInTheDocument()
+  expect(screen.getByRole('radio', { name: 'Aprovadas' })).toHaveAttribute('aria-checked', 'true')
+  expect(screen.getByLabelText('Recebidas até')).toBeInTheDocument()
 })
