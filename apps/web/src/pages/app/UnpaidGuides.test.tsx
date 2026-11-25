@@ -46,3 +46,11 @@ it('standard header and named filters', async () => {
   expect(screen.getByLabelText('Vencimento no mês')).toBeInTheDocument()
   expect(screen.getByLabelText('Situação')).toBeInTheDocument()
 })
+
+it('the client filter also lists deactivated clients (their old guides); situations say what they hold', async () => {
+  let clientsQuery: string | null = null
+  renderPage()
+  server.use(http.get('http://localhost:3000/clients', ({ request }) => { clientsQuery = new URL(request.url).searchParams.get('includeInactive'); return HttpResponse.json([]) }))
+  await waitFor(() => expect(clientsQuery).toBe('true'))
+  expect(Array.from((screen.getByLabelText('Situação') as HTMLSelectElement).options).map((o) => o.textContent)).toEqual(['Todas as não pagas', 'Vencidas', 'A vencer', 'Já pagas'])
+})

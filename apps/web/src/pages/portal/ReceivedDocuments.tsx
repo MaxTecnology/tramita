@@ -5,7 +5,7 @@ import { Inbox, Search } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { formatBRL } from '@/lib/money'
-import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
+import { formatDateOnlyUTC, isPastDateOnlyUTC, formatCompetence } from '@/lib/dates'
 import { Input } from '@/components/ui/input'
 import { usePortalClient } from './Layout'
 import { documentState, STATE_UI, type ReceivedDocument } from './receivedDocuments'
@@ -86,7 +86,7 @@ export default function ReceivedDocuments() {
                     <p className="text-sm font-medium text-foreground">{d.title}</p>
                     <p className="text-xs text-muted-foreground">
                       {d.departmentName}
-                      {d.competence && ` · competência ${formatDateOnlyUTC(d.competence).slice(3)}`}
+                      {d.competence && ` · competência ${formatCompetence(d.competence)}`}
                       {d.dueDate && ` · vence ${formatDateOnlyUTC(d.dueDate)}`}
                     </p>
                     {d.fileUpdatedAt && (

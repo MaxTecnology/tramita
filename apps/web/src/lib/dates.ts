@@ -9,6 +9,12 @@ export function formatDateOnlyUTC(date: string | Date): string {
   return new Date(date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
 }
 
+/** Competence (month of reference) as MM/AAAA — stored as UTC midnight of the 1st. */
+export function formatCompetence(date: string | Date): string {
+  const d = new Date(date)
+  return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`
+}
+
 function utcDayFromUTCDate(d: Date): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
 }

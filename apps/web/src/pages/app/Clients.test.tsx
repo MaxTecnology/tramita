@@ -116,3 +116,12 @@ describe('Clientes', () => {
     expect(screen.queryByRole('button', { name: 'Padaria Pão Quente' })).not.toBeInTheDocument()
   })
 })
+
+it('a link to edit a deactivated client opens it', async () => {
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={['/app/clients?edit=c3']}><Clients /></MemoryRouter>
+    </QueryClientProvider>,
+  )
+  expect(await screen.findByRole('dialog', { name: 'Editar cliente' })).toBeInTheDocument()
+})

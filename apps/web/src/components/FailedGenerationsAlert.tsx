@@ -7,13 +7,10 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useRetryFailedGeneration } from '@/hooks/useRetryFailedGeneration'
 import type { FailedGeneration } from '@/types'
+import { formatCompetence } from '@/lib/dates'
 
 const VIEWER_ROLES = ['ORG_ADMIN', 'ORG_MANAGER']
 
-function competenceLabel(iso: string): string {
-  const d = new Date(iso)
-  return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`
-}
 
 // Tarefa recorrente que não nasceu é uma obrigação do cliente que ninguém vai fazer — fica no topo
 // do Dashboard, com o motivo e o atalho pra corrigir, até não haver mais falha pendente.
@@ -41,9 +38,10 @@ export function FailedGenerationsAlert() {
   if (!canView || failures.length === 0) return null
 
   return (
-    <div role="alert" className="rounded-lg border border-danger-text/30 bg-danger-bg p-4 space-y-3">
+    // Only the title is announced as an alert; expanding the list must not re-announce it
+    <section aria-label="Tarefas recorrentes não geradas" className="rounded-lg border border-danger-text/30 bg-danger-bg p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-sm font-semibold text-danger-text">
+        <p role="alert" className="flex items-center gap-2 text-sm font-semibold text-danger-text">
           <AlertTriangle size={16} aria-hidden />
           {failures.length === 1 ? '1 tarefa recorrente não foi gerada' : `${failures.length} tarefas recorrentes não foram geradas`}
         </p>
@@ -57,7 +55,7 @@ export function FailedGenerationsAlert() {
             <div className="min-w-0">
               <p className="text-sm text-foreground">
                 <span className="font-medium">{f.templateTitle}</span>
-                <span className="text-muted-foreground"> · {f.clientName} · competência {competenceLabel(f.competence)}</span>
+                <span className="text-muted-foreground"> · {f.clientName} · competência {formatCompetence(f.competence)}</span>
               </p>
               <p className="text-xs text-danger-text">{f.errorMessage}</p>
             </div>
@@ -80,6 +78,6 @@ export function FailedGenerationsAlert() {
           {showAll ? 'Mostrar menos' : `Mostrar mais ${failures.length - 3}`}
         </button>
       )}
-    </div>
+    </section>
   )
 }

@@ -5,7 +5,7 @@ import { Receipt } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { formatBRL } from '@/lib/money'
-import { formatDateOnlyUTC } from '@/lib/dates'
+import { formatDateOnlyUTC, formatCompetence } from '@/lib/dates'
 import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
 import { useMyScope } from '@/hooks/useMyScope'
 import { PageHeader } from '@/components/ui/page-header'
@@ -57,8 +57,9 @@ export default function UnpaidGuides() {
     }).then((r) => r.data),
   })
   const { data: clients = [] } = useQuery<{ id: string; name: string; codigo: string | null }[]>({
-    queryKey: ['clients'],
-    queryFn: () => api.get('/clients').then((r) => r.data),
+    // Deactivated ones too: their old guides may still be unpaid
+    queryKey: ['clients', { includeInactive: true }],
+    queryFn: () => api.get('/clients', { params: { includeInactive: true } }).then((r) => r.data),
   })
   const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['departments'],
@@ -83,10 +84,10 @@ export default function UnpaidGuides() {
           {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
         <select value={situation} onChange={(e) => setSituation(e.target.value as Situation)} className={selectCls} aria-label="Situação">
-          <option value="">Não pagas</option>
+          <option value="">Todas as não pagas</option>
           <option value="overdue">Vencidas</option>
           <option value="upcoming">A vencer</option>
-          <option value="paid">Pagas</option>
+          <option value="paid">Já pagas</option>
         </select>
         <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
           Vencimento no mês
@@ -115,7 +116,7 @@ export default function UnpaidGuides() {
                 <Link to={g.link ?? `/app/board/${g.boardId}`} data-testid="guide-row" className={cn(ROW_OPENER, 'block truncate text-sm')}>{g.title}</Link>
                 <p className="truncate text-xs text-muted-foreground">
                   {g.clientName} · {g.departmentName}
-                  {g.competence && ` · competência ${formatDateOnlyUTC(g.competence).slice(3)}`}
+                  {g.competence && ` · competência ${formatCompetence(g.competence)}`}
                 </p>
               </div>
             ),

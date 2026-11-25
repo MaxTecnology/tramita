@@ -15,6 +15,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { SearchField } from '@/components/ui/search-field'
 import { ListTable, ROW_OPENER } from '@/components/ui/list-table'
 import type { DeadlineInfo, DeadlineState } from '@/types'
+import { ChoiceGroup } from '@/components/ui/choice-group'
 
 interface OSItem {
   id: string
@@ -96,15 +97,7 @@ export default function OSList() {
         )}
       </div>
 
-      <div role="radiogroup" aria-label="Situação" className="mb-4 flex flex-wrap gap-1.5">
-        {SITUATIONS.map((s) => (
-          <button key={s.value || 'all'} type="button" role="radio" aria-checked={situation === s.value} onClick={() => setSituation(s.value)}
-            className={cn('rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-              situation === s.value ? 'border-accent bg-accent text-accent-foreground' : 'border-border text-muted-foreground hover:text-foreground')}>
-            {s.label}
-          </button>
-        ))}
-      </div>
+      <ChoiceGroup label="Situação" variant="chips" className="mb-4" value={situation} onChange={setSituation} options={SITUATIONS} />
 
       <ListTable<OSItem>
         label="Ordens de serviço"

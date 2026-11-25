@@ -174,12 +174,20 @@ export default function Clients() {
   // ?edit=<clientId> abre o cadastro direto (links do alerta de recorrentes não geradas no Dashboard).
   const editParam = searchParams.get('edit')
   useEffect(() => {
-    if (!editParam || clients.length === 0) return
-    const target = clients.find((c) => c.id === editParam)
-    if (target) void openEdit(target)
+    if (!editParam || isLoading) return
     setSearchParams((p) => { p.delete('edit'); return p }, { replace: true })
+    const target = clients.find((c) => c.id === editParam)
+    if (target) { void openEdit(target); return }
+    // Not in the list on screen (e.g. deactivated): look among all of them
+    void api.get<Client[]>('/clients', { params: { includeInactive: true } })
+      .then((r) => {
+        const found = r.data.find((c) => c.id === editParam)
+        if (found) void openEdit(found)
+        else toast.error('Cliente não encontrado')
+      })
+      .catch(() => toast.error('Erro ao carregar o cadastro do cliente'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editParam, clients])
+  }, [editParam, clients, isLoading])
 
   return (
     <div className="p-4 md:p-6">

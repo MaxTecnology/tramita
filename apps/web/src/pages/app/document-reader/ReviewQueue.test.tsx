@@ -131,3 +131,13 @@ it('"Concluir prontas" keeps going when one task fails and says which ones did n
   await waitFor(() => expect(completed).toEqual(['t-b']))
   expect(await screen.findByText(/1 tarefa não foi concluída: Aprovação do cliente pendente/)).toBeInTheDocument()
 })
+
+it('the two tabs control their panel and switch with the arrows', async () => {
+  renderQueue()
+  const queue = await screen.findByRole('tab', { name: /Para conferir/ })
+  expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', queue.id)
+  queue.focus()
+  await userEvent.keyboard('{ArrowRight}')
+  expect(screen.getByRole('tab', { name: 'Rejeitados' })).toHaveAttribute('aria-selected', 'true')
+  expect(screen.getByRole('tab', { name: 'Rejeitados' })).toHaveFocus()
+})

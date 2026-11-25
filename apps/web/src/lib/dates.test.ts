@@ -17,3 +17,11 @@ describe('utcDateKey', () => {
     expect(utcDateKey(new Date('2026-12-31T00:00:00.000Z'))).toBe('2026-12-31')
   })
 })
+
+describe('formatCompetence', () => {
+  it('shows the month and year of a competence (stored as UTC midnight of day 1)', async () => {
+    const { formatCompetence } = await import('./dates')
+    expect(formatCompetence('2026-03-01T00:00:00.000Z')).toBe('03/2026')
+    expect(formatCompetence(new Date(Date.UTC(2025, 11, 1)))).toBe('12/2025')
+  })
+})

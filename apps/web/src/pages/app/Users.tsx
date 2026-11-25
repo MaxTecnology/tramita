@@ -11,6 +11,7 @@ import { askConfirm } from '@/components/ui/app-dialogs'
 import { cn, mensagemDeErro } from '@/lib/utils'
 import type { User } from '@/types'
 import { UserFormPanel, EMPTY_USER_FORM, type UserFormValues } from './users/UserFormPanel'
+import { ChoiceGroup } from '@/components/ui/choice-group'
 
 type Status = 'active' | 'inactive'
 type RoleFilter = 'all' | 'ORG_ADMIN' | 'ORG_MANAGER' | 'ORG_MEMBER'
@@ -203,23 +204,7 @@ export default function Users() {
           <option value="all">Todos os departamentos</option>
           {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
-        <div role="radiogroup" aria-label="Situação" className="inline-flex rounded-md border border-border bg-surface p-0.5">
-          {(['active', 'inactive'] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              role="radio"
-              aria-checked={status === s}
-              onClick={() => setStatus(s)}
-              className={cn(
-                'rounded px-3 py-1.5 text-sm transition-colors',
-                status === s ? 'bg-accent font-medium text-accent-foreground' : 'text-muted-foreground hover:bg-neutral-bg hover:text-foreground',
-              )}
-            >
-              {s === 'active' ? 'Ativos' : 'Desativados'}
-            </button>
-          ))}
-        </div>
+        <ChoiceGroup label="Situação" value={status} onChange={setStatus} options={[{ value: 'active', label: 'Ativos' }, { value: 'inactive', label: 'Desativados' }]} />
       </div>
 
       <div className="overflow-visible rounded-lg border border-border bg-surface">

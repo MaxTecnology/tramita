@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Trash2, FileText, DollarSign, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ObligationType } from '@/types'
+import { ChoiceGroup } from '@/components/ui/choice-group'
 
 // Building blocks shared by the template forms (recurring task, OS model, process model)
 
@@ -44,26 +45,7 @@ export function Segmented<T extends string | number>({ label, value, options, on
   onChange: (v: T) => void
   disabled?: boolean
 }) {
-  return (
-    <div role="radiogroup" aria-label={label} className={cn('inline-flex flex-wrap rounded-md border border-border bg-surface p-0.5', disabled && 'opacity-50')}>
-      {options.map((o) => (
-        <button
-          key={String(o.value)}
-          type="button"
-          role="radio"
-          aria-checked={value === o.value}
-          disabled={disabled}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            'rounded px-3 py-1.5 text-sm transition-colors',
-            value === o.value ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-neutral-bg',
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  )
+  return <ChoiceGroup label={label} value={value} options={options} onChange={onChange} disabled={disabled} />
 }
 
 export function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint: string }) {

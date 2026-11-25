@@ -24,12 +24,6 @@ Regra (Max aprovou as sugestões): a tarefa continua no departamento dela; quem 
 
 `Comment.isInternal`: a equipe marca "Interno (o cliente não vê)" em tarefa visível ao cliente; o cliente não vê, não remove, não é notificado, e a conversa interna não leva a tarefa ao "Enviar documentos".
 
-## Teste intermitente: `portal.protocols.routes.test.ts` › "each person who opens it is recorded once" (encontrado em 2026-11-16)
-
-Na suíte completa da API falhou uma vez com `expected 3 to be 2`: a segunda visualização da mesma pessoa gerou outro `VIEWED`. Isolado, passou 3/3, e passou em todas as outras rodadas completas do dia. O dedupe em `protocols.service.ts` (`findFirst` de `VIEWED` com `createdAt >= fileUpdatedAt ?? protocol.createdAt`) compara datas; todas vêm do lado da aplicação, então a hipótese de relógios diferentes (Node × Postgres) não se confirmou. Causa ainda desconhecida.
-
-**Próximo passo:** reproduzir em laço (`for i in $(seq 50)`) dentro da suíte completa; se confirmar, trocar o dedupe por índice único parcial (`protocolId, actorId, versão do arquivo`) com `createMany skipDuplicates`, que não depende de datas.
-
 ## Mocking de dependências externas em testes — padronizado em `vi.spyOn` ✅ (resolvido em 2026-09-20)
 
 **Contexto original:** `apps/api/src/test/setup.ts` cria uma única instância `buildApp()` no carregamento do módulo, antes que os `vi.mock(module, factory)` de cada arquivo de teste tenham chance de fazer hoist. Quando uma rota nova passa a importar de verdade um service que outro arquivo de teste mockava via `vi.mock(...)`, o app compartilhado já capturou o binding real, e o `vi.mock` do outro arquivo deixa de interceptar — causando chamadas reais (rede, fila) vazarem em testes que pareciam isolados.
@@ -595,7 +589,7 @@ Ações fora do código (ainda pendentes, por último na ordem combinada):
   ter ido para os logs antigos.
 - Conferir se o access log do Traefik está desligado (hoje só apareceria um ticket de SSE já consumido).
 
-## Visibilidade por departamento — menores da revisão final (2026-11-13), não corrigidos
+## Visibilidade por departamento — menores da revisão final (2026-11-13) ✅ todos resolvidos
 
 1. ✅ (resolvido em 2026-11-16 — `updateManyAndReturn` com responsável e status abertos no mesmo
    `UPDATE`; histórico, contagem e aviso saem das linhas alteradas) **Corrida no "assumir em lote":** `findMany` + `updateMany` em READ COMMITTED — se um "assumir" individual
@@ -637,7 +631,7 @@ Resolvido na branch `fix/debitos-notificacoes` (cada item com teste):
 
 Fora do escopo (não é débito, é decisão): aprovação em processo (OS) até o Max pedir; E2E sem upload da prévia (evita o bucket real do B2 — upload coberto em teste de componente e API).
 
-## Robô por documento (2026-11-15)
+## Robô por documento (2026-11-15) — notas de desempenho e decisões de produto
 
 1. **Entrega manual lê o PDF duas vezes:** o drawer chama `/check` e o `/upload` refaz a conferência
    (necessário — o upload não pode confiar no cliente). Custo: uma extração a mais por entrega com robô.
@@ -698,26 +692,18 @@ Achados da revisão destas correções — ✅ resolvidos em 2026-11-16:
 - SSE: a reconferência não se sobrepõe e vale para todos os streams (sino, solicitações, processo) e
   perfis: usuário ou usuário do portal desativado perde o stream em até 1 min (`streamRecheck`).
 
-## Documentação da API — pendências (2026-11-17)
+## Documentação da API — notas (2026-11-17, revisto em 2026-11-25)
 
-- **Respostas sem schema:** a referência mostra "Default Response" em todas as rotas. Documentar o
-  formato das respostas principais (login, tarefa, processo, portal) quando a API for aberta a terceiros
-  — exige schema de resposta sem ligar o serializer do Fastify (que descartaria campos não listados).
-- **`scripts/` fora do typecheck:** `tsconfig` inclui só `src/`; `scripts/api-docs/generate.ts` e
-  `scripts/route-audit/*` só são checados ao rodar. Incluir um `tsconfig.scripts.json` se crescerem.
-- **`docs/api/*` é gerado:** pode ficar defasado se alguém mudar rota e não rodar `docs:api`. O catálogo
-  (fonte) está protegido por teste; o arquivo gerado não. Considerar no CI: `audit:routes && docs:api`
-  + `git diff --exit-code docs/api`.
-- **Lista de rotas públicas manual** (`PUBLIC` em `plugins/openapi.ts`): uma rota pública nova
-  esquecida aparece como `bearerAuth` na referência (o "quem pode" do arquivo gerado continua certo,
-  vem do probe). Derivar do probe se começar a divergir.
-- **Uploads sem limite documentado:** a referência não mostra tamanho máximo nem tipos aceitos por
-  upload (padrão `DEFAULT_MAX_UPLOAD_BYTES`, 20 MB no robô, limite próprio no som de SLA).
-- **Rota com vários métodos** documentaria só o primeiro (`route.method[0]`) — nenhuma existe hoje; o
-  teste de contagem operações × catálogo pega se aparecer.
-- Imagem de produção carrega `@scalar/fastify-api-reference` sem usar (import dinâmico só fora de prod).
+Resolvido em 2026-11-25: CI confere `docs/api` contra as rotas, `tsconfig.scripts.json` checa os scripts,
+uploads dizem tamanho e tipos, Scalar virou dependência de desenvolvimento.
 
-## Vencimento por localidade — pendências (2026-11-17)
+- **Respostas sem schema:** a referência mostra "Default Response". Documentar as respostas principais
+  quando a API for aberta a terceiros (exige schema de resposta sem ligar o serializer do Fastify).
+- **Lista de rotas públicas manual** (`PUBLIC` em `plugins/openapi.ts`): rota pública nova esquecida
+  aparece como `bearerAuth` na referência (o "quem pode" gerado continua certo, vem do probe).
+- **Rota com vários métodos** documentaria só o primeiro — nenhuma existe hoje; o teste de contagem pega.
+
+## Vencimento por localidade — decisões e possíveis evoluções (2026-11-17)
 
 - **Exceção por cliente** (ex.: ISS de serviço prestado em outra cidade): fora do escopo; se aparecer,
   uma exceção no vínculo cliente × recorrência, por cima da regra de localidade.
@@ -732,25 +718,8 @@ Achados da revisão destas correções — ✅ resolvidos em 2026-11-16:
 - **Clientes antigos** sem estado/cidade não são migrados (decisão do Max): recorrência estadual/municipal
   falha para eles até a edição do cadastro.
 
-- **Troca de departamento da recorrência fora do lock** (pré-existente, 2026-11-18): `updateTemplate` confere clientes não atendidos pelo novo departamento antes de travar a linha; dois PATCH/`createAssignment` simultâneos podem passar. Mover para dentro do `FOR NO KEY UPDATE` se aparecer.
 
-## Tela de usuários — menores adiados (2026-11-18)
+## Usuários — nota (2026-11-18)
 
-- Reativar não revalida departamentos: se todos os departamentos da pessoa foram removidos, ela volta
-  sem departamento (a lista mostra o selo "Sem departamento"; editar exige escolher um).
-- `createUserSchema`/`updateUserSchema` sem `.max()` em nome, e-mail e telefone; e-mail não é
-  normalizado para minúsculas.
-- Filtro "Ativos/Desativados" usa botões com `role="radio"` sem navegação por setas (mesmo padrão do
-  `Segmented` das outras telas).
 - `resetUserPassword` aceita `organizationId` opcional (o painel master reseta sem org); manter só
   enquanto o master precisar.
-
-## Clientes, Solicitações, Guias e Dashboard — menores da revisão (encontrado em 2026-11-25)
-
-- **Limite de clientes do plano com corrida**: `checkPlanLimit` conta e a criação/reativação grava em passos separados; duas operações simultâneas com N-1 ativos passam as duas. Contar e gravar numa transação com trava na organização (vale para `POST /clients` e `POST /clients/:id/reactivate`).
-- **Etiquetas de situação (Solicitações e OS)** usam `role="radio"` sem setas nem `tabIndex` 0/-1 — ou completar o padrão ou trocar por botões com `aria-pressed`.
-- **Abas da Leitura de documentos** sem `tabpanel`/`aria-controls`/setas (mesmo padrão já feito na gaveta da tarefa).
-- **Filtro "Recebidas até"** compara com `T23:59:59` (perde o último segundo do dia); a competência é formatada com `formatDateOnlyUTC(...).slice(3)` em vários lugares — extrair `formatCompetence`.
-- **Guias não pagas**: a primeira opção de "Situação" se chama "Não pagas" (não "Todas"); o filtro de cliente só lista ativos, então guias antigas de cliente desativado não filtram por ele.
-- **Clientes**: `?edit=<id>` de cliente desativado não abre (a lista inicial só traz ativos) e o parâmetro some sem aviso.
-- **Alerta de falhas no Dashboard** é `role="alert"` inteiro: expandir "Mostrar mais" anuncia a lista como alerta — deixar o alerta só no título.

@@ -344,10 +344,21 @@ export default function ReviewQueue() {
           {(['fila', 'rejeitados'] as const).map((t) => (
             <button
               key={t}
+              id={`reader-tab-${t}`}
               type="button"
               role="tab"
               aria-selected={aba === t}
+              aria-controls="reader-tabpanel"
+              tabIndex={aba === t ? 0 : -1}
               onClick={() => setAba(t)}
+              onKeyDown={(e) => {
+                // Two tabs: any arrow switches, the focus follows
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
+                e.preventDefault()
+                const next = e.key === 'Home' ? 'fila' : e.key === 'End' ? 'rejeitados' : t === 'fila' ? 'rejeitados' : 'fila'
+                setAba(next)
+                document.getElementById(`reader-tab-${next}`)?.focus()
+              }}
               className={cn('px-3 py-2 text-sm font-medium border-b-2 -mb-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent', aba === t ? 'border-accent text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
             >
               {t === 'fila' ? `Para conferir (${fila.length})` : 'Rejeitados'}
@@ -355,6 +366,7 @@ export default function ReviewQueue() {
           ))}
         </div>
 
+        <div role="tabpanel" id="reader-tabpanel" aria-labelledby={`reader-tab-${aba}`} className="space-y-4">
         {aba === 'rejeitados' ? <AbaRejeitados /> : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -486,6 +498,7 @@ export default function ReviewQueue() {
             )}
           </>
         )}
+        </div>
       </div>
 
       {pdf && (

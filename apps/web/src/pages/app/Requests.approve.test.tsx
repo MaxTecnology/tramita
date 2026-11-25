@@ -93,3 +93,12 @@ it('counts in Portuguese and keeps the page while another situation loads', asyn
   expect(screen.getByRole('radio', { name: 'Aprovadas' })).toHaveAttribute('aria-checked', 'true')
   expect(screen.getByLabelText('Recebidas até')).toBeInTheDocument()
 })
+
+it('"Recebidas até" includes the whole last day, up to its last second', async () => {
+  const lastSecond = new Date(2026, 10, 15, 23, 59, 59, 500).toISOString()
+  renderPage({ title: 'Pedido da meia-noite', createdAt: lastSecond })
+  await screen.findByText('Pedido da meia-noite')
+  const until = screen.getByLabelText('Recebidas até')
+  await userEvent.type(until, '2026-11-15')
+  expect(screen.getByText('Pedido da meia-noite')).toBeInTheDocument()
+})

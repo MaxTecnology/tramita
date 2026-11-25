@@ -18,7 +18,8 @@ import { useLinkedItem } from '@/hooks/useLinkedItem'
 import { RequestAttachments } from '@/components/requests/RequestAttachments'
 import { PageHeader } from '@/components/ui/page-header'
 import { SearchField } from '@/components/ui/search-field'
-import { formatDateOnlyUTC } from '@/lib/dates'
+import { formatDateOnlyUTC, formatCompetence } from '@/lib/dates'
+import { ChoiceGroup } from '@/components/ui/choice-group'
 
 const STATUS_LABEL: Record<ClientRequest['status'], string> = {
   PENDING: 'Pendente',
@@ -86,7 +87,12 @@ export default function Requests() {
         if (!matchesTitle && !matchesClient) return false
       }
       if (dateFrom && new Date(r.createdAt) < new Date(dateFrom + 'T00:00:00')) return false
-      if (dateTo && new Date(r.createdAt) > new Date(dateTo + 'T23:59:59')) return false
+      // "até" includes the whole day: anything before the start of the next one
+      if (dateTo) {
+        const end = new Date(dateTo + 'T00:00:00')
+        end.setDate(end.getDate() + 1)
+        if (new Date(r.createdAt) >= end) return false
+      }
       return true
     })
   }, [requests, search, dateFrom, dateTo])
@@ -210,23 +216,13 @@ export default function Requests() {
         )}
       </div>
 
-      <div role="radiogroup" aria-label="Situação" className="flex flex-wrap gap-1.5">
-        {(['PENDING', 'NEEDS_INFO', 'APPROVED', 'REJECTED', 'CANCELLED', ''] as const).map((st) => (
-          <button
-            key={st || 'all'}
-            type="button"
-            role="radio"
-            aria-checked={statusFilter === st}
-            onClick={() => setStatusFilter(st)}
-            className={cn(
-              'rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-              statusFilter === st ? 'border-accent bg-accent text-accent-foreground' : 'border-border text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {FILTER_LABEL[st]}
-          </button>
-        ))}
-      </div>
+      <ChoiceGroup
+        label="Situação"
+        variant="chips"
+        value={statusFilter}
+        onChange={setStatusFilter}
+        options={(['PENDING', 'NEEDS_INFO', 'APPROVED', 'REJECTED', 'CANCELLED', ''] as const).map((st) => ({ value: st, label: FILTER_LABEL[st] }))}
+      />
 
       {requests.length > 0 && (
         <p className="text-xs text-muted-foreground">
@@ -260,7 +256,7 @@ export default function Requests() {
                         r.client?.name,
                         `Recebida em ${new Date(r.createdAt).toLocaleDateString("pt-BR")}`,
                         r.processTemplate?.name,
-                        r.competence ? `competência ${formatDateOnlyUTC(r.competence).slice(3)}` : null,
+                        r.competence ? `competência ${formatCompetence(r.competence)}` : null,
                       ].filter(Boolean).join(' · ')}
                     </p>
                     {r.description && <p className="text-xs text-muted-foreground mt-1">{r.description}</p>}

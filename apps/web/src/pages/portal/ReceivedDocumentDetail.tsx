@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { cn, mensagemDeErro } from '@/lib/utils'
 import { formatBRL } from '@/lib/money'
-import { formatDateOnlyUTC, isPastDateOnlyUTC } from '@/lib/dates'
+import { formatDateOnlyUTC, isPastDateOnlyUTC, formatCompetence } from '@/lib/dates'
 import { Button } from '@/components/ui/button'
 import { MarkPaidDialog } from '@/components/portal/MarkPaidDialog'
 import { documentState, STATE_UI, type ReceivedDocument } from './receivedDocuments'
@@ -91,7 +91,7 @@ export default function ReceivedDocumentDetail() {
 
         <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
           <div><dt className="text-xs text-muted-foreground">Vencimento</dt><dd className="text-foreground">{doc.dueDate ? formatDateOnlyUTC(doc.dueDate) : '—'}</dd></div>
-          <div><dt className="text-xs text-muted-foreground">Competência</dt><dd className="text-foreground">{doc.competence ? formatDateOnlyUTC(doc.competence).slice(3) : '—'}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Competência</dt><dd className="text-foreground">{doc.competence ? formatCompetence(doc.competence) : '—'}</dd></div>
           {doc.requiresPayment && (
             <div><dt className="text-xs text-muted-foreground">Valor</dt><dd className="font-semibold text-foreground">{doc.amount ? formatBRL(doc.amount) : '—'}</dd></div>
           )}
