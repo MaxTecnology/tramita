@@ -6,7 +6,7 @@ import { test, expect } from '../fixtures'
 // tabs are complete. The seed removes this client before each run.
 test('cadastra cliente completo pelas três abas', async ({ orgAdminPage: page }) => {
   await page.goto('/app/clients')
-  await page.getByRole('button', { name: '+ Novo cliente' }).click()
+  await page.getByRole('button', { name: 'Novo cliente' }).click()
   const save = page.getByRole('button', { name: 'Cadastrar' })
   await expect(save).toBeDisabled()
 

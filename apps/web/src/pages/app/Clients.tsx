@@ -5,6 +5,12 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn, mensagemDeErro } from '@/lib/utils'
+import { Plus, Users2 } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
+import { SearchField } from '@/components/ui/search-field'
+import { ListTable, ROW_OPENER, StatusTag } from '@/components/ui/list-table'
+import { ActionMenu } from '@/components/ui/action-menu'
+import { formatDocument, digitsOf } from '@/lib/documents'
 import type { Client } from '@/types'
 import { toast } from 'sonner'
 import { ClientForm } from './clients/ClientForm'
@@ -73,16 +79,17 @@ export default function Clients() {
         .then((r) => r.data),
   })
 
+  // Name, code, or CPF/CNPJ typed with or without punctuation
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
+    const qDigits = digitsOf(q)
     return clients.filter((c) => {
       const matchType = typeFilter === 'all' || c.clientType === typeFilter
       const matchSearch =
         !q ||
         c.name.toLowerCase().includes(q) ||
         (c.codigo ?? '').toLowerCase().includes(q) ||
-        (c.cnpj ?? '').toLowerCase().includes(q) ||
-        (c.cpf ?? '').toLowerCase().includes(q)
+        (qDigits.length >= 3 && (digitsOf(c.cnpj).includes(qDigits) || digitsOf(c.cpf).includes(qDigits)))
       return matchType && matchSearch
     })
   }, [clients, search, typeFilter])
@@ -109,6 +116,21 @@ export default function Clients() {
     },
     onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao salvar alterações')),
   })
+
+  const reactivateMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/clients/${id}/reactivate`),
+    onSuccess: () => {
+      toast.success('Cliente reativado')
+      queryClient.invalidateQueries({ queryKey: ['clients'] })
+    },
+    onError: (err) => toast.error(mensagemDeErro(err, 'Erro ao reativar cliente')),
+  })
+
+  async function deactivate(client: Client) {
+    if (!(await askConfirm({ title: `Desativar o cliente "${client.name}"?`, description: 'O cliente sai das listas e o portal dele é bloqueado. O histórico continua registrado, e dá para reativar depois.', confirmLabel: 'Desativar', danger: true }))) return
+    setDeletingId(client.id)
+    deleteMutation.mutate(client.id)
+  }
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/clients/${id}`),
@@ -149,139 +171,126 @@ export default function Clients() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editParam, clients])
 
-  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando...</div>
-
   return (
     <div className="p-4 md:p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-lg md:text-xl font-bold text-foreground">Clientes</h1>
-        <Button
-          onClick={() => { if (!showCreate) setCreateKey((k) => k + 1); setShowCreate(!showCreate) }}
-          className="bg-accent hover:bg-accent-hover text-accent-foreground"
-        >
-          {showCreate ? 'Cancelar' : '+ Novo cliente'}
-        </Button>
-      </div>
+      <PageHeader
+        title="Clientes"
+        description="As empresas e pessoas que o escritório atende, com os departamentos e quem acompanha pelo portal."
+        actions={
+          <Button onClick={() => { setCreateKey((k) => k + 1); setShowCreate(true) }} className="gap-1.5">
+            <Plus size={16} aria-hidden /> Novo cliente
+          </Button>
+        }
+      />
 
-      {/* Barra de filtros */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            aria-label="Buscar clientes"
-            type="text"
-            placeholder="Buscar por nome, e-mail, CPF/CNPJ..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-md bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-        </div>
-
-        <div className="flex rounded-md border border-border overflow-hidden">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SearchField label="Buscar clientes" placeholder="Nome, código, CPF ou CNPJ" value={search} onChange={setSearch} className="w-full sm:w-72" />
+        <div role="group" aria-label="Tipo de cliente" className="flex overflow-hidden rounded-md border border-border">
           {(['all', 'PJ', 'PF'] as const).map((t) => (
             <button
               key={t}
               type="button"
+              aria-pressed={typeFilter === t}
               onClick={() => setTypeFilter(t)}
               className={cn(
-                'px-3 py-2 text-sm font-medium transition-colors',
+                'h-9 px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent',
                 typeFilter === t ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
               )}
             >
-              {t === 'all' ? 'Todos' : t}
+              {t === 'all' ? 'Todos' : t === 'PJ' ? 'Empresas (PJ)' : 'Pessoas (PF)'}
             </button>
           ))}
         </div>
-
-        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={includeInactive}
-            onChange={(e) => setIncludeInactive(e.target.checked)}
-            className="h-4 w-4 rounded border-border text-accent"
-          />
-          Incluir desativados
+        <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-muted-foreground">
+          <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} className="h-4 w-4 rounded border-border accent-[var(--color-accent)]" />
+          Mostrar desativados
         </label>
       </div>
 
-      {/* Contador */}
       {clients.length > 0 && (
-        <p className="text-xs text-muted-foreground mb-3">
+        <p className="mb-3 text-xs text-muted-foreground">
           {filtered.length === clients.length
-            ? `${clients.length} cliente${clients.length !== 1 ? 's' : ''}`
-            : `Exibindo ${filtered.length} de ${clients.length}`}
+            ? `${clients.length} ${clients.length === 1 ? 'cliente' : 'clientes'}`
+            : `${filtered.length} de ${clients.length} clientes`}
         </p>
       )}
 
-      {showCreate && (
-        <div className="bg-surface rounded-lg border border-border p-4 mb-6 space-y-3">
-          <h2 className="text-sm font-semibold text-foreground">Novo cliente</h2>
-          <ClientForm
-            key={createKey}
-            initial={EMPTY_FORM}
-            submitLabel="Cadastrar"
-            isSaving={createMutation.isPending}
-            onSubmit={(state) => createMutation.mutate(state)}
-            onCancel={() => setShowCreate(false)}
-          />
-        </div>
-      )}
-
-      {/* Lista */}
-      <div className="space-y-2">
-        {filtered.length === 0 && (
-          <p className="text-center text-muted-foreground py-12">
-            {clients.length === 0 ? 'Nenhum cliente cadastrado.' : 'Nenhum cliente encontrado para este filtro.'}
-          </p>
-        )}
-        {filtered.map((client) => (
-          <div key={client.id} className={cn('bg-surface rounded-lg border border-border px-4 py-3 flex items-center justify-between gap-3', !client.isActive && 'opacity-60')}>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {client.codigo ? `${client.codigo} - ${client.name}` : client.name}
-                </p>
-                <span className="text-xs bg-neutral-bg text-muted-foreground px-1.5 py-0.5 rounded flex-shrink-0">
-                  {client.clientType ?? 'PJ'}
-                </span>
-                {!client.isActive && (
-                  <span className="text-xs bg-danger-bg text-danger-text px-1.5 py-0.5 rounded flex-shrink-0">
-                    Inativo
-                  </span>
-                )}
-              </div>
-              {(client.cnpj || client.cpf || client.whatsapp || client.phone) && (
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                  {[client.cnpj, client.cpf, client.whatsapp, client.phone].filter(Boolean).join(' · ')}
-                </p>
-              )}
-              {client.notes && (
-                <p className="text-xs text-warning-text truncate mt-0.5 italic">{client.notes}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <Button variant="ghost" size="sm" onClick={() => openEdit(client)} className="text-muted-foreground hover:text-foreground">
-                Editar
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={async () => {
-                  if (!(await askConfirm({ title: `Desativar o cliente "${client.name}"?`, description: 'O cliente sai das listas e o portal dele é bloqueado. O histórico continua registrado.', confirmLabel: 'Desativar', danger: true }))) return
-                  setDeletingId(client.id)
-                  deleteMutation.mutate(client.id)
-                }}
-                disabled={deleteMutation.isPending && deletingId === client.id}
-                className="text-danger-text hover:text-danger-hover hover:bg-danger-bg"
-              >
-                {deleteMutation.isPending && deletingId === client.id ? 'Desativando...' : 'Desativar'}
-              </Button>
-            </div>
+      <ListTable<Client>
+        label="Clientes"
+        loading={isLoading}
+        rows={filtered}
+        rowKey={(c) => c.id}
+        interactive
+        muted={(c) => !c.isActive}
+        actionsWidth="3rem"
+        empty={
+          <div className="flex flex-col items-center text-muted-foreground">
+            <Users2 size={40} aria-hidden className="mb-3 opacity-40" />
+            <p className="text-sm font-medium">{clients.length === 0 ? 'Nenhum cliente cadastrado' : 'Nenhum cliente com esses filtros'}</p>
+            {clients.length === 0 && <p className="mt-1 text-xs">Cadastre o primeiro pelo botão "Novo cliente".</p>}
           </div>
-        ))}
-      </div>
+        }
+        columns={[
+          {
+            header: 'Cliente', width: 'minmax(0,2fr)',
+            cell: (c) => (
+              <div className="min-w-0">
+                <p className="flex min-w-0 items-baseline gap-2">
+                  {c.codigo && <span className="flex-shrink-0 text-xs text-muted-foreground">{c.codigo}</span>}
+                  {c.isActive
+                    ? <button type="button" onClick={() => void openEdit(c)} className={cn(ROW_OPENER, 'truncate text-sm')}>{c.name}</button>
+                    : <span className="truncate text-sm font-medium text-foreground">{c.name}</span>}
+                </p>
+                {!c.isActive && <span className="mt-1 inline-block"><StatusTag>Desativado</StatusTag></span>}
+                {c.notes && <p className="mt-0.5 truncate text-xs text-muted-foreground" title={c.notes}>{c.notes}</p>}
+              </div>
+            ),
+          },
+          {
+            header: 'Documento', width: 'minmax(0,1.3fr)',
+            cell: (c) => (
+              <p className="flex items-baseline gap-2 text-sm text-foreground">
+                <span>{formatDocument(c.clientType === 'PF' ? c.cpf : c.cnpj) || '—'}</span>
+                <span className="rounded bg-neutral-bg px-1.5 py-0.5 text-[11px] text-muted-foreground">{c.clientType ?? 'PJ'}</span>
+              </p>
+            ),
+          },
+          {
+            header: 'Cidade', width: 'minmax(0,1.1fr)',
+            cell: (c) => <span className="text-sm text-foreground">{c.cidade && c.estado ? `${c.cidade}/${c.estado}` : '—'}</span>,
+          },
+          {
+            header: 'Contato', width: 'minmax(0,1fr)',
+            cell: (c) => <span className="text-sm text-foreground">{c.whatsapp || c.phone || '—'}</span>,
+          },
+        ]}
+        actions={(c) => (
+          <ActionMenu
+            label={`Mais ações de ${c.name}`}
+            items={c.isActive
+              ? [{ label: 'Desativar', onSelect: () => void deactivate(c), danger: true, disabled: deleteMutation.isPending && deletingId === c.id }]
+              : [{ label: 'Reativar', onSelect: () => reactivateMutation.mutate(c.id), disabled: reactivateMutation.isPending }]}
+          />
+        )}
+      />
+
+      <Dialog open={showCreate} onOpenChange={(open) => { if (!open) setShowCreate(false) }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Novo cliente</DialogTitle>
+          </DialogHeader>
+          {showCreate && (
+            <ClientForm
+              key={createKey}
+              initial={EMPTY_FORM}
+              submitLabel="Cadastrar"
+              isSaving={createMutation.isPending}
+              onSubmit={(state) => createMutation.mutate(state)}
+              onCancel={() => setShowCreate(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(open) => { if (!open) setEditing(null) }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
