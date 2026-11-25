@@ -7,6 +7,8 @@ export interface ListColumn<T> {
   // CSS grid track for the desktop table (e.g. 'minmax(0,2fr)')
   width: string
   cell: (row: T) => ReactNode
+  // Numbers (amounts) line up on the right, header included
+  align?: 'right'
 }
 
 // The settings list: a table on wide screens; on phones each row is a card where every column
@@ -31,7 +33,7 @@ export function ListTable<T>({ label, columns, rows, rowKey, actions, actionsWid
     <div className="rounded-lg border border-border bg-surface">
       {/* Visual header only: rows are list items and, on phones, label each value themselves */}
       <div aria-hidden="true" className="hidden md:grid gap-4 border-b border-border px-4 py-2.5 text-xs font-medium text-muted-foreground" style={{ gridTemplateColumns: template }}>
-        {columns.map((c) => <span key={c.header}>{c.header}</span>)}
+        {columns.map((c) => <span key={c.header} className={cn(c.align === 'right' && 'text-right')}>{c.header}</span>)}
         {actions && <span aria-hidden />}
       </div>
       {loading ? (
@@ -59,7 +61,7 @@ export function ListTable<T>({ label, columns, rows, rowKey, actions, actionsWid
               style={{ ['--cols' as string]: template }}
             >
               {columns.map((c, i) => (
-                <div key={c.header} className={cn('min-w-0', i > 0 && 'col-start-1 flex items-baseline gap-1.5 md:col-start-auto md:block')}>
+                <div key={c.header} className={cn('min-w-0', i > 0 && 'col-start-1 flex items-baseline gap-1.5 md:col-start-auto md:block', c.align === 'right' && 'md:text-right')}>
                   {/* On wide screens the visual header names the column; screen readers still get it here */}
                   {i > 0 && <span className="flex-shrink-0 text-xs text-muted-foreground md:sr-only">{c.header}:</span>}
                   {i > 0 ? <div className="min-w-0 flex-1">{c.cell(row)}</div> : c.cell(row)}

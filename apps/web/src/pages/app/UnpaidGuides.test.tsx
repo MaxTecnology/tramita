@@ -31,10 +31,18 @@ it('renders the overdue guide before the upcoming one with the amount in BRL', a
   renderPage()
   await waitFor(() => expect(screen.getByText('Guia DAS')).toBeInTheDocument())
 
-  const rows = screen.getAllByTestId('guide-row')
+  const rows = screen.getAllByTestId('guide-row').map((el) => el.closest('[data-list-row]') as HTMLElement)
   expect(within(rows[0]).getByText('Guia DAS')).toBeInTheDocument()
   expect(within(rows[0]).getByText('R$ 1.234,56')).toBeInTheDocument()
   expect(within(rows[0]).getByText('Vencida')).toBeInTheDocument()
   expect(within(rows[1]).getByText('Guia FGTS')).toBeInTheDocument()
   expect(within(rows[1]).getByText('R$ 100,00')).toBeInTheDocument()
+})
+
+it('standard header and named filters', async () => {
+  renderPage()
+  expect(await screen.findByRole('heading', { name: 'Guias não pagas' })).toBeInTheDocument()
+  expect(screen.getByLabelText('Filtrar por cliente')).toBeInTheDocument()
+  expect(screen.getByLabelText('Vencimento no mês')).toBeInTheDocument()
+  expect(screen.getByLabelText('Situação')).toBeInTheDocument()
 })

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Comments } from '@/components/shared/Comments'
 import { cn } from '@/lib/utils'
-import { Inbox, Search, X, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
+import { Inbox, X, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ClientRequest, Board } from '@/types'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
@@ -16,6 +16,9 @@ import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/Sc
 import { useMyScope } from '@/hooks/useMyScope'
 import { useLinkedItem } from '@/hooks/useLinkedItem'
 import { RequestAttachments } from '@/components/requests/RequestAttachments'
+import { PageHeader } from '@/components/ui/page-header'
+import { SearchField } from '@/components/ui/search-field'
+import { formatDateOnlyUTC } from '@/lib/dates'
 
 const STATUS_LABEL: Record<ClientRequest['status'], string> = {
   PENDING: 'Pendente',
@@ -23,6 +26,11 @@ const STATUS_LABEL: Record<ClientRequest['status'], string> = {
   REJECTED: 'Rejeitada',
   CANCELLED: 'Cancelada',
   NEEDS_INFO: 'Precisa de informação',
+}
+
+// Filter chips: the plural says what the list holds
+const FILTER_LABEL: Record<ClientRequest['status'] | '', string> = {
+  PENDING: 'Pendentes', NEEDS_INFO: 'Aguardando o cliente', APPROVED: 'Aprovadas', REJECTED: 'Rejeitadas', CANCELLED: 'Canceladas', '': 'Todas',
 }
 
 const STATUS_STYLE: Record<ClientRequest['status'], string> = {
@@ -170,75 +178,54 @@ export default function Requests() {
     },
   })
 
-  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando...</div>
+  if (isLoading) return <div className="p-8 text-muted-foreground">Carregando solicitações...</div>
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg md:text-xl font-bold text-foreground">Solicitações dos Clientes</h1>
-      </div>
-
-      {me && <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />}
-
-      <div className="flex rounded-md border border-border overflow-hidden w-fit flex-wrap">
-        {(['PENDING', 'NEEDS_INFO', 'APPROVED', 'REJECTED', 'CANCELLED', ''] as const).map((s) => (
-          <button
-            key={s || 'all'}
-            type="button"
-            onClick={() => setStatusFilter(s)}
-            className={cn(
-              'px-3 py-1.5 text-sm font-medium transition-colors',
-              statusFilter === s ? 'bg-accent text-accent-foreground' : 'bg-surface text-muted-foreground hover:bg-neutral-bg',
-            )}
-          >
-            {s ? STATUS_LABEL[s] : 'Todas'}
-          </button>
-        ))}
-      </div>
+      <PageHeader
+        title="Solicitações"
+        description="O que os clientes pedem pelo portal. Aprovar abre o processo ou a OS; pedir mais informação devolve a pergunta ao cliente."
+      />
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por cliente ou título..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 border-border focus:ring-accent"
-          />
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <Label htmlFor="req-date-from" className="text-xs text-muted-foreground whitespace-nowrap">De</Label>
-          <Input
-            id="req-date-from"
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="w-36 border-border"
-          />
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <Label htmlFor="req-date-to" className="text-xs text-muted-foreground whitespace-nowrap">Até</Label>
-          <Input
-            id="req-date-to"
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="w-36 border-border"
-          />
-        </div>
-
+        {me && <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />}
+        <SearchField label="Buscar solicitações" placeholder="Cliente ou título" value={search} onChange={setSearch} className="w-full sm:w-64" />
+        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          Recebidas de
+          <input id="req-date-from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" />
+        </label>
+        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          até
+          <input id="req-date-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" />
+        </label>
         {hasActiveFilter && (
           <button
             type="button"
             onClick={() => { setSearch(''); setDateFrom(''); setDateTo('') }}
-            className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+            className="flex h-9 items-center gap-1 px-2 text-sm text-muted-foreground hover:text-foreground"
           >
-            <X size={13} />
-            Limpar
+            <X size={14} aria-hidden />
+            Limpar filtros
           </button>
         )}
+      </div>
+
+      <div role="radiogroup" aria-label="Situação" className="flex flex-wrap gap-1.5">
+        {(['PENDING', 'NEEDS_INFO', 'APPROVED', 'REJECTED', 'CANCELLED', ''] as const).map((st) => (
+          <button
+            key={st || 'all'}
+            type="button"
+            role="radio"
+            aria-checked={statusFilter === st}
+            onClick={() => setStatusFilter(st)}
+            className={cn(
+              'rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+              statusFilter === st ? 'border-accent bg-accent text-accent-foreground' : 'border-border text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {FILTER_LABEL[st]}
+          </button>
+        ))}
       </div>
 
       {requests.length > 0 && (
@@ -265,7 +252,14 @@ export default function Requests() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground">{r.title}</p>
-                    <p className="text-xs text-muted-foreground">{r.client?.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {[
+                        r.client?.name,
+                        `Recebida em ${new Date(r.createdAt).toLocaleDateString("pt-BR")}`,
+                        r.processTemplate?.name,
+                        r.competence ? `competência ${formatDateOnlyUTC(r.competence).slice(3)}` : null,
+                      ].filter(Boolean).join(' · ')}
+                    </p>
                     {r.description && <p className="text-xs text-muted-foreground mt-1">{r.description}</p>}
                     {r.status === 'CANCELLED' && r.cancelledByType === 'USER' && r.cancellationReason && (
                       <p className="text-xs text-muted-foreground mt-1 italic">Cancelada pelo escritório — motivo: {r.cancellationReason}</p>
@@ -303,7 +297,7 @@ export default function Requests() {
                   )}
                   {r.status === 'APPROVED' && (
                     <Button size="sm" variant="outline" onClick={() => setCancelling(r)} className="text-danger-text border-danger-text/30 hover:bg-danger-bg">
-                      Cancelar
+                      Cancelar solicitação
                     </Button>
                   )}
                   {/* CANCELLED pode ter boardId (foi aprovada antes de cancelar) — a tarefa virou
@@ -313,7 +307,7 @@ export default function Requests() {
                       to={`/app/board/${r.boardId}`}
                       className="text-xs text-accent hover:underline inline-flex items-center gap-1"
                     >
-                      <ExternalLink size={12} />
+                      <ExternalLink size={12} aria-hidden />
                       Abrir processo
                     </Link>
                   )}

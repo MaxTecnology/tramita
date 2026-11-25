@@ -8,6 +8,8 @@ import { formatBRL } from '@/lib/money'
 import { formatDateOnlyUTC } from '@/lib/dates'
 import { ScopeFilter, useScopeFilter, scopeParams } from '@/components/shared/ScopeFilter'
 import { useMyScope } from '@/hooks/useMyScope'
+import { PageHeader } from '@/components/ui/page-header'
+import { ListTable, ROW_OPENER } from '@/components/ui/list-table'
 
 export interface UnpaidGuide {
   id: string
@@ -29,7 +31,7 @@ export interface UnpaidGuide {
 
 type Situation = '' | 'overdue' | 'upcoming' | 'paid'
 
-const selectCls = 'h-8 rounded-md border border-border bg-surface px-2 text-sm text-foreground'
+const selectCls = 'h-9 rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
 
 // Office view of payment guides sent to clients: who still hasn't paid (overdue first, amount
 // prominent) so the team can call the client before interest grows. No notification — just visibility.
@@ -64,87 +66,91 @@ export default function UnpaidGuides() {
   })
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">Guias não pagas</h1>
-        <p className="text-sm text-muted-foreground">Guias enviadas aos clientes que eles ainda não marcaram como pagas.</p>
-      </div>
+    <div className="p-4 md:p-6">
+      <PageHeader
+        title="Guias não pagas"
+        description="Guias enviadas aos clientes que eles ainda não marcaram como pagas. As vencidas vêm primeiro."
+      />
 
-      {me && <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />}
-
-      <div className="flex flex-wrap gap-2">
-        <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={selectCls} aria-label="Cliente">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {me && <ScopeFilter me={me} value={scopeFilter} onChange={setScopeFilter} />}
+        <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={selectCls} aria-label="Filtrar por cliente">
           <option value="">Todos os clientes</option>
           {clients.map((c) => <option key={c.id} value={c.id}>{c.codigo ? `${c.codigo} - ${c.name}` : c.name}</option>)}
         </select>
-        <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className={selectCls} aria-label="Departamento">
+        <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className={selectCls} aria-label="Filtrar por departamento">
           <option value="">Todos os departamentos</option>
           {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Vencimento em
-          <input type="month" value={dueMonth} onChange={(e) => setDueMonth(e.target.value)} className={selectCls} aria-label="Vencimento em" />
-          {dueMonth && <button type="button" onClick={() => setDueMonth('')} className="text-accent-hover hover:underline">limpar</button>}
-        </label>
         <select value={situation} onChange={(e) => setSituation(e.target.value as Situation)} className={selectCls} aria-label="Situação">
           <option value="">Não pagas</option>
           <option value="overdue">Vencidas</option>
           <option value="upcoming">A vencer</option>
           <option value="paid">Pagas</option>
         </select>
+        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          Vencimento no mês
+          <input type="month" value={dueMonth} onChange={(e) => setDueMonth(e.target.value)} className={selectCls} aria-label="Vencimento no mês" />
+        </label>
+        {dueMonth && <button type="button" onClick={() => setDueMonth('')} className="h-9 px-2 text-sm text-muted-foreground hover:text-foreground">Limpar mês</button>}
       </div>
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Carregando...</p>
-      ) : guides.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
-          <Receipt size={28} />
-          <p className="text-sm">{situation === 'paid' ? 'Nenhuma guia paga com esses filtros.' : 'Nenhuma guia pendente de pagamento.'}</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {guides.map((g) => (
-            <Link
-              key={g.id}
-              to={g.link ?? `/app/board/${g.boardId}`}
-              data-testid="guide-row"
-              className={cn(
-                'flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 rounded-lg border bg-surface p-3 hover:bg-neutral-bg',
-                g.overdue ? 'border-danger-text/40' : 'border-border',
-              )}
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{g.title}</p>
-                <p className="text-xs text-muted-foreground truncate">
+      <ListTable<UnpaidGuide>
+        label="Guias"
+        loading={isLoading}
+        rows={guides}
+        rowKey={(g) => g.id}
+        interactive
+        empty={
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <Receipt size={28} aria-hidden />
+            <p className="text-sm">{situation === 'paid' ? 'Nenhuma guia paga com esses filtros.' : 'Nenhuma guia pendente de pagamento.'}</p>
+          </div>
+        }
+        columns={[
+          {
+            header: 'Guia', width: 'minmax(0,2fr)',
+            cell: (g) => (
+              <div className="min-w-0">
+                <Link to={g.link ?? `/app/board/${g.boardId}`} data-testid="guide-row" className={cn(ROW_OPENER, 'block truncate text-sm')}>{g.title}</Link>
+                <p className="truncate text-xs text-muted-foreground">
                   {g.clientName} · {g.departmentName}
                   {g.competence && ` · competência ${formatDateOnlyUTC(g.competence).slice(3)}`}
                 </p>
               </div>
-              <div className="flex items-center gap-3 sm:justify-end">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                  {g.dueDate ? `Vence ${formatDateOnlyUTC(g.dueDate)}` : 'Sem vencimento'}
-                </span>
-                {g.overdue && (
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-danger-bg text-danger-text">Vencida</span>
+            ),
+          },
+          {
+            header: 'Vencimento', width: '9rem',
+            cell: (g) => (
+              <span className={cn('text-sm', g.overdue ? 'font-medium text-danger-text' : 'text-foreground')}>
+                {g.dueDate ? formatDateOnlyUTC(g.dueDate) : 'Sem vencimento'}
+              </span>
+            ),
+          },
+          {
+            header: 'Situação', width: '11rem',
+            cell: (g) => (
+              <div className="flex flex-col items-start gap-0.5">
+                {g.paidAt ? (
+                  <span className="rounded-full bg-success-bg px-2 py-0.5 text-xs font-medium text-success-text">Pago{g.paidByName ? ` por ${g.paidByName}` : ''}</span>
+                ) : g.overdue ? (
+                  <span className="rounded-full bg-danger-bg px-2 py-0.5 text-xs font-medium text-danger-text">Vencida</span>
+                ) : (
+                  <span className="rounded-full bg-neutral-bg px-2 py-0.5 text-xs font-medium text-muted-foreground">A vencer</span>
                 )}
-                {g.paidAt && (
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-success-bg text-success-text">
-                    Pago{g.paidByName ? ` por ${g.paidByName}` : ''}
-                  </span>
+                {g.paidAt && g.paidAmount && g.amount && g.paidAmount !== g.amount && (
+                  <span className="text-xs text-warning-text">Cliente informou {formatBRL(g.paidAmount)}</span>
                 )}
-                <span className={cn('text-base font-semibold whitespace-nowrap', g.overdue ? 'text-danger-text' : 'text-foreground')}>
-                  {g.amount ? formatBRL(g.amount) : '—'}
-                </span>
               </div>
-              {g.paidAt && g.paidAmount && g.amount && g.paidAmount !== g.amount && (
-                <p className="text-xs text-warning-text sm:basis-full">
-                  Valor informado pelo cliente: {formatBRL(g.paidAmount)}
-                </p>
-              )}
-            </Link>
-          ))}
-        </div>
-      )}
+            ),
+          },
+          {
+            header: 'Valor', width: '8rem', align: 'right',
+            cell: (g) => <span className={cn('text-sm font-semibold tabular-nums', g.overdue ? 'text-danger-text' : 'text-foreground')}>{g.amount ? formatBRL(g.amount) : '—'}</span>,
+          },
+        ]}
+      />
     </div>
   )
 }

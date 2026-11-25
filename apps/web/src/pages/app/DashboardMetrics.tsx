@@ -110,7 +110,7 @@ function OverviewContent({ data }: { data: Metrics }) {
           </div>
 
           {atRisk.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">Nenhum processo em risco 🎉</p>
+            <p className="text-sm text-muted-foreground text-center py-6">Nenhum processo em risco.</p>
           ) : (
             <div className="space-y-2 overflow-y-auto max-h-72">
               {atRisk.map((item) => {
@@ -505,7 +505,10 @@ export default function DashboardMetrics() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <h1 className="text-lg md:text-xl font-bold text-foreground">Dashboard</h1>
+      <div>
+        <h1 className="text-lg md:text-xl font-bold text-foreground">Dashboard</h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">Como está o trabalho do escritório: processos, prazos e o que a equipe entregou.</p>
+      </div>
 
       <FailedGenerationsAlert />
 

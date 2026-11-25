@@ -70,3 +70,11 @@ it('the office sees and downloads the files the client attached', async () => {
   expect(await screen.findByRole('link', { name: /contrato-social\.pdf/ })).toHaveAttribute('href', 'https://signed.example/cs')
   expect(screen.queryByText('Anexar arquivo')).not.toBeInTheDocument()
 })
+
+it('standard header; each request says when it arrived', async () => {
+  renderPage({})
+  expect(await screen.findByRole('heading', { name: 'Solicitações' })).toBeInTheDocument()
+  expect(screen.getByRole('radio', { name: 'Pendentes' })).toHaveAttribute('aria-checked', 'true')
+  expect(await screen.findByText(/Recebida em 15\/11\/2026/)).toBeInTheDocument()
+  expect(screen.getByLabelText('Buscar solicitações')).toBeInTheDocument()
+})

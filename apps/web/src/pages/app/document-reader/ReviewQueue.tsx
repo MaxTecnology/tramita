@@ -321,8 +321,8 @@ export default function ReviewQueue() {
       <div className="flex-1 min-w-0 p-4 md:p-6 space-y-4 overflow-y-auto">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Leitura de documentos</h1>
-            <p className="text-xs text-muted-foreground">O robô lê e confere; você confirma antes de chegar ao cliente.</p>
+            <h1 className="text-lg font-bold text-foreground md:text-xl">Leitura de documentos</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">O robô lê e confere cada PDF; você confirma antes de chegar ao cliente.</p>
           </div>
           {canUpload && (
             <Button onClick={() => fileInputRef.current?.click()} disabled={uploadMutation.isPending}>Enviar PDF</Button>
@@ -340,14 +340,15 @@ export default function ReviewQueue() {
           />
         </div>
 
-        <div role="tablist" className="flex gap-2 border-b border-border">
+        <div role="tablist" aria-label="Documentos" className="flex gap-2 border-b border-border">
           {(['fila', 'rejeitados'] as const).map((t) => (
             <button
               key={t}
+              type="button"
               role="tab"
               aria-selected={aba === t}
               onClick={() => setAba(t)}
-              className={cn('px-3 py-2 text-sm font-medium border-b-2 -mb-px', aba === t ? 'border-accent text-foreground' : 'border-transparent text-muted-foreground')}
+              className={cn('px-3 py-2 text-sm font-medium border-b-2 -mb-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent', aba === t ? 'border-accent text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
             >
               {t === 'fila' ? `Para conferir (${fila.length})` : 'Recusados'}
             </button>
@@ -389,7 +390,7 @@ export default function ReviewQueue() {
             )}
 
             {fila.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhum documento para conferir.</p>
+              <p className="py-8 text-center text-sm text-muted-foreground">Nenhum documento para conferir. Os PDFs enviados aqui ou entregues nas tarefas aparecem nesta fila depois que o robô lê.</p>
             ) : (
               <div className="space-y-2">
                 {fila.map((doc) => {
