@@ -107,3 +107,13 @@ it('a deactivated client can be edited (to fix its responsible) and then reactiv
   expect((await reactivate(s.auth, created.id)).statusCode).toBe(200)
   expect((await prisma.client.findUniqueOrThrow({ where: { id: created.id } })).name).toBe('Fulano Editado')
 })
+
+it('two reactivations at the same time never go past the plan limit', async () => {
+  const s = await setup(2)
+  await createTestClient(s.org.id)
+  const a = await createTestClient(s.org.id, { isActive: false })
+  const b = await createTestClient(s.org.id, { isActive: false })
+  const codes = (await Promise.all([reactivate(s.auth, a.id), reactivate(s.auth, b.id)])).map((r) => r.statusCode).sort()
+  expect(codes).toEqual([200, 422])
+  expect(await prisma.client.count({ where: { organizationId: s.org.id, isActive: true } })).toBe(2)
+})

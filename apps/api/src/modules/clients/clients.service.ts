@@ -10,7 +10,7 @@ import { findMunicipality, findMunicipalityByName } from '@/modules/municipaliti
 import { hashPassword } from '@/modules/auth/auth.service'
 import { normalizarTelefoneBr } from '@/lib/phone'
 import type { ClientBody } from './clients.schema'
-import { assertCanUnserveDepartments, assertPayloadCoverage, lockClients, lockUsersForShare } from './client-coverage'
+import { assertCanUnserveDepartments, assertClientSlot, assertPayloadCoverage, lockClients, lockUsersForShare } from './client-coverage'
 
 const SELECT = {
   id: true, name: true, codigo: true, clientType: true, cnpj: true, cpf: true,
@@ -194,6 +194,7 @@ export async function createClient(organizationId: string, data: ClientBody) {
   const cidade = await resolveClientCity(data.estado, data.ibgeCityCode)
   try {
     return await prisma.$transaction(async (tx) => {
+      await assertClientSlot(tx, organizationId)
       const departmentNames = await resolveDepartmentNames(tx, organizationId, data)
       await assertResponsiblesValid(tx, organizationId, data.departments, departmentNames)
       assertPayloadCoverage(
@@ -268,6 +269,10 @@ export async function deleteClient(id: string, organizationId: string) {
 export async function reactivateClient(id: string, organizationId: string) {
   try {
     return await prisma.$transaction(async (tx) => {
+      // Office first, then the client: the same order as creation, so they never wait on each other
+      const exists = await tx.client.findFirst({ where: { id, organizationId, isActive: false }, select: { id: true } })
+      if (!exists) throw new AppError(404, 'Cliente não encontrado')
+      await assertClientSlot(tx, organizationId)
       await lockClients(tx, [id]) // serializes with other changes of this client
       const client = await tx.client.findFirst({ where: { id, organizationId, isActive: false } })
       if (!client) throw new AppError(404, 'Cliente não encontrado')

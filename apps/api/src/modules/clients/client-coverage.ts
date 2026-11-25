@@ -21,6 +21,20 @@ export async function lockClients(tx: Prisma.TransactionClient, clientIds: strin
   await tx.$queryRaw`SELECT id FROM clients WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`
 }
 
+// One active client more must fit the plan. The office row is locked (NO KEY UPDATE: inserts that only
+// reference it go on) so two creations/reactivations at the same time count one after the other;
+// the route's checkPlanLimit stays as the cheap early answer.
+export async function assertClientSlot(tx: Prisma.TransactionClient, organizationId: string): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM organizations WHERE id = ${organizationId} FOR NO KEY UPDATE`
+  const org = await tx.organization.findUniqueOrThrow({
+    where: { id: organizationId },
+    select: { plan: { select: { maxClients: true } }, _count: { select: { clients: { where: { isActive: true } } } } },
+  })
+  if (org._count.clients >= org.plan.maxClients) {
+    throw new AppError(422, `Limite de clientes atingido (máximo: ${org.plan.maxClients})`)
+  }
+}
+
 // Shared lock on staff about to become responsible (client form, transfer). deleteUser takes the
 // exclusive lock on the same row, so deactivating someone and making them responsible serialize.
 export async function lockUsersForShare(tx: Prisma.TransactionClient, userIds: string[]): Promise<void> {
